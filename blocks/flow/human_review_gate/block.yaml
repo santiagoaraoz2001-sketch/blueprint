@@ -1,0 +1,77 @@
+name: Human Review Gate
+type: human_review_gate
+category: interventions
+description: Pause pipeline for human review — blocks execution until a reviewer approves or rejects via an approval file
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Data to Review
+    data_type: any
+    required: true
+
+outputs:
+  - id: approved
+    label: Approved
+    data_type: any
+    description: "Input data forwarded when reviewer approves (None when rejected)"
+  - id: rejected
+    label: Rejected
+    data_type: any
+    description: "Input data routed here when reviewer rejects (None when approved)"
+  - id: review_notes
+    label: Review Notes
+    data_type: metrics
+    description: "JSON: {review_id, approved, reviewer_comment, urgency, created_at, decided_at, data_summary}"
+
+config:
+  review_prompt:
+    type: text_area
+    label: Review Prompt
+    default: "Review the data and approve to continue"
+    description: "Instructions shown to the reviewer"
+  auto_approve_after_s:
+    type: integer
+    label: Auto-Approve After (sec)
+    default: 0
+    min: 0
+    description: "Auto-approve after this many seconds. 0 = wait indefinitely."
+  require_comment:
+    type: boolean
+    label: Require Comment
+    default: false
+    description: "Reject approval if no comment is provided"
+  poll_interval_s:
+    type: integer
+    label: Poll Interval (sec)
+    default: 5
+    min: 1
+    max: 60
+    description: "How often to check for the approval file"
+  reviewer_name:
+    type: string
+    label: Assigned Reviewer
+    default: ""
+    description: "Name of the person who should review (informational, shown in review request)"
+  urgency:
+    type: select
+    label: Urgency
+    default: "normal"
+    options: ["low", "normal", "high", "critical"]
+    description: "Priority level for the review request"
+  auto_action:
+    type: select
+    label: Timeout Action
+    default: "approve"
+    options: ["approve", "reject"]
+    description: "What to do when the timeout fires — approve or reject the data"
+  display_fields:
+    type: string
+    label: Display Fields
+    default: ""
+    description: "Comma-separated field names to show the reviewer (empty = all fields)"
+  include_data_in_notes:
+    type: boolean
+    label: Include Data Summary in Notes
+    default: true
+    description: "Include a data preview in the review_notes output (disable to reduce output size)"

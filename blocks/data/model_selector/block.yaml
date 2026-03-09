@@ -1,0 +1,49 @@
+name: Model Selector
+type: model_selector
+category: data
+description: Select a base model from HuggingFace, Ollama, MLX, or local path
+version: "1.0.0"
+
+inputs: []
+
+outputs:
+  - id: model
+    label: Model
+    data_type: model
+
+config:
+  source:
+    type: select
+    label: Model Source
+    options: [huggingface, ollama, mlx, local_path]
+    default: "huggingface"
+  model_id:
+    type: string
+    label: Model ID
+    description: "e.g. 'meta-llama/Llama-3-8B' or 'mistral:7b'"
+    default: ""
+  revision:
+    type: string
+    label: Revision
+    description: Git revision / branch
+    default: "main"
+  local_path:
+    type: file_path
+    label: Local Path
+    description: Path to local model directory or file
+    default: ""
+  quantization:
+    type: select
+    label: Quantization
+    options: [none, 4bit, 8bit]
+    default: "none"
+  auto_download:
+    type: boolean
+    label: Auto Download
+    description: Automatically download model if not cached
+    default: false
+  verify_checksum:
+    type: boolean
+    label: Verify Checksum
+    description: Verify file integrity for local models
+    default: true

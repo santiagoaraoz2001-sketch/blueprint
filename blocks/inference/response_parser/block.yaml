@@ -1,0 +1,55 @@
+name: Response Parser
+type: response_parser
+category: inference
+description: Parse and extract structured data from LLM responses
+version: "1.0.0"
+
+inputs:
+  - id: text
+    label: Raw Response
+    data_type: text
+    required: true
+
+outputs:
+  - id: text
+    label: Parsed Text
+    data_type: text
+  - id: data
+    label: Extracted Fields
+    data_type: config
+  - id: dataset
+    label: Extracted Records
+    data_type: dataset
+
+config:
+  format:
+    type: select
+    label: Parse Format
+    options: [json, regex, key_value, markdown, csv, xml]
+    default: json
+    description: "Expected format of the LLM response"
+  extraction_pattern:
+    type: string
+    label: Regex Pattern
+    default: ""
+    description: "Regular expression for regex mode"
+  strict:
+    type: boolean
+    label: Strict Mode
+    default: false
+    description: "Fail if parsing fails instead of passing through"
+  field_names:
+    type: string
+    label: Field Names (CSV mode)
+    default: ""
+    description: "Comma-separated field names for CSV parsing"
+  kv_separator:
+    type: string
+    label: Key-Value Separator
+    default: ":"
+    description: "Separator between key and value in key_value mode (e.g. ':', '=', ' - ')"
+  csv_delimiter:
+    type: string
+    label: CSV Delimiter
+    default: ","
+    description: "Column delimiter for CSV mode (e.g. ',', '\\t', '|')"

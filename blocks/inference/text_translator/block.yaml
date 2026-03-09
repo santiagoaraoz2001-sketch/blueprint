@@ -1,0 +1,100 @@
+name: Text Translator
+type: text_translator
+category: inference
+description: Translate text between languages using LLM or transformers models
+version: "2.0.0"
+
+inputs:
+  - id: model
+    label: Translation Model
+    data_type: model
+    required: false
+  - id: text
+    label: Source Text
+    data_type: text
+    required: true
+
+outputs:
+  - id: text
+    label: Translated
+    data_type: text
+    description: >
+      Plain text file (translated.txt) containing the translated text when output_format=text.
+      When output_format=json, a JSON file (translated.json) with schema:
+      {"response": str (the translation), "model": str, "provider": str, "timestamp": str (ISO 8601), "usage": {"tokens_used": int} (optional)}
+  - id: metrics
+    label: Translation Stats
+    data_type: metrics
+    description: >
+      Dictionary with fields: input_length (int, chars), output_length (int, chars),
+      source_lang (str), target_lang (str), method (str — llm|transformers|transformers_fallback),
+      elapsed_s (float, seconds), length_ratio (float), tokens_used (int, optional)
+
+config:
+  method:
+    type: select
+    label: Method
+    options: [llm, transformers]
+    default: llm
+    description: "llm uses cloud/local LLM, transformers uses Helsinki-NLP MarianMT"
+  provider:
+    type: select
+    label: Provider
+    options: [ollama, mlx, openai, anthropic]
+    default: ollama
+    description: "LLM provider (used when method=llm)"
+  model_name:
+    type: string
+    label: Model Name
+    default: "llama3.2"
+    description: "Model for LLM translation or HF model path"
+  endpoint:
+    type: string
+    label: Endpoint URL
+    default: "http://localhost:11434"
+  api_key:
+    type: string
+    label: API Key
+    default: ""
+    description: "API key for OpenAI/Anthropic"
+  source_lang:
+    type: select
+    label: Source Language
+    description: Source language (auto-detect or specify)
+    default: auto
+    options: [auto, en, es, fr, de, zh, ja, ko, pt, ar, hi]
+  target_lang:
+    type: select
+    label: Target Language
+    description: Target language
+    default: en
+    options: [en, es, fr, de, zh, ja, ko, pt, ar, hi]
+  formality:
+    type: select
+    label: Formality
+    options: [default, formal, informal]
+    default: default
+    description: "Tone control: formal for legal/business, informal for casual/marketing (LLM method only)"
+  preserve_formatting:
+    type: boolean
+    label: Preserve Formatting
+    default: true
+    description: "Keep markdown, HTML tags, and line breaks intact during translation"
+  glossary:
+    type: text_area
+    label: Glossary
+    default: ""
+    description: "Term mappings for consistent translation (e.g. 'API=API, cloud computing=computacion en la nube')"
+  max_input_chars:
+    type: integer
+    label: Max Input Characters
+    default: 12000
+    min: 500
+    max: 100000
+    description: "Truncate input text beyond this length before sending to LLM"
+  output_format:
+    type: select
+    label: Output Format
+    description: "Format for the response output — text returns raw LLM response, json wraps it with metadata (model, provider, tokens, timestamp)"
+    default: text
+    options: [text, json]

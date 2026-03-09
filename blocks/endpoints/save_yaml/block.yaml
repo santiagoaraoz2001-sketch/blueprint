@@ -1,0 +1,58 @@
+name: Save YAML
+type: save_yaml
+category: endpoints
+description: Save configuration or data as YAML file.
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Data
+    data_type: any
+    required: true
+
+outputs:
+  - id: file_path
+    label: File Path
+    data_type: text
+    description: "Absolute path to the saved YAML file"
+  - id: summary
+    label: Export Summary
+    data_type: metrics
+    description: "Object with keys: file_size_bytes (int)"
+
+config:
+  output_path:
+    type: string
+    label: Output Path
+    default: ./output
+  filename:
+    type: string
+    label: Filename
+    default: config.yaml
+  default_flow_style:
+    type: boolean
+    label: Compact Style
+    default: false
+    description: Use flow (inline) style for short sequences/mappings
+  sort_keys:
+    type: boolean
+    label: Sort Keys
+    default: false
+  overwrite_existing:
+    type: boolean
+    label: Overwrite Existing
+    default: true
+  allow_unicode:
+    type: boolean
+    label: Allow Unicode
+    default: true
+  timestamp_filename:
+    type: boolean
+    label: Timestamp Filename
+    default: false
+    description: Append timestamp to filename for versioning
+  header_comment:
+    type: text_area
+    label: Header Comment
+    default: ""
+    description: Comment block prepended to YAML file (each line gets # prefix)

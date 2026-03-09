@@ -1,0 +1,555 @@
+import { useEffect, useRef, useState } from 'react'
+import { T, F, FS } from '@/lib/design-tokens'
+import { useRunStore } from '@/stores/runStore'
+import { usePipelineStore } from '@/stores/pipelineStore'
+import { validatePipelineClient } from '@/lib/pipeline-validator'
+import { useSSE } from '@/hooks/useSSE'
+import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Check, AlertTriangle, Gauge, FileDown } from 'lucide-react'
+import toast from 'react-hot-toast'
+import PipelineAnalysisPanel from './PipelineAnalysisPanel'
+import { getBlockDefinition } from '@/lib/block-registry'
+import { generateRequirements } from '@/lib/block-dependencies'
+import Editor from '@monaco-editor/react'
+
+export default function RunControls() {
+  const { id: pipelineId, nodes, saveAsTemplate } = usePipelineStore()
+  const { status, activeRunId, overallProgress, startRun, stopRun, handleSSEEvent, reset } =
+    useRunStore()
+  const elapsedRef = useRef(0)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [templateDesc, setTemplateDesc] = useState('')
+  const [templateCat, setTemplateCat] = useState('inference')
+
+  const [showCodeModal, setShowCodeModal] = useState(false)
+  const [generatedCode, setGeneratedCode] = useState('')
+  const [codeCopied, setCodeCopied] = useState(false)
+  const [showAnalysis, setShowAnalysis] = useState(false)
+
+  const isRunning = status === 'running'
+
+  // SSE subscription for live events
+  const sseUrl = activeRunId ? `/api/events/runs/${activeRunId}` : null
+  useSSE(sseUrl, {
+    onEvent: handleSSEEvent,
+    enabled: isRunning,
+  })
+
+  // Elapsed timer
+  useEffect(() => {
+    if (isRunning) {
+      elapsedRef.current = 0
+      timerRef.current = setInterval(() => {
+        elapsedRef.current += 1
+        useRunStore.setState({ elapsed: elapsedRef.current })
+      }, 1000)
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [isRunning])
+
+  // Reset node statuses when run completes
+  useEffect(() => {
+    if (status === 'complete') {
+      toast.success('Pipeline run completed')
+    } else if (status === 'failed') {
+      const error = useRunStore.getState().error
+      toast.error(error || 'Pipeline run failed')
+    }
+  }, [status])
+
+  const handleRun = async () => {
+    if (!pipelineId) {
+      toast.error('Save pipeline first')
+      return
+    }
+    if (nodes.length === 0) {
+      toast.error('Add blocks to the pipeline first')
+      return
+    }
+
+    // Pre-flight validation
+    const edges = usePipelineStore.getState().edges
+    const report = validatePipelineClient(nodes, edges)
+
+    if (!report.valid) {
+      // Show first 3 errors as toasts
+      for (const err of report.errors.slice(0, 3)) {
+        toast.error(err.message)
+      }
+      if (report.errors.length > 3) {
+        toast.error(`...and ${report.errors.length - 3} more errors. Run VALIDATE for details.`)
+      }
+      return
+    }
+
+    // Show warnings but continue
+    for (const warn of report.warnings.slice(0, 2)) {
+      toast(warn.message, { icon: '⚠️' })
+    }
+
+    reset()
+    await startRun(pipelineId)
+  }
+
+  const handleStop = async () => {
+    await stopRun()
+  }
+
+  const handleEject = async () => {
+    if (!pipelineId) {
+      toast.error('Save pipeline first')
+      return
+    }
+
+    // Pre-eject validation
+    const warnings: string[] = []
+    const errors: string[] = []
+    const { edges } = usePipelineStore.getState()
+
+    for (const node of nodes) {
+      const def = getBlockDefinition(node.data.type)
+      if (!def) continue
+
+      // Check required inputs are connected
+      for (const input of def.inputs) {
+        if (input.required) {
+          const hasConnection = edges.some(
+            (e) => e.target === node.id && e.targetHandle === input.id,
+          )
+          if (!hasConnection) {
+            errors.push(`${node.data.label}: missing required input "${input.label}"`)
+          }
+        }
+      }
+
+      // Check empty config fields that have no default
+      for (const field of def.configFields) {
+        if (field.default === undefined || field.default === '') {
+          const val = node.data.config?.[field.name]
+          if (val === '' || val === undefined || val === null) {
+            warnings.push(`${node.data.label}: empty config "${field.label || field.name}"`)
+          }
+        }
+      }
+    }
+
+    if (errors.length > 0) {
+      errors.forEach((e) => toast.error(e, { duration: 5000 }))
+      return
+    }
+    if (warnings.length > 0) {
+      warnings.slice(0, 3).forEach((w) => toast(w, { icon: '⚠️', duration: 4000 }))
+    }
+
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || '/api'
+      const res = await fetch(`${baseUrl}/pipelines/${pipelineId}/compile`)
+      if (!res.ok) throw new Error('Failed to compile pipeline')
+      const code = await res.text()
+      setGeneratedCode(code)
+      setCodeCopied(false)
+      setShowCodeModal(true)
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to eject pipeline')
+    }
+  }
+
+  const handleDownloadRequirements = () => {
+    const blockTypes = nodes.map((n) => n.data.type)
+    const content = generateRequirements(blockTypes)
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'requirements.txt'
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Downloaded requirements.txt')
+  }
+
+  const handleDownloadCode = () => {
+    const blob = new Blob([generatedCode], { type: 'text/x-python' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `pipeline_${pipelineId?.substring(0, 8) || 'export'}.py`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Downloaded!')
+  }
+
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedCode)
+      setCodeCopied(true)
+      toast.success('Copied to clipboard!')
+      setTimeout(() => setCodeCopied(false), 2000)
+    } catch {
+      toast.error('Failed to copy')
+    }
+  }
+
+  const handleSaveTemplate = () => {
+    if (nodes.length === 0) {
+      toast.error('Add nodes before saving a template')
+      return
+    }
+    setShowTemplateModal(true)
+  }
+
+  const submitTemplate = () => {
+    if (!templateName.trim()) {
+      toast.error('Name required')
+      return
+    }
+    saveAsTemplate(templateName, templateDesc, templateCat)
+    setShowTemplateModal(false)
+    setTemplateName('')
+    setTemplateDesc('')
+    setTemplateCat('inference')
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {isRunning && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 4 }}>
+          {/* Progress bar */}
+          <div
+            style={{
+              width: 80,
+              height: 4,
+              background: T.surface3,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${Math.round(overallProgress * 100)}%`,
+                height: '100%',
+                background: T.cyan,
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
+          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.cyan }}>
+            {Math.round(overallProgress * 100)}%
+          </span>
+        </div>
+      )}
+
+      {!isRunning ? (
+        <>
+          <button
+            onClick={handleRun}
+            data-tour="btn-run-pipeline"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '3px 10px',
+              background: `${T.green}14`,
+              border: `1px solid ${T.green}33`,
+              color: T.green,
+              fontFamily: F,
+              fontSize: FS.xs,
+              letterSpacing: '0.08em',
+              cursor: 'pointer',
+            }}
+          >
+            <Play size={10} />
+            RUN
+          </button>
+          <button
+            onClick={handleSaveTemplate}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '3px 10px',
+              background: `${T.blue}14`,
+              border: `1px solid ${T.blue}33`,
+              color: T.blue,
+              fontFamily: F,
+              fontSize: FS.xs,
+              letterSpacing: '0.08em',
+              cursor: 'pointer',
+            }}
+          >
+            <LayoutTemplate size={10} />
+            SAVE AS TEMPLATE
+          </button>
+          <button
+            onClick={() => setShowAnalysis(true)}
+            data-tour="btn-analyze"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '3px 10px',
+              background: `${T.amber}14`,
+              border: `1px solid ${T.amber}33`,
+              color: T.amber,
+              fontFamily: F,
+              fontSize: FS.xs,
+              letterSpacing: '0.08em',
+              cursor: 'pointer',
+            }}
+          >
+            <Gauge size={10} />
+            ANALYZE
+          </button>
+          <button
+            onClick={handleEject}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '3px 10px',
+              background: `${T.purple}14`,
+              border: `1px solid ${T.purple}33`,
+              color: T.purple,
+              fontFamily: F,
+              fontSize: FS.xs,
+              letterSpacing: '0.08em',
+              cursor: 'pointer',
+            }}
+          >
+            <FileCode size={10} />
+            EJECT TO PYTHON
+          </button>
+        </>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Loader2
+              size={10}
+              color={T.cyan}
+              style={{ animation: 'spin 1s linear infinite' }}
+            />
+            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.cyan }}>
+              RUNNING
+            </span>
+          </div>
+          <button
+            onClick={handleStop}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '3px 10px',
+              background: `${T.red}14`,
+              border: `1px solid ${T.red}33`,
+              color: T.red,
+              fontFamily: F,
+              fontSize: FS.xs,
+              letterSpacing: '0.08em',
+              cursor: 'pointer',
+            }}
+          >
+            <Square size={8} />
+            STOP
+          </button>
+        </>
+      )}
+
+      {/* Template Modal */}
+      {showTemplateModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.shadowHeavy }} onClick={() => setShowTemplateModal(false)}>
+          <div style={{ width: 400, background: T.surface1, border: `1px solid ${T.borderHi}`, padding: 20 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+              <span style={{ fontFamily: F, fontSize: FS.md, color: T.text, fontWeight: 700 }}>Save Template</span>
+              <button onClick={() => setShowTemplateModal(false)} style={{ background: 'none', border: 'none', color: T.dim }}><X size={14} /></button>
+            </div>
+
+            <label style={{ display: 'block', fontFamily: F, fontSize: FS.xs, color: T.sec, marginBottom: 4 }}>NAME</label>
+            <input value={templateName} onChange={e => setTemplateName(e.target.value)} style={{ width: '100%', padding: 8, background: T.surface3, border: `1px solid ${T.border}`, color: T.text, marginBottom: 12 }} />
+
+            <label style={{ display: 'block', fontFamily: F, fontSize: FS.xs, color: T.sec, marginBottom: 4 }}>DESCRIPTION</label>
+            <input value={templateDesc} onChange={e => setTemplateDesc(e.target.value)} style={{ width: '100%', padding: 8, background: T.surface3, border: `1px solid ${T.border}`, color: T.text, marginBottom: 12 }} />
+
+            <label style={{ display: 'block', fontFamily: F, fontSize: FS.xs, color: T.sec, marginBottom: 4 }}>CATEGORY</label>
+            <select value={templateCat} onChange={e => setTemplateCat(e.target.value)} style={{ width: '100%', padding: 8, background: T.surface3, border: `1px solid ${T.border}`, color: T.text, marginBottom: 20 }}>
+              <option value="training">Training</option>
+              <option value="inference">Inference</option>
+              <option value="data">Data</option>
+              <option value="agents">Agents</option>
+              <option value="evaluation">Evaluation</option>
+              <option value="merge">Merge</option>
+            </select>
+
+            <button onClick={submitTemplate} style={{ width: '100%', padding: 10, background: T.blue, color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
+              SAVE TEMPLATE
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Code Preview Modal */}
+      {showCodeModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.shadowHeavy }}
+          onClick={() => setShowCodeModal(false)}
+        >
+          <div
+            style={{
+              width: 720,
+              maxWidth: '90vw',
+              maxHeight: '85vh',
+              background: T.surface1,
+              border: `1px solid ${T.borderHi}`,
+              borderRadius: 8,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '14px 16px',
+              borderBottom: `1px solid ${T.border}`,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <FileCode size={16} color={T.purple} />
+                <span style={{ fontFamily: F, fontSize: FS.md, color: T.text, fontWeight: 700 }}>
+                  Ejected Python Script
+                </span>
+              </div>
+              <button
+                onClick={() => setShowCodeModal(false)}
+                style={{ background: 'none', border: 'none', color: T.dim, cursor: 'pointer', padding: 4 }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Warning banner */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 8,
+              padding: '10px 16px',
+              background: `${T.amber}10`,
+              borderBottom: `1px solid ${T.amber}30`,
+            }}>
+              <AlertTriangle size={14} color={T.amber} style={{ marginTop: 2, flexShrink: 0 }} />
+              <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.amber, lineHeight: 1.5 }}>
+                This script contains absolute paths to block directories on this machine. Copy the referenced block folders alongside the script to make it portable.
+              </span>
+            </div>
+
+            {/* Code area — Monaco Editor */}
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <Editor
+                language="python"
+                theme="vs-dark"
+                value={generatedCode}
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  fontSize: 12,
+                  lineHeight: 20,
+                  scrollBeyondLastLine: false,
+                  wordWrap: 'off',
+                  folding: true,
+                  lineNumbers: 'on',
+                  renderLineHighlight: 'line',
+                  scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
+                  padding: { top: 8, bottom: 8 },
+                }}
+              />
+            </div>
+
+            {/* Footer actions */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 8,
+              padding: '12px 16px',
+              borderTop: `1px solid ${T.border}`,
+              background: T.surface1,
+            }}>
+              <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, marginRight: 'auto' }}>
+                {generatedCode.split('\n').length} lines
+              </span>
+              <button
+                onClick={handleCopyCode}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 14px',
+                  background: `${T.cyan}14`,
+                  border: `1px solid ${T.cyan}33`,
+                  color: T.cyan,
+                  fontFamily: F,
+                  fontSize: FS.xs,
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                  borderRadius: 4,
+                }}
+              >
+                {codeCopied ? <Check size={12} /> : <Copy size={12} />}
+                {codeCopied ? 'COPIED' : 'COPY'}
+              </button>
+              <button
+                onClick={handleDownloadCode}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 14px',
+                  background: `${T.purple}14`,
+                  border: `1px solid ${T.purple}33`,
+                  color: T.purple,
+                  fontFamily: F,
+                  fontSize: FS.xs,
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                  borderRadius: 4,
+                }}
+              >
+                <Download size={12} />
+                DOWNLOAD .PY
+              </button>
+              <button
+                onClick={handleDownloadRequirements}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 14px',
+                  background: `${T.amber}14`,
+                  border: `1px solid ${T.amber}33`,
+                  color: T.amber,
+                  fontFamily: F,
+                  fontSize: FS.xs,
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                  borderRadius: 4,
+                }}
+              >
+                <FileDown size={12} />
+                REQUIREMENTS.TXT
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pipeline Analysis Panel */}
+      <PipelineAnalysisPanel open={showAnalysis} onClose={() => setShowAnalysis(false)} />
+    </div>
+  )
+}

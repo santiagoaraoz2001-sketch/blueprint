@@ -1,0 +1,74 @@
+name: SQL Query
+type: sql_query
+category: source
+description: Execute SQL queries against SQLite, PostgreSQL, MySQL, or other databases
+version: "2.0.0"
+
+inputs:
+  - id: config
+    label: Config Override
+    data_type: config
+    required: false
+    description: "JSON config to override connection_string, query, max_rows, or provide params dynamically"
+
+outputs:
+  - id: dataset
+    label: Query Result
+    data_type: dataset
+    description: "JSON output (dataset/data.json): array of objects, one per row. Keys are column names from the query result."
+  - id: metrics
+    label: Stats
+    data_type: metrics
+    required: false
+    description: "JSON object: {row_count, column_count, columns[]}"
+
+config:
+  connection_string:
+    type: string
+    label: Connection String
+    default: ""
+    description: "SQLite file path, sqlite:///path, or postgresql://user:pass@host/db"
+  query:
+    type: text_area
+    label: SQL Query
+    default: "SELECT * FROM demo_data"
+    description: "SQL query to execute"
+  timeout:
+    type: integer
+    label: Timeout (s)
+    default: 30
+    min: 1
+  max_rows:
+    type: integer
+    label: Max Rows
+    default: 0
+    min: 0
+    description: "0 = all rows"
+  parameterized:
+    type: boolean
+    label: Parameterized Query
+    default: false
+    description: "Use ? placeholders for safe value substitution (prevents SQL injection)"
+  params:
+    type: text_area
+    label: Parameters
+    default: ""
+    description: "JSON array of values to substitute for ? placeholders (e.g. [\"Alice\", 42])"
+    depends_on:
+      field: parameterized
+      value: true
+  ssl_ca:
+    type: file_path
+    label: SSL CA Certificate
+    default: ""
+    description: "Path to CA certificate file for SSL database connections"
+  ssl_cert:
+    type: file_path
+    label: SSL Client Certificate
+    default: ""
+    description: "Path to client certificate for mutual TLS authentication"
+  ssl_key:
+    type: file_path
+    label: SSL Client Key
+    default: ""
+    description: "Path to client private key for mutual TLS authentication"

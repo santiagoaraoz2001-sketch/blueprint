@@ -1,0 +1,82 @@
+name: Curriculum Training
+type: curriculum_training
+category: training
+description: Multi-stage training with progressively harder examples
+version: "1.0.0"
+
+inputs:
+  - id: dataset
+    label: Training Data
+    data_type: dataset
+    required: true
+  - id: model
+    label: Base Model
+    data_type: model
+    required: false
+
+outputs:
+  - id: model
+    label: Trained Model
+    data_type: model
+  - id: metrics
+    label: Curriculum Metrics
+    data_type: metrics
+
+config:
+  model_name:
+    type: string
+    label: Base Model
+    description: HuggingFace model name or local path
+  num_stages:
+    type: integer
+    label: Curriculum Stages
+    description: Number of difficulty stages to split data into
+    default: 3
+    min: 2
+    max: 10
+  epochs_per_stage:
+    type: integer
+    label: Epochs Per Stage
+    description: Training epochs for each curriculum stage
+    default: 1
+    min: 1
+    max: 20
+  difficulty_column:
+    type: string
+    label: Difficulty Column
+    description: Column name in dataset used to sort by difficulty
+    default: difficulty
+  sort_ascending:
+    type: boolean
+    label: Sort Ascending
+    description: If true, lower values = easier examples (trained first)
+    default: true
+  lr:
+    type: float
+    label: Learning Rate
+    default: 0.00005
+    min: 0.0000001
+    max: 0.01
+  batch_size:
+    type: integer
+    label: Batch Size
+    default: 4
+    min: 1
+    max: 128
+  max_seq_length:
+    type: integer
+    label: Max Sequence Length
+    description: Maximum token length for training samples
+    default: 512
+    min: 64
+    max: 32768
+  text_column:
+    type: string
+    label: Text Column
+    description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
+    default: ""
+  prompt_template:
+    type: string
+    label: Prompt Template
+    description: "Template to combine multiple columns into training text, e.g. '### Instruction:\\n{instruction}\\n### Response:\\n{output}'"
+    default: ""

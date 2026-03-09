@@ -1,0 +1,183 @@
+"""HuggingFace Hub Push — upload model or dataset to HuggingFace Hub."""
+
+import json
+import os
+
+
+def _resolve_data(raw):
+    """Resolve raw input to determine what to upload."""
+    if isinstance(raw, str):
+        if os.path.isdir(raw):
+            return {"type": "directory", "path": raw}
+        if os.path.isfile(raw):
+            return {"type": "file", "path": raw}
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                if "model_path" in parsed or "path" in parsed:
+                    path = parsed.get("model_path") or parsed.get("path")
+                    if os.path.exists(path):
+                        return {"type": "directory" if os.path.isdir(path) else "file", "path": path, "metadata": parsed}
+            return {"type": "data", "data": parsed}
+        except (json.JSONDecodeError, ValueError):
+            return {"type": "string", "data": raw}
+    if isinstance(raw, dict):
+        for key in ["model_path", "path", "output_path", "file_path"]:
+            if key in raw and isinstance(raw[key], str) and os.path.exists(raw[key]):
+                path = raw[key]
+                return {"type": "directory" if os.path.isdir(path) else "file", "path": path, "metadata": raw}
+        return {"type": "data", "data": raw}
+    if isinstance(raw, list):
+        return {"type": "data", "data": raw}
+    return {"type": "unknown", "data": str(raw)}
+
+
+def run(ctx):
+    repo_id = ctx.config.get("repo_id", "").strip()
+    repo_type = ctx.config.get("repo_type", "model").lower().strip()
+    private = ctx.config.get("private", True)
+    commit_message = ctx.config.get("commit_message", "Upload from Blueprint").strip()
+    hf_token = ctx.config.get("hf_token", "").strip()
+    create_repo = ctx.config.get("create_repo", True)
+    revision = ctx.config.get("revision", "main").strip()
+    path_in_repo = ctx.config.get("path_in_repo", "").strip()
+
+    if not repo_id:
+        raise ValueError("Repository ID is required (e.g. 'username/model-name').")
+
+    if not hf_token:
+        hf_token = os.environ.get("HF_TOKEN", "") or os.environ.get("HUGGING_FACE_HUB_TOKEN", "")
+    if not hf_token:
+        raise ValueError(
+            "HuggingFace token is required. Set it in the config, "
+            "use $secret:HF_TOKEN, or set the HF_TOKEN environment variable."
+        )
+
+    ctx.log_message(f"HF Hub Push starting (repo={repo_id}, type={repo_type})")
+    ctx.report_progress(0, 4)
+
+    # ---- Step 1: Import huggingface_hub ----
+    ctx.report_progress(1, 4)
+    try:
+        from huggingface_hub import HfApi, create_repo as hf_create_repo
+    except ImportError:
+        raise ImportError(
+            "huggingface_hub is required. Install with: pip install huggingface_hub"
+        )
+
+    api = HfApi(token=hf_token)
+
+    # ---- Step 2: Load and resolve data ----
+    ctx.report_progress(2, 4)
+    raw_data = ctx.load_input("data")
+    if raw_data is None:
+        raise ValueError("No input data provided. Connect a 'data' input.")
+
+    resolved = _resolve_data(raw_data)
+    ctx.log_message(f"Upload source type: {resolved['type']}")
+
+    # ---- Step 3: Create repo if needed ----
+    if create_repo:
+        try:
+            api.create_repo(
+                repo_id=repo_id,
+                repo_type=repo_type,
+                private=private,
+                exist_ok=True,
+            )
+            ctx.log_message(f"Repository ensured: {repo_id}")
+        except Exception as e:
+            ctx.log_message(f"WARNING: Could not create/verify repo: {e}")
+
+    # ---- Step 4: Upload ----
+    ctx.report_progress(3, 4)
+    uploaded_files = 0
+    repo_url = f"https://huggingface.co/{repo_id}"
+
+    if resolved["type"] == "directory":
+        path = resolved["path"]
+        upload_kwargs = dict(
+            folder_path=path,
+            repo_id=repo_id,
+            repo_type=repo_type,
+            commit_message=commit_message,
+            revision=revision,
+        )
+        if path_in_repo:
+            upload_kwargs["path_in_repo"] = path_in_repo
+        api.upload_folder(**upload_kwargs)
+        uploaded_files = sum(1 for _, _, files in os.walk(path) for _ in files)
+        ctx.log_message(f"Uploaded directory: {path} ({uploaded_files} files)")
+
+    elif resolved["type"] == "file":
+        path = resolved["path"]
+        filename = os.path.basename(path)
+        file_repo_path = os.path.join(path_in_repo, filename) if path_in_repo else filename
+        api.upload_file(
+            path_or_fileobj=path,
+            path_in_repo=file_repo_path,
+            repo_id=repo_id,
+            repo_type=repo_type,
+            commit_message=commit_message,
+            revision=revision,
+        )
+        uploaded_files = 1
+        ctx.log_message(f"Uploaded file: {filename}")
+
+    elif resolved["type"] == "data":
+        # Save data to temp file and upload
+        data = resolved["data"]
+        temp_path = os.path.join(ctx.run_dir, "upload_data.json")
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, default=str, ensure_ascii=False)
+
+        filename = "data.json"
+        if repo_type == "dataset":
+            # For datasets, try to upload as a more useful format
+            if isinstance(data, list) and all(isinstance(r, dict) for r in data):
+                try:
+                    import csv as csv_mod
+                    import io
+                    headers = list(data[0].keys()) if data else []
+                    buf = io.StringIO()
+                    writer = csv_mod.writer(buf)
+                    writer.writerow(headers)
+                    for row in data:
+                        writer.writerow([row.get(h, "") for h in headers])
+                    temp_path = os.path.join(ctx.run_dir, "data.csv")
+                    with open(temp_path, "w", encoding="utf-8", newline="") as f:
+                        f.write(buf.getvalue())
+                    filename = "data.csv"
+                except Exception:
+                    pass
+
+        file_repo_path = os.path.join(path_in_repo, filename) if path_in_repo else filename
+        api.upload_file(
+            path_or_fileobj=temp_path,
+            path_in_repo=file_repo_path,
+            repo_id=repo_id,
+            repo_type=repo_type,
+            commit_message=commit_message,
+            revision=revision,
+        )
+        uploaded_files = 1
+        ctx.log_message(f"Uploaded data as {filename}")
+
+    else:
+        raise ValueError(f"Cannot determine how to upload data of type: {resolved['type']}")
+
+    # ---- Finalize ----
+    ctx.report_progress(4, 4)
+    ctx.log_message(f"Push complete: {repo_url}")
+
+    ctx.save_output("repo_url", repo_url)
+    ctx.save_output("summary", {
+        "repo_id": repo_id,
+        "repo_type": repo_type,
+        "files_uploaded": uploaded_files,
+        "private": private,
+        "revision": revision,
+    })
+    ctx.log_metric("files_uploaded", float(uploaded_files))
+
+    ctx.log_message("HF Hub Push complete.")

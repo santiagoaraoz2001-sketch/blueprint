@@ -1,0 +1,31 @@
+name: Config Builder
+type: config_builder
+category: source
+description: Build a JSON or YAML configuration object, optionally merging with an upstream config
+version: "2.0.0"
+
+inputs:
+  - id: base_config
+    label: Base Config
+    data_type: config
+    required: false
+    description: "Upstream config to merge with. Replace = shallow overwrite, deep_merge = recursive merge."
+
+outputs:
+  - id: config
+    label: Config
+    data_type: config
+    description: "JSON file (config.json): parsed config object. Input can be JSON or YAML, always outputs JSON."
+
+config:
+  json_body:
+    type: text_area
+    label: JSON Config
+    description: "Raw JSON or YAML config object"
+    default: '{"key": "value"}'
+  merge_strategy:
+    type: select
+    label: Merge Strategy
+    options: [replace, deep_merge]
+    default: replace
+    description: "How to merge with base config input (replace = shallow overwrite, deep_merge = recursive merge)"

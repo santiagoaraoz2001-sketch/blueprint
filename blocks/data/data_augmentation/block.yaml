@@ -1,0 +1,96 @@
+name: Data Augmentation
+type: data_augmentation
+category: data
+description: Augment dataset with text transformation strategies
+version: "2.0.0"
+
+inputs:
+  - id: dataset
+    label: Dataset
+    data_type: dataset
+    required: true
+  - id: model
+    label: Augmentation Model
+    data_type: model
+    required: false
+  - id: prompt
+    label: Augmentation Prompt
+    data_type: text
+    required: false
+  - id: corpus
+    label: Corpus Data
+    data_type: dataset
+    required: false
+
+outputs:
+  - id: dataset
+    label: Augmented
+    data_type: dataset
+    description: "JSON array containing original rows followed by augmented copies. When add_metadata is true, augmented rows include _augmented (bool) and _aug_strategy (string) columns. Comma-separated strategies randomly select one per row for diversity."
+  - id: metrics
+    label: Augmentation Stats
+    data_type: metrics
+    description: "Object with original_rows, augmented_rows, strategy, augment_factor, model_backed, corpus_phrases"
+
+config:
+  strategy:
+    type: select
+    label: Strategy
+    options: [synonym_swap, random_insertion, random_deletion, random_swap, char_noise, paraphrase, back_translate, contextual_insert]
+    default: synonym_swap
+    description: "Rule-based: synonym_swap, random_insertion, random_deletion, random_swap, char_noise. Model-backed: paraphrase, back_translate, contextual_insert. Comma-separate multiple strategies for diversity."
+  augment_factor:
+    type: integer
+    label: Augmentation Factor
+    default: 2
+    min: 1
+    max: 20
+    description: Total copies of each row (including originals)
+  text_column:
+    type: string
+    label: Text Column
+    default: text
+    description: Column name containing text to augment
+  seed:
+    type: integer
+    label: Random Seed
+    default: 42
+    description: Seed for reproducibility
+  preserve_labels:
+    type: boolean
+    label: Preserve Labels
+    default: true
+    description: Copy all non-text columns to augmented rows
+  balance_column:
+    type: string
+    label: Balance Column
+    default: ""
+    description: Column to balance classes by (augments minority classes proportionally more)
+  add_metadata:
+    type: boolean
+    label: Add Metadata Columns
+    default: true
+    description: Add _augmented and _aug_strategy columns to augmented rows (disable for clean output)
+  augment_prompt:
+    type: text_area
+    label: Custom Prompt
+    default: ""
+    description: "Custom prompt for model-backed strategies. Use {text} placeholder for the input text, {phrase} for corpus phrases."
+  provider:
+    type: select
+    label: Provider
+    options: [ollama, transformers]
+    default: ollama
+    description: Model provider (overridden by model input if connected)
+  endpoint:
+    type: string
+    label: Endpoint
+    default: "http://localhost:11434"
+    description: API endpoint for Ollama provider
+  max_tokens:
+    type: integer
+    label: Max Tokens
+    default: 256
+    min: 10
+    max: 4096
+    description: Maximum tokens per augmented text

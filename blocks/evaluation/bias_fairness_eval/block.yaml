@@ -1,0 +1,106 @@
+name: Bias & Fairness Eval
+type: bias_fairness_eval
+category: evaluation
+description: Evaluate model outputs for demographic biases and fairness across protected groups
+version: "1.0.0"
+
+inputs:
+  - id: dataset
+    label: Test Data
+    data_type: data
+    required: false
+    description: Dataset with model outputs to analyze (or prompts for generation)
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Optional: generate responses from templates across demographic groups"
+
+outputs:
+  - id: metrics
+    label: Fairness Scores
+    data_type: metrics
+    description: Aggregate: total_texts, flagged_count/rate, avg_bias, threshold, per-dimension avg bias, group averages
+  - id: dataset
+    label: Annotated Results
+    data_type: data
+    description: Per-text: text, group, {dimension}_bias scores, overall_bias, flagged (bool) — filterable
+  - id: report
+    label: Bias Report
+    data_type: artifact
+    description: bias_report.json: metrics summary + flagged_examples with text, scores, dimension breakdown
+
+config:
+  text_column:
+    type: string
+    label: Text Column
+    default: "text"
+    description: Column containing text to analyze
+  bias_dimensions:
+    type: string
+    label: Bias Dimensions
+    default: "gender,race,age,religion"
+    description: "Comma-separated dimensions to evaluate"
+  group_column:
+    type: string
+    label: Group Column
+    default: ""
+    description: "Column containing demographic group labels (for parity analysis)"
+  method:
+    type: select
+    label: Detection Method
+    options: [keyword, sentiment, llm_judge]
+    default: keyword
+    description: "keyword: lexicon-based. sentiment: sentiment parity. llm_judge: LLM evaluator."
+  threshold:
+    type: float
+    label: Bias Threshold
+    default: 0.1
+    min: 0.0
+    max: 1.0
+    description: "Maximum acceptable bias score (0 = no bias)"
+  generate_from_templates:
+    type: boolean
+    label: Generate from Templates
+    default: false
+    description: "If true, auto-generate prompts with demographic variations and evaluate responses"
+  max_samples:
+    type: integer
+    label: Max Samples
+    default: 0
+    min: 0
+    description: "Limit to N samples (0 = all)"
+  generation_temperature:
+    type: float
+    label: Generation Temperature
+    default: 0.7
+    min: 0.0
+    max: 2.0
+    description: Temperature for template-based response generation
+  max_new_tokens:
+    type: integer
+    label: Max New Tokens
+    default: 200
+    min: 1
+    max: 4096
+    description: Maximum tokens to generate per response
+  generation_timeout:
+    type: integer
+    label: Generation Timeout (s)
+    default: 60
+    min: 5
+    max: 600
+    description: Timeout in seconds for each generation request
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"

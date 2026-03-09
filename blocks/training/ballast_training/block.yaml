@@ -1,0 +1,84 @@
+name: BALLAST Training
+type: ballast_training
+category: training
+description: Balanced layer-wise training — freeze early layers, scale LR by depth
+version: "1.1.0"
+
+inputs:
+  - id: dataset
+    label: Training Data
+    data_type: dataset
+    required: true
+  - id: model
+    label: Base Model
+    data_type: model
+    required: false
+
+outputs:
+  - id: model
+    label: Trained Model
+    data_type: model
+  - id: metrics
+    label: Training Metrics
+    data_type: metrics
+
+config:
+  model_name:
+    type: string
+    label: Base Model
+    description: HuggingFace model name or local path
+  layer_depth:
+    type: float
+    label: Layer Depth
+    description: "Fraction of layers to train (0.5 = train top 50% of layers)"
+    default: 0.5
+    min: 0.1
+    max: 1.0
+  balance_factor:
+    type: float
+    label: Balance Factor
+    description: "LR scaling — deeper layers get up to balance_factor * base_lr"
+    default: 1.0
+    min: 0.1
+    max: 5.0
+  lr:
+    type: float
+    label: Learning Rate
+    default: 0.00002
+    min: 0.0000001
+    max: 0.01
+  epochs:
+    type: integer
+    label: Epochs
+    default: 5
+    min: 1
+    max: 100
+  batch_size:
+    type: integer
+    label: Batch Size
+    default: 4
+    min: 1
+    max: 128
+  max_seq_length:
+    type: integer
+    label: Max Sequence Length
+    default: 512
+    min: 64
+    max: 32768
+  text_column:
+    type: string
+    label: Text Column
+    description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
+    default: ""
+  prompt_template:
+    type: string
+    label: Prompt Template
+    description: "Template to combine multiple columns into training text, e.g. '### Instruction:\\n{instruction}\\n### Response:\\n{output}'"
+    default: ""
+  eval_split:
+    type: float
+    label: Eval Split
+    description: "Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)"
+    default: 0.0
+    min: 0.0
+    max: 0.3

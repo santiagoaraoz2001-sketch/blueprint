@@ -1,0 +1,70 @@
+name: Text Chunker
+type: text_chunker
+category: data
+description: Split long documents into smaller semantic chunks
+version: "2.0.0"
+
+inputs:
+  - id: dataset
+    label: Raw Documents
+    data_type: dataset
+    required: true
+
+outputs:
+  - id: dataset
+    label: Chunked Data
+    data_type: dataset
+    description: "JSON array of chunk objects. Each row contains the text column with chunk content. When include_chunk_id is true: doc_id, chunk_id, chunk_index columns are added. When keep_metadata is true: all non-text columns from the source document are copied."
+  - id: stats
+    label: Chunking Stats
+    data_type: metrics
+    description: "Object with total_documents, total_chunks, avg_chunk_size, min_chunk_size, max_chunk_size"
+
+config:
+  chunk_size:
+    type: integer
+    label: Chunk Size (chars)
+    default: 1000
+    min: 50
+    max: 50000
+    description: Maximum characters per chunk
+  chunk_overlap:
+    type: integer
+    label: Overlap (chars)
+    default: 200
+    min: 0
+    description: Characters of overlap between consecutive chunks
+  strategy:
+    type: select
+    label: Strategy
+    options: [recursive, character, token]
+    default: recursive
+    description: "recursive: split by paragraphs/sentences first; character: fixed-window; token: approximate token-based"
+  text_column:
+    type: string
+    label: Text Column
+    default: text
+    description: Name of the column containing text to chunk
+  keep_metadata:
+    type: boolean
+    label: Keep Source Metadata
+    default: true
+    description: Copy non-text columns from source document to each chunk
+  min_chunk_size:
+    type: integer
+    label: Min Chunk Size
+    default: 0
+    min: 0
+    description: Merge chunks smaller than this into their predecessor (0 = disabled). Improves RAG retrieval quality.
+  chars_per_token:
+    type: integer
+    label: Chars per Token
+    default: 4
+    min: 1
+    max: 20
+    description: Character-to-token ratio for token strategy (4 for English, 2-3 for CJK/multilingual)
+  include_chunk_id:
+    type: boolean
+    label: Include Chunk IDs
+    default: true
+    description: Add doc_id, chunk_id, and chunk_index columns to output (disable for clean flat output)

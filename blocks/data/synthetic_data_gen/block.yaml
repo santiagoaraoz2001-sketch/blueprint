@@ -1,0 +1,90 @@
+name: Synthetic Data Generator
+type: synthetic_data_gen
+category: data
+description: Generate training data using LLM-based synthesis
+version: "2.0.0"
+
+inputs:
+  - id: seed_data
+    label: Seed Data
+    data_type: dataset
+    required: false
+  - id: prompt
+    label: Prompt Template
+    data_type: text
+    required: true
+  - id: model
+    label: Generator Model
+    data_type: model
+    required: true
+
+outputs:
+  - id: dataset
+    label: Synthetic Dataset
+    data_type: dataset
+    description: "JSON array of generated rows. Each row has id, source='synthetic', and the output_column containing generated text (default: generated_text). When output_format=json, parsed JSON fields are merged into the row."
+  - id: metrics
+    label: Generation Stats
+    data_type: metrics
+    description: "Object with total_generated, temperature, diversity_penalty, max_tokens, seed_mode, seed_examples_used"
+
+config:
+  num_samples:
+    type: integer
+    label: Num Samples
+    default: 1000
+    min: 1
+    max: 100000
+    description: Number of rows to generate
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.8
+    min: 0.0
+    max: 2.0
+  diversity_penalty:
+    type: float
+    label: Diversity Penalty
+    default: 0.0
+    min: 0.0
+    max: 2.0
+    description: Penalty to reduce repetition across samples
+  max_tokens:
+    type: integer
+    label: Max Tokens per Sample
+    default: 256
+    min: 10
+    max: 4096
+  batch_size:
+    type: integer
+    label: Batch Size
+    default: 10
+    min: 1
+    max: 100
+  seed_mode:
+    type: select
+    label: Seed Data Usage
+    options: [none, in_context, schema_only]
+    default: none
+    description: How seed data is incorporated into prompts
+  output_format:
+    type: select
+    label: Output Format
+    options: [raw, json]
+    default: raw
+    description: "raw: save generated text as-is; json: parse each output as JSON object"
+  output_column:
+    type: string
+    label: Output Column Name
+    default: generated_text
+    description: Name of the column containing generated text (e.g. response, completion, text)
+  system_prompt:
+    type: text_area
+    label: System Prompt
+    default: ""
+    description: System prompt prepended to guide generation behavior
+  vary_prompt:
+    type: boolean
+    label: Vary Prompt per Batch
+    default: false
+    description: Randomly rotate seed examples per batch for more diverse outputs (requires seed_mode=in_context)

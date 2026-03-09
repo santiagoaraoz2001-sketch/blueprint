@@ -1,0 +1,72 @@
+name: Error Handler
+type: error_handler
+category: flow
+description: Wrap script execution with retry logic, error catching, and fallback behavior
+version: "1.0.0"
+
+inputs:
+  - id: input
+    label: Input Data
+    data_type: any
+    required: true
+
+outputs:
+  - id: output
+    label: Output
+    data_type: any
+    description: "Script result on success; fallback value or input pass-through on failure"
+  - id: error
+    label: Error Info
+    data_type: metrics
+    description: "JSON on failure: {error, error_type, traceback, attempts}. None on success."
+
+config:
+  max_retries:
+    type: integer
+    label: Max Retries
+    default: 0
+    min: 0
+    max: 10
+    description: "Number of retry attempts before giving up (0 = no retries)"
+  retry_delay:
+    type: float
+    label: Retry Delay (sec)
+    default: 1.0
+    min: 0
+    description: "Seconds to wait between retry attempts"
+  exponential_backoff:
+    type: boolean
+    label: Exponential Backoff
+    default: false
+    description: "Double the delay after each retry (e.g. 1s, 2s, 4s, 8s). Essential for API rate limiting."
+  on_error:
+    type: select
+    label: On Error
+    default: fallback
+    options:
+      - fallback
+      - raise
+      - log
+    description: "fallback: use fallback value as output; raise: stop the pipeline with error; log: log error and pass input through"
+  fallback_value:
+    type: text_area
+    label: Fallback Value (JSON)
+    default: "{}"
+    description: "JSON value to use as output when on_error is 'fallback' and all retries are exhausted"
+  script:
+    type: text_area
+    label: Script to Wrap
+    default: ""
+    description: "Python code to execute with retry protection. Use 'input_data' for input and set 'result' for output. If empty, input passes through."
+  timeout_s:
+    type: integer
+    label: Timeout (sec)
+    default: 0
+    min: 0
+    max: 600
+    description: "Maximum seconds for script execution per attempt (0 = no timeout). Prevents hanging pipelines."
+  error_pattern:
+    type: string
+    label: Retry Error Pattern
+    default: ""
+    description: "Regex pattern — only retry if the error message matches (e.g., 'ConnectionError|Timeout'). Empty = retry on all errors."

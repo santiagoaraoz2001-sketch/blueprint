@@ -1,0 +1,58 @@
+name: Save to Local Path
+type: save_local
+category: endpoints
+description: Save any pipeline output to a specific directory with auto-format detection.
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Input
+    data_type: any
+    required: true
+
+outputs:
+  - id: file_path
+    label: File Path
+    data_type: text
+    description: "Absolute path to the saved file"
+  - id: summary
+    label: Export Summary
+    data_type: metrics
+    description: "Object with keys: file_size_bytes (int), format (string)"
+
+config:
+  output_directory:
+    type: file_path
+    label: Output Directory
+    default: ""
+    description: Absolute path on your machine
+  filename:
+    type: string
+    label: Filename
+    default: output
+    description: Filename without extension (extension auto-added based on format)
+  format:
+    type: select
+    label: Format
+    options: [auto, json, csv, txt, yaml, parquet]
+    default: auto
+    description: Auto detects optimal format from input data type
+  create_dirs:
+    type: boolean
+    label: Create Directories
+    default: true
+    description: Create directories if they don't exist
+  overwrite:
+    type: boolean
+    label: Overwrite
+    default: false
+  include_metadata:
+    type: boolean
+    label: Include Metadata
+    default: false
+    description: Write a .meta.json sidecar with run info
+  timestamp_filename:
+    type: boolean
+    label: Timestamp Filename
+    default: false
+    description: Append timestamp to filename for versioning

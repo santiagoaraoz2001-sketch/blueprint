@@ -1,0 +1,90 @@
+name: Full Fine-Tuning
+type: full_finetuning
+category: training
+description: Full parameter fine-tuning — all model weights are updated
+version: "1.0.0"
+
+inputs:
+  - id: dataset
+    label: Training Data
+    data_type: dataset
+    required: true
+  - id: model
+    label: Base Model
+    data_type: model
+    required: false
+
+outputs:
+  - id: model
+    label: Fine-tuned Model
+    data_type: model
+  - id: metrics
+    label: Training Metrics
+    data_type: metrics
+
+config:
+  model_name:
+    type: string
+    label: Base Model
+    description: HuggingFace model name or local path
+  lr:
+    type: float
+    label: Learning Rate
+    default: 0.00002
+    min: 0.0000001
+    max: 0.01
+  epochs:
+    type: integer
+    label: Epochs
+    default: 3
+    min: 1
+    max: 100
+  batch_size:
+    type: integer
+    label: Batch Size
+    default: 4
+    min: 1
+    max: 128
+  warmup_steps:
+    type: integer
+    label: Warmup Steps
+    description: Number of warmup steps for LR scheduler
+    default: 100
+    min: 0
+    max: 10000
+  weight_decay:
+    type: float
+    label: Weight Decay
+    description: L2 regularization strength
+    default: 0.01
+    min: 0.0
+    max: 1.0
+  max_seq_length:
+    type: integer
+    label: Max Sequence Length
+    description: Maximum token length for training samples
+    default: 512
+    min: 64
+    max: 32768
+  gradient_checkpointing:
+    type: boolean
+    label: Gradient Checkpointing
+    description: Trade compute for memory by recomputing activations
+    default: true
+  text_column:
+    type: string
+    label: Text Column
+    description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
+    default: ""
+  prompt_template:
+    type: string
+    label: Prompt Template
+    description: "Template to combine multiple columns into training text, e.g. '### Instruction:\\n{instruction}\\n### Response:\\n{output}'"
+    default: ""
+  eval_split:
+    type: float
+    label: Eval Split
+    description: "Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)"
+    default: 0.0
+    min: 0.0
+    max: 0.3

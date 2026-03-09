@@ -1,0 +1,42 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+sqlalchemy>=2.0.0
+pydantic>=2.5.0
+sse-starlette>=1.8.0
+gitpython>=3.1.40
+watchdog>=3.0.0
+mlflow>=2.9.0
+python-multipart>=0.0.6
+aiosqlite>=0.19.0
+pyyaml>=6.0.0
+requests>=2.31.0
+httpx>=0.24.0
+ruff>=0.1.0
+pyright>=1.1.300
+pytest>=7.0.0
+alembic>=1.12.0
+
+# ── Optional ML dependencies ────────────────────────────────
+# Uncomment the libraries you need for your specific workflows.
+# These are not installed by default to keep the base install lean
+# and avoid platform-specific build issues.
+#
+# torch>=2.1.0              # PyTorch — deep learning framework
+# torchvision>=0.16.0       # Image models and transforms
+# torchaudio>=2.1.0         # Audio processing with PyTorch
+# transformers>=4.36.0      # Hugging Face model hub
+# datasets>=2.16.0          # Hugging Face datasets
+# accelerate>=0.25.0        # Distributed training utilities
+# scikit-learn>=1.3.0       # Classical ML algorithms
+# pandas>=2.1.0             # Data manipulation and analysis
+# numpy>=1.26.0             # Numerical computing
+# scipy>=1.11.0             # Scientific computing
+# matplotlib>=3.8.0         # Plotting and visualization
+# seaborn>=0.13.0           # Statistical data visualization
+# opencv-python>=4.8.0      # Computer vision
+# pillow>=10.1.0            # Image processing
+# tokenizers>=0.15.0        # Fast tokenizers
+# safetensors>=0.4.0        # Safe model serialization
+# bitsandbytes>=0.41.0      # Quantization (Linux/CUDA only)
+# peft>=0.7.0               # Parameter-efficient fine-tuning
+# trl>=0.7.0                # Transformer reinforcement learning

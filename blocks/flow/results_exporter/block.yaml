@@ -1,0 +1,63 @@
+name: Results Exporter
+type: results_exporter
+category: endpoints
+description: Export pipeline results to CSV, JSON, JSONL, or Parquet with format selection.
+version: "2.0.0"
+
+inputs:
+  - id: data
+    label: Results Data
+    data_type: dataset
+    required: true
+
+outputs:
+  - id: file_path
+    label: File Path
+    data_type: text
+    description: "Absolute path to the exported results file"
+  - id: summary
+    label: Export Summary
+    data_type: metrics
+    description: "Object with keys: rows_exported (int), columns (int), file_size_bytes (int), format (string)"
+
+config:
+  format:
+    type: select
+    label: Export Format
+    options: [csv, json, jsonl, parquet]
+    default: csv
+    description: Output file format
+  file_name:
+    type: string
+    label: File Name
+    default: results
+    description: Base name (without extension)
+  output_path:
+    type: string
+    label: Output Directory
+    default: ""
+    description: Directory to save to (empty = run directory)
+  include_metadata:
+    type: boolean
+    label: Include Metadata
+    default: true
+    description: Add timestamp, run ID, and config to output
+  overwrite:
+    type: boolean
+    label: Overwrite Existing
+    default: true
+  timestamp_filename:
+    type: boolean
+    label: Timestamp Filename
+    default: false
+    description: Append timestamp to filename for versioning
+  columns_filter:
+    type: string
+    label: Columns Filter
+    default: ""
+    description: Comma-separated column names to include (empty = all)
+  sort_by:
+    type: string
+    label: Sort By
+    default: ""
+    description: Column name to sort by (prefix with - for descending, e.g. -score)

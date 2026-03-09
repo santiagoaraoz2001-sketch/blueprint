@@ -1,0 +1,125 @@
+name: Web Scraper
+type: web_scraper
+category: source
+description: Scrape and extract text data from web pages with crawling, CSS selectors, and robots.txt support
+version: "2.0.0"
+
+inputs:
+  - id: model
+    label: Extraction Model
+    data_type: model
+    required: false
+    description: "LLM model for intelligent content extraction (future feature)"
+  - id: config
+    label: Config Override
+    data_type: config
+    required: false
+    description: "JSON config to override urls, selector, max_pages, cookies dynamically. urls can be string (newline-separated) or array."
+
+outputs:
+  - id: dataset
+    label: Scraped Data
+    data_type: dataset
+    description: "JSON output (dataset/data.json): array of objects. Each page: {text, url?, title?, char_count?, word_count?}. Metadata fields included when include_metadata=true."
+  - id: metrics
+    label: Stats
+    data_type: metrics
+    required: false
+    description: "JSON object: {pages_scraped, pages_failed, total_chars, urls_visited, output_format}"
+
+config:
+  urls:
+    type: text_area
+    label: URLs (one per line)
+    description: "Target URLs to scrape, one per line"
+  selector:
+    type: string
+    label: CSS Selector
+    default: "body"
+    description: "CSS selector to extract specific content"
+  max_pages:
+    type: integer
+    label: Max Pages
+    default: 10
+    min: 1
+    description: "Maximum pages to scrape"
+  timeout:
+    type: integer
+    label: Timeout (s)
+    default: 30
+    min: 1
+  browse_mode:
+    type: select
+    label: Browse Mode
+    options: [static, dynamic, follow_links]
+    default: static
+    description: "static = HTTP fetch, dynamic = JS rendering, follow_links = crawl"
+  follow_link_pattern:
+    type: string
+    label: Follow Link Pattern
+    default: ""
+    description: "Regex pattern to filter which links to follow"
+    depends_on:
+      field: browse_mode
+      value: follow_links
+  max_depth:
+    type: integer
+    label: Max Depth
+    default: 2
+    min: 1
+    description: "Maximum crawl depth from seed URLs"
+    depends_on:
+      field: browse_mode
+      value: follow_links
+  output_format:
+    type: select
+    label: Output Format
+    options: [structured_json, raw_text, markdown]
+    default: structured_json
+    description: "structured_json = plain text with metadata, raw_text = text only, markdown = text with # headers"
+  include_metadata:
+    type: boolean
+    label: Include Metadata
+    default: true
+    description: "Include URL, title, and word counts in output"
+  user_agent:
+    type: string
+    label: User Agent
+    default: ""
+    description: "Custom user agent string (empty = default)"
+  delay_ms:
+    type: integer
+    label: Delay Between Requests (ms)
+    default: 0
+    min: 0
+    description: "Politeness delay in milliseconds between requests (0 = no delay)"
+  exclude_url_pattern:
+    type: string
+    label: Exclude URL Pattern
+    default: ""
+    description: "Regex pattern for URLs to exclude from crawl (e.g. '/login|/privacy')"
+    depends_on:
+      field: browse_mode
+      value: follow_links
+  cookies:
+    type: text_area
+    label: Cookies
+    default: ""
+    description: "Cookie header string or JSON {\"key\": \"value\"} for authenticated scraping"
+  respect_robots:
+    type: boolean
+    label: Respect Robots.txt
+    default: true
+  use_llm_extraction:
+    type: boolean
+    label: Use LLM Extraction
+    default: false
+    description: "Use connected model for intelligent content extraction"
+  extraction_prompt:
+    type: text_area
+    label: Extraction Prompt
+    default: "Extract the main content from this page."
+    description: "Instructions for LLM-based extraction"
+    depends_on:
+      field: use_llm_extraction
+      value: true

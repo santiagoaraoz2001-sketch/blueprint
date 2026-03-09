@@ -1,0 +1,88 @@
+name: RAG Eval
+type: rag_eval
+category: evaluation
+description: Evaluate Retrieval-Augmented Generation pipelines — context relevance, answer faithfulness, and answer relevance
+version: "1.0.0"
+
+inputs:
+  - id: dataset
+    label: RAG Results
+    data_type: data
+    required: true
+    description: "Dataset with question, context, answer, and optional reference columns"
+  - id: model
+    label: Judge Model
+    data_type: model
+    required: false
+    description: "Optional: LLM for semantic evaluation of faithfulness and relevance"
+
+outputs:
+  - id: metrics
+    label: RAG Scores
+    data_type: metrics
+    description: Aggregate: total_samples, method, avg_faithfulness, avg_answer_relevance, avg_context_relevance, avg_answer_correctness
+  - id: dataset
+    label: Annotated Results
+    data_type: data
+    description: Per-sample: question, answer_preview, faithfulness, answer_relevance, context_relevance, answer_correctness scores
+  - id: report
+    label: RAG Report
+    data_type: artifact
+    description: rag_report.json: metrics summary + per-sample scores with question, answer_preview, all metric scores
+
+config:
+  question_column:
+    type: string
+    label: Question Column
+    default: "question"
+  context_column:
+    type: string
+    label: Context Column
+    default: "context"
+    description: "Column with retrieved context/passages"
+  answer_column:
+    type: string
+    label: Answer Column
+    default: "answer"
+  reference_column:
+    type: string
+    label: Reference Column
+    default: "reference"
+    description: "Optional ground truth answer column"
+  metrics_to_compute:
+    type: string
+    label: Metrics
+    default: "faithfulness,answer_relevance,context_relevance,answer_correctness"
+    description: "Comma-separated metrics to compute"
+  method:
+    type: select
+    label: Evaluation Method
+    options: [heuristic, llm_judge]
+    default: heuristic
+    description: "heuristic: token overlap. llm_judge: LLM evaluates quality."
+  max_samples:
+    type: integer
+    label: Max Samples
+    default: 0
+    min: 0
+    description: "Limit evaluation to N samples (0 = all)"
+  judge_timeout:
+    type: integer
+    label: Judge Timeout (s)
+    default: 30
+    min: 5
+    max: 300
+    description: Timeout in seconds for each LLM judge request
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"

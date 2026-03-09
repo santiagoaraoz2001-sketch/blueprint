@@ -1,0 +1,70 @@
+name: Save CSV
+type: save_csv
+category: endpoints
+description: Save data as a CSV file with configurable delimiter, encoding, and header options.
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Data
+    data_type: dataset
+    required: true
+
+outputs:
+  - id: file_path
+    label: File Path
+    data_type: text
+    description: "Absolute path to the saved CSV file"
+  - id: summary
+    label: Export Summary
+    data_type: metrics
+    description: "Object with keys: rows (int), columns (int), file_size_bytes (int), delimiter (string)"
+
+config:
+  output_path:
+    type: string
+    label: Output Path
+    default: ./output
+    description: Directory to save to (relative to run directory or absolute)
+  filename:
+    type: string
+    label: Filename
+    default: data.csv
+  delimiter:
+    type: select
+    label: Delimiter
+    options: [",", ";", "\\t", "|"]
+    default: ","
+  include_header:
+    type: boolean
+    label: Include Header
+    default: true
+  encoding:
+    type: select
+    label: Encoding
+    options: [utf-8, ascii, latin-1, utf-16]
+    default: utf-8
+  overwrite_existing:
+    type: boolean
+    label: Overwrite Existing
+    default: true
+  quote_all:
+    type: boolean
+    label: Quote All Fields
+    default: false
+    description: Wrap every field in quotes (useful for fields containing delimiters)
+  timestamp_filename:
+    type: boolean
+    label: Timestamp Filename
+    default: false
+    description: Append timestamp to filename for versioning
+  columns:
+    type: string
+    label: Columns Filter
+    default: ""
+    description: Comma-separated column names to include (empty = all columns)
+  na_value:
+    type: string
+    label: Missing Value
+    default: ""
+    description: String to use for missing/null values

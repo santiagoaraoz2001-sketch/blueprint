@@ -1,0 +1,37 @@
+name: Tool Registry
+type: tool_registry
+category: agents
+description: Register callable tools for agent use with OpenAI/Anthropic-compatible schemas
+version: "1.1.0"
+
+inputs:
+  - id: definitions
+    label: External Definitions
+    data_type: config
+    required: false
+
+outputs:
+  - id: tools
+    label: Tool Registry
+    data_type: config
+  - id: metrics
+    label: Registry Stats
+    data_type: metrics
+
+config:
+  tools:
+    type: text_area
+    label: Custom Tool Definitions (JSON)
+    default: "[]"
+    description: "JSON array of tool objects: [{\"name\": \"...\", \"description\": \"...\", \"parameters\": {...}}]"
+  include_defaults:
+    type: boolean
+    label: Include Default Tools
+    default: true
+    description: Include built-in tools (calculator, web_search, text_length, json_parser, datetime, string_transform)
+  output_format:
+    type: select
+    label: Schema Format
+    options: [openai, anthropic, generic]
+    default: openai
+    description: Format of generated function-calling schemas

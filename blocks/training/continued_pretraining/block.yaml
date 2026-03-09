@@ -1,0 +1,73 @@
+name: Continued Pre-Training
+type: continued_pretraining
+category: training
+description: Continue pre-training a model on domain-specific text corpus
+version: "1.0.0"
+
+inputs:
+  - id: dataset
+    label: Corpus
+    data_type: dataset
+    required: true
+  - id: model
+    label: Base Model
+    data_type: model
+    required: false
+
+outputs:
+  - id: model
+    label: Pre-trained Model
+    data_type: model
+  - id: metrics
+    label: Loss Curve
+    data_type: metrics
+
+config:
+  model_name:
+    type: string
+    label: Base Model
+    description: HuggingFace model name or local path
+  lr:
+    type: float
+    label: Learning Rate
+    default: 0.00001
+    min: 0.0000001
+    max: 0.001
+  epochs:
+    type: integer
+    label: Epochs
+    default: 1
+    min: 1
+    max: 50
+  batch_size:
+    type: integer
+    label: Batch Size
+    default: 4
+    min: 1
+    max: 128
+  max_seq_length:
+    type: integer
+    label: Max Sequence Length
+    description: Maximum token length for training documents
+    default: 2048
+    min: 128
+    max: 32768
+  warmup_ratio:
+    type: float
+    label: Warmup Ratio
+    description: Proportion of total steps used for LR warmup
+    default: 0.05
+    min: 0.0
+    max: 0.5
+  text_column:
+    type: string
+    label: Text Column
+    description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
+    default: ""
+  eval_split:
+    type: float
+    label: Eval Split
+    description: "Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)"
+    default: 0.0
+    min: 0.0
+    max: 0.3

@@ -1,0 +1,48 @@
+name: Prompt Template
+type: prompt_template
+category: inference
+description: String template engine with {variable} substitution for prompt engineering
+version: "1.0.0"
+
+inputs:
+  - id: text
+    label: Text Input
+    data_type: text
+    required: false
+  - id: context
+    label: Context
+    data_type: text
+    required: false
+  - id: variables
+    label: Variables (JSON)
+    data_type: config
+    required: false
+  - id: dataset
+    label: Dataset
+    data_type: dataset
+    required: false
+
+outputs:
+  - id: text
+    label: Rendered Prompt
+    data_type: text
+  - id: metrics
+    label: Template Metrics
+    data_type: metrics
+
+config:
+  template:
+    type: text_area
+    label: Template
+    default: "{input}"
+    description: "Template with {variable} placeholders"
+  variables:
+    type: text_area
+    label: Variables (JSON)
+    default: "{}"
+    description: "JSON object of variable values: {\"name\": \"value\"}"
+  output_format:
+    type: select
+    label: Output Format
+    options: [text, json]
+    default: text

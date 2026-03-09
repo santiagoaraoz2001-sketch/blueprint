@@ -1,0 +1,99 @@
+name: Factuality Checker
+type: factuality_checker
+category: evaluation
+description: Evaluate factual accuracy of model responses against reference answers using multiple comparison methods
+version: "2.0.0"
+
+inputs:
+  - id: dataset
+    label: QA Dataset
+    data_type: data
+    required: true
+    description: Dataset with model outputs and reference answers
+  - id: model
+    label: Judge Model
+    data_type: model
+    required: false
+    description: "Optional: LLM to use as a judge for semantic factuality checking"
+
+outputs:
+  - id: metrics
+    label: Factuality Scores
+    data_type: metrics
+    description: Aggregate: accuracy, correct, total, errors count, method used
+  - id: dataset
+    label: Annotated Results
+    data_type: data
+    description: Per-item: index, output, reference, correct (bool), score, question — filterable
+  - id: report
+    label: Error Report
+    data_type: artifact
+    description: error_report.json: metrics summary + full error list with question, output, reference, score
+
+config:
+  method:
+    type: select
+    label: Comparison Method
+    options: [exact_match, contains, f1, semantic_sim, llm_judge]
+    default: exact_match
+    description: "exact_match: case-insensitive exact; contains: reference in output; f1: token F1; semantic_sim: embedding cosine; llm_judge: LLM evaluates correctness"
+  output_column:
+    type: string
+    label: Output Column
+    default: "_response"
+    description: Column name containing model outputs
+  reference_column:
+    type: string
+    label: Reference Column
+    default: "reference"
+    description: Column name containing ground truth answers
+  case_sensitive:
+    type: boolean
+    label: Case Sensitive
+    default: false
+    description: Use case-sensitive comparison (for exact_match and contains methods)
+  f1_threshold:
+    type: float
+    label: F1 Pass Threshold
+    default: 0.5
+    min: 0.0
+    max: 1.0
+    description: "Minimum token F1 score to consider an answer correct (for f1 method)"
+  similarity_threshold:
+    type: float
+    label: Similarity Threshold
+    default: 0.8
+    min: 0.0
+    max: 1.0
+    description: "Minimum cosine similarity to consider correct (for semantic_sim method)"
+  max_samples:
+    type: integer
+    label: Max Samples
+    default: 0
+    min: 0
+    description: "Limit evaluation to N samples (0 = all)"
+  embedding_model:
+    type: string
+    label: Embedding Model
+    default: "all-MiniLM-L6-v2"
+    description: "sentence-transformers model for semantic similarity (used when method=semantic_sim)"
+  judge_timeout:
+    type: integer
+    label: Judge Timeout (s)
+    default: 30
+    min: 5
+    max: 300
+    description: Timeout in seconds for each LLM judge request
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"

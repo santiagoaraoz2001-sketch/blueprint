@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+backend/venv/
+.eggs/
+
+# Node
+node_modules/
+frontend/out/
+frontend/dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite3
+
+# Specific Labs data dir
+.specific-labs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PyInstaller
+*.spec.bak
+
+# Electron build output
+frontend/out/
+
+# Icon generation artifacts
+frontend/electron/icon.iconset/
+
+# Claude Code local config
+.claude/
+
+# Build logs
+pyinstaller_log.txt
+
+# TypeScript build info
+*.tsbuildinfo

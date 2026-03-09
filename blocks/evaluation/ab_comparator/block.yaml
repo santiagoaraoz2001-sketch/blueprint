@@ -1,0 +1,128 @@
+name: A/B Comparator
+type: ab_comparator
+category: evaluation
+description: Compare two or three models side-by-side on the same inputs — compute win rates and preference metrics
+version: "2.0.0"
+
+inputs:
+  - id: model_a
+    label: Model A
+    data_type: model
+    required: false
+    description: First model to compare
+  - id: model_b
+    label: Model B
+    data_type: model
+    required: false
+    description: Second model to compare
+  - id: model_c
+    label: Model C
+    data_type: model
+    required: false
+    description: Optional third model for tournament comparison
+  - id: dataset
+    label: Test Data
+    data_type: data
+    required: false
+    description: "Dataset with prompts OR pre-computed responses (columns: _response_a, _response_b)"
+
+outputs:
+  - id: metrics
+    label: Comparison Results
+    data_type: metrics
+    description: Aggregate: total_pairs, model_a/b_wins, ties, model_a/b_win_rate, tie_rate, method
+  - id: dataset
+    label: Annotated Comparisons
+    data_type: data
+    description: Per-item: index, input, response_a, response_b, score_a, score_b, winner (A/B/tie)
+
+  - id: report
+    label: Comparison Report
+    data_type: artifact
+    description: "Detailed comparison: win rates summary, per-sample winner/scores, method config"
+
+config:
+  comparison_method:
+    type: select
+    label: Comparison Method
+    options: [heuristic, llm_judge]
+    default: heuristic
+    description: "heuristic: length/specificity scoring. llm_judge: use judge model."
+  judge_model:
+    type: string
+    label: Judge Model
+    default: ""
+    description: "Ollama model name for LLM-as-judge (used when method=llm_judge)"
+  judge_endpoint:
+    type: string
+    label: Judge Endpoint
+    default: "http://localhost:11434"
+    description: API endpoint for the judge model
+  prompt_column:
+    type: string
+    label: Prompt Column
+    default: "input"
+    description: Column name for prompts in the dataset
+  response_column_a:
+    type: string
+    label: Response A Column
+    default: "_response_a"
+    description: "Column for pre-computed Model A responses (skips inference if present)"
+  response_column_b:
+    type: string
+    label: Response B Column
+    default: "_response_b"
+    description: "Column for pre-computed Model B responses (skips inference if present)"
+  max_samples:
+    type: integer
+    label: Max Samples
+    default: 0
+    min: 0
+    description: "Limit to N comparisons (0 = all)"
+  seed:
+    type: integer
+    label: Random Seed
+    default: 42
+    min: 0
+    description: Random seed for reproducible comparison ordering
+  generation_temperature:
+    type: float
+    label: Generation Temperature
+    default: 0.7
+    min: 0.0
+    max: 2.0
+    description: Temperature for model response generation
+  max_new_tokens:
+    type: integer
+    label: Max New Tokens
+    default: 256
+    min: 1
+    max: 4096
+    description: Maximum tokens to generate per response
+  generation_timeout:
+    type: integer
+    label: Generation Timeout (s)
+    default: 60
+    min: 5
+    max: 600
+    description: Timeout in seconds for each generation request
+  judge_timeout:
+    type: integer
+    label: Judge Timeout (s)
+    default: 30
+    min: 5
+    max: 300
+    description: Timeout in seconds for each judge request
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"

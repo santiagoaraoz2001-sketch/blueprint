@@ -1,0 +1,143 @@
+name: A/B Test Inference
+type: ab_test_inference
+category: inference
+description: Compare outputs from two model configurations side-by-side
+version: "1.0.0"
+
+inputs:
+  - id: text
+    label: Prompt / Input
+    data_type: text
+    required: false
+  - id: dataset
+    label: Test Dataset
+    data_type: dataset
+    required: false
+
+outputs:
+  - id: dataset
+    label: Comparison Results
+    data_type: dataset
+    description: >
+      JSON array of per-prompt comparison objects. Each row contains:
+      prompt (str) — the input prompt text (truncated to 500 chars);
+      response_a (str) — Model A's generated response;
+      response_b (str) — Model B's generated response;
+      model_a (str) — Model A identifier;
+      model_b (str) — Model B identifier;
+      latency_a (float) — Model A mean latency in seconds;
+      latency_b (float) — Model B mean latency in seconds;
+      length_a (int) — Model A response character count;
+      length_b (int) — Model B response character count;
+      std_latency_a (float, optional) — latency standard deviation for A (when num_runs > 1);
+      std_latency_b (float, optional) — latency standard deviation for B (when num_runs > 1);
+      num_runs (int, optional) — number of runs per prompt (when num_runs > 1).
+      Output format configurable via dataset_format (json, jsonl, csv).
+  - id: metrics
+    label: Quality Metrics
+    data_type: metrics
+    description: >
+      Aggregated A/B comparison statistics. Fields:
+      model_a (str) — Model A identifier;
+      model_b (str) — Model B identifier;
+      num_prompts (int) — total number of prompts compared;
+      avg_latency_a (float) — mean latency for Model A in seconds;
+      avg_latency_b (float) — mean latency for Model B in seconds;
+      avg_length_a (int) — mean response length for Model A in characters;
+      avg_length_b (int) — mean response length for Model B in characters;
+      total_latency_a (float) — sum of all Model A latencies in seconds;
+      total_latency_b (float) — sum of all Model B latencies in seconds.
+
+config:
+  provider_a:
+    type: select
+    label: Provider A
+    options: [ollama, mlx, openai, anthropic]
+    default: ollama
+  model_a:
+    type: string
+    label: Model A
+    default: "llama3.2"
+  provider_b:
+    type: select
+    label: Provider B
+    options: [ollama, mlx, openai, anthropic]
+    default: ollama
+  model_b:
+    type: string
+    label: Model B
+    default: "mistral"
+  endpoint_a:
+    type: string
+    label: Endpoint A
+    default: "http://localhost:11434"
+  endpoint_b:
+    type: string
+    label: Endpoint B
+    default: "http://localhost:11434"
+  api_key_a:
+    type: string
+    label: API Key A
+    default: ""
+  api_key_b:
+    type: string
+    label: API Key B
+    default: ""
+  temperature_a:
+    type: float
+    label: Temperature A
+    default: 0.7
+    min: 0.0
+    max: 2.0
+  temperature_b:
+    type: float
+    label: Temperature B
+    default: 0.7
+    min: 0.0
+    max: 2.0
+  max_tokens:
+    type: integer
+    label: Max Tokens
+    default: 512
+    min: 1
+    max: 32768
+  text_column:
+    type: string
+    label: Text Column
+    default: "text"
+    description: "Column containing prompts when using a dataset input"
+  system_prompt:
+    type: text_area
+    label: System Prompt
+    default: ""
+    description: "System prompt sent to both models"
+  single_prompt:
+    type: text_area
+    label: Single Prompt
+    default: ""
+    description: "Direct prompt (overridden by connected text input)"
+  num_runs:
+    type: integer
+    label: Runs Per Prompt
+    default: 1
+    min: 1
+    max: 10
+    description: "Repeat each prompt N times for statistical significance. Results include mean/std latency"
+  seed_a:
+    type: integer
+    label: Seed (Model A)
+    default: -1
+    min: -1
+    description: "Random seed for model A (-1 = random). For reproducible comparisons."
+  seed_b:
+    type: integer
+    label: Seed (Model B)
+    default: -1
+    min: -1
+    description: "Random seed for model B (-1 = random). For reproducible comparisons."
+  dataset_format:
+    type: select
+    label: Dataset Format
+    description: "Output format for results — json (default), jsonl (one JSON object per line), csv (comma-separated values)"
+    default: json
+    options: [json, jsonl, csv]

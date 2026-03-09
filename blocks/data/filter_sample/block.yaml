@@ -1,0 +1,99 @@
+name: Filter & Sample
+type: filter_sample
+category: data
+description: Filter rows by length, regex, quality score, dedup, or take a random sample
+version: "2.0.0"
+
+inputs:
+  - id: dataset
+    label: Dataset
+    data_type: dataset
+    required: true
+
+outputs:
+  - id: dataset
+    label: Filtered
+    data_type: dataset
+    description: "JSON array of rows that passed the filter. Same schema as input."
+  - id: rejected
+    label: Rejected
+    data_type: dataset
+    description: "JSON array of rows that failed the filter. Useful for inspecting what was removed."
+  - id: stats
+    label: Stats
+    data_type: metrics
+    description: "Object with original, kept, rejected, drop_rate"
+
+config:
+  method:
+    type: select
+    label: Filter Method
+    options: [length, quality_score, regex, random_sample, dedup, top_k, not_empty, value_match]
+    default: length
+    description: Filtering strategy
+  text_column:
+    type: string
+    label: Target Column
+    default: text
+    description: Column to filter on (used by length, regex, not_empty, and value_match methods)
+  min_length:
+    type: integer
+    label: Min Length (chars)
+    default: 10
+    min: 0
+    description: Minimum character length (for length method)
+  max_length:
+    type: integer
+    label: Max Length (chars)
+    default: 0
+    min: 0
+    description: "Maximum character length, 0 = unlimited"
+  regex_pattern:
+    type: string
+    label: Regex Pattern
+    default: ""
+    description: Regex pattern to match against target column
+  regex_mode:
+    type: select
+    label: Regex Mode
+    options: [keep_match, remove_match]
+    default: keep_match
+    description: Whether to keep or remove matching rows
+  score_column:
+    type: string
+    label: Score Column
+    default: quality_score
+    description: Column containing numeric quality scores
+  min_score:
+    type: float
+    label: Min Score
+    default: 0.5
+    min: 0
+    max: 1
+    description: Minimum score threshold
+  dedup_columns:
+    type: string
+    label: Dedup Columns
+    default: ""
+    description: "Comma-separated columns for dedup (empty = all columns)"
+  top_k:
+    type: integer
+    label: Top K
+    default: 100
+    min: 1
+    description: Keep top K rows by score
+  match_values:
+    type: string
+    label: Match Values
+    default: ""
+    description: "Comma-separated values to keep (for value_match method)"
+  sample_size:
+    type: integer
+    label: Sample Size
+    default: 0
+    min: 0
+    description: "Number of rows to sample after filtering, 0 = no sampling"
+  seed:
+    type: integer
+    label: Random Seed
+    default: 42

@@ -1,0 +1,25 @@
+name: Control Tower
+type: control_tower
+category: flow
+description: Pipe telemetry and data to a local Control Tower instance
+version: "1.0.0"
+
+inputs:
+  - id: telemetry
+    label: Data / Telemetry
+    data_type: any
+    required: true
+
+outputs: []
+
+config:
+  host:
+    type: string
+    label: CT Host
+    description: Control Tower host address
+    default: "http://localhost"
+  port:
+    type: integer
+    label: CT Port
+    description: Control Tower port number
+    default: 4173

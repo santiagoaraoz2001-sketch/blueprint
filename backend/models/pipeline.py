@@ -1,0 +1,16 @@
+from datetime import datetime, timezone
+from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey
+from ..database import Base
+
+
+class Pipeline(Base):
+    __tablename__ = "blueprint_pipelines"
+
+    id = Column(String, primary_key=True)
+    experiment_id = Column(String, ForeignKey("blueprint_experiments.id"), nullable=True)
+    project_id = Column(String, ForeignKey("blueprint_projects.id"), nullable=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, default="")
+    definition = Column(JSON, default=dict)  # Full DAG: nodes, edges, block configs
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

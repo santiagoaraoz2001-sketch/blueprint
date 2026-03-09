@@ -1,0 +1,83 @@
+name: Coherence Eval
+type: coherence_eval
+category: evaluation
+description: Evaluate text quality — coherence, fluency, readability, and repetition detection
+version: "1.0.0"
+
+inputs:
+  - id: dataset
+    label: Text Data
+    data_type: data
+    required: false
+    description: Dataset containing texts to evaluate
+  - id: model
+    label: Scorer Model
+    data_type: model
+    required: false
+    description: "Optional: LLM for perplexity-based fluency scoring"
+
+outputs:
+  - id: metrics
+    label: Quality Scores
+    data_type: metrics
+    description: Aggregate: avg_word_count, avg_flesch_kincaid, avg_repetition_ratio, avg_vocabulary_diversity, degenerate count/rate
+  - id: dataset
+    label: Annotated Data
+    data_type: data
+    description: Per-text: text, word_count, flesch_kincaid_grade, repetition_ratio, vocabulary_diversity, too_short, is_degenerate
+
+  - id: report
+    label: Quality Report
+    data_type: artifact
+    description: "Text quality analysis: score distributions, flagged texts, metric breakdowns by category"
+
+config:
+  text_column:
+    type: string
+    label: Text Column
+    default: "text"
+    description: Column containing text to evaluate
+  metrics_to_compute:
+    type: string
+    label: Metrics
+    default: "readability,repetition,length,vocabulary"
+    description: "Comma-separated: readability, repetition, length, vocabulary, perplexity"
+  min_length:
+    type: integer
+    label: Min Expected Length (words)
+    default: 10
+    min: 1
+    description: Texts shorter than this are flagged as too short
+  max_repetition_ratio:
+    type: float
+    label: Max Repetition Ratio
+    default: 0.3
+    min: 0.0
+    max: 1.0
+    description: "Fraction of repeated n-grams above which text is flagged as degenerate"
+  max_samples:
+    type: integer
+    label: Max Samples
+    default: 0
+    min: 0
+    description: "Limit to N samples (0 = all)"
+  repetition_ngram_size:
+    type: integer
+    label: Repetition N-gram Size
+    default: 3
+    min: 1
+    max: 10
+    description: N-gram size for repetition detection (larger catches longer repeated phrases)
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"

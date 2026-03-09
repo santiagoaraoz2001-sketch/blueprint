@@ -1,0 +1,26 @@
+name: Artifact Viewer
+type: artifact_viewer
+category: flow
+description: View, inspect, and download generated artifacts
+version: "1.0.0"
+
+inputs:
+  - id: artifact
+    label: Artifact
+    data_type: data
+    required: true
+
+outputs: []
+
+config:
+  auto_open:
+    type: boolean
+    label: Auto-Open
+    description: Automatically display artifact when ready
+    default: true
+  display_mode:
+    type: select
+    label: Display
+    description: How to display the artifact
+    default: preview
+    options: [preview, raw, download]

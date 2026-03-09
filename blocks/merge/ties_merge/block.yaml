@@ -1,0 +1,47 @@
+name: TIES Merge
+type: ties_merge
+category: merge
+description: Task Interference Elimination with Sign consensus
+version: "1.0.0"
+
+inputs:
+  - id: model_a
+    label: Model A
+    data_type: model
+    required: true
+  - id: model_b
+    label: Model B
+    data_type: model
+    required: true
+  - id: base
+    label: Base Model
+    data_type: model
+    required: true
+
+outputs:
+  - id: model
+    label: TIES Model
+    data_type: model
+  - id: metrics
+    label: Merge Metrics
+    data_type: metrics
+
+config:
+  density:
+    type: float
+    label: Density
+    description: "Proportion of parameters retained after trimming"
+    default: 0.5
+    min: 0
+    max: 1
+  weight:
+    type: float
+    label: Weight
+    description: "Weight for Model B task vector"
+    default: 1.0
+    min: 0
+  output_name:
+    type: string
+    label: Output Name
+    description: Name for the merged model
+    default: "ties-merged-model"

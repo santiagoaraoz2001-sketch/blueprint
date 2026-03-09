@@ -1,0 +1,39 @@
+name: Config File Loader
+type: config_file_loader
+category: source
+description: Load a JSON, YAML, or TOML config file from disk with optional schema validation
+version: "2.0.0"
+
+inputs: []
+
+outputs:
+  - id: config
+    label: Config
+    data_type: config
+    description: "JSON file (config.json): parsed config object from source file. All formats (JSON/YAML/TOML) are normalized to JSON output."
+
+config:
+  file_path:
+    type: file_path
+    label: File Path
+    description: "Path to config file (JSON, YAML, or TOML)"
+    default: ""
+  format:
+    type: select
+    label: Format
+    description: "File format (auto-detect from extension)"
+    default: auto
+    options: [auto, json, yaml, toml]
+  validate_schema:
+    type: boolean
+    label: Validate Schema
+    default: false
+    description: "Validate loaded config against a JSON Schema"
+  schema_path:
+    type: file_path
+    label: Schema Path
+    default: ""
+    description: "Path to JSON Schema file for validation"
+    depends_on:
+      field: validate_schema
+      value: true

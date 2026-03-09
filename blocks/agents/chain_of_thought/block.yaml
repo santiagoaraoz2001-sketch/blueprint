@@ -1,0 +1,80 @@
+name: Chain of Thought
+type: chain_of_thought
+category: agents
+description: Multi-step LLM reasoning with chain-of-thought prompting and optional self-consistency
+version: "1.1.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+  - id: input
+    label: Question / Prompt
+    data_type: text
+    required: true
+
+outputs:
+  - id: response
+    label: Final Answer
+    data_type: text
+  - id: dataset
+    label: Reasoning Chain
+    data_type: dataset
+  - id: metrics
+    label: Reasoning Metrics
+    data_type: metrics
+
+config:
+  num_steps:
+    type: integer
+    label: Reasoning Steps
+    default: 3
+    min: 1
+    max: 10
+    description: Number of reasoning steps in the chain
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.3
+    min: 0.0
+    max: 2.0
+  max_tokens:
+    type: integer
+    label: Max Tokens per Step
+    default: 512
+    min: 64
+    max: 8192
+  self_consistency:
+    type: integer
+    label: Self-Consistency Samples
+    default: 1
+    min: 1
+    max: 20
+    description: "Generate N independent chains and select the most consistent answer (1 = disabled)"
+  output_mode:
+    type: select
+    label: Output Mode
+    options: [full_chain, final_only]
+    default: full_chain
+    description: "full_chain: include all reasoning steps in output, final_only: only the last step's answer"
+  custom_steps:
+    type: text_area
+    label: Custom Step Prompts
+    default: ""
+    description: "Optional: one prompt template per line. Use {input}, {previous}, {step_num} as placeholders."
+  output_format:
+    type: select
+    label: Output Format
+    options: [plain, markdown, json]
+    default: markdown
+    description: "plain: raw text, markdown: headers per step, json: structured {steps, final_answer, metadata}"
+  provider:
+    type: select
+    label: Provider
+    options: [ollama, openai, anthropic, mlx]
+    default: ollama
+  endpoint:
+    type: string
+    label: Endpoint URL
+    default: "http://localhost:11434"

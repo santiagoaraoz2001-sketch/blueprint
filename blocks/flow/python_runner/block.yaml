@@ -1,0 +1,70 @@
+name: Python Runner
+type: python_runner
+category: flow
+description: Run custom Python code as a pipeline block — paste code or reference a script file
+version: "2.0.0"
+
+inputs:
+  - id: input_data
+    label: Input Data
+    data_type: any
+    required: false
+    description: "Any data from upstream — access via ctx.load_input('input_data')"
+  - id: config
+    label: Config
+    data_type: config
+    required: false
+    description: "Config object — access via ctx.load_input('config')"
+  - id: context
+    label: Context
+    data_type: text
+    required: false
+    description: "Text context — access via ctx.load_input('context')"
+
+outputs:
+  - id: output_data
+    label: Output Data
+    data_type: any
+    description: "User-defined output. Set via ctx.save_output('output_data', result). Can be any data type: dict, list, file path, etc."
+
+config:
+  script:
+    type: text_area
+    label: Python Script
+    default: "# Access inputs via: ctx.load_input('input_data')\n# Save outputs via: ctx.save_output('output_data', result)\n# Log messages via: ctx.log_message('hello')\n\nctx.log_message('Python Runner executed successfully')\nctx.save_output('output_data', {'status': 'ok'})\n"
+    description: "Python code to execute. Use ctx for BlockContext methods."
+  script_path:
+    type: file_path
+    label: Script File Path
+    default: ""
+    description: "Optional: path to .py file (overrides inline script)"
+  timeout_seconds:
+    type: integer
+    label: Timeout (seconds)
+    default: 300
+    min: 10
+    max: 3600
+  trust_level:
+    type: select
+    label: Trust Level
+    default: sandboxed
+    options: [sandboxed, trusted, system]
+    description: "sandboxed = restricted builtins, trusted = full Python, system = unrestricted"
+  requirements:
+    type: string
+    label: Pip Requirements
+    default: ""
+    description: "Comma-separated pip packages to install before running"
+  env_vars:
+    type: text_area
+    label: Environment Variables
+    default: ""
+    description: "KEY=VALUE pairs, one per line. Set before script runs."
+  allowed_modules:
+    type: string
+    label: Allowed Modules
+    default: ""
+    description: "Comma-separated modules allowed in sandboxed mode (e.g. 'pandas,numpy,sklearn'). Empty = no imports."
+    depends_on:
+      field: trust_level
+      value: sandboxed

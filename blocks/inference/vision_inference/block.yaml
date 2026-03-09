@@ -1,0 +1,89 @@
+name: Vision Inference
+type: vision_inference
+category: inference
+description: Image understanding with multimodal LLMs (GPT-4o, Claude, LLaVA)
+version: "1.0.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+  - id: image
+    label: Image
+    data_type: artifact
+    required: false
+  - id: text
+    label: Additional Context
+    data_type: text
+    required: false
+
+outputs:
+  - id: response
+    label: Description / Response
+    data_type: text
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+
+config:
+  provider:
+    type: select
+    label: Provider
+    options: [openai, anthropic, ollama]
+    default: openai
+    description: "Provider must support vision (GPT-4o, Claude, LLaVA via Ollama)"
+  model_name:
+    type: string
+    label: Model Name
+    default: "gpt-4o"
+    description: "Vision-capable model (gpt-4o, claude-sonnet-4-20250514, llava)"
+  prompt:
+    type: text_area
+    label: Prompt
+    default: "Describe this image in detail."
+    description: "What to ask about the image"
+  image_path:
+    type: string
+    label: Image Path
+    default: ""
+    description: "Path to image file (overridden by connected image input)"
+  endpoint:
+    type: string
+    label: Endpoint URL
+    default: "https://api.openai.com"
+  api_key:
+    type: string
+    label: API Key
+    default: ""
+    description: "API key for cloud providers"
+  max_tokens:
+    type: integer
+    label: Max Tokens
+    default: 1024
+    min: 1
+    max: 8192
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.5
+    min: 0.0
+    max: 2.0
+  detail:
+    type: select
+    label: Image Detail
+    options: [auto, low, high]
+    default: auto
+    description: "Image analysis detail level (OpenAI only)"
+  system_prompt:
+    type: text_area
+    label: System Prompt
+    default: ""
+    description: "System instruction (e.g. 'Extract all visible text' or 'Describe for accessibility')"
+  resize_max:
+    type: integer
+    label: Max Image Dimension
+    default: 0
+    min: 0
+    max: 4096
+    description: "Resize if larger than this (pixels). 0 = no resize. Reduces token cost"

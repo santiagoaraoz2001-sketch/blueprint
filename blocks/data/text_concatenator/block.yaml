@@ -1,0 +1,63 @@
+name: Text Concatenator
+type: text_concatenator
+category: data
+description: Combine multiple text inputs into a single output
+version: "2.0.0"
+
+inputs:
+  - id: text_a
+    label: Text A
+    data_type: text
+    required: true
+  - id: text_b
+    label: Text B
+    data_type: text
+    required: true
+  - id: text_c
+    label: Text C
+    data_type: text
+    required: false
+
+outputs:
+  - id: text
+    label: Combined Text
+    data_type: text
+    description: "Single text file containing the concatenated result. Template placeholders are replaced, prefix/suffix applied, then truncated to max_length if set."
+
+config:
+  separator:
+    type: string
+    label: Separator
+    default: "\n\n"
+    description: Separator between text inputs
+  template:
+    type: text_area
+    label: Template
+    default: "{text_a}{separator}{text_b}"
+    description: "Use {text_a}, {text_b}, {text_c}, {separator}"
+  trim_whitespace:
+    type: boolean
+    label: Trim Whitespace
+    default: true
+    description: Trim leading/trailing whitespace from inputs and result
+  skip_empty:
+    type: boolean
+    label: Skip Empty Inputs
+    default: true
+    description: Omit empty text inputs from concatenation
+  prefix:
+    type: string
+    label: Prefix
+    default: ""
+    description: "Text prepended to the final output (e.g. prompt markers like <s>[INST])"
+  suffix:
+    type: string
+    label: Suffix
+    default: ""
+    description: "Text appended to the final output (e.g. prompt markers like [/INST])"
+  max_length:
+    type: integer
+    label: Max Length
+    default: 0
+    min: 0
+    description: "Truncate output to this many characters (0 = unlimited). Useful as a prompt size guard."

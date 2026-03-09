@@ -1,0 +1,294 @@
+"""System information endpoints — hardware profile, capability detection,
+benchmark data, and parallel scheduling."""
+
+from __future__ import annotations
+
+import ast
+import importlib
+import re
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, Body, Query, HTTPException
+
+from ..config import BUILTIN_BLOCKS_DIR, BLOCKS_DIR
+
+SAFE_MODEL_ID = re.compile(r'^[a-zA-Z0-9_\-./]+$')
+
+from ..utils.hardware import get_hardware_profile
+from ..utils.benchmarks import get_benchmarks, search_benchmarks, refresh_cache
+from ..engine.parallelizer import build_schedule, explain_schedule
+
+router = APIRouter(prefix="/api/system", tags=["system"])
+
+
+@router.get("/hardware")
+def hardware():
+    """Return the full hardware profile of the host machine."""
+    return get_hardware_profile()
+
+
+@router.get("/capabilities")
+def capabilities():
+    """Derive high-level ML capabilities from the hardware profile.
+
+    Returns a dict indicating what the current machine can reasonably do
+    (e.g. run local LLMs, fine-tune, use GPU acceleration, etc.).
+    """
+    profile = get_hardware_profile()
+
+    ram_gb = profile.get("ram", {}).get("total_gb", 0)
+    gpus = profile.get("gpu", [])
+    accel = profile.get("accelerators", {})
+    disk_free = profile.get("disk", {}).get("free_gb", 0)
+
+    # Best available GPU VRAM
+    max_vram = max((g.get("vram_gb", 0) for g in gpus), default=0)
+
+    # GPU backend
+    has_gpu = any(g.get("type") in ("metal", "cuda", "rocm") for g in gpus)
+    gpu_backend = "none"
+    for g in gpus:
+        if g.get("type") in ("metal", "cuda", "rocm"):
+            gpu_backend = g["type"]
+            break
+
+    # What size models can we run?
+    # Rough heuristic: model needs ~1.2x its parameter-count in GB of VRAM/RAM
+    usable_memory = max(max_vram, ram_gb * 0.7)  # if unified memory, use RAM
+
+    if usable_memory >= 48:
+        max_model_size = "70b"
+    elif usable_memory >= 24:
+        max_model_size = "34b"
+    elif usable_memory >= 14:
+        max_model_size = "13b"
+    elif usable_memory >= 6:
+        max_model_size = "7b"
+    elif usable_memory >= 3:
+        max_model_size = "3b"
+    else:
+        max_model_size = "1b"
+
+    return {
+        "gpu_available": has_gpu,
+        "gpu_backend": gpu_backend,
+        "max_vram_gb": max_vram,
+        "usable_memory_gb": round(usable_memory, 1),
+        "max_model_size": max_model_size,
+        "can_fine_tune": has_gpu and usable_memory >= 8,
+        "can_run_local_llm": usable_memory >= 4,
+        "disk_ok": disk_free >= 10,
+        "accelerators": accel,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Benchmarks
+# ---------------------------------------------------------------------------
+
+
+@router.get("/benchmarks/{model_id:path}")
+def model_benchmarks(model_id: str):
+    """Return benchmark scores for a specific model."""
+    if not SAFE_MODEL_ID.match(model_id):
+        raise HTTPException(400, "Invalid model ID")
+    result = get_benchmarks(model_id)
+    if result is None:
+        return {"model_id": model_id, "scores": {}, "source": "not_found"}
+    return result.to_dict()
+
+
+@router.get("/benchmarks")
+def benchmark_search(
+    q: str = Query("", description="Model name substring"),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """Search benchmark results by model name."""
+    results = search_benchmarks(q, limit=limit)
+    return [r.to_dict() for r in results]
+
+
+@router.post("/benchmarks/refresh")
+def benchmark_refresh():
+    """Force-refresh the benchmark cache from the HuggingFace leaderboard."""
+    count = refresh_cache(force=True)
+    return {"status": "refreshed", "entries": count}
+
+
+# ---------------------------------------------------------------------------
+# Parallel scheduler
+# ---------------------------------------------------------------------------
+
+
+@router.post("/schedule")
+def compute_schedule(
+    payload: dict[str, Any] = Body(..., description="Pipeline definition with nodes and edges"),
+):
+    """Compute a resource-aware parallel execution schedule for a pipeline.
+
+    Expects ``{ "nodes": [...], "edges": [...] }`` in the request body.
+    Returns the list of execution stages with human-readable labels.
+    """
+    nodes = payload.get("nodes", [])
+    edges = payload.get("edges", [])
+    hw_profile = get_hardware_profile()
+    schedule = build_schedule(nodes, edges, hw_profile)
+    return {
+        "stages": explain_schedule(schedule, nodes),
+        "total_stages": len(schedule),
+        "max_parallelism": max((len(s) for s in schedule), default=0),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Dependency Health Check
+# ---------------------------------------------------------------------------
+
+# Package -> pip install name (when they differ)
+_INSTALL_MAP = {
+    'sklearn': 'scikit-learn',
+    'cv2': 'opencv-python',
+    'yaml': 'pyyaml',
+    'PIL': 'Pillow',
+    'bs4': 'beautifulsoup4',
+    'attr': 'attrs',
+    'dotenv': 'python-dotenv',
+}
+
+# Standard library modules to exclude
+_STDLIB_MODULES = {
+    'os', 'sys', 'json', 'math', 'time', 're', 'io', 'csv', 'copy',
+    'pathlib', 'typing', 'collections', 'itertools', 'functools',
+    'dataclasses', 'abc', 'enum', 'datetime', 'logging', 'hashlib',
+    'base64', 'uuid', 'shutil', 'tempfile', 'subprocess', 'threading',
+    'multiprocessing', 'socket', 'http', 'urllib', 'email', 'html',
+    'xml', 'sqlite3', 'argparse', 'textwrap', 'string', 'struct',
+    'pickle', 'gzip', 'zipfile', 'tarfile', 'glob', 'fnmatch',
+    'signal', 'contextlib', 'warnings', 'traceback', 'inspect',
+    'importlib', 'pkgutil', 'operator', 'statistics', 'random',
+    'secrets', 'heapq', 'bisect', 'array', 'queue', 'weakref',
+    'types', 'pprint', 'platform', 'ast', 'dis', 'code', 'codecs',
+    'locale', 'gettext', 'unicodedata', 'difflib', 'readline',
+    'rlcompleter', 'pdb', 'profile', 'timeit', 'unittest', 'doctest',
+    'numbers', 'decimal', 'fractions', 'cmath', 'configparser',
+}
+
+
+def _extract_imports(run_py: Path) -> list[str]:
+    """Parse top-level imports from a run.py file using AST."""
+    try:
+        tree = ast.parse(run_py.read_text())
+    except Exception:
+        return []
+    modules = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                modules.add(alias.name.split('.')[0])
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                modules.add(node.module.split('.')[0])
+    return sorted(modules)
+
+
+def _scan_all_block_deps() -> dict[str, list[str]]:
+    """Walk all block directories, parse imports from run.py files."""
+    result: dict[str, list[str]] = {}
+    for base_dir in [BUILTIN_BLOCKS_DIR, BLOCKS_DIR]:
+        if not base_dir.exists():
+            continue
+        for run_py in base_dir.rglob('run.py'):
+            block_type = run_py.parent.name
+            imports = _extract_imports(run_py)
+            third_party = [m for m in imports if m not in _STDLIB_MODULES and m != 'backend']
+            if third_party:
+                result[block_type] = third_party
+    return result
+
+
+def _check_package(package: str) -> dict:
+    """Check if a package is importable and get its version."""
+    try:
+        mod = importlib.import_module(package)
+        version = getattr(mod, '__version__', 'installed')
+        return {'package': package, 'installed': True, 'version': str(version)}
+    except ImportError:
+        return {'package': package, 'installed': False, 'version': None}
+
+
+@router.get("/dependencies")
+def check_dependencies():
+    """Return dependency status for all blocks."""
+    block_deps = _scan_all_block_deps()
+
+    # Check all unique packages once
+    all_packages: set[str] = set()
+    for deps in block_deps.values():
+        all_packages.update(deps)
+
+    package_status = {pkg: _check_package(pkg) for pkg in sorted(all_packages)}
+
+    # Map back to blocks
+    block_status: dict[str, dict] = {}
+    for block_type, deps in block_deps.items():
+        missing = [d for d in deps if not package_status.get(d, {}).get('installed', False)]
+        block_status[block_type] = {
+            'ready': len(missing) == 0,
+            'total_deps': len(deps),
+            'missing': missing,
+            'install_command': f"pip install {' '.join(_INSTALL_MAP.get(m, m) for m in missing)}" if missing else None,
+        }
+
+    total_blocks = len(block_status)
+    ready_blocks = sum(1 for b in block_status.values() if b['ready'])
+
+    # Virtual environment detection
+    in_venv = sys.prefix != sys.base_prefix
+
+    return {
+        'summary': {
+            'total_blocks': total_blocks,
+            'ready_blocks': ready_blocks,
+            'missing_packages': [p for p, s in package_status.items() if not s['installed']],
+            'in_virtual_env': in_venv,
+        },
+        'packages': package_status,
+        'blocks': block_status,
+    }
+
+
+@router.post("/install")
+def install_packages(body: dict):
+    """Install missing packages via pip. Only allows packages found in block dependencies."""
+    packages = body.get('packages', [])
+    if not packages:
+        return {'error': 'No packages specified'}
+
+    # Validate: only allow known packages from block deps
+    block_deps = _scan_all_block_deps()
+    allowed: set[str] = set()
+    for deps in block_deps.values():
+        allowed.update(deps)
+
+    safe = [_INSTALL_MAP.get(p, p) for p in packages if p in allowed]
+    if not safe:
+        return {'success': False, 'error': 'No valid packages specified'}
+
+    try:
+        result = subprocess.run(
+            [sys.executable, '-m', 'pip', 'install', *safe],
+            capture_output=True, text=True, timeout=300,
+        )
+        return {
+            'success': result.returncode == 0,
+            'stdout': result.stdout[-2000:] if result.stdout else '',
+            'stderr': result.stderr[-2000:] if result.stderr else '',
+            'installed': safe,
+        }
+    except subprocess.TimeoutExpired:
+        return {'success': False, 'error': 'Installation timed out after 5 minutes'}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}

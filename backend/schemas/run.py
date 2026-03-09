@@ -1,0 +1,18 @@
+from pydantic import BaseModel
+from datetime import datetime
+from typing import Any
+
+
+class RunResponse(BaseModel):
+    id: str
+    pipeline_id: str
+    mlflow_run_id: str | None
+    status: str
+    started_at: datetime
+    finished_at: datetime | None
+    duration_seconds: float | None
+    error_message: str | None
+    config_snapshot: dict[str, Any]
+    metrics: dict[str, Any]
+
+    model_config = {"from_attributes": True}

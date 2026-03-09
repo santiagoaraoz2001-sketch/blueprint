@@ -1,0 +1,87 @@
+name: Agent Orchestrator
+type: agent_orchestrator
+category: agents
+description: Multi-step agent that reasons through tasks using tools and memory
+version: "1.1.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+  - id: input
+    label: Task / Prompt
+    data_type: text
+    required: true
+  - id: tools
+    label: Tool Registry
+    data_type: config
+    required: false
+  - id: memory
+    label: Agent Memory
+    data_type: config
+    required: false
+
+outputs:
+  - id: response
+    label: Final Response
+    data_type: text
+  - id: dataset
+    label: Step Log
+    data_type: dataset
+  - id: metrics
+    label: Run Metrics
+    data_type: metrics
+
+config:
+  system_prompt:
+    type: text_area
+    label: System Prompt
+    default: "You are a helpful assistant that breaks down tasks into steps and uses tools when needed. Think step by step."
+    description: System instructions for the agent
+  max_steps:
+    type: integer
+    label: Max Steps
+    default: 10
+    min: 1
+    max: 50
+    description: Maximum number of reasoning steps before stopping
+  strategy:
+    type: select
+    label: Strategy
+    options: [sequential, react, plan_and_execute]
+    default: sequential
+    description: "sequential: step-by-step, react: reason-act-observe loops, plan_and_execute: plan first then execute"
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.3
+    min: 0.0
+    max: 2.0
+  max_tokens:
+    type: integer
+    label: Max Tokens per Step
+    default: 1024
+    min: 64
+    max: 8192
+  provider:
+    type: select
+    label: Provider
+    options: [ollama, openai, anthropic, mlx]
+    default: ollama
+  endpoint:
+    type: string
+    label: Endpoint URL
+    default: "http://localhost:11434"
+    description: Provider API endpoint
+  stop_phrase:
+    type: string
+    label: Completion Signal
+    default: "FINAL ANSWER:"
+    description: Phrase the agent uses to signal it has finished
+  output_format:
+    type: select
+    label: Output Format
+    options: [plain, markdown, json]
+    default: plain
+    description: "plain: raw text, markdown: formatted with headers, json: structured JSON object"

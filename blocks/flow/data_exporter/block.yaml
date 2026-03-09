@@ -1,0 +1,79 @@
+name: Data Exporter
+type: data_exporter
+category: endpoints
+description: Export pipeline data to JSON, JSONL, CSV, TSV, Markdown, or LaTeX format.
+version: "2.0.0"
+
+inputs:
+  - id: data
+    label: Input Data
+    data_type: dataset
+    required: true
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+    required: false
+
+outputs:
+  - id: file_path
+    label: File Path
+    data_type: text
+    description: "Absolute path to the exported file"
+  - id: row_count
+    label: Row Count
+    data_type: metrics
+    description: "Object with keys: rows_exported (int), file_size_bytes (int), format (string)"
+
+config:
+  format:
+    type: select
+    label: Format
+    options: [json, jsonl, csv, tsv, markdown, latex]
+    default: json
+    description: Output file format
+  filename:
+    type: string
+    label: Filename (no extension)
+    default: output
+  path:
+    type: string
+    label: Save Directory
+    default: ./exports/
+  indent:
+    type: integer
+    label: JSON Indent
+    default: 2
+    min: 0
+    max: 8
+    depends_on:
+      field: format
+      value: json
+  include_metadata:
+    type: boolean
+    label: Include Run Metadata
+    default: false
+  overwrite:
+    type: boolean
+    label: Overwrite Existing
+    default: true
+  timestamp_filename:
+    type: boolean
+    label: Timestamp Filename
+    default: false
+    description: Append timestamp to filename for versioning
+  encoding:
+    type: select
+    label: Encoding
+    options: [utf-8, ascii, latin-1]
+    default: utf-8
+  columns_filter:
+    type: string
+    label: Columns Filter
+    default: ""
+    description: Comma-separated column names to include (empty = all)
+  max_rows:
+    type: integer
+    label: Max Rows
+    default: 0
+    min: 0
+    description: Limit exported rows (0 = no limit)

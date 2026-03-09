@@ -1,0 +1,100 @@
+name: HumanEval
+type: human_eval
+category: evaluation
+description: Evaluate code generation quality using the HumanEval benchmark with pass@k metrics
+version: "2.0.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: Code generation model to evaluate (Ollama, HF, or MLX)
+
+outputs:
+  - id: metrics
+    label: Pass@k Scores
+    data_type: metrics
+    description: Aggregate: pass@{k} for each configured k, num_problems, total_samples, model, temperature
+  - id: results
+    label: Detailed Results
+    data_type: artifact
+    description: human_eval_results.json: metrics dict, per-problem results with task_id, passed, completions
+
+  - id: dataset
+    label: Problem Results
+    data_type: data
+    description: "Per-problem results: task_id, prompt_preview, passed, num_samples, difficulty"
+
+config:
+  model_name:
+    type: string
+    label: Model Name
+    default: ""
+    description: "Model identifier (overridden by connected model input)"
+  k_values:
+    type: string
+    label: k Values
+    default: "1,10,100"
+    description: "Comma-separated k values for pass@k evaluation"
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.8
+    min: 0.0
+    max: 2.0
+    description: Sampling temperature for code generation
+  num_problems:
+    type: integer
+    label: Number of Problems
+    default: 164
+    min: 1
+    max: 164
+    description: How many HumanEval problems to evaluate (max 164)
+  num_samples_per_problem:
+    type: integer
+    label: Samples per Problem
+    default: 0
+    min: 0
+    max: 200
+    description: "Completions per problem (0 = auto based on max k)"
+  timeout:
+    type: float
+    label: Execution Timeout (s)
+    default: 5.0
+    min: 1.0
+    max: 30.0
+    description: Timeout in seconds for each test execution
+  seed:
+    type: integer
+    label: Random Seed
+    default: 42
+    min: 0
+    description: Random seed for reproducible evaluation
+  max_new_tokens:
+    type: integer
+    label: Max New Tokens
+    default: 256
+    min: 1
+    max: 4096
+    description: Maximum tokens to generate per code completion
+  inference_timeout:
+    type: integer
+    label: Inference Timeout (s)
+    default: 30
+    min: 5
+    max: 300
+    description: Timeout in seconds for each model inference request
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"

@@ -1,0 +1,68 @@
+name: Cloud Compute Connection
+type: cloud_compute_provider
+category: flow
+description: Offload heavy pipeline tasks to a cloud container (Modal, RunPod, etc.)
+version: "2.0.0"
+
+inputs:
+  - id: dataset
+    label: Input Data
+    data_type: dataset
+    required: false
+    description: "Optional dataset to upload to the cloud container"
+
+outputs:
+  - id: config
+    label: Connection Details
+    data_type: config
+    description: "JSON file (connection.json): {status, provider, instance, region, timeout_minutes, gpu_count, memory_gb, container_image}"
+  - id: dataset
+    label: Output Data
+    data_type: dataset
+    description: "Dataset directory with sync_manifest.json if input was connected, otherwise empty.json"
+
+config:
+  provider:
+    type: select
+    label: Cloud Provider
+    options: [modal, runpod, baseten, replicate, aws_sagemaker]
+    default: "modal"
+  api_key:
+    type: string
+    label: API / Auth Token
+    default: ""
+    description: "Provider API key or authentication token"
+  instance_type:
+    type: select
+    label: Instance Type
+    options: [A100G, H100G, L40S, T4, CPU-Only]
+    default: "A100G"
+  region:
+    type: string
+    label: Region
+    default: "us-east-1"
+    description: "Cloud region for provisioning"
+  gpu_count:
+    type: integer
+    label: GPU Count
+    default: 1
+    min: 1
+    max: 8
+    description: "Number of GPUs to provision (multi-GPU for large model training/eval)"
+  timeout_minutes:
+    type: integer
+    label: Timeout (min)
+    default: 60
+    min: 1
+    description: "Maximum session duration in minutes"
+  memory_gb:
+    type: integer
+    label: Memory (GB)
+    default: 0
+    min: 0
+    description: "Memory in GB (0 = provider default)"
+  container_image:
+    type: string
+    label: Container Image
+    default: ""
+    description: "Docker image or environment slug (e.g. 'python:3.11-slim'). Empty = provider default."

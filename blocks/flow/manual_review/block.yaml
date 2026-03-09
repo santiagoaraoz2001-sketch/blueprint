@@ -1,0 +1,85 @@
+name: Manual Review
+type: manual_review
+category: interventions
+description: Rich human review with configurable scoring rubric — approve, reject, and score data against custom criteria
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Data to Review
+    data_type: any
+    required: true
+
+outputs:
+  - id: approved
+    label: Approved
+    data_type: any
+    description: "Input data forwarded when reviewer approves (None when rejected)"
+  - id: rejected
+    label: Rejected
+    data_type: any
+    description: "Input data routed here when reviewer rejects (None when approved)"
+  - id: notes
+    label: Review Notes
+    data_type: metrics
+    description: "JSON: {review_id, approved, scores, avg_normalized_score, notes, reviewer, rubric, decision_label}"
+
+config:
+  review_criteria:
+    type: text_area
+    label: Review Criteria
+    default: "Check for accuracy and completeness"
+    description: "Instructions and criteria shown to the reviewer"
+  scoring_rubric:
+    type: text_area
+    label: Scoring Rubric
+    default: "overall: 1-5"
+    description: "One criterion per line. Format: 'name: min-max' (e.g., 'accuracy: 1-5'). Comma-separated also works."
+  require_score:
+    type: boolean
+    label: Require Score
+    default: true
+    description: "Whether scores must be provided with the review decision"
+  min_passing_score:
+    type: float
+    label: Min Passing Score (0-1)
+    default: 0.0
+    min: 0
+    max: 1
+    description: "Minimum normalized score to pass. 0 = no minimum (purely manual decision)."
+  auto_approve_after_s:
+    type: integer
+    label: Auto-Approve After (sec)
+    default: 0
+    min: 0
+    description: "Auto-approve if no review within this time. 0 = wait indefinitely."
+  poll_interval_s:
+    type: integer
+    label: Poll Interval (sec)
+    default: 5
+    min: 1
+    max: 60
+    description: "How often to check for the review decision file"
+  review_type:
+    type: select
+    label: Review Type
+    default: "approve_reject"
+    options: ["approve_reject", "scoring_only"]
+    description: "approve_reject = reviewer decides pass/fail; scoring_only = approval is determined by score vs min_passing_score"
+  priority:
+    type: select
+    label: Priority
+    default: "normal"
+    options: ["low", "normal", "high", "critical"]
+    description: "Review priority level (shown to reviewer)"
+  auto_action:
+    type: select
+    label: Timeout Action
+    default: "approve"
+    options: ["approve", "reject"]
+    description: "What to do when the timeout fires — approve or reject the data"
+  decision_options:
+    type: string
+    label: Custom Decision Labels
+    default: ""
+    description: "Comma-separated custom labels for reviewers (e.g., 'safe, flagged, escalate, remove'). Empty = standard approve/reject."

@@ -1,0 +1,93 @@
+name: Streaming Server
+type: streaming_server
+category: inference
+description: Generate an OpenAI-compatible HTTP inference server configuration
+version: "1.0.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+
+outputs:
+  - id: config
+    label: Server Config
+    data_type: config
+    description: >
+      JSON object with the full server configuration. Fields:
+      host (str) — bind address (e.g. "0.0.0.0");
+      port (int) — listening port;
+      model_name (str) — model being served;
+      provider (str) — backend provider ("ollama", "mlx", "openai", "anthropic");
+      backend_endpoint (str) — upstream provider URL;
+      max_concurrent_requests (int) — concurrency limit;
+      cors_enabled (bool) — whether CORS headers are sent;
+      api_key_required (bool) — whether X-API-Key header is enforced;
+      endpoints (dict) — map of endpoint names to full URLs:
+        chat (str), completions (str), embeddings (str), models (str), health (str);
+      backend_routes (dict) — map of route names to upstream URLs:
+        chat (str), generate (str), embeddings (str or null).
+  - id: artifact
+    label: Server Script
+    data_type: artifact
+    description: >
+      Directory containing the generated server files:
+      server.py — a self-contained Python HTTP server script implementing
+      OpenAI-compatible /v1/chat/completions, /v1/completions, /v1/embeddings,
+      /v1/models, and /health endpoints with concurrency limiting and optional
+      CORS and API key authentication;
+      config.json — the server configuration as a JSON file.
+  - id: metrics
+    label: Server Info
+    data_type: metrics
+    description: >
+      Dictionary with fields:
+      host (str) — bind address;
+      port (int) — listening port;
+      model (str) — model being served;
+      provider (str) — backend provider;
+      cors_enabled (bool) — whether CORS is enabled;
+      api_key_required (bool) — whether API key auth is required;
+      max_concurrent (int) — max concurrent requests allowed.
+
+config:
+  host:
+    type: string
+    label: Host
+    default: "0.0.0.0"
+  port:
+    type: integer
+    label: Port
+    default: 8080
+    min: 1024
+    max: 65535
+  model_name:
+    type: string
+    label: Model Name
+    default: ""
+    description: "Model to serve (overridden by connected model input)"
+  provider:
+    type: select
+    label: Backend Provider
+    options: [ollama, mlx, openai, anthropic]
+    default: ollama
+  endpoint:
+    type: string
+    label: Backend Endpoint
+    default: "http://localhost:11434"
+  max_concurrent:
+    type: integer
+    label: Max Concurrent Requests
+    default: 4
+    min: 1
+    max: 64
+  cors_enabled:
+    type: boolean
+    label: Enable CORS
+    default: true
+  api_key_required:
+    type: boolean
+    label: Require API Key
+    default: false
+    description: "Require X-API-Key header for requests"

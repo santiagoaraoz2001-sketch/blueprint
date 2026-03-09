@@ -1,0 +1,77 @@
+name: Checkpoint Gate
+type: checkpoint_gate
+category: interventions
+description: Evaluate metrics against configurable thresholds — pass data through if all checks succeed, otherwise route to failure path
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Data to Gate
+    data_type: any
+    required: true
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+    required: false
+
+outputs:
+  - id: passed
+    label: Passed
+    data_type: any
+    description: "Input data forwarded when gate passes (None when rejected)"
+  - id: rejected
+    label: Rejected
+    data_type: any
+    description: "Input data routed here when gate fails (None when passed)"
+  - id: report
+    label: Gate Report
+    data_type: metrics
+    description: "JSON report: {gate_passed, total_checks, passed_checks, failed_checks, checks[{metric, value, operator, threshold, passed}]}"
+
+config:
+  metric_name:
+    type: string
+    label: Metric Name
+    default: "accuracy"
+    description: "Name of the metric to check (must be a key in the metrics input)"
+  threshold:
+    type: float
+    label: Threshold
+    default: 0.8
+    min: 0
+    max: 1000000
+    description: "Value to compare the metric against"
+  operator:
+    type: select
+    label: Operator
+    default: ">="
+    options: [">=", ">", "<=", "<", "==", "!="]
+    description: "Comparison operator for the threshold check"
+  on_fail:
+    type: select
+    label: On Fail
+    default: "route_fail"
+    options: ["route_fail", "stop_pipeline", "warn_continue"]
+    description: "What to do when the gate fails"
+  additional_checks:
+    type: text_area
+    label: Additional Checks
+    default: ""
+    description: "One check per line in format: metric_name operator threshold (e.g., f1 >= 0.7)"
+  match_mode:
+    type: select
+    label: Match Mode
+    default: "all"
+    options: ["all", "any"]
+    description: "all = every check must pass, any = at least one check must pass"
+  label:
+    type: string
+    label: Gate Label
+    default: "checkpoint"
+    description: "A label for this checkpoint (shown in logs and reports)"
+  report_detail:
+    type: select
+    label: Report Detail
+    default: "detailed"
+    options: ["detailed", "summary"]
+    description: "detailed = full check results + metrics, summary = pass/fail counts + failed metric names only"

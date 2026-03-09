@@ -1,0 +1,32 @@
+name: Text Input
+type: text_input
+category: source
+description: Provide raw text or prompt input with format hints for downstream blocks
+version: "2.0.0"
+
+inputs: []
+
+outputs:
+  - id: text
+    label: Text Output
+    data_type: text
+    description: "Plain text file (text_input.txt) with specified encoding. Sidecar metadata.json contains {format, encoding, char_count, line_count}."
+
+config:
+  text_value:
+    type: text_area
+    label: Text Value
+    description: Raw text to be used as input for other blocks
+    default: "Enter your text here..."
+  format:
+    type: select
+    label: Format
+    options: [plain, markdown, json, csv]
+    default: plain
+    description: "Format hint for downstream blocks (json format is validated on save)"
+  encoding:
+    type: select
+    label: Encoding
+    options: [utf-8, ascii, latin-1]
+    default: utf-8
+    description: "Output text encoding"

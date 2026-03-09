@@ -1,0 +1,45 @@
+name: Rollback Point
+type: rollback_point
+category: interventions
+description: Create a state snapshot for downstream failure recovery — data passes through while a recoverable snapshot is stored
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Input Data
+    data_type: any
+    required: true
+
+outputs:
+  - id: output
+    label: Output
+    data_type: any
+    description: "Input data passed through (or restored from snapshot if rollback was triggered)"
+  - id: snapshot
+    label: Snapshot Info
+    data_type: metrics
+    description: "JSON: {snapshot_id, label, snapshot_path, rolled_back, auto_rollback_on_failure, total_snapshots, created_at}"
+
+config:
+  label:
+    type: string
+    label: Snapshot Label
+    default: "rollback-1"
+    description: "Label for this rollback point (used to identify snapshots)"
+  auto_rollback_on_failure:
+    type: boolean
+    label: Auto-Rollback on Failure
+    default: true
+    description: "If true, downstream blocks can trigger automatic rollback by creating a rollback_request.json"
+  max_snapshots:
+    type: integer
+    label: Max Snapshots
+    default: 3
+    min: 1
+    max: 10
+    description: "Maximum number of snapshots to keep (oldest are deleted first)"
+  snapshot_metadata:
+    type: text_area
+    label: Snapshot Metadata
+    default: ""
+    description: "Custom tags attached to each snapshot (one per line: key: value). E.g., 'stage: preprocessing'"

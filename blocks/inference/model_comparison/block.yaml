@@ -1,0 +1,89 @@
+name: Model Comparison
+type: model_comparison
+category: inference
+description: Compare multiple models on the same prompts and rank by quality and speed
+version: "1.0.0"
+
+inputs:
+  - id: dataset
+    label: Prompt Dataset
+    data_type: dataset
+    required: false
+
+outputs:
+  - id: dataset
+    label: Comparison Results
+    data_type: dataset
+    description: >
+      JSON array of per-prompt comparison objects. Each row contains:
+      prompt (str) — the input prompt text (truncated to 500 chars);
+      For each model (by index, e.g. model_1, model_2, model_3):
+        response_<N> (str) — the model's response;
+        latency_<N> (float) — request latency in seconds;
+        length_<N> (int) — response character count;
+        model_<N> (str) — the model identifier;
+        provider_<N> (str) — the provider used;
+        error_<N> (str, optional) — error message if the request failed.
+      fastest_model (str) — name of the model with lowest latency for this prompt;
+      longest_response_model (str) — name of the model with longest response.
+      Output format configurable via dataset_format (json, jsonl, csv).
+  - id: metrics
+    label: Comparison Summary
+    data_type: metrics
+    description: >
+      Aggregated comparison statistics. Fields:
+      num_prompts (int) — total prompts compared;
+      num_models (int) — number of models compared;
+      models (list of str) — list of model identifiers;
+      For each model (by index):
+        avg_latency_<N> (float) — mean latency in seconds;
+        avg_length_<N> (float) — mean response length in characters;
+        total_latency_<N> (float) — sum of all latencies;
+        errors_<N> (int) — number of failed requests;
+      fastest_model (str) — model with lowest average latency;
+      ranking_by_speed (list of str) — models sorted fastest to slowest.
+
+config:
+  models:
+    type: text_area
+    label: Models (one per line)
+    default: "ollama:llama3.2\nollama:mistral"
+    description: "Format: provider:model_name per line (e.g. 'ollama:llama3.2', 'openai:gpt-4o')"
+  endpoint:
+    type: string
+    label: Default Endpoint
+    default: "http://localhost:11434"
+    description: "Default endpoint for providers that need one (ollama, openai)"
+  api_key:
+    type: string
+    label: API Key
+    default: ""
+    description: "API key for cloud providers"
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.7
+    min: 0.0
+    max: 2.0
+  max_tokens:
+    type: integer
+    label: Max Tokens
+    default: 256
+    min: 1
+    max: 32768
+  prompts:
+    type: text_area
+    label: Prompts (one per line)
+    default: "Explain quantum computing in simple terms.\nWrite a haiku about coding."
+    description: "One prompt per line. Used if no dataset is connected."
+  text_column:
+    type: string
+    label: Text Column
+    default: "text"
+    description: "Column containing prompts when using a dataset input"
+  dataset_format:
+    type: select
+    label: Dataset Format
+    description: "Output format for results — json (default), jsonl (one JSON object per line), csv (comma-separated values)"
+    default: json
+    options: [json, jsonl, csv]

@@ -1,0 +1,87 @@
+name: Retrieval Agent (RAG)
+type: retrieval_agent
+category: agents
+description: Retrieval-Augmented Generation agent that searches a vector store and generates answers
+version: "1.1.0"
+
+inputs:
+  - id: model
+    label: Generator Model
+    data_type: model
+    required: false
+  - id: store
+    label: Vector Store Config
+    data_type: config
+    required: true
+  - id: dataset
+    label: Queries
+    data_type: dataset
+    required: false
+  - id: query
+    label: Single Query
+    data_type: text
+    required: false
+
+outputs:
+  - id: response
+    label: Response Text
+    data_type: text
+  - id: dataset
+    label: Responses
+    data_type: dataset
+  - id: metrics
+    label: RAG Metrics
+    data_type: metrics
+
+config:
+  top_k:
+    type: integer
+    label: Top K
+    default: 5
+    min: 1
+    max: 50
+    description: Number of documents to retrieve per query
+  rerank:
+    type: boolean
+    label: Rerank Results
+    default: false
+    description: Re-score and reorder retrieved documents by relevance
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.3
+    min: 0.0
+    max: 2.0
+    description: LLM generation temperature (lower = more factual, higher = more creative)
+  include_sources:
+    type: boolean
+    label: Include Sources
+    default: false
+    description: Append retrieved source document references at the end of each response
+  max_tokens:
+    type: integer
+    label: Max Tokens
+    default: 1024
+    min: 64
+    max: 8192
+    description: Maximum tokens for generated response
+  prompt_template:
+    type: text_area
+    label: Prompt Template
+    default: "Context:\n{context}\n\nQuestion: {query}\n\nAnswer based on the context above:"
+    description: "RAG prompt template. Use {context} for retrieved docs and {query} for the user question."
+  output_format:
+    type: select
+    label: Output Format
+    options: [plain, markdown, json]
+    default: plain
+    description: "Format for the response text output"
+  provider:
+    type: select
+    label: Provider
+    options: [ollama, openai, anthropic, mlx, transformers]
+    default: ollama
+  endpoint:
+    type: string
+    label: Endpoint URL
+    default: "http://localhost:11434"

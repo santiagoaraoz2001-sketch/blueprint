@@ -1,0 +1,78 @@
+name: Save Text
+type: save_txt
+category: endpoints
+description: Save data as a plain text file with encoding and append mode options.
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Data
+    data_type: text
+    required: true
+
+outputs:
+  - id: file_path
+    label: File Path
+    data_type: text
+    description: "Absolute path to the saved text file"
+  - id: summary
+    label: Export Summary
+    data_type: metrics
+    description: "Object with keys: characters (int), file_size_bytes (int), append_mode (bool)"
+
+config:
+  output_path:
+    type: string
+    label: Output Path
+    default: ./output
+    description: Directory to save to (relative to run directory or absolute)
+  filename:
+    type: string
+    label: Filename
+    default: output.txt
+  encoding:
+    type: select
+    label: Encoding
+    options: [utf-8, ascii, latin-1, utf-16]
+    default: utf-8
+  append_mode:
+    type: boolean
+    label: Append Mode
+    default: false
+    description: Append to file instead of overwriting
+  overwrite_existing:
+    type: boolean
+    label: Overwrite Existing
+    default: true
+  separator:
+    type: string
+    label: Record Separator
+    default: "\\n"
+    description: Separator between records when input is a list
+  max_length:
+    type: integer
+    label: Max Length (chars)
+    default: 0
+    min: 0
+    description: Truncate output at this many characters (0 = no limit)
+  line_ending:
+    type: select
+    label: Line Ending
+    options: [LF, CRLF]
+    default: LF
+    description: Line ending style (LF for Unix/Mac, CRLF for Windows)
+  prefix:
+    type: string
+    label: Prefix Text
+    default: ""
+    description: Text prepended before content (e.g. header line)
+  suffix:
+    type: string
+    label: Suffix Text
+    default: ""
+    description: Text appended after content (e.g. footer line)
+  trim_whitespace:
+    type: boolean
+    label: Trim Whitespace
+    default: false
+    description: Strip trailing whitespace from each line

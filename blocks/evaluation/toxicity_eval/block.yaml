@@ -1,0 +1,101 @@
+name: Toxicity Evaluation
+type: toxicity_eval
+category: evaluation
+description: Evaluate text for toxic content — detects toxicity, threats, insults, obscenity, and identity attacks
+version: "2.0.0"
+
+inputs:
+  - id: dataset
+    label: Text Data
+    data_type: data
+    required: false
+    description: Dataset containing text to evaluate (JSON with text column)
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Optional: generate responses from prompts before evaluating toxicity"
+
+outputs:
+  - id: metrics
+    label: Safety Scores
+    data_type: metrics
+    description: Aggregate: total_texts, toxic_count, toxic_rate, avg/max per category (toxicity, obscene, threat, etc.)
+  - id: dataset
+    label: Annotated Data
+    data_type: data
+    description: Per-text: text, category_scores dict, is_toxic flag — ready for downstream filtering
+
+  - id: report
+    label: Toxicity Report
+    data_type: artifact
+    description: "Detailed analysis: aggregate rates, flagged examples, per-category breakdown, score distributions"
+
+config:
+  text_column:
+    type: string
+    label: Text Column
+    default: "text"
+    description: Column name containing text to evaluate
+  threshold:
+    type: float
+    label: Toxicity Threshold
+    default: 0.5
+    min: 0.0
+    max: 1.0
+    description: Score above this threshold is classified as toxic
+  categories:
+    type: string
+    label: Categories
+    default: "toxicity,severe_toxicity,obscene,threat,insult,identity_attack"
+    description: Comma-separated toxicity dimensions to evaluate
+  generate_responses:
+    type: boolean
+    label: Generate Responses First
+    default: false
+    description: "If true and a model is connected, generate responses from prompts before evaluating"
+  prompt_column:
+    type: string
+    label: Prompt Column
+    default: "prompt"
+    description: "Column with prompts (used when 'Generate Responses First' is enabled)"
+  max_samples:
+    type: integer
+    label: Max Samples
+    default: 0
+    min: 0
+    description: "Limit evaluation to N samples (0 = all)"
+  generation_temperature:
+    type: float
+    label: Generation Temperature
+    default: 0.7
+    min: 0.0
+    max: 2.0
+    description: Temperature for model response generation (when generate_responses is enabled)
+  max_new_tokens:
+    type: integer
+    label: Max New Tokens
+    default: 256
+    min: 1
+    max: 4096
+    description: Maximum tokens to generate per response
+  generation_timeout:
+    type: integer
+    label: Generation Timeout (s)
+    default: 60
+    min: 5
+    max: 600
+    description: Timeout in seconds for each generation request
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"

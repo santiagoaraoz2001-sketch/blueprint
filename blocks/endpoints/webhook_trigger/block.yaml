@@ -1,0 +1,92 @@
+name: Webhook Trigger
+type: webhook_trigger
+category: endpoints
+description: Fire a webhook with pipeline results, metrics, and custom payload.
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Data
+    data_type: any
+    required: true
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+    required: false
+
+outputs:
+  - id: status
+    label: Response Status
+    data_type: text
+    description: "Status message (e.g. 'OK (200)' or 'FAILED: HTTP 500')"
+  - id: summary
+    label: Webhook Summary
+    data_type: metrics
+    description: "Object with keys: status (string), status_code (int), url (string), method (string), payload_size_bytes (int)"
+  - id: response
+    label: Response Body
+    data_type: text
+    description: "Raw response body from the webhook endpoint (up to 500 chars)"
+
+config:
+  webhook_url:
+    type: string
+    label: Webhook URL
+    default: ""
+    description: The URL to send the webhook to
+  method:
+    type: select
+    label: Method
+    options: [POST, PUT, GET]
+    default: POST
+  headers:
+    type: text_area
+    label: Headers
+    default: "{}"
+    description: JSON object of custom headers
+  payload_template:
+    type: text_area
+    label: Payload Template
+    default: ""
+    description: "JSON template with {data} and {metrics} placeholders. Empty = send data directly"
+  include_metrics:
+    type: boolean
+    label: Include Metrics
+    default: true
+    description: Include metrics data in the webhook payload
+  retry_on_failure:
+    type: boolean
+    label: Retry on Failure
+    default: true
+  max_retries:
+    type: integer
+    label: Max Retries
+    default: 3
+    min: 0
+    max: 10
+  timeout:
+    type: integer
+    label: Timeout (seconds)
+    default: 30
+    min: 5
+    max: 120
+  secret_header:
+    type: string
+    label: Secret Header
+    default: ""
+    description: "Optional header name for webhook secret (value from auth token)"
+  secret_value:
+    type: string
+    label: Secret Value
+    default: ""
+    description: "Value for secret header. Supports $secret:NAME syntax"
+  on_failure_url:
+    type: string
+    label: Failure Webhook URL
+    default: ""
+    description: Separate URL to notify on failure (e.g. Slack, PagerDuty)
+  include_run_id:
+    type: boolean
+    label: Include Run ID
+    default: false
+    description: Add pipeline run ID to webhook payload

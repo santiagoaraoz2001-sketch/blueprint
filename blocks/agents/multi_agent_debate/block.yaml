@@ -1,0 +1,88 @@
+name: Multi-Agent Debate
+type: multi_agent_debate
+category: agents
+description: Multiple agents with distinct personas debate a topic to reach consensus
+version: "1.1.0"
+
+inputs:
+  - id: model
+    label: Debate Model
+    data_type: model
+    required: false
+  - id: input
+    label: Topic / Prompt
+    data_type: text
+    required: true
+
+outputs:
+  - id: response
+    label: Debate Summary
+    data_type: text
+  - id: dataset
+    label: Debate Log
+    data_type: dataset
+  - id: metrics
+    label: Consensus Metrics
+    data_type: metrics
+
+config:
+  num_agents:
+    type: integer
+    label: Number of Agents
+    default: 3
+    min: 2
+    max: 10
+  num_rounds:
+    type: integer
+    label: Debate Rounds
+    default: 3
+    min: 1
+    max: 10
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.7
+    min: 0.0
+    max: 2.0
+  max_tokens:
+    type: integer
+    label: Max Tokens per Turn
+    default: 256
+    min: 64
+    max: 2048
+  format:
+    type: select
+    label: Debate Format
+    options: [free_form, structured, socratic]
+    default: free_form
+    description: "free_form: open discussion, structured: opening/rebuttal/closing, socratic: question-driven"
+  custom_personas:
+    type: text_area
+    label: Custom Personas
+    default: ""
+    description: "One per line: 'Name: style description'. Leave empty for defaults (Analyst, Advocate, Critic, etc.)"
+  output_format:
+    type: select
+    label: Output Format
+    options: [markdown, plain, json]
+    default: markdown
+    description: "markdown: formatted summary, plain: text only, json: structured debate object"
+  provider:
+    type: select
+    label: Provider
+    options: [ollama, openai, anthropic, mlx]
+    default: ollama
+  endpoint:
+    type: string
+    label: Endpoint URL
+    default: "http://localhost:11434"
+  moderator_prompt:
+    type: text_area
+    label: Moderator Prompt
+    default: ""
+    description: "Custom summary template. Use {topic}, {agents}, {rounds}, {consensus} placeholders. Leave empty for default."
+  seed:
+    type: integer
+    label: Random Seed
+    default: 42
+    description: Seed for reproducible demo outputs

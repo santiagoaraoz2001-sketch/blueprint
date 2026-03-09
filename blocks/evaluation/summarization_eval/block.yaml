@@ -1,0 +1,74 @@
+name: Summarization Eval
+type: summarization_eval
+category: evaluation
+description: Evaluate summarization quality with ROUGE, compression ratio, coverage, and extractive novelty metrics
+version: "1.0.0"
+
+inputs:
+  - id: dataset
+    label: Summarization Data
+    data_type: data
+    required: true
+    description: "Dataset with source documents and summaries (or references)"
+
+  - id: model
+    label: Summarization Model
+    data_type: model
+    required: false
+    description: "Optional: generate summaries from source texts before evaluation"
+
+outputs:
+  - id: metrics
+    label: Summarization Scores
+    data_type: metrics
+    description: Aggregate: total_samples, avg_rouge1/2/L, avg_compression_ratio, avg_coverage, avg_novelty
+  - id: report
+    label: Detailed Report
+    data_type: artifact
+    description: summarization_report.json: metrics summary + per-sample rouge/compression/coverage/novelty scores
+
+  - id: dataset
+    label: Scored Summaries
+    data_type: data
+    description: "Per-summary scores: summary_preview, reference_preview, rouge1, rouge2, rougeL, compression_ratio"
+
+config:
+  summary_column:
+    type: string
+    label: Summary Column
+    default: "summary"
+    description: Column containing generated summaries
+  reference_column:
+    type: string
+    label: Reference Column
+    default: "reference"
+    description: "Column with reference summaries (optional for ROUGE)"
+  source_column:
+    type: string
+    label: Source Column
+    default: "source"
+    description: Column with source documents (for compression and coverage metrics)
+  metrics_to_compute:
+    type: string
+    label: Metrics
+    default: "rouge1,rouge2,rougeL,compression,coverage,novelty"
+    description: "Comma-separated metrics to compute"
+  max_samples:
+    type: integer
+    label: Max Samples
+    default: 0
+    min: 0
+    description: "Limit to N samples (0 = all)"
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"

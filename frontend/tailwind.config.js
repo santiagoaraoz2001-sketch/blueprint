@@ -1,0 +1,53 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        sl: {
+          bg: '#000000',
+          surface: 'rgba(5,5,5,0.92)',
+          raised: '#050505',
+          border: '#111111',
+          'border-hi': '#222222',
+          text: '#FFFFFF',
+          sec: '#b5b5b5',
+          dim: '#666666',
+          muted: '#1a1a1a',
+          surface0: '#030303',
+          surface1: '#040404',
+          surface2: '#060606',
+          surface3: '#080808',
+          surface4: '#0A0A0A',
+          surface5: '#0D0D0D',
+          surface6: '#0E0E0E',
+          cyan: '#4af6c3',
+          green: '#22c55e',
+          amber: '#f59e0b',
+          yellow: '#EAB308',
+          orange: '#fb8b1e',
+          red: '#ff433d',
+          blue: '#0068ff',
+          purple: '#8B5CF6',
+          pink: '#EC4899',
+        },
+      },
+      fontFamily: {
+        mono: ["'JetBrains Mono'", "'SF Mono'", "'Fira Code'", 'monospace'],
+        display: ["'Space Grotesk'", "'Helvetica Neue'", 'Arial', 'sans-serif'],
+      },
+      borderRadius: {
+        none: '0px',
+        sm: '0px',
+        DEFAULT: '0px',
+        md: '0px',
+        lg: '0px',
+        xl: '0px',
+        '2xl': '0px',
+        '3xl': '0px',
+        full: '0px',
+      },
+    },
+  },
+  plugins: [],
+}

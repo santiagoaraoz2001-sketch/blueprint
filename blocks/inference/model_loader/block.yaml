@@ -1,0 +1,60 @@
+name: Model Loader
+type: model_loader
+category: inference
+description: Load and configure a model reference for downstream inference blocks
+version: "1.0.0"
+
+inputs: []
+
+outputs:
+  - id: model
+    label: Model Config
+    data_type: model
+    description: >
+      JSON object describing the loaded model configuration. Fields:
+      model_name (str) — the model identifier (e.g. "llama3.2", "gpt-4o");
+      backend (str) — inference provider, one of "ollama", "mlx", "openai", "anthropic";
+      base_url (str) — API endpoint URL for the provider;
+      model_id (str) — same as model_name, for compatibility with blocks expecting model_id;
+      api_key (str) — API key if provided (empty string if not set);
+      source (str) — same as backend, for compatibility with blocks expecting source;
+      endpoint (str) — same as base_url, for compatibility with blocks expecting endpoint.
+  - id: metrics
+    label: Load Info
+    data_type: metrics
+    description: >
+      Dictionary with fields:
+      model_name (str) — the model identifier;
+      backend (str) — inference provider;
+      base_url (str) — API endpoint URL;
+      loaded (bool) — whether the model was successfully validated/reachable;
+      error (str, optional) — error message if validation failed;
+      elapsed_s (float) — time taken to validate the model in seconds.
+
+config:
+  model_name:
+    type: string
+    label: Model Name
+    default: "llama3.2"
+    description: "Model identifier (e.g. 'llama3.2', 'gpt-4o', 'claude-sonnet-4-20250514')"
+  backend:
+    type: select
+    label: Backend
+    options: [ollama, mlx, openai, anthropic]
+    default: ollama
+    description: "Inference provider — ollama/mlx for local, openai/anthropic for cloud"
+  base_url:
+    type: string
+    label: Base URL
+    default: "http://localhost:11434"
+    description: "API endpoint URL (Ollama: http://localhost:11434, OpenAI: https://api.openai.com)"
+  api_key:
+    type: string
+    label: API Key
+    default: ""
+    description: "API key for cloud providers (OpenAI, Anthropic)"
+  validate:
+    type: boolean
+    label: Validate Connection
+    default: true
+    description: "Check if model is reachable before passing downstream"
