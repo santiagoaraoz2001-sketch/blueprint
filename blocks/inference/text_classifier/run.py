@@ -87,7 +87,7 @@ def _call_llm(provider, endpoint, model_name, api_key, system_prompt, user_promp
 def run(ctx):
     categories_str = ctx.config.get("categories", "positive,negative,neutral")
     method = ctx.config.get("method", "llm")
-    provider = ctx.config.get("provider", "ollama")
+    provider = ctx.config.get("backend", "ollama")
     model_name = ctx.config.get("model_name", "llama3.2")
     endpoint = ctx.config.get("endpoint", "http://localhost:11434")
     api_key = ctx.config.get("api_key", "")

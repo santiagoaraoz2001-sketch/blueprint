@@ -14,7 +14,7 @@ import os
 
 
 def run(ctx):
-    provider = ctx.config.get("provider", "openai")
+    provider = ctx.config.get("backend", "openai")
     model_name = ctx.config.get("model_name", "gpt-4o")
     tools_json = ctx.config.get("tools", "[]")
     tool_choice = ctx.config.get("tool_choice", "auto")

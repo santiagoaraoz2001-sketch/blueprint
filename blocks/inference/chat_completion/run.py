@@ -15,7 +15,7 @@ import os
 
 
 def run(ctx):
-    provider = ctx.config.get("provider", "ollama")
+    provider = ctx.config.get("backend", "ollama")
     model_name = ctx.config.get("model_name", "llama3.2")
     system_prompt = ctx.config.get("system_prompt", "You are a helpful assistant.")
     user_message = ctx.config.get("user_message", "")

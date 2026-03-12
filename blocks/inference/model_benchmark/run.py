@@ -14,7 +14,7 @@ import time
 
 
 def run(ctx):
-    provider = ctx.config.get("provider", "ollama")
+    provider = ctx.config.get("backend", "ollama")
     model_name = ctx.config.get("model_name", "")
     endpoint = ctx.config.get("endpoint", "http://localhost:11434")
     api_key = ctx.config.get("api_key", "")
