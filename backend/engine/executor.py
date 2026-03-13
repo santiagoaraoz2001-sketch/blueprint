@@ -107,6 +107,11 @@ def _find_block_module(block_type: str) -> Path | None:
         run_py = block_dir / "run.py"
         if run_py.exists():
             return block_dir
+    # Search plugin blocks (direct lookup per plugin, not a full scan)
+    from ..plugins.registry import plugin_registry
+    plugin_block = plugin_registry.find_block(block_type)
+    if plugin_block is not None:
+        return plugin_block
     return None
 
 
