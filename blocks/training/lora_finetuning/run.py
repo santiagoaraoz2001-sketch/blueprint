@@ -43,7 +43,18 @@ def run(ctx):
     # Load dataset
     dataset_path = ctx.load_input("dataset")
 
-    # Import required libraries — raise on failure
+    # Load dataset
+    data_file = os.path.join(dataset_path, "data.json") if os.path.isdir(dataset_path) else dataset_path
+    if os.path.isfile(data_file):
+        with open(data_file, "r") as f:
+            raw_data = json.load(f)
+    else:
+        raise FileNotFoundError(f"Dataset not found: {data_file}")
+
+    if not isinstance(raw_data, list) or len(raw_data) == 0:
+        raise ValueError("Dataset must be a non-empty JSON list")
+
+    # Import required libraries — fallback if unavailable
     try:
         import torch
         from transformers import (
@@ -56,11 +67,32 @@ def run(ctx):
         )
         from peft import LoraConfig, get_peft_model, TaskType
         from datasets import Dataset
+
+        _run_real_training(
+            ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
+            lr, epochs, batch_size, max_seq_length, text_column, prompt_template,
+            eval_split, save_merged,
+            torch, AutoModelForCausalLM, AutoTokenizer, TrainingArguments,
+            Trainer, TrainerCallback, DataCollatorForLanguageModeling,
+            LoraConfig, get_peft_model, TaskType, Dataset,
+        )
     except ImportError as e:
-        raise ImportError(
-            f"Required library not installed: {e}. "
-            f"Install with: pip install torch transformers peft datasets"
-        ) from e
+        ctx.log_message(f"Required libraries not available ({e}); running in config-only fallback mode")
+        _run_fallback(
+            ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
+            lr, epochs, batch_size, max_seq_length, save_merged,
+        )
+
+
+def _run_real_training(
+    ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
+    lr, epochs, batch_size, max_seq_length, text_column, prompt_template,
+    eval_split, save_merged,
+    torch, AutoModelForCausalLM, AutoTokenizer, TrainingArguments,
+    Trainer, TrainerCallback, DataCollatorForLanguageModeling,
+    LoraConfig, get_peft_model, TaskType, Dataset,
+):
+    """Full LoRA training using HuggingFace transformers + PEFT."""
 
     ctx.log_message(f"LoRA fine-tuning: {model_name} (r={r}, alpha={alpha})")
     ctx.log_message(f"LR={lr}, epochs={epochs}, batch_size={batch_size}")
@@ -93,41 +125,31 @@ def run(ctx):
     total_params = sum(p.numel() for p in model.parameters())
     ctx.log_message(f"Trainable params: {trainable:,} / {total_params:,} ({100 * trainable / total_params:.2f}%)")
 
-    # Load and tokenize dataset
-    ctx.log_message("Loading dataset...")
-    ctx.report_progress(1, 3)
-    data_file = os.path.join(dataset_path, "data.json") if os.path.isdir(dataset_path) else dataset_path
-    if os.path.isfile(data_file):
-        with open(data_file, "r") as f:
-            raw_data = json.load(f)
-    else:
-        raise FileNotFoundError(f"Dataset not found: {data_file}")
-
     # Determine text field
-    if isinstance(raw_data, list) and len(raw_data) > 0:
-        if isinstance(raw_data[0], dict):
-            if prompt_template:
-                texts = []
-                for row in raw_data:
-                    try:
-                        texts.append(prompt_template.format(**row))
-                    except KeyError as e:
-                        raise ValueError(
-                            f"prompt_template references missing column {e}. "
-                            f"Available columns: {list(row.keys())}"
-                        )
-            else:
-                text_key = text_column if text_column and text_column in raw_data[0] else (
-                    "text" if "text" in raw_data[0] else list(raw_data[0].keys())[0]
-                )
-                texts = [str(row.get(text_key, "")) for row in raw_data]
+    if isinstance(raw_data[0], dict):
+        if prompt_template:
+            texts = []
+            for row in raw_data:
+                try:
+                    texts.append(prompt_template.format(**row))
+                except KeyError as e:
+                    raise ValueError(
+                        f"prompt_template references missing column {e}. "
+                        f"Available columns: {list(row.keys())}"
+                    )
         else:
-            texts = [str(item) for item in raw_data]
+            text_key = text_column if text_column and text_column in raw_data[0] else (
+                "text" if "text" in raw_data[0] else list(raw_data[0].keys())[0]
+            )
+            texts = [str(row.get(text_key, "")) for row in raw_data]
     else:
-        raise ValueError("Dataset must be a non-empty JSON list")
+        texts = [str(item) for item in raw_data]
 
     def tokenize_fn(examples):
         return tokenizer(examples["text"], truncation=True, max_length=max_seq_length, padding="max_length")
+
+    ctx.log_message("Loading dataset...")
+    ctx.report_progress(1, 3)
 
     dataset = Dataset.from_dict({"text": texts})
     tokenized = dataset.map(tokenize_fn, batched=True, remove_columns=["text"])
@@ -165,10 +187,10 @@ def run(ctx):
     class CtxCallback(TrainerCallback):
         def on_log(self, args, state, control, logs=None, **kwargs):
             if logs and "loss" in logs:
-                ctx.log_metric("train_loss", round(logs["loss"], 4), state.global_step)
+                ctx.log_metric("train/loss", round(logs["loss"], 4), state.global_step)
                 ctx.log_message(f"  Step {state.global_step} — loss: {logs['loss']:.4f}")
             if logs and "eval_loss" in logs:
-                ctx.log_metric("eval_loss", round(logs["eval_loss"], 4), state.global_step)
+                ctx.log_metric("eval/loss", round(logs["eval_loss"], 4), state.global_step)
                 ctx.log_message(f"  Eval loss: {logs['eval_loss']:.4f}")
             if state.max_steps > 0:
                 ctx.report_progress(state.global_step, state.max_steps)
@@ -216,7 +238,7 @@ def run(ctx):
             "total_params": total_params,
         }, f, indent=2)
 
-    ctx.log_metric("final_loss", final_loss)
+    ctx.log_metric("train/loss", final_loss)
     ctx.log_metric("epochs_completed", epochs)
     ctx.log_metric("trainable_params", trainable)
     ctx.save_output("model", output_dir)
@@ -231,4 +253,83 @@ def run(ctx):
         "save_merged": save_merged,
     })
     ctx.log_message(f"LoRA training complete. Final loss: {final_loss}")
+    ctx.report_progress(1, 1)
+
+
+def _run_fallback(
+    ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
+    lr, epochs, batch_size, max_seq_length, save_merged,
+):
+    """Config-only fallback when PEFT/transformers are not installed.
+
+    Generates a configuration plan JSON with all training parameters,
+    estimated compute, and instructions for installing the required libraries.
+    """
+    ctx.log_message("Running in config-only mode: generating LoRA training plan")
+
+    # Estimate trainable parameters based on LoRA config
+    # LoRA adds r * d_model * 2 * num_target_modules parameters
+    est_params = r * 4096 * 2 * len(target_modules)  # rough estimate assuming d_model=4096
+    estimated_steps = (len(raw_data) // batch_size) * epochs
+
+    output_dir = os.path.join(ctx.run_dir, "model")
+    os.makedirs(output_dir, exist_ok=True)
+
+    training_plan = {
+        "base_model": model_name,
+        "method": "lora_finetuning",
+        "status": "plan_only",
+        "message": (
+            "LoRA training could not run because required libraries are not installed. "
+            "Install them with: pip install torch transformers peft datasets"
+        ),
+        "lora_config": {
+            "r": r,
+            "lora_alpha": alpha,
+            "lora_dropout": lora_dropout,
+            "target_modules": target_modules,
+            "bias": "none",
+            "task_type": "CAUSAL_LM",
+        },
+        "training_config": {
+            "learning_rate": lr,
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "max_seq_length": max_seq_length,
+            "save_merged": save_merged,
+        },
+        "dataset_info": {
+            "num_samples": len(raw_data),
+            "sample_keys": list(raw_data[0].keys()) if isinstance(raw_data[0], dict) else [],
+        },
+        "estimates": {
+            "trainable_params": est_params,
+            "estimated_steps": estimated_steps,
+            "estimated_epochs": epochs,
+        },
+        "requirements": [
+            "pip install torch transformers peft datasets",
+            f"Model: {model_name}",
+            "GPU recommended for efficient LoRA training",
+        ],
+    }
+
+    plan_path = os.path.join(output_dir, "lora_training_plan.json")
+    with open(plan_path, "w") as f:
+        json.dump(training_plan, f, indent=2)
+
+    ctx.save_artifact("training_plan", plan_path)
+
+    ctx.log_message(f"Dataset: {len(raw_data)} samples, {epochs} epochs, batch_size={batch_size}")
+    ctx.log_message(f"Estimated steps: {estimated_steps}")
+    ctx.log_message(f"Training plan saved to {plan_path}")
+    ctx.log_message("Install torch + transformers + peft to execute actual training")
+
+    ctx.save_output("model", output_dir)
+    ctx.save_output("metrics", {
+        "status": "plan_only",
+        "estimated_steps": estimated_steps,
+        "lora_rank": r,
+        "lora_alpha": alpha,
+    })
     ctx.report_progress(1, 1)

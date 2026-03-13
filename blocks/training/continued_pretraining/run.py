@@ -161,10 +161,10 @@ def run(ctx):
             def on_log(self, args, state, control, logs=None, **kwargs):
                 if logs and "loss" in logs:
                     self.ctx.log_message(f"  Step {state.global_step} — loss: {logs['loss']:.4f}")
-                    self.ctx.log_metric("train_loss", round(logs["loss"], 4), state.global_step)
+                    self.ctx.log_metric("train/loss", round(logs["loss"], 4), state.global_step)
                     if "perplexity" not in logs and "loss" in logs:
                         ppl = math.exp(min(logs["loss"], 20))
-                        self.ctx.log_metric("perplexity", round(ppl, 2), state.global_step)
+                        self.ctx.log_metric("train/perplexity", round(ppl, 2), state.global_step)
                 self.ctx.report_progress(state.global_step, self.total_steps)
 
         total_steps = math.ceil(len(train_dataset) / batch_size) * epochs
@@ -184,10 +184,10 @@ def run(ctx):
             def on_log(self, args, state, control, logs=None, **kwargs):
                 if logs and "loss" in logs:
                     ctx.log_message(f"  Step {state.global_step} — loss: {logs['loss']:.4f}")
-                    ctx.log_metric("train_loss", round(logs["loss"], 4), state.global_step)
+                    ctx.log_metric("train/loss", round(logs["loss"], 4), state.global_step)
                 if logs and "eval_loss" in logs:
                     ctx.log_message(f"  Eval loss: {logs['eval_loss']:.4f}")
-                    ctx.log_metric("eval_loss", round(logs["eval_loss"], 4), state.global_step)
+                    ctx.log_metric("eval/loss", round(logs["eval_loss"], 4), state.global_step)
                 ctx.report_progress(state.global_step, total_steps)
 
         trainer.add_callback(BlueprintCallback())
@@ -221,8 +221,8 @@ def run(ctx):
             "total_steps": train_result.global_step,
             "estimated_tokens": est_tokens,
         })
-        ctx.log_metric("final_loss", final_loss)
-        ctx.log_metric("final_perplexity", final_ppl)
+        ctx.log_metric("train/loss", final_loss)
+        ctx.log_metric("train/perplexity", final_ppl)
         ctx.log_message(f"Pretraining complete. Final loss: {final_loss}, perplexity: {final_ppl}")
         ctx.report_progress(1, 1)
         return
@@ -257,8 +257,8 @@ def run(ctx):
 
             if step % max(1, total_steps // 15) == 0:
                 ctx.log_message(f"  Step {step}/{total_steps} — loss: {loss:.4f}, ppl: {ppl:.1f}, lr: {current_lr:.2e}")
-                ctx.log_metric("train_loss", round(loss, 4), step)
-                ctx.log_metric("perplexity", round(ppl, 2), step)
+                ctx.log_metric("train/loss", round(loss, 4), step)
+                ctx.log_metric("train/perplexity", round(ppl, 2), step)
 
             ctx.report_progress(step, total_steps)
             time.sleep(0.03)
@@ -289,7 +289,7 @@ def run(ctx):
         "total_steps": total_steps,
         "estimated_tokens": est_tokens,
     })
-    ctx.log_metric("final_loss", final_loss)
-    ctx.log_metric("final_perplexity", final_ppl)
+    ctx.log_metric("train/loss", final_loss)
+    ctx.log_metric("train/perplexity", final_ppl)
     ctx.log_message(f"Pretraining complete (simulated). Final perplexity: {final_ppl}")
     ctx.report_progress(1, 1)

@@ -18,7 +18,7 @@ def run(ctx):
     query = ctx.config.get("query", "")
     text_column = ctx.config.get("text_column", "text")
     top_k = int(ctx.config.get("top_k", 5))
-    provider = ctx.config.get("provider", "ollama")
+    provider = ctx.config.get("backend", "ollama")
     model_name = ctx.config.get("model_name", "")
     endpoint = ctx.config.get("endpoint", "http://localhost:11434")
     api_key = ctx.config.get("api_key", "")

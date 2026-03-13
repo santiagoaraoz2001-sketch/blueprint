@@ -75,6 +75,26 @@ def duplicate_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
     return clone
 
 
+@router.post("/{pipeline_id}/clone", response_model=PipelineResponse)
+def clone_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
+    """Clone a pipeline (alias for duplicate)."""
+    original = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not original:
+        raise HTTPException(404, "Pipeline not found")
+    clone = Pipeline(
+        id=str(uuid.uuid4()),
+        name=f"{original.name} (clone)",
+        project_id=original.project_id,
+        experiment_id=original.experiment_id,
+        description=original.description,
+        definition=original.definition,
+    )
+    db.add(clone)
+    db.commit()
+    db.refresh(clone)
+    return clone
+
+
 @router.get("/{pipeline_id}/compile")
 def compile_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
     from ..engine.compiler import compile_pipeline_to_python

@@ -7,13 +7,71 @@ export interface Project {
   id: string
   name: string
   paper_number: string | null
+  paper_title: string | null
+  paper_subtitle: string | null
+  target_venue: string | null
   description: string
   status: string
+  blocked_by: string | null
+  priority: number
   github_repo: string | null
   notes: string
+  hypothesis: string | null
+  key_result: string | null
   tags: string[]
+  total_experiments: number
+  completed_experiments: number
+  current_phase: string | null
+  completion_criteria: string | null
+  estimated_compute_hours: number
+  estimated_cost_usd: number
+  actual_compute_hours: number
+  started_at: string | null
+  completed_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface ExperimentPhase {
+  id: string
+  project_id: string
+  phase_id: string
+  name: string
+  description: string | null
+  status: string
+  blocked_by_phase: string | null
+  total_runs: number
+  completed_runs: number
+  research_question: string | null
+  finding: string | null
+  sort_order: number
+  created_at: string
+}
+
+export interface DashboardStats {
+  total_papers: number
+  by_status: Record<string, number>
+  currently_running: { id: string; name: string }[]
+  recently_completed: { id: string; name: string; completed_at: string | null }[]
+  total_compute_hours: number
+  blocked_papers: { id: string; name: string; blocked_by: string | null }[]
+  unassigned_runs: number
+  recent_unassigned: { run_id: string; pipeline_name: string; metrics: Record<string, any> }[]
+}
+
+export interface ProjectStats {
+  total_runs: number
+  completed_runs: number
+  failed_runs: number
+  running_runs: number
+  total_compute_hours: number
+  best_run: { run_id: string; metrics: Record<string, any> } | null
+  latest_run: { run_id: string; status: string } | null
+  phases: {
+    id: string; phase_id: string; name: string
+    status: string; total_runs: number; completed_runs: number
+  }[]
+  active_runs: { run_id: string; pipeline_id: string; status: string }[]
 }
 
 interface ProjectState {
@@ -25,6 +83,16 @@ interface ProjectState {
   updateProject: (id: string, data: Partial<Project>) => Promise<void>
   deleteProject: (id: string) => Promise<void>
   setProjects: (projects: Project[]) => void
+  fetchProject: (id: string) => Promise<Project>
+  fetchPhases: (projectId: string) => Promise<ExperimentPhase[]>
+  createPhase: (projectId: string, data: Partial<ExperimentPhase>) => Promise<ExperimentPhase>
+  updatePhase: (projectId: string, phaseId: string, data: Partial<ExperimentPhase>) => Promise<ExperimentPhase>
+  quickSetup: (projectId: string, phases: { phase_id: string; name: string; total_runs: number; description?: string; research_question?: string }[]) => Promise<Project>
+  assignRun: (runId: string, experimentPhaseId: string) => Promise<void>
+  fetchStats: (projectId: string) => Promise<ProjectStats>
+  fetchDashboard: () => Promise<DashboardStats>
+  clonePipeline: (pipelineId: string) => Promise<any>
+  cloneFromRun: (runId: string) => Promise<any>
 }
 
 function isDemoMode() {
@@ -44,11 +112,27 @@ export const useProjectStore = create<ProjectState>((set) => ({
         id: p.id,
         name: p.name,
         paper_number: p.paper_number ?? null,
+        paper_title: null,
+        paper_subtitle: null,
+        target_venue: null,
         description: p.description,
         status: p.status,
+        blocked_by: null,
+        priority: 5,
         github_repo: null,
         notes: '',
+        hypothesis: null,
+        key_result: null,
         tags: [],
+        total_experiments: 0,
+        completed_experiments: 0,
+        current_phase: null,
+        completion_criteria: null,
+        estimated_compute_hours: 0,
+        estimated_cost_usd: 0,
+        actual_compute_hours: 0,
+        started_at: null,
+        completed_at: null,
         created_at: p.created_at,
         updated_at: p.updated_at,
       }))
@@ -63,17 +147,37 @@ export const useProjectStore = create<ProjectState>((set) => ({
     }
   },
 
+  fetchProject: async (id) => {
+    return api.get<Project>(`/projects/${id}`)
+  },
+
   createProject: async (data) => {
     if (isDemoMode()) {
       const project: Project = {
         id: `demo-new-${Date.now()}`,
         name: data.name || 'New Project',
         paper_number: data.paper_number ?? null,
+        paper_title: null,
+        paper_subtitle: null,
+        target_venue: null,
         description: data.description || '',
-        status: data.status || 'active',
+        status: data.status || 'planned',
+        blocked_by: null,
+        priority: 5,
         github_repo: null,
         notes: '',
+        hypothesis: null,
+        key_result: null,
         tags: [],
+        total_experiments: 0,
+        completed_experiments: 0,
+        current_phase: null,
+        completion_criteria: null,
+        estimated_compute_hours: 0,
+        estimated_cost_usd: 0,
+        actual_compute_hours: 0,
+        started_at: null,
+        completed_at: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
@@ -107,5 +211,45 @@ export const useProjectStore = create<ProjectState>((set) => ({
     }
     await api.delete(`/projects/${id}`)
     set((s) => ({ projects: s.projects.filter((p) => p.id !== id) }))
+  },
+
+  fetchPhases: async (projectId) => {
+    return api.get<ExperimentPhase[]>(`/projects/${projectId}/phases`)
+  },
+
+  createPhase: async (projectId, data) => {
+    return api.post<ExperimentPhase>(`/projects/${projectId}/phases`, data)
+  },
+
+  updatePhase: async (projectId, phaseId, data) => {
+    return api.put<ExperimentPhase>(`/projects/${projectId}/phases/${phaseId}`, data)
+  },
+
+  quickSetup: async (projectId, phases) => {
+    const result = await api.post<Project>(`/projects/${projectId}/quick-setup`, { phases })
+    set((s) => ({
+      projects: s.projects.map((p) => (p.id === projectId ? result : p)),
+    }))
+    return result
+  },
+
+  assignRun: async (runId, experimentPhaseId) => {
+    await api.post(`/runs/${runId}/assign`, { experiment_phase_id: experimentPhaseId })
+  },
+
+  fetchStats: async (projectId) => {
+    return api.get<ProjectStats>(`/projects/${projectId}/stats`)
+  },
+
+  fetchDashboard: async () => {
+    return api.get<DashboardStats>('/projects/dashboard')
+  },
+
+  clonePipeline: async (pipelineId) => {
+    return api.post(`/pipelines/${pipelineId}/clone`, {})
+  },
+
+  cloneFromRun: async (runId) => {
+    return api.post(`/runs/${runId}/clone-pipeline`, {})
   },
 }))

@@ -20,7 +20,7 @@ def run(ctx):
     model_name = ctx.config.get("model_name", "")
     prompt_template = ctx.config.get("prompt_template", "{input}")
     user_input = ctx.config.get("user_input", "")
-    provider = ctx.config.get("provider", "ollama")
+    provider = ctx.config.get("backend", ctx.config.get("provider", "ollama"))
     endpoint = ctx.config.get("endpoint", "http://localhost:11434")
     api_key = ctx.config.get("api_key", "")
     temperature = float(ctx.config.get("temperature", 0.7))
