@@ -10,7 +10,9 @@ import DashboardSelector from '@/components/Monitor/DashboardSelector'
 import SystemPanel from '@/components/Monitor/SystemPanel'
 import LogStream from '@/components/Monitor/LogStream'
 import ComparisonView from '@/components/Monitor/ComparisonView'
-import { Activity, ExternalLink, Wifi, WifiOff, Radio, Archive } from 'lucide-react'
+import { runMetricsToTable } from '@/services/metricsBridge'
+import { Activity, ExternalLink, Wifi, WifiOff, Radio, Archive, TableProperties } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function MonitorView() {
   const monitorRunId = useUIStore((s) => s.monitorRunId)
@@ -139,6 +141,15 @@ function MonitorContent({ runId }: { runId: string }) {
     window.open(url, `monitor-${runId}`, 'width=1200,height=800')
   }, [runId])
 
+  const handleOpenInDataView = useCallback(async () => {
+    try {
+      await runMetricsToTable(runId, pipelineName || undefined)
+      useUIStore.getState().setView('data')
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to export metrics')
+    }
+  }, [runId, pipelineName])
+
   const pct = Math.round(overallProgress * 100)
 
   return (
@@ -250,6 +261,27 @@ function MonitorContent({ runId }: { runId: string }) {
             <Radio size={9} style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
           </span>
         )}
+
+        <button
+          onClick={handleOpenInDataView}
+          title="Open metrics in Data View"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '2px 8px',
+            background: `${T.cyan}14`,
+            border: `1px solid ${T.cyan}33`,
+            color: T.cyan,
+            fontFamily: F,
+            fontSize: FS.xxs,
+            letterSpacing: '0.06em',
+            cursor: 'pointer',
+          }}
+        >
+          <TableProperties size={10} />
+          Data View
+        </button>
 
         <button
           onClick={handlePopout}

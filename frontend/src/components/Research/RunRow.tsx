@@ -1,7 +1,9 @@
 import { T, F, FS } from '@/lib/design-tokens'
 import { useUIStore } from '@/stores/uiStore'
 import { useMetricsStore } from '@/stores/metricsStore'
+import { runMetricsToTable } from '@/services/metricsBridge'
 import ProgressBar from '@/components/shared/ProgressBar'
+import toast from 'react-hot-toast'
 import {
   CheckCircle2,
   XCircle,
@@ -9,6 +11,7 @@ import {
   Loader,
   Copy,
   ExternalLink,
+  TableProperties,
 } from 'lucide-react'
 
 interface Run {
@@ -123,6 +126,24 @@ export default function RunRow({ run, onClone, onCompareToggle, compareSelected 
       )}
 
       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+        {run.status === 'complete' && (
+          <button
+            onClick={async () => {
+              try {
+                await runMetricsToTable(run.id, run.name)
+                setView('data')
+              } catch (e: any) {
+                toast.error(e.message || 'No metrics available')
+              }
+            }}
+            title="Analyze in Data View"
+            style={btnStyle}
+            onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}22` }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = `${T.cyan}14` }}
+          >
+            <TableProperties size={9} />
+          </button>
+        )}
         <button
           onClick={handleClone}
           title="Clone"
