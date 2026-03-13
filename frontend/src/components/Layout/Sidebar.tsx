@@ -17,6 +17,7 @@ import {
   LineChart,
   PanelLeftClose,
   PanelLeftOpen,
+  Home,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -31,6 +32,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { id: 'research', label: 'Research', icon: Home },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'editor', label: 'Pipelines', icon: GitBranch },
   { id: 'datasets', label: 'Datasets', icon: Database },
@@ -109,7 +111,7 @@ export default function Sidebar() {
 
       <nav style={{ flex: 1, paddingTop: 6 }}>
         {NAV_ITEMS.map((item, index) => {
-          const active = activeView === item.id
+          const active = activeView === item.id || (item.id === 'research' && activeView === 'research-detail')
           const Icon = item.icon
           return (
             <motion.button
