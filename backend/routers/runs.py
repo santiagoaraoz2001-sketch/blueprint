@@ -1,8 +1,12 @@
+import json
 import uuid
+from pathlib import Path
+
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from ..config import ARTIFACTS_DIR
 from ..database import get_db
 from ..models.run import Run
 from ..models.pipeline import Pipeline
@@ -99,6 +103,37 @@ def compare_runs(
         'metric_columns': sorted_metrics,
         'runs': rows,
     }
+
+
+@router.get("/{run_id}/metrics-log")
+def get_metrics_log(run_id: str, db: Session = Depends(get_db)):
+    """Return the full metrics event log for a run.
+
+    Layer 2 (SQLite) is preferred. Falls back to Layer 1 (JSONL file)
+    if metrics_log is null (crash recovery / old runs).
+    """
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    # Layer 2: SQLite metrics_log
+    if run.metrics_log:
+        return run.metrics_log
+
+    # Layer 1 fallback: JSONL file
+    jsonl_path = ARTIFACTS_DIR / run_id / "metrics.jsonl"
+    if jsonl_path.exists():
+        events = []
+        for line in jsonl_path.read_text().splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return events
+
+    return []
 
 
 @router.get("/{run_id}", response_model=RunResponse)
