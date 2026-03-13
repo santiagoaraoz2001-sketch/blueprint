@@ -194,6 +194,25 @@ def run(ctx):
 
     # Save metrics output
     _col_names = list(rows[0].keys()) if rows else []
+
+    # Propagate dataset metadata for downstream blocks
+    _text_col = "text"
+    if _col_names:
+        if "text" in _col_names:
+            _text_col = "text"
+        elif "content" in _col_names:
+            _text_col = "content"
+        elif "body" in _col_names:
+            _text_col = "body"
+        elif _col_names:
+            _text_col = _col_names[0]
+    ctx.save_output("dataset_meta", {
+        "text_column": _text_col,
+        "columns": _col_names,
+        "num_rows": len(rows),
+        "source": "local_file",
+    })
+
     _metrics = {"row_count": len(rows), "column_count": len(_col_names), "columns": _col_names, "format": fmt, "file_size_bytes": os.path.getsize(file_path)}
     _mp = os.path.join(ctx.run_dir, "metrics.json")
     with open(_mp, "w") as f:

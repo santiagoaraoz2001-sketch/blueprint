@@ -16,6 +16,11 @@ outputs:
     label: Dataset
     data_type: dataset
     description: "JSON output (dataset/data.json): array of objects, one per row. Each object has keys matching dataset columns. Native mode: HuggingFace Arrow format."
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
+    description: "Metadata about the dataset: text_column, columns, num_rows, seed, shuffle, source"
   - id: metrics
     label: Stats
     data_type: metrics

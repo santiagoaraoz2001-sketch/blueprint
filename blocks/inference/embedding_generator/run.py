@@ -16,7 +16,17 @@ import urllib.request
 
 def run(ctx):
     dataset_path = ctx.load_input("dataset")
-    text_column = ctx.config.get("text_column", "text")
+
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
 
     # ── Model config: upstream model input takes priority ──────────────
     model_data = {}

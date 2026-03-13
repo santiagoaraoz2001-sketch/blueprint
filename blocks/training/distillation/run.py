@@ -13,6 +13,16 @@ import time
 
 def run(ctx):
     dataset_path = ctx.load_input("dataset")
+
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     teacher_name = ctx.config.get("teacher_model", "")
     student_name = ctx.config.get("student_model", "")
     lr = float(ctx.config.get("lr", 5e-5))
@@ -20,7 +30,7 @@ def run(ctx):
     batch_size = int(ctx.config.get("batch_size", 8))
     temperature = float(ctx.config.get("temperature", 2.0))
     alpha = float(ctx.config.get("alpha", 0.5))
-    text_column = ctx.config.get("text_column", "")
+    text_column = ctx.config.get("text_column") or _dataset_meta.get("text_column", "")
     max_seq_length = int(ctx.config.get("max_seq_length", 512))
 
     # Try to get models from input ports (port IDs: "teacher" and "student")

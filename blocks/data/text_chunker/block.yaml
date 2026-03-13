@@ -9,12 +9,20 @@ inputs:
     label: Raw Documents
     data_type: dataset
     required: true
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
 
 outputs:
   - id: dataset
     label: Chunked Data
     data_type: dataset
     description: "JSON array of chunk objects. Each row contains the text column with chunk content. When include_chunk_id is true: doc_id, chunk_id, chunk_index columns are added. When keep_metadata is true: all non-text columns from the source document are copied."
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
   - id: stats
     label: Chunking Stats
     data_type: metrics

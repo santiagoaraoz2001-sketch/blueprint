@@ -9,6 +9,10 @@ inputs:
     label: Dataset
     data_type: dataset
     required: true
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
 
 outputs:
   - id: train
@@ -23,6 +27,10 @@ outputs:
     label: Test
     data_type: dataset
     description: "JSON array of test rows. Schema matches input."
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
   - id: stats
     label: Split Stats
     data_type: metrics

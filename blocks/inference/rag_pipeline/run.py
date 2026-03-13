@@ -15,8 +15,17 @@ import math
 
 
 def run(ctx):
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     query = ctx.config.get("query", "")
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     top_k = int(ctx.config.get("top_k", 5))
     # ── Model config: upstream model input takes priority ──────────────
     model_data = {}

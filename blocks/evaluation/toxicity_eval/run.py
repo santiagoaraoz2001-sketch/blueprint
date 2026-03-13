@@ -14,8 +14,17 @@ from blocks.inference._inference_utils import call_inference
 
 
 def run(ctx):
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     # ── Configuration ─────────────────────────────────────────────────────
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     threshold = float(ctx.config.get("threshold", 0.5))
     categories_str = ctx.config.get("categories",
                      "toxicity,severe_toxicity,obscene,threat,insult,identity_attack")

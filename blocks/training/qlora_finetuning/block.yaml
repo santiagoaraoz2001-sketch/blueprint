@@ -13,6 +13,10 @@ inputs:
     label: Base Model
     data_type: model
     required: false
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
 
 outputs:
   - id: model
@@ -94,10 +98,10 @@ config:
     label: Text Column
     description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
     default: ""
-  prompt_template:
-    type: string
-    label: Prompt Template
-    description: "Template to combine multiple columns into training text, e.g. '### Instruction:\\n{instruction}\\n### Response:\\n{output}'"
+  training_format:
+    type: text_area
+    label: Training Format
+    description: "Template for structuring training examples. Use {text}, {instruction}, {output} placeholders."
     default: ""
   eval_split:
     type: float

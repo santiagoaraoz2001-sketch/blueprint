@@ -58,8 +58,17 @@ DEMOGRAPHIC_NAMES = {
 
 
 def run(ctx):
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     # ── Configuration ─────────────────────────────────────────────────────
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     dimensions_str = ctx.config.get("bias_dimensions", "gender,race,age,religion")
     group_column = ctx.config.get("group_column", "")
     method = ctx.config.get("method", "keyword")

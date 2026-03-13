@@ -191,10 +191,20 @@ def _augment_with_model(text, strategy, model_name, provider, endpoint,
 
 def run(ctx):
     dataset_path = ctx.load_input("dataset")
+
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     strategy = ctx.config.get("strategy", "synonym_swap")
     augment_factor = int(ctx.config.get("augment_factor", 2))
-    text_column = ctx.config.get("text_column", "text")
-    seed = int(ctx.config.get("seed", 42))
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
+    seed = int(ctx.config.get("seed") or _dataset_meta.get("seed", 42))
     preserve_labels = ctx.config.get("preserve_labels", True)
     balance_column = ctx.config.get("balance_column", "")
     augment_prompt = ctx.config.get("augment_prompt", "")
@@ -366,6 +376,11 @@ def run(ctx):
         "model_backed": has_model_strategies,
         "corpus_phrases": len(corpus_phrases),
     }
+
+    # Pass through dataset metadata
+    if _dataset_meta:
+        _dataset_meta["num_rows"] = len(augmented)
+        ctx.save_output("dataset_meta", _dataset_meta)
 
     ctx.save_output("dataset", out_dir)
     ctx.save_output("metrics", stats)

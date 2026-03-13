@@ -13,6 +13,16 @@ import time
 
 def run(ctx):
     dataset_path = ctx.load_input("dataset")
+
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     model_name = ctx.config.get("model_name", "")
     lr = float(ctx.config.get("lr", 5e-5))
     epochs_per_stage = int(ctx.config.get("epochs_per_stage", 1))
@@ -20,8 +30,8 @@ def run(ctx):
     num_stages = int(ctx.config.get("num_stages", 3))
     difficulty_column = ctx.config.get("difficulty_column", "difficulty")
     sort_ascending = ctx.config.get("sort_ascending", True)
-    text_column = ctx.config.get("text_column", "")
-    prompt_template = ctx.config.get("prompt_template", "")
+    text_column = ctx.config.get("text_column") or _dataset_meta.get("text_column", "")
+    training_format = ctx.config.get("training_format", ctx.config.get("prompt_template", ""))
     max_seq_length = int(ctx.config.get("max_seq_length", 512))
 
     # Try to get model from input
@@ -118,12 +128,12 @@ def run(ctx):
             texts = []
             for r in stage_data:
                 if isinstance(r, dict):
-                    if prompt_template:
+                    if training_format:
                         try:
-                            texts.append(prompt_template.format(**r))
+                            texts.append(training_format.format(**r))
                         except KeyError as e:
                             raise ValueError(
-                                f"prompt_template references missing column {e}. "
+                                f"training_format references missing column {e}. "
                                 f"Available columns: {list(r.keys())}"
                             )
                     elif text_column and text_column in r:
