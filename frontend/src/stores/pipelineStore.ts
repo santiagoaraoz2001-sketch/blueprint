@@ -454,9 +454,18 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   updateNodeConfig: (id, config) => {
     set((s) => ({
       ..._histSnapshot(s),
-      nodes: s.nodes.map((n) =>
-        n.id === id ? { ...n, data: { ...n.data, config: { ...n.data.config, ...config } } } : n
-      ),
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id) return n
+        const newConfig = { ...n.data.config }
+        for (const [key, value] of Object.entries(config)) {
+          if (value === undefined || value === null) {
+            delete newConfig[key]  // Remove → reverts to inherited/default
+          } else {
+            newConfig[key] = value
+          }
+        }
+        return { ...n, data: { ...n.data, config: newConfig } }
+      }),
       isDirty: true,
     }))
   },
