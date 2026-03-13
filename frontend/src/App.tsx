@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, lazy, Suspense } from 'react'
 import ErrorBoundary from '@/components/shared/ErrorBoundary'
 import AppShell from '@/components/Layout/AppShell'
-import CommandPalette from '@/components/Layout/CommandPalette'
+import CommandPalette from '@/components/shared/CommandPalette'
 import StartScreen from '@/components/Layout/StartScreen'
 import SplashScreen from '@/components/Layout/SplashScreen'
 import { useUIStore } from '@/stores/uiStore'
@@ -20,6 +20,9 @@ import WorkshopView from '@/views/WorkshopView'
 import InferenceView from '@/views/InferenceView'
 import DataView from '@/views/DataView'
 import VisualizationView from '@/views/VisualizationView'
+import MonitorView from '@/views/MonitorView'
+import ResearchDashboardView from '@/views/ResearchDashboardView'
+import PaperDetailView from '@/views/PaperDetailView'
 
 // Lazy-loaded views
 const HelpView = lazy(() => import('@/views/HelpView'))
@@ -37,6 +40,9 @@ const viewComponents: Record<string, React.ComponentType> = {
   settings: SettingsView,
   paper: PaperView,
   help: HelpView,
+  monitor: MonitorView,
+  'research-dashboard': ResearchDashboardView,
+  'paper-detail': PaperDetailView,
 }
 
 function ViewTransition({ viewKey, children }: { viewKey: string; children: React.ReactNode }) {

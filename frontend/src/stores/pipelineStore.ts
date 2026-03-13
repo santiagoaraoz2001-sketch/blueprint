@@ -46,7 +46,7 @@ export interface PipelineTab {
   edges: Edge[]
   pipelineId: string | null  // backend pipeline ID
   isDirty: boolean
-  runStatus: 'idle' | 'running' | 'complete' | 'failed'
+  runStatus: 'idle' | 'running' | 'complete' | 'failed' | 'cancelled'
 }
 
 export interface PipelineSnapshot {

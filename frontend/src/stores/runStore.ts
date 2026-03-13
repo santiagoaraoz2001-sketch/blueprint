@@ -24,7 +24,7 @@ export interface SSEEventData {
 interface RunState {
   activeRunId: string | null
   pipelineId: string | null
-  status: 'idle' | 'running' | 'complete' | 'failed'
+  status: 'idle' | 'running' | 'complete' | 'failed' | 'cancelled'
   nodeStatuses: Record<string, NodeStatus>
   nodeOutputs: Record<string, Record<string, any>>
   overallProgress: number
@@ -115,12 +115,12 @@ export const useRunStore = create<RunState>((set, get) => ({
     if (!activeRunId) return
     if (isDemoMode()) {
       if (_demoTimer) window.clearInterval(_demoTimer)
-      set({ status: 'failed', error: 'Stopped by user', _demoTimer: null })
+      set({ status: 'cancelled', error: 'Stopped by user', _demoTimer: null })
       return
     }
     try {
       await api.post(`/runs/${activeRunId}/stop`)
-      set({ status: 'failed', error: 'Stopped by user' })
+      set({ status: 'cancelled', error: 'Stopped by user' })
     } catch {
       // Ignore stop errors
     }
