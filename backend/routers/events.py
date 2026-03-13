@@ -19,7 +19,23 @@ BUFFER_SIZE = 200
 
 
 def publish_event(run_id: str, event_type: str, data: dict):
-    """Publish an event to all SSE subscribers for a run."""
+    """Publish an event to all SSE subscribers for a run.
+
+    Supported event types:
+      node_started   – block execution begins
+      node_progress  – block progress update (0-1)
+      node_log       – log message from block
+      node_output    – block outputs (truncated)
+      node_completed – block finished successfully
+      node_failed    – block raised an error
+      node_cached    – block skipped; outputs reused from a previous run
+                       (emitted by partial executor)
+      metric         – per-block metric value
+      system_metric  – CPU/memory/GPU snapshot
+      run_completed  – pipeline finished successfully
+      run_failed     – pipeline failed
+      run_cancelled  – pipeline cancelled by user
+    """
     # Assign monotonic event ID
     if run_id not in _event_counters:
         _event_counters[run_id] = 0

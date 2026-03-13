@@ -2,12 +2,14 @@ import uuid
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db, SessionLocal
 from ..models.pipeline import Pipeline
 from ..models.run import Run
 from ..engine.executor import execute_pipeline, request_cancel
+from ..engine.partial_executor import execute_partial_pipeline
 from ..engine.validator import validate_pipeline
 
 router = APIRouter(prefix="/api", tags=["execution"])
@@ -15,6 +17,16 @@ _logger = logging.getLogger("blueprint.execution")
 
 # Bounded thread pool prevents resource exhaustion from concurrent runs
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="pipeline-run")
+
+
+class PartialExecuteRequest(BaseModel):
+    """Request body for partial pipeline re-execution."""
+    source_run_id: str = Field(..., description="ID of the completed run to reuse cached outputs from")
+    start_node_id: str = Field(..., description="Node ID to re-execute from (inclusive)")
+    config_overrides: dict[str, dict] = Field(
+        default_factory=dict,
+        description="Per-node config overrides: {node_id: {key: value}}",
+    )
 
 
 def shutdown_executor():
@@ -52,6 +64,82 @@ def start_pipeline_run(pipeline_id: str, db: Session = Depends(get_db)):
         raise HTTPException(503, "Pipeline executor is shutting down. Please try again later.")
 
     return {"status": "started", "pipeline_id": pipeline_id, "run_id": run_id}
+
+
+@router.post("/pipelines/{pipeline_id}/execute-from")
+def execute_from_node(
+    pipeline_id: str,
+    body: PartialExecuteRequest,
+    db: Session = Depends(get_db),
+):
+    """Execute a pipeline starting from a specific node, reusing cached outputs."""
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    if not nodes:
+        raise HTTPException(400, "Pipeline has no blocks")
+
+    # --- Validate source run (fail-fast before thread submission) ---
+    source_run = db.query(Run).filter(Run.id == body.source_run_id).first()
+    if not source_run:
+        raise HTTPException(404, "Source run not found")
+    if source_run.status != "complete":
+        raise HTTPException(
+            400,
+            f"Source run has status '{source_run.status}', expected 'complete'",
+        )
+    if not source_run.outputs_snapshot:
+        raise HTTPException(400, "Source run has no cached outputs")
+
+    # --- Validate start_node_id exists in the pipeline ---
+    node_ids = {n["id"] for n in nodes}
+    if body.start_node_id not in node_ids:
+        raise HTTPException(
+            400,
+            f"start_node_id '{body.start_node_id}' not found in pipeline",
+        )
+
+    # --- Validate config_overrides reference real nodes ---
+    if body.config_overrides:
+        unknown = set(body.config_overrides.keys()) - node_ids
+        if unknown:
+            raise HTTPException(
+                400,
+                f"config_overrides reference unknown node IDs: {sorted(unknown)}",
+            )
+
+    run_id = str(uuid.uuid4())
+
+    def run_in_thread():
+        session = SessionLocal()
+        try:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            loop.run_until_complete(
+                execute_partial_pipeline(
+                    pipeline_id, run_id, body.source_run_id, body.start_node_id,
+                    definition, body.config_overrides, session,
+                )
+            )
+        finally:
+            session.close()
+
+    try:
+        _executor.submit(run_in_thread)
+    except RuntimeError:
+        raise HTTPException(503, "Pipeline executor is shutting down. Please try again later.")
+
+    return {
+        "status": "started",
+        "pipeline_id": pipeline_id,
+        "run_id": run_id,
+        "partial": True,
+        "source_run_id": body.source_run_id,
+        "start_node_id": body.start_node_id,
+    }
 
 
 @router.post("/runs/{run_id}/stop")
