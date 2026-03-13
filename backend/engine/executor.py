@@ -33,12 +33,14 @@ from ..config import ARTIFACTS_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCK
 from ..database import SessionLocal
 from ..models.run import Run, LiveRun
 from ..block_sdk.context import BlockContext
+from ..block_sdk.exceptions import BlockError, BlockConfigError
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
 from ..utils.structured_logger import (
     log_run_start, log_run_complete, log_run_failed,
     log_block_start, log_block_complete, log_block_failed,
 )
+from .metrics_schema import create_metric
 
 # Cancel events: threading.Event per run_id, protected by lock for thread safety
 _cancel_events: dict[str, threading.Event] = {}
@@ -453,30 +455,26 @@ async def execute_pipeline(
                         pass
 
                 def metric_cb(name, value, step):
+                    metric_event_obj = create_metric(
+                        node_id=node_id,
+                        name=name,
+                        value=value,
+                        category=category,
+                        step=step,
+                    )
+                    event_dict = metric_event_obj.to_dict()
+
                     all_metrics[f"{block_type}.{name}"] = value
-                    metric_event = {
-                        "type": "metric",
-                        "node_id": node_id,
-                        "name": name,
-                        "value": value,
-                        "category": category,
-                        "timestamp": time.time(),
-                    }
+
                     try:
-                        publish_event(run_id, "metric", {
-                            "node_id": node_id,
-                            "name": name,
-                            "value": value,
-                            "category": category,
-                            "timestamp": metric_event["timestamp"],
-                        })
+                        publish_event(run_id, "metric", event_dict)
                     except Exception:
                         pass
                     # Layer 1: JSONL
-                    metrics_file.write(json.dumps(metric_event) + "\n")
+                    metrics_file.write(json.dumps(event_dict) + "\n")
                     metrics_file.flush()
                     # Layer 2: buffer
-                    metrics_log_buffer.append(metric_event)
+                    metrics_log_buffer.append(event_dict)
 
                 try:
                     node_outputs = _load_and_run_block(
@@ -500,6 +498,30 @@ async def execute_pipeline(
                         })
                     except Exception:
                         pass
+                    return
+                except BlockError as e:
+                    log_block_failed(run_id, node_id, block_type, e.message)
+                    error_payload = {
+                        "node_id": node_id,
+                        "error": e.message,
+                        "error_type": type(e).__name__,
+                        "recoverable": e.recoverable,
+                        "details": e.details,
+                    }
+                    if isinstance(e, BlockConfigError):
+                        error_payload["config_field"] = e.field
+                    try:
+                        publish_event(run_id, "node_failed", error_payload)
+                    except Exception:
+                        pass
+                    run.status = "failed"
+                    run.error_message = f"[{type(e).__name__}] {e.message}"
+                    if e.details:
+                        run.error_message += f"\n\nDetails: {e.details}"
+                    run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    live.status = "failed"
+                    db.commit()
+                    log_run_failed(run_id, e.message, node_id)
                     return
                 except Exception as e:
                     tb = traceback.format_exc()

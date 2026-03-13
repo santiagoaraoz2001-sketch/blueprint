@@ -136,6 +136,47 @@ def get_metrics_log(run_id: str, db: Session = Depends(get_db)):
     return []
 
 
+@router.get("/{run_id}/metrics-typed")
+def get_typed_metrics(run_id: str, db: Session = Depends(get_db)):
+    """Get metrics with schema version and aggregation.
+
+    Layer 2 (SQLite metrics_log) is preferred.  Falls back to Layer 1
+    (JSONL file) when metrics_log is null -- e.g. crash recovery or
+    old runs that pre-date the column.
+    """
+    from ..engine.metrics_schema import (
+        CURRENT_SCHEMA_VERSION, parse_metrics_log, aggregate_metrics,
+    )
+
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    raw_log = run.metrics_log
+    if not raw_log:
+        # Layer 1 fallback: JSONL file
+        jsonl_path = ARTIFACTS_DIR / run_id / "metrics.jsonl"
+        if jsonl_path.exists():
+            raw_log = []
+            for line in jsonl_path.read_text().splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        raw_log.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+
+    events = parse_metrics_log(raw_log or [])
+    summary = aggregate_metrics(events)
+
+    return {
+        "schema_version": CURRENT_SCHEMA_VERSION,
+        "events": [e.to_dict() for e in events],
+        "summary": summary,
+        "event_count": len(events),
+    }
+
+
 @router.get("/{run_id}", response_model=RunResponse)
 def get_run(run_id: str, db: Session = Depends(get_db)):
     run = db.query(Run).filter(Run.id == run_id).first()
