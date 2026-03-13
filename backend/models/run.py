@@ -18,6 +18,7 @@ class Run(Base):
     config_snapshot = Column(JSON, default=dict)
     metrics = Column(JSON, default=dict)
     outputs_snapshot = Column(JSON, nullable=True)
+    metrics_log = Column(JSON, nullable=True)
 
 
 class LiveRun(Base):

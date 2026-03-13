@@ -11,8 +11,8 @@ import traceback
 import uuid
 import time
 import asyncio
-import importlib.util
 import threading
+import importlib.util
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -158,6 +158,40 @@ def _check_cancelled(run_id: str) -> bool:
     return event is not None and event.is_set()
 
 
+def _collect_system_metrics() -> dict | None:
+    """Collect CPU/memory/GPU metrics. Returns None if psutil unavailable."""
+    try:
+        import psutil
+    except ImportError:
+        return None
+    metrics: dict[str, float] = {
+        "cpu_pct": psutil.cpu_percent(interval=None),
+        "mem_pct": psutil.virtual_memory().percent,
+        "mem_gb": round(psutil.virtual_memory().used / (1024 ** 3), 2),
+    }
+    # GPU memory via nvidia-smi (optional)
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            used, total = result.stdout.strip().split(",")
+            metrics["gpu_mem_pct"] = round(float(used) / float(total) * 100, 1)
+    except Exception:
+        pass
+    return metrics
+
+
+def _safe_commit(db: Session):
+    """Commit without raising — log and continue on failure."""
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+
+
 async def execute_pipeline(
     pipeline_id: str,
     run_id: str,
@@ -198,6 +232,42 @@ async def execute_pipeline(
     node_map = {n["id"]: n for n in nodes}
     outputs: dict[str, dict[str, Any]] = {}
     all_metrics: dict[str, Any] = {}
+
+    # --- Layer 1: JSONL file failsafe ---
+    metrics_dir = ARTIFACTS_DIR / run_id
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    metrics_file = open(metrics_dir / "metrics.jsonl", "a")
+
+    # --- Layer 2: In-memory buffer for SQLite checkpoints ---
+    metrics_log_buffer: list[dict] = []
+    last_checkpoint_time = time.time()
+    CHECKPOINT_INTERVAL = 60  # seconds
+
+    # --- System metrics publisher ---
+    system_metrics_stop = threading.Event()
+
+    def _system_metrics_loop():
+        while not system_metrics_stop.is_set():
+            system_metrics_stop.wait(10)
+            if system_metrics_stop.is_set():
+                break
+            sm = _collect_system_metrics()
+            if sm is None:
+                continue
+            event_data = {"type": "system_metric", "timestamp": time.time(), **sm}
+            # Layer 1: JSONL
+            try:
+                metrics_file.write(json.dumps(event_data) + "\n")
+                metrics_file.flush()
+            except Exception:
+                pass
+            # Layer 2: buffer
+            metrics_log_buffer.append(event_data)
+            # SSE
+            publish_event(run_id, "system_metric", event_data)
+
+    system_thread = threading.Thread(target=_system_metrics_loop, daemon=True)
+    system_thread.start()
 
     start_time = time.time()
 
@@ -241,15 +311,22 @@ async def execute_pipeline(
             live.overall_progress = idx / len(nodes)
             db.commit()
 
+            category = node_data.get("category", "flow")
+
+            started_event = {
+                "node_id": node_id,
+                "block_type": block_type,
+                "category": category,
+                "index": idx,
+                "total": len(nodes),
+            }
             try:
-                publish_event(run_id, "node_started", {
-                    "node_id": node_id,
-                    "block_type": block_type,
-                    "index": idx,
-                    "total": len(nodes),
-                })
+                publish_event(run_id, "node_started", started_event)
             except Exception:
                 pass
+            metrics_log_buffer.append({"type": "node_started", "timestamp": time.time(), **started_event})
+            metrics_file.write(json.dumps({"type": "node_started", "timestamp": time.time(), **started_event}) + "\n")
+            metrics_file.flush()
 
             # Gather inputs from upstream edges
             # When multiple edges connect to the same target handle, collect values into a list
@@ -328,10 +405,29 @@ async def execute_pipeline(
 
                 def metric_cb(name, value, step):
                     all_metrics[f"{block_type}.{name}"] = value
+                    metric_event = {
+                        "type": "metric",
+                        "node_id": node_id,
+                        "name": name,
+                        "value": value,
+                        "category": category,
+                        "timestamp": time.time(),
+                    }
                     try:
-                        publish_event(run_id, "metric", {"node_id": node_id, "name": name, "value": value})
+                        publish_event(run_id, "metric", {
+                            "node_id": node_id,
+                            "name": name,
+                            "value": value,
+                            "category": category,
+                            "timestamp": metric_event["timestamp"],
+                        })
                     except Exception:
                         pass
+                    # Layer 1: JSONL
+                    metrics_file.write(json.dumps(metric_event) + "\n")
+                    metrics_file.flush()
+                    # Layer 2: buffer
+                    metrics_log_buffer.append(metric_event)
 
                 try:
                     node_outputs = _load_and_run_block(
@@ -400,10 +496,22 @@ async def execute_pipeline(
                 publish_event(run_id, "node_output", {"node_id": node_id, "outputs": safe_outputs})
             except Exception:
                 pass
+
+            completed_event = {"node_id": node_id, "index": idx}
             try:
-                publish_event(run_id, "node_completed", {"node_id": node_id, "index": idx})
+                publish_event(run_id, "node_completed", completed_event)
             except Exception:
                 pass
+            metrics_log_buffer.append({"type": "node_completed", "timestamp": time.time(), **completed_event})
+            metrics_file.write(json.dumps({"type": "node_completed", "timestamp": time.time(), **completed_event}) + "\n")
+            metrics_file.flush()
+
+            # Layer 2: 60s checkpoint to SQLite
+            now = time.time()
+            if now - last_checkpoint_time >= CHECKPOINT_INTERVAL:
+                run.metrics_log = list(metrics_log_buffer)
+                _safe_commit(db)
+                last_checkpoint_time = now
 
         # Pipeline complete
         run.status = "complete"
@@ -411,6 +519,7 @@ async def execute_pipeline(
         run.duration_seconds = time.time() - start_time
         run.metrics = all_metrics
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+        run.metrics_log = list(metrics_log_buffer)
         live.status = "complete"
         live.overall_progress = 1.0
         db.commit()
@@ -436,6 +545,7 @@ async def execute_pipeline(
         run.status = "failed"
         run.error_message = f"{str(e)}\n\n{tb}"
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+        run.metrics_log = list(metrics_log_buffer)
         live.status = "failed"
         db.commit()
         _write_error_log(run_id, tb)
@@ -454,6 +564,13 @@ async def execute_pipeline(
     finally:
         # Clean up cancel event
         _cancel_events.pop(run_id, None)
+        # Stop system metrics publisher
+        system_metrics_stop.set()
+        # Close JSONL file
+        try:
+            metrics_file.close()
+        except Exception:
+            pass
 
 
 def _safe_outputs_snapshot(outputs: dict[str, dict[str, Any]]) -> dict:
