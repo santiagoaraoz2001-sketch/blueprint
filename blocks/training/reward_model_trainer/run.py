@@ -118,14 +118,14 @@ def run(ctx):
         trainer.save_model(output_model_path)
 
         metrics = {
-            "train_loss": round(train_result.training_loss, 6),
+            "train/loss": round(train_result.training_loss, 6),
             "train_runtime": round(train_result.metrics.get("train_runtime", 0), 2),
             "train_samples_per_second": round(train_result.metrics.get("train_samples_per_second", 0), 2),
             "epochs": epochs,
             "learning_rate": lr,
             "loss_function": loss_fn,
         }
-        ctx.log_message(f"Training complete: loss={metrics['train_loss']:.6f}")
+        ctx.log_message(f"Training complete: loss={metrics['train/loss']:.6f}")
 
     except ImportError as e:
         missing = str(e)
@@ -140,7 +140,7 @@ def run(ctx):
 
         random.seed(42)
         metrics = {
-            "train_loss": round(0.5 - 0.3 * (1 - 1 / (epochs + 1)) + random.gauss(0, 0.02), 6),
+            "train/loss": round(0.5 - 0.3 * (1 - 1 / (epochs + 1)) + random.gauss(0, 0.02), 6),
             "train_runtime": round(n_samples * epochs * 0.05, 2),
             "train_samples_per_second": round(n_samples / max(n_samples * epochs * 0.05, 0.01), 2),
             "epochs": epochs,

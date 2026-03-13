@@ -7,7 +7,7 @@ import re
 
 def run(ctx):
     checkpoint_dir = ctx.config.get("checkpoint_dir", "")
-    metric_name = ctx.config.get("metric", "eval_loss")
+    metric_name = ctx.config.get("metric", "eval/loss")
     mode = ctx.config.get("mode", "min")  # "min" or "max"
 
     # Try to get checkpoint dir from input
@@ -75,7 +75,7 @@ def run(ctx):
                 "path": f"/demo/checkpoints/checkpoint-{step}",
                 "step": step,
                 "metrics": {
-                    "eval_loss": round(loss, 4),
+                    "eval/loss": round(loss, 4),
                     "eval_accuracy": round(1.0 - loss / 3.0, 4),
                     "step": step,
                 },

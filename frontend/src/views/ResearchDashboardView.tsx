@@ -9,6 +9,7 @@ import ActivityFeed from '@/components/Research/ActivityFeed'
 import PaperSidebar from '@/components/Research/PaperSidebar'
 import QuickStats from '@/components/Research/QuickStats'
 import CreateProjectModal from '@/components/Projects/CreateProjectModal'
+import ImportPaperModal from '@/components/Projects/ImportPaperModal'
 import EmptyState from '@/components/shared/EmptyState'
 import { FlaskConical } from 'lucide-react'
 import { useState } from 'react'
@@ -21,6 +22,7 @@ export default function ResearchDashboardView() {
   const fetchProjects = useProjectStore((s) => s.fetchProjects)
   const { dashboard, loading, fetchDashboard } = useMetricsStore()
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // SSE subscription for live run updates
@@ -121,6 +123,7 @@ export default function ResearchDashboardView() {
             projects={projects}
             onSelect={handleSelectPaper}
             onAdd={() => setShowCreateModal(true)}
+            onImport={() => setShowImportModal(true)}
           />
         </div>
       </div>
@@ -129,6 +132,7 @@ export default function ResearchDashboardView() {
       <QuickStats stats={dashboard} />
 
       {showCreateModal && <CreateProjectModal onClose={() => setShowCreateModal(false)} />}
+      {showImportModal && <ImportPaperModal onClose={() => setShowImportModal(false)} />}
     </div>
   )
 }

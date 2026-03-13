@@ -3,6 +3,8 @@ type: results_exporter
 category: endpoints
 description: Export pipeline results to CSV, JSON, JSONL, or Parquet with format selection.
 version: "2.0.0"
+deprecated: true
+deprecated_message: "Use 'Save to Local Path' for files or 'Results Formatter' for metrics. This block will be removed in v0.3."
 
 inputs:
   - id: data

@@ -24,7 +24,7 @@ def run(ctx):
     search_type = ctx.config.get("search_type", "grid")
     param_space_str = ctx.config.get("param_space", "{}")
     n_trials = int(ctx.config.get("n_trials", 10))
-    optimize_metric = ctx.config.get("metric", "eval_loss")
+    optimize_metric = ctx.config.get("metric", "eval/loss")
     mode = ctx.config.get("mode", "min")
 
     ctx.log_message(f"Starting {search_type} sweep. Target metric: {optimize_metric} (mode={mode})")
