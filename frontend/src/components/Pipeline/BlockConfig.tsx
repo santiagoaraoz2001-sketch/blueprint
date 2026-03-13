@@ -42,7 +42,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
   const [frameworkData, setFrameworkData] = useState<any[]>([])
 
   useEffect(() => {
-    if (def?.type === 'llm_inference') {
+    if (def?.type === 'model_selector') {
       api.get<any[]>('/system/models')
         .then(data => {
           if (Array.isArray(data)) {
@@ -53,24 +53,23 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
     }
   }, [def?.type])
 
-  // Filter config fields by depends_on and enrich model_name with auto-detected options
+  // Filter config fields by depends_on and enrich model_id with auto-detected options
   const displayFields = def?.configFields
     .filter(f => {
       if (!f.depends_on) return true
       return node.data.config[f.depends_on.field] === f.depends_on.value
     })
     .map(f => {
-      // Auto-populate model field with discovered models for the selected framework
-      if (def.type === 'llm_inference' && f.name === 'model') {
-        const fw = node.data.config.framework || 'auto'
-        const fwEntry = frameworkData.find((d: any) => d.id === fw)
+      // Auto-populate model_id field with discovered models for the selected source
+      if (def.type === 'model_selector' && f.name === 'model_id') {
+        const source = node.data.config.source || 'huggingface'
+        // Map model_selector source names to framework IDs from /api/system/models
+        const sourceToFramework: Record<string, string> = { ollama: 'ollama', mlx: 'mlx', huggingface: 'pytorch', local_path: '' }
+        const fwId = sourceToFramework[source] || ''
+        const fwEntry = frameworkData.find((d: any) => d.id === fwId)
         const models: string[] = fwEntry?.models || []
-        // If "auto", show all models from all available frameworks
-        const allModels = fw === 'auto'
-          ? frameworkData.filter((d: any) => d.available).flatMap((d: any) => (d.models || []).map((m: string) => `${d.id}/${m}`))
-          : models
-        if (allModels.length > 0) {
-          return { ...f, type: 'select' as const, options: allModels } as ConfigField
+        if (models.length > 0) {
+          return { ...f, type: 'select' as const, options: models } as ConfigField
         }
       }
       return f

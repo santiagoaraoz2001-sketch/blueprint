@@ -13,6 +13,8 @@ import json
 import os
 import random
 
+from blocks.inference._inference_utils import call_inference
+
 
 def run(ctx):
     # ── Configuration ─────────────────────────────────────────────────────
@@ -70,13 +72,27 @@ def run(ctx):
     n_pairs = len(rows)
     ctx.log_message(f"Comparing {n_pairs} pairs")
 
+    # ── Judge model config: upstream model input takes priority ──────────
+    judge_model_data = {}
+    if ctx.inputs.get("model"):
+        judge_model_data = ctx.load_input("model")
+        if isinstance(judge_model_data, dict):
+            ctx.log_message(f"Using connected model: {judge_model_data.get('model_name', 'unknown')}")
+
+    judge_framework = judge_model_data.get("source", judge_model_data.get("backend",
+        ctx.config.get("provider", "ollama")))
+    judge_model_name = judge_model_data.get("model_name", judge_model_data.get("model_id",
+        ctx.config.get("judge_model", "")))
+    judge_config = {"endpoint": judge_model_data.get("endpoint", judge_model_data.get("base_url",
+        ctx.config.get("judge_endpoint", "http://localhost:11434")))}
+
     # ── Initialize comparison function ────────────────────────────────────
-    if method == "llm_judge" and judge_model:
-        compare_fn = _make_llm_judge(judge_model, judge_endpoint, judge_timeout)
-        ctx.log_message(f"Using LLM judge: {judge_model}")
+    if method == "llm_judge" and judge_model_name:
+        compare_fn = _make_llm_judge(judge_framework, judge_model_name, judge_config, ctx)
+        ctx.log_message(f"Using LLM judge: {judge_model_name}")
     else:
         compare_fn = _heuristic_compare
-        if method == "llm_judge" and not judge_model:
+        if method == "llm_judge" and not judge_model_name:
             ctx.log_message("No judge model specified — falling back to heuristic")
 
     # ── Compare each pair ─────────────────────────────────────────────────
@@ -261,9 +277,8 @@ def _heuristic_compare(prompt, text_a, text_b):
         return "B", score_a, score_b
 
 
-def _make_llm_judge(judge_model, judge_endpoint, timeout=30):
+def _make_llm_judge(framework, model_name, config, ctx):
     """Create an LLM judge comparison function."""
-    import urllib.request
 
     def llm_judge(prompt, text_a, text_b):
         judge_prompt = (
@@ -275,25 +290,19 @@ def _make_llm_judge(judge_model, judge_endpoint, timeout=30):
             f"Reply with exactly one of: A, B, or TIE"
         )
         try:
-            payload = json.dumps({
-                "model": judge_model, "prompt": judge_prompt,
-                "options": {"temperature": 0.0, "num_predict": 10},
-                "stream": False,
-            }).encode()
-            req = urllib.request.Request(
-                f"{judge_endpoint.rstrip('/')}/api/generate",
-                data=payload, headers={"Content-Type": "application/json"},
+            judge_cfg = {**config, "temperature": 0.0, "max_tokens": 10}
+            response_text, meta = call_inference(
+                framework, model_name, judge_prompt, "", judge_cfg,
+                log_fn=ctx.log_message,
             )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                data = json.loads(resp.read().decode())
-                verdict = data.get("response", "").strip().upper()
-                if "TIE" in verdict:
-                    return "tie", 0.5, 0.5
-                elif verdict.startswith("A"):
-                    return "A", 1.0, 0.0
-                elif verdict.startswith("B"):
-                    return "B", 0.0, 1.0
+            verdict = response_text.strip().upper()
+            if "TIE" in verdict:
                 return "tie", 0.5, 0.5
+            elif verdict.startswith("A"):
+                return "A", 1.0, 0.0
+            elif verdict.startswith("B"):
+                return "B", 0.0, 1.0
+            return "tie", 0.5, 0.5
         except Exception:
             return "tie", 0.5, 0.5
 

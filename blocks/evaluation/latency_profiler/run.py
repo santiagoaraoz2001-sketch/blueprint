@@ -12,6 +12,8 @@ import time
 import random
 import math
 
+from blocks.inference._inference_utils import call_inference
+
 
 def run(ctx):
     # ── Configuration ─────────────────────────────────────────────────────
@@ -31,31 +33,31 @@ def run(ctx):
     decimal_precision = int(ctx.config.get("decimal_precision", 4))
 
 
-    # ── Resolve model from input ──────────────────────────────────────────
-    try:
-        model_info = ctx.load_input("model")
-        if isinstance(model_info, dict):
-            model_name = model_name or model_info.get("model_name",
-                         model_info.get("model_id", ""))
-            if provider == "auto":
-                provider = model_info.get("source", "ollama")
-            endpoint = model_info.get("endpoint", endpoint)
-        elif isinstance(model_info, str):
-            model_name = model_name or model_info
-    except (ValueError, Exception):
-        pass
+    # ── Model config: upstream model input takes priority ────────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    framework = model_data.get("source", model_data.get("backend",
+        ctx.config.get("provider", "ollama")))
+    model_name = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_name", "llama3.2"))) if not model_name else model_name
+    config = {"endpoint": model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))}
 
     batch_sizes = [int(b.strip()) for b in batch_sizes_str.split(",") if b.strip()]
     input_lengths = [int(l.strip()) for l in input_lengths_str.split(",") if l.strip()]
 
     ctx.log_message(f"Latency Profiler: {model_name or '(demo)'}")
-    ctx.log_message(f"Provider: {provider}, Endpoint: {endpoint}")
+    ctx.log_message(f"Framework: {framework}, Endpoint: {config.get('endpoint')}")
     ctx.log_message(f"Batch sizes: {batch_sizes}, Input lengths: {input_lengths}")
     ctx.log_message(f"Output length: {output_length}, Warmup: {num_warmup}, Runs: {num_runs}")
 
     # ── Detect real inference capability ───────────────────────────────────
-    infer_fn = _get_inference_fn(ctx, provider, model_name, endpoint, output_length,
-                                temperature, inference_timeout)
+    infer_fn = _get_inference_fn(ctx, framework, model_name, config, output_length,
+                                temperature)
 
     if infer_fn is None:
         ctx.log_message("No inference provider available — generating simulated profiles")
@@ -132,7 +134,7 @@ def run(ctx):
     metrics = {
         "num_configs": len(profiles),
         "model": model_name,
-        "provider": provider,
+        "provider": framework,
         "demo_mode": infer_fn is None,
     }
     if profiles:
@@ -178,64 +180,31 @@ def run(ctx):
     ctx.report_progress(1, 1)
 
 
-def _get_inference_fn(ctx, provider, model_name, endpoint, output_length,
-                      temperature=0.0, timeout=120):
-    """Return an inference function or None if no provider is available."""
+def _get_inference_fn(ctx, framework, model_name, config, output_length,
+                      temperature=0.0):
+    """Return an inference function using call_inference, or None if unavailable."""
     if not model_name:
         return None
 
-    if provider in ("ollama", "auto"):
-        fn = _try_ollama(ctx, model_name, endpoint, output_length, temperature, timeout)
-        if fn is not None:
-            return fn
+    inf_config = dict(config)
+    inf_config["max_tokens"] = output_length
+    inf_config["temperature"] = temperature
 
-    if provider in ("mlx", "auto"):
-        fn = _try_mlx(ctx, model_name, output_length, temperature)
-        if fn is not None:
-            return fn
-
-    return None
-
-
-def _try_ollama(ctx, model_name, endpoint, output_length, temperature=0.0, timeout=120):
-    """Check Ollama availability and return inference function."""
-    try:
-        import urllib.request
-        url = f"{endpoint.rstrip('/')}/api/tags"
-        with urllib.request.urlopen(url, timeout=5):
-            pass
-    except Exception:
-        return None
-
-    ctx.log_message(f"Ollama connected: {model_name}")
-    import urllib.request
+    # Quick connectivity check for Ollama
+    if framework == "ollama":
+        try:
+            import urllib.request
+            endpoint = config.get("endpoint", "http://localhost:11434")
+            url = f"{endpoint.rstrip('/')}/api/tags"
+            with urllib.request.urlopen(url, timeout=5):
+                pass
+            ctx.log_message(f"Ollama connected: {model_name}")
+        except Exception:
+            ctx.log_message("Ollama not reachable")
+            return None
 
     def infer(text):
-        payload = json.dumps({
-            "model": model_name, "prompt": text,
-            "options": {"num_predict": output_length, "temperature": temperature},
-            "stream": False,
-        }).encode()
-        req = urllib.request.Request(
-            f"{endpoint.rstrip('/')}/api/generate",
-            data=payload, headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            resp.read()
+        call_inference(framework, model_name, text, config=inf_config,
+                       log_fn=ctx.log_message)
 
     return infer
-
-
-def _try_mlx(ctx, model_name, output_length, temperature=0.0):
-    """Check MLX availability and return inference function."""
-    try:
-        from mlx_lm import load, generate
-        model, tokenizer = load(model_name)
-        ctx.log_message(f"MLX loaded: {model_name}")
-
-        def infer(text):
-            generate(model, tokenizer, prompt=text, max_tokens=output_length, temp=temperature)
-
-        return infer
-    except (ImportError, Exception):
-        return None

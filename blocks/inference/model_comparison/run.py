@@ -14,9 +14,27 @@ import time
 
 
 def run(ctx):
+    # ── Model config: upstream model input takes priority ──────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
     models_text = ctx.config.get("models", "ollama:llama3.2\nollama:mistral")
-    endpoint = ctx.config.get("endpoint", "http://localhost:11434")
-    api_key = ctx.config.get("api_key", "")
+    endpoint = model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))
+    api_key = model_data.get("api_key",
+        ctx.config.get("api_key", ""))
+
+    # Config conflict warnings
+    if ctx.inputs.get("model") and ctx.config.get("models"):
+        ctx.log_message(
+            f"\u26a0 Config conflict: upstream model='{model_data.get('model_name')}' "
+            f"but local config has models='{ctx.config.get('models')}'. "
+            f"Using upstream. Clear local config to remove this warning."
+        )
+
     temperature = float(ctx.config.get("temperature", 0.7))
     max_tokens = int(ctx.config.get("max_tokens", 256))
     prompts_text = ctx.config.get("prompts", "")
