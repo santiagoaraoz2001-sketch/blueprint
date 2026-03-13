@@ -1,37 +1,43 @@
 import { T, F, FS } from '@/lib/design-tokens'
-import { useMetricsStore } from '@/stores/metricsStore'
-import { FileText } from 'lucide-react'
-import { useUIStore } from '@/stores/uiStore'
-import { LineChart, Line, ResponsiveContainer } from 'recharts'
+import { useMetricsStore, type SystemMetricPoint } from '@/stores/metricsStore'
+import { Cpu, HardDrive } from 'lucide-react'
 
-interface Props {
-  runId: string | null
-  paperId: string | null
-  elapsed: number
-  formatElapsed: (s: number) => string
+const EMPTY_SYSTEM_METRICS: SystemMetricPoint[] = []
+
+interface SystemPanelProps {
+  runId: string
 }
 
-/** SVG circular gauge */
-function CircularGauge({ value, label, unit, size = 64 }: {
-  value: number; label: string; unit?: string; size?: number
-}) {
+function GaugeRing({ value, label, detail, size = 60 }: { value: number; label: string; detail: string; size?: number }) {
   const radius = (size - 8) / 2
   const circumference = 2 * Math.PI * radius
-  const offset = circumference * (1 - Math.min(1, value / 100))
-  const gaugeColor = value < 60 ? T.green : value < 80 ? T.amber : T.red
+  const progress = Math.min(Math.max(value, 0), 100) / 100
+  const offset = circumference * (1 - progress)
+
+  let color = '#22c55e' // green
+  if (value > 80) color = '#ff433d' // red
+  else if (value > 60) color = '#f59e0b' // yellow
 
   return (
-    <div style={{ textAlign: 'center' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        {/* Background circle */}
+        {/* Background ring */}
         <circle
-          cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke={T.surface3} strokeWidth={3}
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={T.surface3}
+          strokeWidth={3}
         />
-        {/* Value arc */}
+        {/* Progress ring */}
         <circle
-          cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke={gaugeColor} strokeWidth={3}
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={3}
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
@@ -40,186 +46,147 @@ function CircularGauge({ value, label, unit, size = 64 }: {
         />
         {/* Center text */}
         <text
-          x={size / 2} y={size / 2}
-          textAnchor="middle" dominantBaseline="central"
+          x={size / 2}
+          y={size / 2 - 2}
+          textAnchor="middle"
+          dominantBaseline="central"
           fill={T.text}
-          style={{ fontFamily: F, fontSize: 11, fontWeight: 700 }}
+          fontFamily={F}
+          fontSize={FS.sm}
+          fontWeight={700}
         >
           {Math.round(value)}%
         </text>
+        <text
+          x={size / 2}
+          y={size / 2 + 10}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill={T.dim}
+          fontFamily={F}
+          fontSize={FS.xxs}
+        >
+          {detail}
+        </text>
       </svg>
-      <div style={{
-        fontFamily: F, fontSize: FS.xxs, color: T.dim,
-        letterSpacing: '0.06em', marginTop: 2,
-      }}>
+      <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.08em' }}>
         {label}
-        {unit && <span style={{ color: T.dim }}> ({unit})</span>}
-      </div>
+      </span>
     </div>
   )
 }
 
-/** Mini sparkline for system history */
-function SystemSparkline({ data, color }: { data: number[]; color: string }) {
+function MiniSparkline({ data, height = 20, width = 80 }: { data: number[]; height?: number; width?: number }) {
   if (data.length < 2) return null
-  const chartData = data.map((v, i) => ({ i, v }))
+
+  const max = Math.max(...data, 1)
+  const points = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * width
+      const y = height - (v / max) * height
+      return `${x},${y}`
+    })
+    .join(' ')
+
   return (
-    <div style={{ width: '100%', height: 20, marginTop: 2 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData}>
-          <Line type="monotone" dataKey="v" stroke={color} strokeWidth={1} dot={false} isAnimationActive={false} />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+    <svg width={width} height={height} style={{ display: 'block' }}>
+      <polyline
+        points={points}
+        fill="none"
+        stroke={T.cyan}
+        strokeWidth={1}
+        opacity={0.6}
+      />
+    </svg>
   )
 }
 
-export default function SystemPanel({ runId, paperId, elapsed, formatElapsed }: Props) {
-  const system = useMetricsStore((s) => s.system)
-  const systemHistory = useMetricsStore((s) => s.systemHistory)
-  const executionOrder = useMetricsStore((s) => s.monitorExecutionOrder)
-  const eta = useMetricsStore((s) => s.monitorEta)
-  const runStatus = useMetricsStore((s) => s.runStatus)
-  const pipelineId = useMetricsStore((s) => s.pipelineId)
-  const setView = useUIStore((s) => s.setView)
+export default function SystemPanel({ runId }: SystemPanelProps) {
+  const latest = useMetricsStore((s) => s.getLatestSystemMetrics(runId))
+  const systemHistory = useMetricsStore((s) => s.runs[runId]?.systemMetrics ?? EMPTY_SYSTEM_METRICS)
+  const runStatus = useMetricsStore((s) => s.runs[runId]?.status)
+  const isReplay = runStatus !== 'running'
 
-  const completedBlocks = executionOrder.filter(b => b.status === 'complete').length
-  const totalBlocks = executionOrder.length
-  const overallProgress = totalBlocks > 0 ? completedBlocks / totalBlocks : 0
-  const isRecorded = runStatus === 'recorded'
+  if (!latest && systemHistory.length === 0) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          gap: 8,
+          padding: 16,
+        }}
+      >
+        <Cpu size={16} color={T.dim} />
+        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
+          System metrics loading...
+        </span>
+      </div>
+    )
+  }
 
-  const cpuHistory = systemHistory.map(h => h.cpu)
-  const memHistory = systemHistory.map(h => h.memory)
-  const gpuHistory = systemHistory.filter(h => h.gpuMemory != null).map(h => h.gpuMemory!)
+  const cpuHistory = systemHistory.map((m: SystemMetricPoint) => m.cpu)
+  const memHistory = systemHistory.map((m: SystemMetricPoint) => (m.memoryTotal > 0 ? (m.memory / m.memoryTotal) * 100 : 0))
+  const gpuHistory = systemHistory.filter((m: SystemMetricPoint) => m.gpu != null).map((m: SystemMetricPoint) => m.gpu!)
+
+  const cpu = latest?.cpu ?? (isReplay ? Math.max(...cpuHistory, 0) : 0)
+  const memPct = latest && latest.memoryTotal > 0 ? (latest.memory / latest.memoryTotal) * 100 : (isReplay ? Math.max(...memHistory, 0) : 0)
+  const memDetail = latest ? `${latest.memory.toFixed(0)} GB` : ''
+  const hasGpu = latest?.gpu != null || gpuHistory.length > 0
+  const gpuPct = latest?.gpu ?? (isReplay && gpuHistory.length > 0 ? Math.max(...gpuHistory) : 0)
+  const gpuMemDetail = latest?.gpuMemory != null && latest?.gpuMemoryTotal != null
+    ? `${latest.gpuMemory.toFixed(0)} GB`
+    : ''
 
   return (
-    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12, height: '100%', overflow: 'auto' }}>
-      {/* Title */}
-      <div style={{
-        fontFamily: F, fontSize: FS.xxs, fontWeight: 900,
-        color: T.dim, letterSpacing: '0.1em',
-        padding: '0 0 4px',
-        borderBottom: `1px solid ${T.border}`,
-      }}>
-        SYSTEM
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        padding: '10px 8px',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: F,
+          fontSize: FS.xxs,
+          color: T.dim,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        <HardDrive size={9} />
+        SYSTEM {isReplay ? '(PEAK)' : ''}
       </div>
 
-      {/* Gauges */}
-      <div style={{ display: 'flex', justifyContent: 'space-around', gap: 8 }}>
-        <div style={{ flex: 1 }}>
-          <CircularGauge value={system.cpu} label="CPU" />
-          <SystemSparkline data={cpuHistory} color={T.green} />
-          {isRecorded && cpuHistory.length > 0 && (
-            <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, textAlign: 'center', marginTop: 2 }}>
-              Peak: {Math.round(Math.max(...cpuHistory))}%
-            </div>
-          )}
-        </div>
-        <div style={{ flex: 1 }}>
-          <CircularGauge value={system.memory} label="RAM" unit={`${system.memoryGB.toFixed(1)}GB`} />
-          <SystemSparkline data={memHistory} color={T.amber} />
-          {isRecorded && memHistory.length > 0 && (
-            <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, textAlign: 'center', marginTop: 2 }}>
-              Peak: {Math.round(Math.max(...memHistory))}%
-            </div>
-          )}
-        </div>
-        {system.gpuMemory != null && (
-          <div style={{ flex: 1 }}>
-            <CircularGauge value={system.gpuMemory} label="GPU" unit={system.gpuMemoryGB ? `${system.gpuMemoryGB.toFixed(1)}GB` : undefined} />
-            <SystemSparkline data={gpuHistory} color={T.purple} />
-            {isRecorded && gpuHistory.length > 0 && (
-              <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, textAlign: 'center', marginTop: 2 }}>
-                Peak: {Math.round(Math.max(...gpuHistory))}%
-              </div>
-            )}
-          </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
+        <GaugeRing value={cpu} label="CPU" detail={memDetail ? '' : '--'} size={56} />
+        <GaugeRing value={memPct} label="MEM" detail={memDetail} size={56} />
+        {hasGpu && (
+          <GaugeRing value={gpuPct} label="GPU" detail={gpuMemDetail} size={56} />
         )}
       </div>
 
-      {/* Run Info */}
-      <div style={{
-        background: T.surface1, border: `1px solid ${T.border}`,
-        padding: 8, display: 'flex', flexDirection: 'column', gap: 4,
-      }}>
-        <div style={{
-          fontFamily: F, fontSize: FS.xxs, fontWeight: 700,
-          color: T.dim, letterSpacing: '0.06em', marginBottom: 2,
-        }}>
-          RUN INFO
+      {cpuHistory.length > 2 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>CPU History</span>
+          <MiniSparkline data={cpuHistory} />
         </div>
+      )}
 
-        {runId && (
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>ID</span>
-            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec, fontVariantNumeric: 'tabular-nums' }}>
-              {runId.length > 12 ? `${runId.slice(0, 12)}...` : runId}
-            </span>
-          </div>
-        )}
-
-        {pipelineId && (
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>Pipeline</span>
-            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec }}>{pipelineId}</span>
-          </div>
-        )}
-
-        {paperId && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>Paper</span>
-            <button
-              onClick={() => setView('paper')}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 3,
-                background: `${T.cyan}10`, border: `1px solid ${T.cyan}30`,
-                padding: '1px 6px', cursor: 'pointer',
-                fontFamily: F, fontSize: FS.xxs, color: T.cyan,
-              }}
-            >
-              <FileText size={8} /> {paperId}
-            </button>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>Elapsed</span>
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-            {formatElapsed(elapsed)}
-          </span>
+      {memHistory.length > 2 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>Memory History</span>
+          <MiniSparkline data={memHistory} />
         </div>
-
-        {eta != null && eta > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>ETA</span>
-            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec, fontVariantNumeric: 'tabular-nums' }}>
-              {formatElapsed(Math.round(eta))}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Pipeline progress */}
-      <div style={{
-        background: T.surface1, border: `1px solid ${T.border}`, padding: 8,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>Pipeline Progress</span>
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec, fontVariantNumeric: 'tabular-nums' }}>
-            Block {completedBlocks}/{totalBlocks} — {Math.round(overallProgress * 100)}%
-          </span>
-        </div>
-        <div style={{
-          width: '100%', height: 4, background: T.surface3, borderRadius: 2,
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            width: `${Math.round(overallProgress * 100)}%`,
-            height: '100%', background: T.cyan,
-            transition: 'width 0.3s ease',
-          }} />
-        </div>
-      </div>
+      )}
     </div>
   )
 }

@@ -106,6 +106,20 @@ export default function App() {
     injectThemeCSSVars(theme)
   }, [theme])
 
+  // Handle URL params for monitor popout and deep linking
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const view = params.get('view')
+    const runId = params.get('runId')
+    const compareRuns = params.get('runs')
+
+    if (view === 'monitor' && runId) {
+      useUIStore.getState().openMonitor(runId)
+    } else if (view === 'monitor' && compareRuns) {
+      useUIStore.getState().openComparison(compareRuns.split(','))
+    }
+  }, [])
+
   const ViewComponent = viewComponents[activeView] || ResearchDashboardView
 
   return (
