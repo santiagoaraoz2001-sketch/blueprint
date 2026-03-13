@@ -22,11 +22,29 @@ from blocks.inference._inference_utils import (
 
 
 def run(ctx):
-    framework = ctx.config.get("framework", "auto")
-    model = ctx.config.get("model", "")
     prompt_template = ctx.config.get("prompt_template", "{input}")
     user_input = ctx.config.get("user_input", "")
     system_prompt_cfg = ctx.config.get("system_prompt", "")
+
+    # ── Model config from upstream (preferred) or fallback ─────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(
+                f"Using connected model: {model_data.get('model_name', 'unknown')} "
+                f"via {model_data.get('source', 'unknown')}"
+            )
+
+    framework = model_data.get("source", model_data.get("backend", "auto")) if model_data else "auto"
+    model = model_data.get("model_name", model_data.get("model_id", "")) if model_data else ""
+
+    if not model_data:
+        ctx.log_message(
+            "\u26a0 No model connected \u2014 using Ollama default (llama3.2). "
+            "Connect a Model Selector for explicit model choice."
+        )
+        model = "llama3.2"
 
     # ── Load inputs ────────────────────────────────────────────────────
     # Prompt input port takes priority over user_input config
@@ -76,6 +94,11 @@ def run(ctx):
 
     # ── Build config with user overrides ───────────────────────────────
     overrides = {}
+    # Pass endpoint from upstream model if available
+    if model_data:
+        endpoint = model_data.get("endpoint", model_data.get("base_url", ""))
+        if endpoint:
+            overrides["endpoint"] = endpoint
     for key in ["max_tokens", "temperature", "top_p", "repeat_penalty",
                  "stop_sequences", "frequency_penalty", "presence_penalty", "seed"]:
         val = ctx.config.get(key)

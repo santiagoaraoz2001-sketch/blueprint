@@ -15,26 +15,33 @@ import os
 def run(ctx):
     host = ctx.config.get("host", "0.0.0.0")
     port = int(ctx.config.get("port", 8080))
-    model_name = ctx.config.get("model_name", "")
-    provider = ctx.config.get("backend", ctx.config.get("provider", "ollama"))
-    endpoint = ctx.config.get("endpoint", "http://localhost:11434")
+    # ── Model config: upstream model input takes priority ──────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    provider = model_data.get("source", model_data.get("backend",
+        ctx.config.get("backend", ctx.config.get("provider", "ollama"))))
+    model_name = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_name", "llama3.2")))
+    endpoint = model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))
+    api_key = model_data.get("api_key",
+        ctx.config.get("api_key", ""))
+
+    # Config conflict warnings
+    if ctx.inputs.get("model") and ctx.config.get("model_name"):
+        ctx.log_message(
+            f"\u26a0 Config conflict: upstream model='{model_data.get('model_name')}' "
+            f"but local config has model_name='{ctx.config.get('model_name')}'. "
+            f"Using upstream. Clear local config to remove this warning."
+        )
+
     max_concurrent = int(ctx.config.get("max_concurrent", 4))
     cors_enabled = ctx.config.get("cors_enabled", True)
     api_key_required = ctx.config.get("api_key_required", False)
-
-    # Try to get model from input
-    if ctx.inputs.get("model"):
-        try:
-            model_info = ctx.load_input("model")
-            if isinstance(model_info, dict):
-                model_name = model_name or model_info.get("model_name", model_info.get("model_id", ""))
-                provider = model_info.get("source", model_info.get("provider", provider))
-                endpoint = model_info.get("endpoint", endpoint)
-        except Exception:
-            pass
-
-    if not model_name:
-        model_name = "llama3.2"
 
     ctx.log_message(f"Configuring streaming inference server")
     ctx.log_message(f"  Host: {host}:{port}, Model: {model_name}")

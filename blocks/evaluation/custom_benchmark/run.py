@@ -11,6 +11,8 @@ import math
 import os
 from collections import Counter
 
+from blocks.inference._inference_utils import call_inference
+
 
 def run(ctx):
     # ── Load inputs ───────────────────────────────────────────────────────
@@ -51,7 +53,20 @@ def run(ctx):
     num_samples = len(rows)
     ctx.log_message(f"Loaded {num_samples} samples")
 
-    # ── Resolve model identity ────────────────────────────────────────────
+    # ── Model config: upstream model input takes priority ────────────────
+    model_data = {}
+    if isinstance(model_info, dict):
+        model_data = model_info
+        ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    framework = model_data.get("source", model_data.get("backend",
+        ctx.config.get("provider", "ollama")))
+    model_name_resolved = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_name", "llama3.2")))
+    model_config = {"endpoint": model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))}
+
+    # Also resolve via legacy _resolve_model for transformers/mlx paths
     model_name, model_path, model_endpoint, model_source = _resolve_model(model_info)
     ctx.log_message(f"Model: {model_name or model_path or '(unknown)'} (source={model_source or 'auto'})")
 
@@ -275,23 +290,16 @@ def _try_ollama(ctx, endpoint, model_name, inputs, total, max_tokens,
     except Exception:
         return None
 
-    import urllib.request
     ctx.log_message(f"Using Ollama ({model_name})")
+    config = {"endpoint": endpoint, "temperature": temperature, "max_tokens": max_tokens}
     predictions = []
     for i, text in enumerate(inputs):
         try:
-            payload = json.dumps({
-                "model": model_name, "prompt": text,
-                "options": {"temperature": temperature, "num_predict": max_tokens},
-                "stream": False,
-            }).encode()
-            req = urllib.request.Request(
-                f"{endpoint.rstrip('/')}/api/generate",
-                data=payload, headers={"Content-Type": "application/json"},
+            response_text, meta = call_inference(
+                "ollama", model_name, text, "", config,
+                log_fn=ctx.log_message,
             )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                data = json.loads(resp.read().decode())
-                predictions.append(data.get("response", "").strip())
+            predictions.append(response_text.strip())
         except Exception as e:
             predictions.append(f"[Error: {e}]")
         if (i + 1) % max(1, total // 10) == 0:

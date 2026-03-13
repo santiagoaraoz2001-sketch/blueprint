@@ -15,13 +15,33 @@ import time
 
 
 def run(ctx):
-    provider_a = ctx.config.get("provider_a", "ollama")
-    model_a = ctx.config.get("model_a", "llama3.2")
+    # ── Model config: upstream model input takes priority ──────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    provider_a = model_data.get("source", model_data.get("backend",
+        ctx.config.get("provider_a", "ollama")))
+    model_a = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_a", "llama3.2")))
+    endpoint_a = model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint_a", "http://localhost:11434")))
+    api_key_a = model_data.get("api_key",
+        ctx.config.get("api_key_a", ""))
+
+    # Config conflict warnings
+    if ctx.inputs.get("model") and ctx.config.get("model_a"):
+        ctx.log_message(
+            f"\u26a0 Config conflict: upstream model='{model_data.get('model_name')}' "
+            f"but local config has model_a='{ctx.config.get('model_a')}'. "
+            f"Using upstream. Clear local config to remove this warning."
+        )
+
     provider_b = ctx.config.get("provider_b", "ollama")
     model_b = ctx.config.get("model_b", "mistral")
-    endpoint_a = ctx.config.get("endpoint_a", "http://localhost:11434")
     endpoint_b = ctx.config.get("endpoint_b", "http://localhost:11434")
-    api_key_a = ctx.config.get("api_key_a", "")
     api_key_b = ctx.config.get("api_key_b", "")
     temperature_a = float(ctx.config.get("temperature_a", 0.7))
     temperature_b = float(ctx.config.get("temperature_b", 0.7))

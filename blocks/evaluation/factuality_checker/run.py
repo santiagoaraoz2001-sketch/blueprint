@@ -12,6 +12,8 @@ import json
 import os
 import re
 
+from blocks.inference._inference_utils import call_inference
+
 
 def run(ctx):
     # ── Configuration ─────────────────────────────────────────────────────
@@ -242,27 +244,27 @@ def _init_embeddings(ctx, model_name="all-MiniLM-L6-v2"):
 
 def _init_llm_judge(ctx, timeout=30):
     """Initialize LLM judge using the connected model."""
-    try:
-        model_info = ctx.load_input("model")
-    except (ValueError, Exception):
-        ctx.log_message("No judge model connected — cannot use llm_judge method")
-        return None
+    # Model config: upstream model input takes priority
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
 
-    model_name = ""
-    endpoint = "http://localhost:11434"
-    if isinstance(model_info, dict):
-        model_name = model_info.get("model_name", model_info.get("model_id", ""))
-        endpoint = model_info.get("endpoint", endpoint)
-    elif isinstance(model_info, str):
-        model_name = model_info
+    framework = model_data.get("source", model_data.get("backend",
+        ctx.config.get("provider", "ollama")))
+    model_name = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_name", "")))
+    config = {"endpoint": model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))}
 
     if not model_name:
+        ctx.log_message("No judge model connected — cannot use llm_judge method")
         return None
 
     ctx.log_message(f"Using LLM judge: {model_name}")
 
     def judge(output, reference):
-        import urllib.request
         prompt = (
             f"You are a factuality judge. Determine if the model's answer is factually "
             f"correct given the reference answer.\n\n"
@@ -271,20 +273,14 @@ def _init_llm_judge(ctx, timeout=30):
             f"Is the model's answer factually correct? Reply with exactly 'CORRECT' or 'INCORRECT'."
         )
         try:
-            payload = json.dumps({
-                "model": model_name, "prompt": prompt,
-                "options": {"temperature": 0.0, "num_predict": 20},
-                "stream": False,
-            }).encode()
-            req = urllib.request.Request(
-                f"{endpoint.rstrip('/')}/api/generate",
-                data=payload, headers={"Content-Type": "application/json"},
+            judge_cfg = {**config, "temperature": 0.0, "max_tokens": 20}
+            response_text, meta = call_inference(
+                framework, model_name, prompt, "", judge_cfg,
+                log_fn=ctx.log_message,
             )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                data = json.loads(resp.read().decode())
-                response = data.get("response", "").strip().upper()
-                is_correct = "CORRECT" in response and "INCORRECT" not in response
-                return is_correct, 1.0 if is_correct else 0.0
+            response = response_text.strip().upper()
+            is_correct = "CORRECT" in response and "INCORRECT" not in response
+            return is_correct, 1.0 if is_correct else 0.0
         except Exception:
             return False, 0.0
 

@@ -7,6 +7,17 @@ import urllib.request
 import urllib.error
 
 
+def _default_endpoint(source):
+    """Return the default API endpoint for a given model source."""
+    return {
+        "ollama": "http://localhost:11434",
+        "mlx": "",
+        "huggingface": "",
+        "pytorch": "",
+        "local_path": "",
+    }.get(source, "")
+
+
 def _scan_local_models(source, ctx):
     """Auto-detect locally available models for the given source.
 
@@ -469,26 +480,43 @@ def run(ctx):
     if "revision" not in model_info and revision:
         model_info["revision"] = revision
 
-    # Set model_name for downstream compatibility
-    model_info["model_name"] = model_info.get("model_id", model_info.get("path", ""))
-
-    # Include locally discovered models for downstream visibility
-    if available_local_models:
-        model_info["available_local_models"] = available_local_models
+    # ---- Standardize output format (Rule 3) ----
+    # All model output ports must use this exact format with compatibility aliases.
+    _name = model_info.get("model_id", model_info.get("path", ""))
+    standardized = {
+        # Identity (always present)
+        "model_name": _name,
+        "model_id": _name,
+        "source": source,
+        "endpoint": _default_endpoint(source),
+        # Auth (optional)
+        "api_key": model_info.get("api_key", ""),
+        # Metadata (optional)
+        "validated": model_info.get("validated", False),
+        "available_locally": model_info.get("available_locally", False),
+        "quantization": model_info.get("quantization"),
+        "available_local_models": available_local_models if available_local_models else [],
+        # Compatibility aliases (mirror keys)
+        "backend": source,
+        "provider": source,
+        "base_url": _default_endpoint(source),
+    }
+    # Merge any extra metadata from validation (tags, downloads, etc.)
+    standardized.update({k: v for k, v in model_info.items() if k not in standardized})
 
     # Write model info to a file for downstream reference
     model_info_path = os.path.join(ctx.run_dir, "model_info.json")
     with open(model_info_path, "w", encoding="utf-8") as f:
-        json.dump(model_info, f, indent=2, default=str, ensure_ascii=False)
+        json.dump(standardized, f, indent=2, default=str, ensure_ascii=False)
 
-    ctx.save_output("model", model_info)
+    ctx.save_output("model", standardized)
     ctx.save_artifact("model_info", model_info_path)
-    ctx.log_metric("model_validated", 1.0 if model_info.get("validated") else 0.0)
+    ctx.log_metric("model_validated", 1.0 if standardized.get("validated") else 0.0)
 
-    validated_str = "VALIDATED" if model_info.get("validated") else "NOT VALIDATED"
+    validated_str = "VALIDATED" if standardized.get("validated") else "NOT VALIDATED"
     ctx.log_message(
         f"Model selected: source={source}, "
-        f"id={model_info.get('model_id', model_info.get('path', 'N/A'))}, "
+        f"id={standardized.get('model_name', 'N/A')}, "
         f"status={validated_str}"
     )
     ctx.log_message("Model Selector complete.")

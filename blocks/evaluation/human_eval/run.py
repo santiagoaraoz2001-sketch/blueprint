@@ -10,6 +10,8 @@ import os
 import random
 import time
 
+from blocks.inference._inference_utils import call_inference
+
 
 def run(ctx):
     # ── Configuration ─────────────────────────────────────────────────────
@@ -32,18 +34,19 @@ def run(ctx):
 
     k_values = [int(k.strip()) for k in k_values_str.split(",") if k.strip()]
 
-    # ── Resolve model from input ──────────────────────────────────────────
-    model_info_dict = None
-    try:
-        model_info = ctx.load_input("model")
-        if isinstance(model_info, dict):
-            model_info_dict = model_info
-            model_name = model_name or model_info.get("model_name",
-                         model_info.get("model_id", ""))
-        elif isinstance(model_info, str):
-            model_name = model_name or model_info
-    except (ValueError, Exception):
-        pass
+    # ── Model config: upstream model input takes priority ────────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    framework = model_data.get("source", model_data.get("backend",
+        ctx.config.get("provider", "ollama")))
+    model_name = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_name", "llama3.2"))) if not model_name else model_name
+    config = {"endpoint": model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))}
 
     # Auto samples: generate max(k) samples per problem
     if num_samples_per <= 0:
@@ -59,7 +62,7 @@ def run(ctx):
         from human_eval.evaluation import evaluate_functional_correctness
 
         ctx.log_message("human-eval package found — running real evaluation")
-        _run_real_eval(ctx, model_name, model_info_dict, num_problems,
+        _run_real_eval(ctx, model_name, framework, config, num_problems,
                        temperature, k_values, num_samples_per, timeout,
                        max_new_tokens, inference_timeout)
         return
@@ -70,7 +73,7 @@ def run(ctx):
     _run_simulation(ctx, model_name, num_problems, temperature, k_values, seed)
 
 
-def _run_real_eval(ctx, model_name, model_info_dict, num_problems,
+def _run_real_eval(ctx, model_name, framework, config, num_problems,
                    temperature, k_values, num_samples_per, timeout,
                    max_new_tokens=256, inference_timeout=30):
     """Run actual HumanEval evaluation."""
@@ -81,7 +84,7 @@ def _run_real_eval(ctx, model_name, model_info_dict, num_problems,
     problem_ids = list(problems.keys())[:num_problems]
     ctx.log_message(f"Loaded {len(problem_ids)} problems")
 
-    generate_fn = _get_generate_fn(model_info_dict, model_name,
+    generate_fn = _get_generate_fn(ctx, framework, model_name, config,
                                    max_new_tokens, inference_timeout)
 
     samples = []
@@ -218,51 +221,25 @@ def _save_results(ctx, metrics, pass_at_k, problem_results):
     ctx.report_progress(1, 1)
 
 
-def _get_generate_fn(model_info, model_name, max_new_tokens=256, inference_timeout=30):
-    """Return a function that generates code completions."""
-    if model_info and model_info.get("source") == "ollama":
-        import urllib.request
+def _get_generate_fn(ctx, framework, model_name, config, max_new_tokens=256,
+                     inference_timeout=30):
+    """Return a function that generates code completions via call_inference."""
+    if not model_name:
+        def generate_stub(prompt, temperature):
+            return "pass  # placeholder"
+        return generate_stub
 
-        def generate_ollama(prompt, temperature):
-            try:
-                payload = json.dumps({
-                    "model": model_info.get("model_name", model_name),
-                    "prompt": prompt, "stream": False,
-                    "options": {"temperature": temperature, "num_predict": max_new_tokens},
-                }).encode("utf-8")
-                req = urllib.request.Request(
-                    f"{model_info.get('endpoint', 'http://localhost:11434')}/api/generate",
-                    data=payload, headers={"Content-Type": "application/json"},
-                )
-                with urllib.request.urlopen(req, timeout=inference_timeout) as resp:
-                    return json.loads(resp.read().decode("utf-8")).get("response", "pass")
-            except Exception:
-                return "pass  # generation failed"
-        return generate_ollama
-
-    if model_info and model_info.get("source") == "huggingface":
+    def generate(prompt, temperature):
         try:
-            from transformers import AutoTokenizer, AutoModelForCausalLM
-            import torch
-
-            hf_id = model_info.get("model_id", model_name)
-            tokenizer = AutoTokenizer.from_pretrained(hf_id)
-            model = AutoModelForCausalLM.from_pretrained(hf_id)
-            model.eval()
-
-            def generate_hf(prompt, temperature):
-                inputs = tokenizer(prompt, return_tensors="pt")
-                with torch.no_grad():
-                    outputs = model.generate(
-                        **inputs, max_new_tokens=max_new_tokens,
-                        temperature=max(temperature, 0.01),
-                        do_sample=temperature > 0,
-                    )
-                return tokenizer.decode(outputs[0], skip_special_tokens=True)[len(prompt):]
-            return generate_hf
+            inf_config = dict(config)
+            inf_config["max_tokens"] = max_new_tokens
+            inf_config["temperature"] = temperature
+            response_text, _meta = call_inference(
+                framework, model_name, prompt, config=inf_config,
+                log_fn=ctx.log_message,
+            )
+            return response_text or "pass"
         except Exception:
-            pass
+            return "pass  # generation failed"
 
-    def generate_stub(prompt, temperature):
-        return "pass  # placeholder"
-    return generate_stub
+    return generate

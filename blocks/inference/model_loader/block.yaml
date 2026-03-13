@@ -3,6 +3,8 @@ type: model_loader
 category: inference
 description: Load and configure a model reference for downstream inference blocks
 version: "1.0.0"
+deprecated: true
+deprecated_message: "Use Model Selector block instead. It handles all model sources (Ollama, MLX, HuggingFace, local)."
 
 inputs: []
 
