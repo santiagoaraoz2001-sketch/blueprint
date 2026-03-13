@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
+import { useUIStore } from '@/stores/uiStore'
+import { useRunStore } from '@/stores/runStore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Circle, Loader, XCircle, X, ChevronDown } from 'lucide-react'
+import { CheckCircle2, Circle, Loader, XCircle, X, ChevronDown, Maximize2 } from 'lucide-react'
 
 export interface MonitorBlock {
   id: string
@@ -151,6 +153,24 @@ export default function PipelineMonitor({
             <div style={{ flex: 1 }} />
 
             <button
+              onClick={() => {
+                const runId = useRunStore.getState().activeRunId
+                useUIStore.getState().navigateToMonitor(runId)
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: T.dim,
+                cursor: 'pointer',
+                padding: 2,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              title="Open in Monitor view"
+            >
+              <Maximize2 size={14} />
+            </button>
+            <button
               onClick={onClose}
               style={{
                 background: 'none',
@@ -161,7 +181,7 @@ export default function PipelineMonitor({
                 display: 'flex',
                 alignItems: 'center',
               }}
-              title="Close monitor"
+              title="Minimize"
             >
               <ChevronDown size={14} />
             </button>

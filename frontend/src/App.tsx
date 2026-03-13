@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, lazy, Suspense } from 'react'
 import ErrorBoundary from '@/components/shared/ErrorBoundary'
 import AppShell from '@/components/Layout/AppShell'
-import CommandPalette from '@/components/Layout/CommandPalette'
+import CommandPalette from '@/components/shared/CommandPalette'
 import StartScreen from '@/components/Layout/StartScreen'
 import SplashScreen from '@/components/Layout/SplashScreen'
 import { useUIStore } from '@/stores/uiStore'

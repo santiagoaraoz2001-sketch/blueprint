@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useUIStore } from '@/stores/uiStore'
 import { usePipelineStore } from '@/stores/pipelineStore'
+import { useRunStore } from '@/stores/runStore'
 import { useGuideStore } from '@/stores/guideStore'
 import toast from 'react-hot-toast'
 
@@ -10,16 +11,17 @@ export function useKeyboardShortcuts() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey
+      const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement
 
-      // G — Toggle guide
-      if (!meta && e.key === 'g' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+      // G — Toggle guide (not in inputs)
+      if (!meta && e.key === 'g' && !isInput) {
         e.preventDefault()
         useGuideStore.getState().toggleGuide()
         return
       }
 
       // Cmd+S — Save pipeline
-      if (meta && e.key === 's') {
+      if (meta && !e.shiftKey && e.key === 's') {
         e.preventDefault()
         const { savePipeline, isDirty } = usePipelineStore.getState()
         if (isDirty) {
@@ -30,8 +32,42 @@ export function useKeyboardShortcuts() {
         return
       }
 
+      // Cmd+Shift+M — Navigate to Monitor (active or latest run)
+      if (meta && e.shiftKey && (e.key === 'm' || e.key === 'M')) {
+        e.preventDefault()
+        const { activeRunId } = useRunStore.getState()
+        useUIStore.getState().navigateToMonitor(activeRunId)
+        return
+      }
+
+      // Cmd+Shift+R — Re-run most recent pipeline (same config)
+      if (meta && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault()
+        const { pipelineId } = useRunStore.getState()
+        const currentPipelineId = pipelineId || usePipelineStore.getState().id
+        if (currentPipelineId) {
+          useRunStore.getState().startRun(currentPipelineId)
+          toast.success('Re-running pipeline')
+        } else {
+          toast.error('No pipeline to re-run')
+        }
+        return
+      }
+
+      // Cmd+Shift+C — Clone currently viewed pipeline
+      if (meta && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+        e.preventDefault()
+        const pipelineId = usePipelineStore.getState().id
+        if (pipelineId) {
+          usePipelineStore.getState().duplicatePipeline(pipelineId)
+        } else {
+          toast.error('No pipeline to clone')
+        }
+        return
+      }
+
       // Cmd+1-7 — Switch views
-      if (meta && e.key >= '1' && e.key <= '7') {
+      if (meta && !e.shiftKey && e.key >= '1' && e.key <= '7') {
         e.preventDefault()
         const views = ['dashboard', 'editor', 'results', 'datasets', 'marketplace', 'paper', 'settings'] as const
         const idx = parseInt(e.key) - 1
