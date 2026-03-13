@@ -6,6 +6,7 @@ import { useMetricsStore } from '@/stores/metricsStore'
 import type { DashboardStats } from '@/stores/metricsStore'
 import PaperBadge from './PaperBadge'
 import ProgressBar from '@/components/shared/ProgressBar'
+import { runMetricsToTable } from '@/services/metricsBridge'
 import {
   Activity,
   CheckCircle2,
@@ -16,7 +17,9 @@ import {
   ChevronRight,
   ExternalLink,
   Link2,
+  TableProperties,
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 interface ActivityFeedProps {
   dashboard: DashboardStats
@@ -286,6 +289,24 @@ export default function ActivityFeed({ dashboard }: ActivityFeedProps) {
               >
                 Results
               </button>
+              {ok && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await runMetricsToTable(run.id, run.name)
+                      setView('data')
+                    } catch (e: any) {
+                      toast.error(e.message || 'No metrics available')
+                    }
+                  }}
+                  style={btnStyle}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}22` }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = `${T.cyan}14` }}
+                >
+                  <TableProperties size={9} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+                  Analyze
+                </button>
+              )}
             </div>
           </div>
         )

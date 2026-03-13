@@ -2,6 +2,10 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { T, F, FS } from '@/lib/design-tokens'
 import DataTable from '@/components/shared/DataTable'
 import StatusBadge from '@/components/shared/StatusBadge'
+import { runMetricsToTable } from '@/services/metricsBridge'
+import { useUIStore } from '@/stores/uiStore'
+import { TableProperties } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export interface RunRow {
   id: string
@@ -106,6 +110,39 @@ export default function ResultsTable({ runs, selectedIds, onToggleSelect, onRowC
         },
       })
     ),
+    {
+      id: 'actions',
+      header: '',
+      size: 80,
+      cell: ({ row }) => (
+        <button
+          onClick={async (e) => {
+            e.stopPropagation()
+            try {
+              await runMetricsToTable(row.original.id, row.original.pipeline_id)
+              useUIStore.getState().setView('data')
+            } catch (err: any) {
+              toast.error(err.message || 'No metrics available')
+            }
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
+            padding: '2px 6px',
+            background: `${T.cyan}14`,
+            border: `1px solid ${T.cyan}33`,
+            color: T.cyan,
+            fontFamily: F,
+            fontSize: FS.xxs,
+            cursor: 'pointer',
+          }}
+        >
+          <TableProperties size={9} />
+          Analyze
+        </button>
+      ),
+    },
   ]
 
   return <DataTable data={runs} columns={columns} onRowClick={onRowClick} pageSize={25} />

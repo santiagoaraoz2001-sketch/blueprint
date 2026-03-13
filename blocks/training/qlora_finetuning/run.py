@@ -196,10 +196,10 @@ def run(ctx):
     class CtxCallback(TrainerCallback):
         def on_log(self, args, state, control, logs=None, **kwargs):
             if logs and "loss" in logs:
-                ctx.log_metric("train_loss", round(logs["loss"], 4), state.global_step)
+                ctx.log_metric("train/loss", round(logs["loss"], 4), state.global_step)
                 ctx.log_message(f"  Step {state.global_step} — loss: {logs['loss']:.4f}")
             if logs and "eval_loss" in logs:
-                ctx.log_metric("eval_loss", round(logs["eval_loss"], 4), state.global_step)
+                ctx.log_metric("eval/loss", round(logs["eval_loss"], 4), state.global_step)
                 ctx.log_message(f"  Eval loss: {logs['eval_loss']:.4f}")
             if state.max_steps > 0:
                 ctx.report_progress(state.global_step, state.max_steps)

@@ -95,10 +95,31 @@ def run(ctx):
     method = ctx.config.get("method", "llm")
     max_length = int(ctx.config.get("max_length", 256))
     style = ctx.config.get("style", "concise")
-    provider = ctx.config.get("backend", ctx.config.get("provider", "ollama"))
-    model_name = ctx.config.get("model_name", "llama3.2")
-    endpoint = ctx.config.get("endpoint", "http://localhost:11434")
-    api_key = ctx.config.get("api_key", "")
+
+    # ── Model config: upstream model input takes priority ──────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    provider = model_data.get("source", model_data.get("backend",
+        ctx.config.get("backend", ctx.config.get("provider", "ollama"))))
+    model_name = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_name", "llama3.2")))
+    endpoint = model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))
+    api_key = model_data.get("api_key",
+        ctx.config.get("api_key", ""))
+
+    # Config conflict warnings
+    if ctx.inputs.get("model") and ctx.config.get("model_name"):
+        ctx.log_message(
+            f"\u26a0 Config conflict: upstream model='{model_data.get('model_name')}' "
+            f"but local config has model_name='{ctx.config.get('model_name')}'. "
+            f"Using upstream. Clear local config to remove this warning."
+        )
+
     system_prompt = ctx.config.get("system_prompt", "")
     temperature = float(ctx.config.get("temperature", 0.5))
     max_input_chars = int(ctx.config.get("max_input_chars", 12000))

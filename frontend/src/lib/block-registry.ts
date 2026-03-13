@@ -64,6 +64,7 @@ export interface BlockDefinition {
   detail?: BlockDetail
   deprecated?: boolean
   deprecatedMessage?: string
+  recommended?: boolean
 }
 
 /** Backward-compat aliases — map old type names to new 9-type system */
@@ -2294,6 +2295,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     icon: 'FileOutput',
     accent: '#34D399',
     maturity: 'stable',
+    recommended: true,
     inputs: [{ id: 'metrics', label: 'Metrics', dataType: 'metrics', required: true }],
     outputs: [{ id: 'artifact', label: 'Report', dataType: 'artifact', required: true }],
     defaultConfig: { format: 'csv', include_config: true },
@@ -2703,6 +2705,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     icon: 'MessageSquare',
     accent: '#A3E635',
     inputs: [
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'prompt', label: 'Prompt', dataType: 'text', required: true },
       { id: 'system_prompt', label: 'System Prompt', dataType: 'text', required: false },
       { id: 'context', label: 'Context', dataType: 'any', required: false },
@@ -2713,13 +2716,11 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'llm_config', label: 'LLM Config', dataType: 'config', required: false },
     ],
     defaultConfig: {
-      framework: 'auto', model: '', prompt_template: '{input}',
+      prompt_template: '{input}',
       user_input: '', temperature: 0.7, max_tokens: 512,
       system_prompt: '', output_format: 'text',
     },
     configFields: [
-      { name: 'framework', label: 'Framework', type: 'select', options: ['auto', 'ollama', 'mlx', 'pytorch'], default: 'auto', description: 'Inference framework (auto = detect best available)' },
-      { name: 'model', label: 'Model', type: 'string', default: '', description: "Model identifier (e.g. 'llama3.2' for Ollama, 'mlx-community/Llama-3.2-3B' for MLX)" },
       { name: 'prompt_template', label: 'Prompt Template', type: 'text_area', default: '{input}', description: 'Use {context} and {input} as placeholders' },
       { name: 'user_input', label: 'User Input', type: 'text_area', description: 'The user prompt to send' },
       { name: 'system_prompt', label: 'System Prompt', type: 'text_area', default: '', description: 'System message (ignored by MLX)' },
@@ -2732,9 +2733,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     detail: {
       tips: [
-        'Framework "auto" picks the best available backend for your model',
+        'Connect a Model Selector block to the Model input for explicit model choice',
+        'If no model connected, defaults to Ollama llama3.2',
         'Connect llm_config output to agent blocks for shared inference config',
-        'Model dropdown auto-populates from /api/system/models',
       ],
     },
   },
@@ -3162,6 +3163,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   {
     type: 'data_exporter',
     maturity: 'stable',
+    deprecated: true,
+    deprecatedMessage: "Use 'Save to Local Path' or 'Results Formatter' instead.",
     name: 'Data Exporter',
     description: 'Export pipeline data to JSON, JSONL, CSV, TSV, Markdown, or LaTeX format.',
     category: 'endpoints',
@@ -3224,6 +3227,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   {
     type: 'results_exporter',
     maturity: 'stable',
+    deprecated: true,
+    deprecatedMessage: "Use 'Save to Local Path' or 'Results Formatter' instead.",
     name: 'Results Exporter',
     description: 'Export pipeline results to CSV, JSON, JSONL, or Parquet with format selection',
     category: 'endpoints',
@@ -3353,7 +3358,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     defaultConfig: { source: 'huggingface', model_id: '', revision: 'main', local_path: '', quantization: 'none', auto_download: false, verify_checksum: true },
     configFields: [
       { name: 'source', label: 'Model Source', type: 'select', options: ['huggingface', 'ollama', 'mlx', 'local_path'], default: 'huggingface' },
-      { name: 'model_id', label: 'Model ID', type: 'string', description: "HuggingFace: 'org/model'. Ollama: 'model:tag'. MLX: 'mlx-community/model'" },
+      { name: 'model_id', label: 'Model ID', type: 'string', description: "Select from detected models or type manually. HuggingFace: 'org/model'. Ollama: 'model:tag'. MLX: 'mlx-community/model'" },
       { name: 'revision', label: 'Revision', type: 'string', default: 'main', description: 'Git branch or tag', depends_on: { field: 'source', value: 'huggingface' } },
       { name: 'local_path', label: 'Local Path', type: 'file_path', description: 'Absolute path to model directory or file', depends_on: { field: 'source', value: 'local_path' } },
       { name: 'quantization', label: 'Quantization', type: 'select', options: ['none', '4bit', '8bit'], default: 'none', description: 'Pre-load quantization (HuggingFace/MLX only)' },
@@ -3797,6 +3802,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     icon: 'FolderDown',
     accent: '#38BDF8',
     maturity: 'stable',
+    recommended: true,
     inputs: [{ id: 'data', label: 'Input', dataType: 'any', required: true }],
     outputs: [
       { id: 'file_path', label: 'File Path', dataType: 'text', required: true },

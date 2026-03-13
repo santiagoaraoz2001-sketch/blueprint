@@ -166,7 +166,7 @@ def run(ctx):
                 def on_log(self, args, state, control, logs=None, **kwargs):
                     if logs and "loss" in logs:
                         ctx.log_message(f"  [{difficulty_label}] Step {state.global_step} — loss: {logs['loss']:.4f}")
-                        ctx.log_metric("train_loss", round(logs["loss"], 4), state.global_step)
+                        ctx.log_metric("train/loss", round(logs["loss"], 4), state.global_step)
                     completed = stage_idx * epochs_per_stage + min(state.epoch or 0, epochs_per_stage)
                     ctx.report_progress(int(completed), total_epochs)
 
@@ -246,7 +246,7 @@ def run(ctx):
 
                 if global_step % max(1, steps_per_epoch // 5) == 0:
                     ctx.log_message(f"  [{difficulty_label}] Step {s + 1}/{steps_per_epoch} — loss: {loss:.4f}")
-                    ctx.log_metric("train_loss", round(loss, 4), global_step)
+                    ctx.log_metric("train/loss", round(loss, 4), global_step)
 
                 time.sleep(0.02)
 

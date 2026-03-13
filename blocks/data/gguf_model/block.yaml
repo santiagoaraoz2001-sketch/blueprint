@@ -1,0 +1,29 @@
+name: GGUF Model
+type: gguf_model
+category: data
+description: Load a GGUF model using llama-cpp-python
+version: "1.0.0"
+deprecated: true
+deprecated_message: "Use Model Selector block instead. It handles all model sources (Ollama, MLX, HuggingFace, local)."
+
+inputs: []
+
+outputs:
+  - id: model
+    label: Model
+    data_type: model
+
+config:
+  model_path:
+    type: file_path
+    label: Model Path
+    default: ""
+    description: "Path to .gguf model file"
+  n_ctx:
+    type: integer
+    label: Context Length
+    default: 2048
+  n_gpu_layers:
+    type: integer
+    label: GPU Layers
+    default: 0

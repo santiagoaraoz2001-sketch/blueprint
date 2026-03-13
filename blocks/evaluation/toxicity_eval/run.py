@@ -10,6 +10,8 @@ import json
 import os
 import re
 
+from blocks.inference._inference_utils import call_inference
+
 
 def run(ctx):
     # Read upstream dataset metadata
@@ -67,10 +69,25 @@ def run(ctx):
     if max_samples > 0:
         rows = rows[:max_samples]
 
+    # ── Model config: upstream model input takes priority ────────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    framework = model_data.get("source", model_data.get("backend",
+        ctx.config.get("provider", "ollama")))
+    model_name = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_name", "llama3.2")))
+    inf_config = {"endpoint": model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))}
+
     # ── Optional: generate model responses ────────────────────────────────
     if generate_responses:
         rows = _generate_model_responses(ctx, rows, prompt_column, text_column,
-                                         generation_temperature, max_new_tokens, generation_timeout)
+                                         framework, model_name, inf_config,
+                                         generation_temperature, max_new_tokens)
 
     ctx.log_message(f"Evaluating {len(rows)} texts for toxicity")
     ctx.log_message(f"Categories: {', '.join(categories)}")
@@ -196,28 +213,18 @@ def _init_scorer(ctx):
 
 
 def _generate_model_responses(ctx, rows, prompt_column, text_column,
-                              temperature=0.7, max_tokens=256, timeout=60):
+                              framework, model_name, config,
+                              temperature=0.7, max_tokens=256):
     """Generate model responses from prompts, store as text_column."""
-    try:
-        model_info = ctx.load_input("model")
-    except (ValueError, Exception):
-        ctx.log_message("No model connected — skipping response generation")
-        return rows
-
-    model_name = ""
-    endpoint = "http://localhost:11434"
-    if isinstance(model_info, dict):
-        model_name = model_info.get("model_name", model_info.get("model_id", ""))
-        endpoint = model_info.get("endpoint", endpoint)
-    elif isinstance(model_info, str):
-        model_name = model_info
-
     if not model_name:
         ctx.log_message("No model name available — skipping response generation")
         return rows
 
     ctx.log_message(f"Generating responses with {model_name}...")
-    import urllib.request
+
+    inf_config = dict(config)
+    inf_config["max_tokens"] = max_tokens
+    inf_config["temperature"] = temperature
 
     for i, row in enumerate(rows):
         if not isinstance(row, dict):
@@ -226,18 +233,11 @@ def _generate_model_responses(ctx, rows, prompt_column, text_column,
         if not prompt:
             continue
         try:
-            payload = json.dumps({
-                "model": model_name, "prompt": prompt,
-                "options": {"temperature": temperature, "num_predict": max_tokens},
-                "stream": False,
-            }).encode()
-            req = urllib.request.Request(
-                f"{endpoint.rstrip('/')}/api/generate",
-                data=payload, headers={"Content-Type": "application/json"},
+            response_text, _meta = call_inference(
+                framework, model_name, prompt, config=inf_config,
+                log_fn=ctx.log_message,
             )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                data = json.loads(resp.read().decode())
-                row[text_column] = data.get("response", "")
+            row[text_column] = response_text or ""
         except Exception as e:
             row[text_column] = f"[Generation error: {e}]"
 

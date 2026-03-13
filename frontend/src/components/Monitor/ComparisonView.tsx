@@ -1,9 +1,13 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useCallback } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useMetricsStore, type MetricPoint } from '@/stores/metricsStore'
+import { useUIStore } from '@/stores/uiStore'
 import { api } from '@/api/client'
+import { comparisonToTable } from '@/services/metricsBridge'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
+import { TableProperties } from 'lucide-react'
 import ConfigDiff from './ConfigDiff'
+import toast from 'react-hot-toast'
 
 interface ComparisonViewProps {
   runIds: string[]
@@ -105,6 +109,16 @@ export default function ComparisonView({ runIds }: ComparisonViewProps) {
 
   const loadedCount = runIds.filter((id) => runs[id]).length
 
+  const handleAnalyzeInDataView = useCallback(async () => {
+    try {
+      const names = runIds.map((id) => runs[id]?.pipelineName || id.slice(0, 8))
+      await comparisonToTable(runIds, names)
+      useUIStore.getState().setView('data')
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to export comparison')
+    }
+  }, [runIds, runs])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', padding: '12px 16px', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -112,6 +126,26 @@ export default function ComparisonView({ runIds }: ComparisonViewProps) {
         <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
           {loadedCount}/{runIds.length} runs loaded
         </span>
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={handleAnalyzeInDataView}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '3px 10px',
+            background: `${T.cyan}14`,
+            border: `1px solid ${T.cyan}33`,
+            color: T.cyan,
+            fontFamily: F,
+            fontSize: FS.xxs,
+            letterSpacing: '0.06em',
+            cursor: 'pointer',
+          }}
+        >
+          <TableProperties size={10} />
+          Analyze in Data View
+        </button>
       </div>
 
       {/* Run legend */}

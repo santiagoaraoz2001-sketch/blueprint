@@ -18,9 +18,9 @@ config:
     options: [huggingface, ollama, mlx, local_path]
     default: "huggingface"
   model_id:
-    type: string
+    type: model_select
     label: Model ID
-    description: "e.g. 'meta-llama/Llama-3-8B' or 'mistral:7b'"
+    description: "Select from detected models or type manually"
     default: ""
   revision:
     type: string

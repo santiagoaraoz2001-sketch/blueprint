@@ -189,8 +189,8 @@ def run(ctx):
                         f"  Step {step}/{total_steps} — total: {loss.item():.4f}, "
                         f"KL: {kl_loss.item():.4f}, CE: {ce_loss.item():.4f}"
                     )
-                    ctx.log_metric("distill_loss", round(loss.item(), 4), step)
-                    ctx.log_metric("kl_loss", round(kl_loss.item(), 4), step)
+                    ctx.log_metric("train/loss", round(loss.item(), 4), step)
+                    ctx.log_metric("train/kl_loss", round(kl_loss.item(), 4), step)
 
                 ctx.report_progress(step, total_steps)
 
@@ -253,8 +253,8 @@ def run(ctx):
                     f"  Step {step}/{total_steps} — total: {total_loss:.4f}, "
                     f"KL: {kl_loss:.4f}, CE: {ce_loss:.4f}"
                 )
-                ctx.log_metric("distill_loss", round(total_loss, 4), step)
-                ctx.log_metric("kl_loss", round(kl_loss, 4), step)
+                ctx.log_metric("train/loss", round(total_loss, 4), step)
+                ctx.log_metric("train/kl_loss", round(kl_loss, 4), step)
 
             ctx.report_progress(step, total_steps)
             time.sleep(0.03)

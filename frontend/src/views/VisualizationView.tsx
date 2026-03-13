@@ -1,13 +1,17 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { T, F, FS, FD } from '@/lib/design-tokens'
 import { useVizStore, type ChartType, type ChartPanel } from '@/stores/vizStore'
 import { useDataStore } from '@/stores/dataStore'
+import { api } from '@/api/client'
+import { runMetricsToTimeSeries } from '@/services/metricsBridge'
 import { motion, AnimatePresence } from 'framer-motion'
+import toast from 'react-hot-toast'
 import {
   BarChart3, LineChart, ScatterChart,
   Plus, Trash2, Settings, X, ChevronDown,
   LayoutGrid, Layers, Grid3X3, TrendingUp,
   Activity, Radar, TreePine, SquareStack,
+  FlaskConical,
 } from 'lucide-react'
 import {
   BarChart, Bar, LineChart as ReLineChart, Line,
@@ -56,6 +60,42 @@ export default function VisualizationView() {
   const [newChartType, setNewChartType] = useState<ChartType>('bar')
   const [showNewChartModal, setShowNewChartModal] = useState(false)
   const [dashDropdown, setDashDropdown] = useState(false)
+  const [showRunImport, setShowRunImport] = useState(false)
+  const [recentRuns, setRecentRuns] = useState<any[]>([])
+
+  // Fetch recent runs when dropdown is opened
+  useEffect(() => {
+    if (!showRunImport) return
+    api.get<any[]>('/runs?status=complete&limit=20')
+      .then((runs) => setRecentRuns(runs || []))
+      .catch(() => setRecentRuns([]))
+  }, [showRunImport])
+
+  const handleImportRunData = useCallback(async (runId: string) => {
+    try {
+      const tableId = await runMetricsToTimeSeries(runId)
+      setShowRunImport(false)
+
+      // Auto-create a line chart if we have an active dashboard
+      const dash = getActiveDashboard()
+      const table = useDataStore.getState().tables.find((t) => t.id === tableId)
+      if (dash && table) {
+        const numCols = table.columns.filter((c) => c.type === 'number' && c.id !== 'step')
+        const panelCount = dash.panels.length
+        addPanel(dash.id, {
+          title: `Run ${runId.slice(0, 8)} — ${numCols[0]?.name || 'Metrics'}`,
+          chartType: 'line',
+          dataTableId: tableId,
+          xField: 'step',
+          yField: numCols[0]?.id || table.columns[1]?.id || '',
+          style: { colorScheme: 'default', showLegend: true, showGrid: true },
+          layout: { x: (panelCount % 2) * 6, y: Math.floor(panelCount / 2) * 4, w: 6, h: 4 },
+        })
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to import run data')
+    }
+  }, [getActiveDashboard, addPanel])
 
   const activeDashboard = getActiveDashboard()
   const selectedPanel = activeDashboard?.panels.find((p) => p.id === selectedPanelId) || null
@@ -163,6 +203,67 @@ export default function VisualizationView() {
               >
                 <Plus size={10} /> New Dashboard
               </button>
+            </div>
+          )}
+        </div>
+
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowRunImport(!showRunImport)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 12px', background: T.surface3,
+              border: `1px solid ${T.border}`, borderRadius: 4,
+              color: T.sec, fontFamily: F, fontSize: FS.sm,
+              cursor: 'pointer', letterSpacing: '0.04em',
+            }}
+          >
+            <FlaskConical size={10} />
+            Import Run Data
+            <ChevronDown size={10} />
+          </button>
+          {showRunImport && (
+            <div style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: 4,
+              width: 260, zIndex: 100, background: T.surface2,
+              border: `1px solid ${T.border}`, boxShadow: `0 8px 24px ${T.shadow}`,
+              borderRadius: 4, overflow: 'hidden', maxHeight: 320, overflowY: 'auto',
+            }}>
+              <div style={{ padding: '6px 10px', fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.1em', borderBottom: `1px solid ${T.border}` }}>
+                SELECT A COMPLETED RUN
+              </div>
+              {recentRuns.length === 0 ? (
+                <div style={{ padding: '10px 12px', fontFamily: F, fontSize: FS.xs, color: T.dim }}>
+                  No completed runs found
+                </div>
+              ) : (
+                recentRuns.map((run: any) => (
+                  <button
+                    key={run.id}
+                    onClick={() => handleImportRunData(run.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      width: '100%', padding: '6px 10px',
+                      background: 'transparent', border: 'none',
+                      borderBottom: `1px solid ${T.border}`,
+                      color: T.sec, fontFamily: F, fontSize: FS.xs,
+                      cursor: 'pointer', textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = T.surface4 }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                  >
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+                      {run.id.slice(0, 8)}
+                    </span>
+                    {run.started_at && (
+                      <span style={{ fontSize: FS.xxs, color: T.dim }}>
+                        {new Date(run.started_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </button>
+                ))
+              )}
             </div>
           )}
         </div>

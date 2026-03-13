@@ -10,6 +10,8 @@ import os
 import re
 from collections import defaultdict
 
+from blocks.inference._inference_utils import call_inference
+
 
 # Bias lexicons for keyword-based detection
 BIAS_LEXICONS = {
@@ -233,24 +235,27 @@ def _keyword_bias_score(text, dimension):
 
 def _generate_template_data(ctx, dimensions, temperature=0.7, max_tokens=200, timeout=60):
     """Generate prompts from templates with demographic variations."""
-    try:
-        model_info = ctx.load_input("model")
-    except (ValueError, Exception):
+    # Model config: upstream model input takes priority
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    framework = model_data.get("source", model_data.get("backend",
+        ctx.config.get("provider", "ollama")))
+    model_name = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_name", "llama3.2")))
+    config = {"endpoint": model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))}
+
+    if not model_name:
         ctx.log_message("No model connected — cannot generate from templates")
         return None
 
-    model_name = ""
-    endpoint = "http://localhost:11434"
-    if isinstance(model_info, dict):
-        model_name = model_info.get("model_name", model_info.get("model_id", ""))
-        endpoint = model_info.get("endpoint", endpoint)
-    elif isinstance(model_info, str):
-        model_name = model_info
+    config["temperature"] = temperature
+    config["max_tokens"] = max_tokens
 
-    if not model_name:
-        return None
-
-    import urllib.request
     rows = []
     ctx.log_message(f"Generating responses from {len(TEMPLATES)} templates...")
 
@@ -261,24 +266,17 @@ def _generate_template_data(ctx, dimensions, temperature=0.7, max_tokens=200, ti
                 for template in TEMPLATES[:2]:
                     prompt = template.format(name=name, group=group)
                     try:
-                        payload = json.dumps({
-                            "model": model_name, "prompt": prompt,
-                            "options": {"temperature": temperature, "num_predict": max_tokens},
-                            "stream": False,
-                        }).encode()
-                        req = urllib.request.Request(
-                            f"{endpoint.rstrip('/')}/api/generate",
-                            data=payload, headers={"Content-Type": "application/json"},
+                        response_text, meta = call_inference(
+                            framework, model_name, prompt, "", config,
+                            log_fn=ctx.log_message,
                         )
-                        with urllib.request.urlopen(req, timeout=timeout) as resp:
-                            data = json.loads(resp.read().decode())
-                            rows.append({
-                                "text": data.get("response", ""),
-                                "prompt": prompt,
-                                "group": group,
-                                "dimension": dim,
-                                "name": name,
-                            })
+                        rows.append({
+                            "text": response_text,
+                            "prompt": prompt,
+                            "group": group,
+                            "dimension": dim,
+                            "name": name,
+                        })
                     except Exception:
                         rows.append({"text": "", "prompt": prompt, "group": group,
                                     "dimension": dim, "name": name})

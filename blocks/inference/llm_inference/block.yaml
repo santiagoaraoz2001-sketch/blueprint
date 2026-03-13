@@ -5,6 +5,11 @@ description: "Universal inference block — auto-detects frameworks and models"
 version: "2.0.0"
 
 inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Connect a Model Selector block. If not connected, uses Ollama default."
   - id: prompt
     label: Prompt
     data_type: text
@@ -36,17 +41,6 @@ outputs:
     description: "Framework + model + config for downstream blocks to make their own calls"
 
 config:
-  framework:
-    type: select
-    label: Framework
-    options: [auto, ollama, mlx, pytorch]
-    default: auto
-    description: "Inference framework (auto = detect best available)"
-  model:
-    type: string
-    label: Model
-    default: ""
-    description: "Model to use (e.g. 'llama3.2' for Ollama, 'mlx-community/Llama-3.2-3B' for MLX)"
   prompt_template:
     type: text_area
     label: Prompt Template

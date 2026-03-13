@@ -1,9 +1,12 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { T, F, FS, FD } from '@/lib/design-tokens'
 import { useDataStore, type DataFilter, type DataSort, type DataColumn, type ColumnStats, type PivotConfig } from '@/stores/dataStore'
+import { api } from '@/api/client'
+import { runMetricsToTable } from '@/services/metricsBridge'
 import DataGrid from '@/components/Data/DataGrid'
 import EmptyState from '@/components/shared/EmptyState'
 import { motion, AnimatePresence } from 'framer-motion'
+import toast from 'react-hot-toast'
 import {
   Table2,
   Plus,
@@ -19,6 +22,7 @@ import {
   FileText,
   FileJson,
   PieChart,
+  FlaskConical,
 } from 'lucide-react'
 
 type RightPanel = 'none' | 'profiler' | 'filter' | 'pivot' | 'formula'
@@ -52,6 +56,39 @@ export default function DataView() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [pivotResult, setPivotResult] = useState<Record<string, any>[] | null>(null)
+  const [showRunImport, setShowRunImport] = useState(false)
+  const [recentRuns, setRecentRuns] = useState<any[]>([])
+  const [runImportLoading, setRunImportLoading] = useState(false)
+
+  // Auto-select table from URL param ?table={tableId}
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tableParam = params.get('table')
+    if (tableParam) {
+      const exists = useDataStore.getState().tables.find((t) => t.id === tableParam)
+      if (exists) setActiveTable(tableParam)
+    }
+  }, [setActiveTable])
+
+  // Fetch recent runs when dropdown is opened
+  useEffect(() => {
+    if (!showRunImport) return
+    api.get<any[]>('/runs?status=complete&limit=20')
+      .then((runs) => setRecentRuns(runs || []))
+      .catch(() => setRecentRuns([]))
+  }, [showRunImport])
+
+  const handleImportFromRun = useCallback(async (runId: string, runName?: string) => {
+    setRunImportLoading(true)
+    try {
+      await runMetricsToTable(runId, runName)
+      setShowRunImport(false)
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to import run metrics')
+    } finally {
+      setRunImportLoading(false)
+    }
+  }, [])
 
   const activeTable = getActiveTable()
   const filteredRows = getFilteredRows()
@@ -222,6 +259,74 @@ export default function DataView() {
             label="Import"
             onClick={() => setShowImportModal(true)}
           />
+          <div style={{ position: 'relative' }}>
+            <ToolbarButton
+              icon={FlaskConical}
+              label="From Run"
+              onClick={() => setShowRunImport((v) => !v)}
+            />
+            {showRunImport && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: 4,
+                  background: T.surface2,
+                  border: `1px solid ${T.border}`,
+                  zIndex: 20,
+                  minWidth: 240,
+                  maxHeight: 320,
+                  overflowY: 'auto',
+                  boxShadow: `0 4px 12px ${T.shadow}`,
+                }}
+              >
+                <div style={{ padding: '6px 10px', fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.1em', borderBottom: `1px solid ${T.border}` }}>
+                  IMPORT FROM RUN
+                </div>
+                {recentRuns.length === 0 ? (
+                  <div style={{ padding: '10px 12px', fontFamily: F, fontSize: FS.xs, color: T.dim }}>
+                    No completed runs found
+                  </div>
+                ) : (
+                  recentRuns.map((run: any) => (
+                    <button
+                      key={run.id}
+                      onClick={() => handleImportFromRun(run.id, run.pipeline_name || run.id.slice(0, 8))}
+                      disabled={runImportLoading}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        width: '100%',
+                        padding: '6px 10px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderBottom: `1px solid ${T.border}`,
+                        color: T.sec,
+                        fontFamily: F,
+                        fontSize: FS.xs,
+                        cursor: runImportLoading ? 'wait' : 'pointer',
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = T.surface3 }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                    >
+                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {run.id.slice(0, 8)}
+                      </span>
+                      {run.started_at && (
+                        <span style={{ fontSize: FS.xxs, color: T.dim }}>
+                          {new Date(run.started_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           <div style={{ position: 'relative' }}>
             <ToolbarButton
               icon={Download}

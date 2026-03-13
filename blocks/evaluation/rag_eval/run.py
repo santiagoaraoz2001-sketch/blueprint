@@ -14,6 +14,8 @@ import os
 import re
 from collections import Counter
 
+from blocks.inference._inference_utils import call_inference
+
 
 def run(ctx):
     # ── Configuration ─────────────────────────────────────────────────────
@@ -47,10 +49,24 @@ def run(ctx):
     if max_samples > 0:
         rows = rows[:max_samples]
 
+    # ── Model config: upstream model input takes priority ────────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    framework = model_data.get("source", model_data.get("backend",
+        ctx.config.get("provider", "ollama")))
+    model_name = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_name", "llama3.2")))
+    inf_config = {"endpoint": model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))}
+
     # ── Initialize LLM judge if needed ────────────────────────────────────
     judge_fn = None
     if method == "llm_judge":
-        judge_fn = _init_judge(ctx, judge_timeout)
+        judge_fn = _init_judge(ctx, framework, model_name, inf_config, judge_timeout)
         if judge_fn is None:
             ctx.log_message("No judge model available — falling back to heuristic")
             method = "heuristic"
@@ -189,47 +205,28 @@ def _token_f1(prediction, reference):
     return round(2 * precision * recall / (precision + recall), 4)
 
 
-def _init_judge(ctx, timeout=30):
-    """Initialize LLM judge for scoring."""
-    try:
-        model_info = ctx.load_input("model")
-    except (ValueError, Exception):
-        return None
-
-    model_name = ""
-    endpoint = "http://localhost:11434"
-    if isinstance(model_info, dict):
-        model_name = model_info.get("model_name", model_info.get("model_id", ""))
-        endpoint = model_info.get("endpoint", endpoint)
-    elif isinstance(model_info, str):
-        model_name = model_info
-
+def _init_judge(ctx, framework, model_name, config, timeout=30):
+    """Initialize LLM judge for scoring via call_inference."""
     if not model_name:
         return None
 
-    import urllib.request
+    inf_config = dict(config)
+    inf_config["max_tokens"] = 20
+    inf_config["temperature"] = 0.0
 
     def judge(prompt):
         try:
-            payload = json.dumps({
-                "model": model_name, "prompt": prompt,
-                "options": {"temperature": 0.0, "num_predict": 20},
-                "stream": False,
-            }).encode()
-            req = urllib.request.Request(
-                f"{endpoint.rstrip('/')}/api/generate",
-                data=payload, headers={"Content-Type": "application/json"},
+            response_text, _meta = call_inference(
+                framework, model_name, prompt, config=inf_config,
+                log_fn=ctx.log_message,
             )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                data = json.loads(resp.read().decode())
-                response = data.get("response", "0.5").strip()
-                # Extract numeric score
-                import re
-                nums = re.findall(r'(\d+\.?\d*)', response)
-                if nums:
-                    score = float(nums[0])
-                    return min(max(score, 0.0), 1.0)
-                return 0.5
+            response = (response_text or "0.5").strip()
+            # Extract numeric score
+            nums = re.findall(r'(\d+\.?\d*)', response)
+            if nums:
+                score = float(nums[0])
+                return min(max(score, 0.0), 1.0)
+            return 0.5
         except Exception:
             return 0.5
 

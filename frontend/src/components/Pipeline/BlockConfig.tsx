@@ -28,21 +28,91 @@ export default function BlockConfig() {
   )
 }
 
+type FieldState = 'local' | 'inherited' | 'default'
+interface FieldInfo {
+  state: FieldState
+  effectiveValue: any
+  source?: string
+}
+
 function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
   const updateNodeConfig = usePipelineStore((s) => s.updateNodeConfig)
   const removeNode = usePipelineStore((s) => s.removeNode)
   const selectNode = usePipelineStore((s) => s.selectNode)
+  const edges = usePipelineStore((s) => s.edges)
+  const nodes = usePipelineStore((s) => s.nodes)
   const def = getBlockDefinition(node.data.type)
   const IconComponent = getIcon(node.data.icon)
 
-  const handleConfigChange = (name: string, value: string | number | boolean) => {
+  const handleConfigChange = (name: string, value: string | number | boolean | undefined | null) => {
     updateNodeConfig(node.id, { [name]: value })
+  }
+
+  // Task 1: Compute inherited config from upstream blocks
+  const incomingEdges = useMemo(() => edges.filter(e => e.target === node.id), [edges, node.id])
+
+  const inheritedConfig = useMemo(() => {
+    const inherited: Record<string, { value: any; sourceName: string; sourceId: string }> = {}
+
+    for (const edge of incomingEdges) {
+      if (edge.targetHandle !== 'model' && edge.targetHandle !== 'llm_config' && edge.targetHandle !== 'llm') {
+        continue
+      }
+
+      const sourceNode = nodes.find(n => n.id === edge.source)
+      if (!sourceNode) continue
+
+      const sourceConfig = sourceNode.data.config || {}
+      const sourceName = sourceNode.data.label || sourceNode.data.type
+
+      const inheritableKeys = [
+        'model_name', 'model', 'model_id',
+        'provider', 'backend', 'source',
+        'endpoint', 'base_url',
+        'api_key',
+        'framework',
+        'temperature', 'max_tokens', 'top_p',
+        'repeat_penalty', 'stop_sequences',
+        'system_prompt',
+        'frequency_penalty', 'presence_penalty',
+      ]
+
+      for (const key of inheritableKeys) {
+        const value = sourceConfig[key]
+        if (value !== undefined && value !== null && value !== '') {
+          inherited[key] = { value, sourceName, sourceId: edge.source }
+        }
+      }
+    }
+
+    return inherited
+  }, [incomingEdges, nodes])
+
+  // Task 2: Determine field state
+  function getFieldState(fieldName: string, currentValue: any, defaultValue: any): FieldInfo {
+    const locallySet = currentValue !== undefined && currentValue !== null && currentValue !== ''
+      && String(currentValue) !== String(defaultValue ?? '')
+
+    if (locallySet) {
+      return { state: 'local', effectiveValue: currentValue }
+    }
+
+    const inherited = inheritedConfig[fieldName]
+    if (inherited) {
+      return {
+        state: 'inherited',
+        effectiveValue: inherited.value,
+        source: inherited.sourceName,
+      }
+    }
+
+    return { state: 'default', effectiveValue: defaultValue }
   }
 
   const [frameworkData, setFrameworkData] = useState<any[]>([])
 
   useEffect(() => {
-    if (def?.type === 'llm_inference') {
+    if (def?.type === 'model_selector') {
       api.get<any[]>('/system/models')
         .then(data => {
           if (Array.isArray(data)) {
@@ -53,24 +123,23 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
     }
   }, [def?.type])
 
-  // Filter config fields by depends_on and enrich model_name with auto-detected options
+  // Filter config fields by depends_on and enrich model_id with auto-detected options
   const displayFields = def?.configFields
     .filter(f => {
       if (!f.depends_on) return true
       return node.data.config[f.depends_on.field] === f.depends_on.value
     })
     .map(f => {
-      // Auto-populate model field with discovered models for the selected framework
-      if (def.type === 'llm_inference' && f.name === 'model') {
-        const fw = node.data.config.framework || 'auto'
-        const fwEntry = frameworkData.find((d: any) => d.id === fw)
+      // Auto-populate model_id field with discovered models for the selected source
+      if (def.type === 'model_selector' && f.name === 'model_id') {
+        const source = node.data.config.source || 'huggingface'
+        // Map model_selector source names to framework IDs from /api/system/models
+        const sourceToFramework: Record<string, string> = { ollama: 'ollama', mlx: 'mlx', huggingface: 'pytorch', local_path: '' }
+        const fwId = sourceToFramework[source] || ''
+        const fwEntry = frameworkData.find((d: any) => d.id === fwId)
         const models: string[] = fwEntry?.models || []
-        // If "auto", show all models from all available frameworks
-        const allModels = fw === 'auto'
-          ? frameworkData.filter((d: any) => d.available).flatMap((d: any) => (d.models || []).map((m: string) => `${d.id}/${m}`))
-          : models
-        if (allModels.length > 0) {
-          return { ...f, type: 'select' as const, options: allModels } as ConfigField
+        if (models.length > 0) {
+          return { ...f, type: 'select' as const, options: models } as ConfigField
         }
       }
       return f
@@ -202,6 +271,38 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
         </div>
       )}
 
+      {/* Task 5: Inheritance summary banner */}
+      {(() => {
+        const inheritedCount = Object.keys(inheritedConfig).length
+        const overriddenCount = displayFields?.filter(f => {
+          const info = getFieldState(f.name, node.data.config[f.name], f.default)
+          return info.state === 'local' && inheritedConfig[f.name]
+        }).length || 0
+
+        if (inheritedCount === 0) return null
+        return (
+          <div style={{
+            padding: '8px 16px',
+            background: '#00BFA510',
+            borderBottom: '1px solid #00BFA520',
+            fontSize: FS.xs,
+            color: '#00BFA5',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontFamily: F,
+          }}>
+            <span>&#x2B21;</span>
+            {inheritedCount} config value{inheritedCount > 1 ? 's' : ''} inherited from upstream
+            {overriddenCount > 0 && (
+              <span style={{ color: T.dim }}>
+                ({overriddenCount} overridden locally)
+              </span>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Config fields */}
       <div style={{ flex: 1, overflow: 'auto', padding: '20px', scrollbarWidth: 'thin' }}>
         <span
@@ -226,15 +327,22 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
         {def && <PresetSelector blockType={def.type} nodeId={node.id} currentConfig={node.data.config} />}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {displayFields?.map((field) => (
-            <ConfigFieldInput
-              key={field.name}
-              field={field}
-              value={node.data.config[field.name] ?? field.default ?? ''}
-              onChange={(v) => handleConfigChange(field.name, v)}
-              expectedOutputType={def?.outputs[0]?.dataType as ConnectorType | undefined}
-            />
-          ))}
+          {displayFields?.map((field) => {
+            const fieldInfo = getFieldState(field.name, node.data.config[field.name], field.default)
+            const inherited = inheritedConfig[field.name]
+            return (
+              <ConfigFieldInput
+                key={field.name}
+                field={field}
+                value={node.data.config[field.name] ?? field.default ?? ''}
+                onChange={(v) => handleConfigChange(field.name, v)}
+                onRevert={inherited ? () => handleConfigChange(field.name, undefined) : undefined}
+                expectedOutputType={def?.outputs[0]?.dataType as ConnectorType | undefined}
+                fieldInfo={fieldInfo}
+                inherited={inherited}
+              />
+            )
+          })}
         </div>
 
         {/* Inputs/Outputs info */}
@@ -325,20 +433,26 @@ function ConfigFieldInput({
   field,
   value,
   onChange,
+  onRevert,
   expectedOutputType,
+  fieldInfo,
+  inherited,
 }: {
   field: ConfigField
   value: ConfigValue
   onChange: (v: ConfigValue) => void
+  onRevert?: () => void
   expectedOutputType?: ConnectorType
+  fieldInfo: FieldInfo
+  inherited?: { value: any; sourceName: string; sourceId: string }
 }) {
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '8px 12px',
     background: T.surface3,
-    border: `1px solid ${T.borderHi}`,
+    border: `1px solid ${fieldInfo.state === 'inherited' ? '#00BFA540' : T.borderHi}`,
     borderRadius: 6,
-    color: T.text,
+    color: fieldInfo.state === 'default' ? T.dim : T.text,
     fontFamily: F,
     fontSize: FS.sm,
     outline: 'none',
@@ -346,26 +460,89 @@ function ConfigFieldInput({
     transition: 'border-color 0.2s',
   }
 
+  // For inherited fields: show inherited value as placeholder, empty the input
+  const isInherited = fieldInfo.state === 'inherited'
+  const inheritedPlaceholder = isInherited
+    ? `${fieldInfo.effectiveValue} (from ${fieldInfo.source})`
+    : String(field.default ?? '')
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {/* Label with state indicator */}
       <label
         style={{
           fontFamily: F,
           fontSize: FS.xs,
-          color: T.sec,
+          color: fieldInfo.state === 'inherited' ? '#00BFA5'
+               : fieldInfo.state === 'default' ? T.dim
+               : T.sec,
           fontWeight: 600,
-          display: 'block',
+          fontStyle: fieldInfo.state === 'inherited' ? 'italic' : 'normal',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
         }}
       >
         {field.label}
+        {fieldInfo.state === 'inherited' && (
+          <span style={{
+            fontSize: FS.xxs,
+            color: '#00BFA580',
+            fontStyle: 'normal',
+            fontWeight: 400,
+          }}>
+            &larr; {fieldInfo.source}
+          </span>
+        )}
+        {fieldInfo.state === 'default' && (
+          <span style={{
+            fontSize: FS.xxs,
+            color: T.dim,
+            fontStyle: 'normal',
+            fontWeight: 400,
+          }}>
+            (default)
+          </span>
+        )}
+        {/* Task 4: Clear override / revert button */}
+        {fieldInfo.state === 'local' && inherited && onRevert && (
+          <button
+            onClick={onRevert}
+            title={`Clear override. Will use ${inherited.value} from ${inherited.sourceName}`}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: T.dim,
+              cursor: 'pointer',
+              padding: '0 4px',
+              fontSize: FS.xxs,
+              fontFamily: F,
+              fontStyle: 'normal',
+              fontWeight: 400,
+              marginLeft: 'auto',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = '#00BFA5'}
+            onMouseLeave={e => e.currentTarget.style.color = T.dim}
+          >
+            &#x2715; revert
+          </button>
+        )}
       </label>
 
       {field.type === 'select' ? (
         <select
-          value={String(value)}
+          value={isInherited ? String(fieldInfo.effectiveValue) : String(value)}
           onChange={(e) => onChange(e.target.value)}
-          style={inputStyle}
+          style={{
+            ...inputStyle,
+            color: isInherited ? '#00BFA5' : fieldInfo.state === 'default' ? T.dim : T.text,
+          }}
         >
+          {isInherited && !field.options?.includes(String(fieldInfo.effectiveValue)) && (
+            <option value={String(fieldInfo.effectiveValue)}>
+              {fieldInfo.effectiveValue} (from {fieldInfo.source})
+            </option>
+          )}
           {field.options?.map((opt) => (
             <option key={opt} value={opt}>
               {opt}
@@ -373,27 +550,42 @@ function ConfigFieldInput({
           ))}
         </select>
       ) : field.type === 'boolean' ? (
-        <button
-          onClick={() => onChange(!value)}
-          style={{
-            ...inputStyle,
-            textAlign: 'left',
-            color: value ? T.cyan : T.dim,
-            cursor: 'pointer',
-          }}
-        >
-          {value ? 'ON' : 'OFF'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => onChange(!value)}
+            style={{
+              ...inputStyle,
+              flex: 1,
+              textAlign: 'left',
+              color: isInherited ? '#00BFA5' : (value ? T.cyan : T.dim),
+              cursor: 'pointer',
+            }}
+          >
+            {isInherited ? (fieldInfo.effectiveValue ? 'ON' : 'OFF') : (value ? 'ON' : 'OFF')}
+          </button>
+          {isInherited && (
+            <span style={{ fontSize: FS.xxs, color: '#00BFA580', fontFamily: F, whiteSpace: 'nowrap' }}>
+              &larr; {fieldInfo.source}
+            </span>
+          )}
+        </div>
       ) : field.type === 'text_area' ? (
         <textarea
-          value={String(value)}
+          value={isInherited ? '' : String(value)}
+          placeholder={inheritedPlaceholder}
           onChange={(e) => onChange(e.target.value)}
-          style={{ ...inputStyle, minHeight: 50, resize: 'vertical' }}
+          style={{
+            ...inputStyle,
+            minHeight: 50,
+            resize: 'vertical',
+            color: isInherited ? '#00BFA5' : fieldInfo.state === 'default' ? T.dim : T.text,
+          }}
         />
       ) : field.type === 'integer' ? (
         <input
           type="number"
-          value={value === '' ? '' : Number(value)}
+          value={isInherited ? '' : (value === '' ? '' : Number(value))}
+          placeholder={inheritedPlaceholder}
           onChange={(e) => onChange(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
           min={field.min}
           max={field.max}
@@ -403,7 +595,8 @@ function ConfigFieldInput({
       ) : field.type === 'float' ? (
         <input
           type="number"
-          value={value === '' ? '' : Number(value)}
+          value={isInherited ? '' : (value === '' ? '' : Number(value))}
+          placeholder={inheritedPlaceholder}
           onChange={(e) => onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
           min={field.min}
           max={field.max}
@@ -413,7 +606,8 @@ function ConfigFieldInput({
       ) : (
         <input
           type="text"
-          value={String(value)}
+          value={isInherited ? '' : String(value)}
+          placeholder={inheritedPlaceholder}
           onChange={(e) => onChange(e.target.value)}
           style={inputStyle}
         />

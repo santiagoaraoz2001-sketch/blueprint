@@ -27,25 +27,33 @@ def run(ctx):
     query = ctx.config.get("query", "")
     text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     top_k = int(ctx.config.get("top_k", 5))
-    provider = ctx.config.get("backend", "ollama")
-    model_name = ctx.config.get("model_name", "")
-    endpoint = ctx.config.get("endpoint", "http://localhost:11434")
-    api_key = ctx.config.get("api_key", "")
+    # ── Model config: upstream model input takes priority ──────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    provider = model_data.get("source", model_data.get("backend",
+        ctx.config.get("backend", ctx.config.get("provider", "ollama"))))
+    model_name = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_name", "llama3.2")))
+    endpoint = model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))
+    api_key = model_data.get("api_key",
+        ctx.config.get("api_key", ""))
+
+    # Config conflict warnings
+    if ctx.inputs.get("model") and ctx.config.get("model_name"):
+        ctx.log_message(
+            f"\u26a0 Config conflict: upstream model='{model_data.get('model_name')}' "
+            f"but local config has model_name='{ctx.config.get('model_name')}'. "
+            f"Using upstream. Clear local config to remove this warning."
+        )
+
     temperature = float(ctx.config.get("temperature", 0.3))
     max_tokens = int(ctx.config.get("max_tokens", 512))
     system_prompt = ctx.config.get("system_prompt", "")
-
-    # Override from connected model input
-    if ctx.inputs.get("model"):
-        try:
-            model_info = ctx.load_input("model")
-            if isinstance(model_info, dict):
-                model_name = model_name or model_info.get("model_name", model_info.get("model_id", ""))
-                provider = model_info.get("backend", model_info.get("provider", provider))
-                endpoint = model_info.get("base_url", model_info.get("endpoint", endpoint))
-                api_key = model_info.get("api_key", api_key)
-        except Exception:
-            pass
 
     if not model_name:
         raise ValueError("model_name is required — set it in config or connect a model input.")

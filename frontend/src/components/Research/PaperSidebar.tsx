@@ -1,12 +1,13 @@
 import { T, F, FS } from '@/lib/design-tokens'
 import type { Project } from '@/stores/projectStore'
 import PaperBadge, { PAPER_STATUS_COLORS } from './PaperBadge'
-import { Plus } from 'lucide-react'
+import { Plus, FileJson } from 'lucide-react'
 
 interface PaperSidebarProps {
   projects: Project[]
   onSelect: (id: string) => void
   onAdd: () => void
+  onImport?: () => void
 }
 
 const STATUS_ORDER: Record<string, number> = {
@@ -19,7 +20,7 @@ const STATUS_ORDER: Record<string, number> = {
   complete: 6,
 }
 
-export default function PaperSidebar({ projects, onSelect, onAdd }: PaperSidebarProps) {
+export default function PaperSidebar({ projects, onSelect, onAdd, onImport }: PaperSidebarProps) {
   const sorted = [...projects].sort((a, b) => {
     const aOrder = STATUS_ORDER[a.status] ?? 5
     const bOrder = STATUS_ORDER[b.status] ?? 5
@@ -108,32 +109,60 @@ export default function PaperSidebar({ projects, onSelect, onAdd }: PaperSidebar
         })}
       </div>
 
-      <button
-        onClick={onAdd}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 6,
-          padding: '10px 12px',
-          background: 'transparent',
-          border: 'none',
-          borderTop: `1px solid ${T.border}`,
-          color: T.cyan,
-          fontFamily: F,
-          fontSize: FS.xs,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          cursor: 'pointer',
-          transition: 'background 0.15s',
-          width: '100%',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}08` }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-      >
-        <Plus size={12} />
-        Add Paper
-      </button>
+      <div style={{ display: 'flex', borderTop: `1px solid ${T.border}` }}>
+        <button
+          onClick={onAdd}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            padding: '10px 12px',
+            background: 'transparent',
+            border: 'none',
+            color: T.cyan,
+            fontFamily: F,
+            fontSize: FS.xs,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+            transition: 'background 0.15s',
+            flex: 1,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}08` }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+        >
+          <Plus size={12} />
+          Add Paper
+        </button>
+        {onImport && (
+          <button
+            onClick={onImport}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              padding: '10px 12px',
+              background: 'transparent',
+              border: 'none',
+              borderLeft: `1px solid ${T.border}`,
+              color: T.sec,
+              fontFamily: F,
+              fontSize: FS.xs,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}08`; e.currentTarget.style.color = T.cyan }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.sec }}
+          >
+            <FileJson size={12} />
+            Import
+          </button>
+        )}
+      </div>
     </div>
   )
 }

@@ -27,10 +27,30 @@ def run(ctx):
         pass
 
     text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
-    model_name = ctx.config.get("model_name", "all-MiniLM-L6-v2")
-    provider = ctx.config.get("backend", ctx.config.get("provider", "sentence-transformers"))
-    endpoint = ctx.config.get("endpoint", "http://localhost:11434")
-    api_key = ctx.config.get("api_key", "") or os.environ.get("OPENAI_API_KEY", "")
+
+    # ── Model config: upstream model input takes priority ──────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    provider = model_data.get("source", model_data.get("backend",
+        ctx.config.get("backend", ctx.config.get("provider", "sentence-transformers"))))
+    model_name = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("model_name", "all-MiniLM-L6-v2")))
+    endpoint = model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("endpoint", "http://localhost:11434")))
+    api_key = model_data.get("api_key",
+        ctx.config.get("api_key", "")) or os.environ.get("OPENAI_API_KEY", "")
+
+    # Config conflict warnings
+    if ctx.inputs.get("model") and ctx.config.get("model_name"):
+        ctx.log_message(
+            f"\u26a0 Config conflict: upstream model='{model_data.get('model_name')}' "
+            f"but local config has model_name='{ctx.config.get('model_name')}'. "
+            f"Using upstream. Clear local config to remove this warning."
+        )
     batch_size = int(ctx.config.get("batch_size", 32))
     embedding_column = ctx.config.get("embedding_column", "_embedding")
     output_format = ctx.config.get("output_format", "numpy")

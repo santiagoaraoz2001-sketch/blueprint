@@ -16,28 +16,40 @@ import time
 
 def run(ctx):
     routing_strategy = ctx.config.get("routing_strategy", "complexity")
-    primary_provider = ctx.config.get("primary_provider", "ollama")
-    primary_model = ctx.config.get("primary_model", "llama3.2")
-    primary_endpoint = ctx.config.get("primary_endpoint", "http://localhost:11434")
+
+    # ── Model config: upstream model input takes priority ──────────────
+    model_data = {}
+    if ctx.inputs.get("model"):
+        model_data = ctx.load_input("model")
+        if isinstance(model_data, dict):
+            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+
+    primary_provider = model_data.get("source", model_data.get("backend",
+        ctx.config.get("primary_provider", "ollama")))
+    primary_model = model_data.get("model_name", model_data.get("model_id",
+        ctx.config.get("primary_model", "llama3.2")))
+    primary_endpoint = model_data.get("endpoint", model_data.get("base_url",
+        ctx.config.get("primary_endpoint", "http://localhost:11434")))
+    api_key = model_data.get("api_key",
+        ctx.config.get("api_key", ""))
+
+    # Config conflict warnings
+    if ctx.inputs.get("model") and ctx.config.get("primary_model"):
+        ctx.log_message(
+            f"\u26a0 Config conflict: upstream model='{model_data.get('model_name')}' "
+            f"but local config has primary_model='{ctx.config.get('primary_model')}'. "
+            f"Using upstream. Clear local config to remove this warning."
+        )
+
     fallback_provider = ctx.config.get("fallback_provider", "openai")
     fallback_model = ctx.config.get("fallback_model", "gpt-4o-mini")
     fallback_endpoint = ctx.config.get("fallback_endpoint", "https://api.openai.com")
-    api_key = ctx.config.get("api_key", "")
     threshold = float(ctx.config.get("threshold", 0.5))
     keyword_triggers = ctx.config.get("keyword_triggers", "code,math,analyze,complex")
     prompt = ctx.config.get("prompt", "")
     temperature = float(ctx.config.get("temperature", 0.7))
     max_tokens = int(ctx.config.get("max_tokens", 512))
     max_retries = int(ctx.config.get("max_retries", 1))
-
-    # Override primary from connected model input
-    if ctx.inputs.get("model"):
-        model_data = ctx.load_input("model")
-        if isinstance(model_data, dict):
-            primary_model = model_data.get("model_name", model_data.get("model_id", primary_model))
-            primary_provider = model_data.get("backend", model_data.get("provider", primary_provider))
-            primary_endpoint = model_data.get("base_url", model_data.get("endpoint", primary_endpoint))
-            api_key = model_data.get("api_key", api_key)
 
     ctx.report_progress(0, 3)
 
