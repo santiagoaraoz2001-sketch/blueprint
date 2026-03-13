@@ -115,6 +115,45 @@ export interface ReadyRun {
   estimated_time: number | null
 }
 
+// ── Monitor View Types (Session 6) ──────────────────────────────────────────
+
+/** A single metric event from SSE or historical data */
+export interface MetricEvent {
+  timestamp: string  // ISO or HH:MM:SS
+  blockId: string
+  name: string       // e.g. "train/loss", "eval/acc", "benchmark/mmlu/acc"
+  value: number
+  step?: number
+}
+
+/** A pipeline block with its execution status */
+export interface BlockStatus {
+  id: string
+  name: string
+  category: string   // training, evaluation, inference, merge, data, etc.
+  status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled'
+  progress: number   // 0-1
+  startedAt?: string
+  finishedAt?: string
+  error?: string
+}
+
+/** System resource metrics */
+export interface SystemMetrics {
+  cpu: number         // 0-100
+  memory: number      // 0-100
+  memoryGB: number
+  gpuMemory?: number  // 0-100
+  gpuMemoryGB?: number
+}
+
+/** Time-series data point for a single metric */
+export interface MetricSeries {
+  step: number
+  value: number
+  timestamp: string
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function isDemoMode() {
@@ -140,6 +179,12 @@ function ensureRunState(runs: Record<string, RunMonitorState>, runId: string): R
   if (runs[runId]) return runs
   return { ...runs, [runId]: defaultRunState() }
 }
+
+const INITIAL_SYSTEM: SystemMetrics = { cpu: 0, memory: 0, memoryGB: 0 }
+
+/** Stable empty refs for Zustand selectors — avoids infinite re-render from `|| {}` creating new references */
+export const EMPTY_BLOCK_METRICS: Record<string, MetricSeries[]> = {}
+export const EMPTY_SERIES: MetricSeries[] = []
 
 // ── Demo Data ───────────────────────────────────────────────────────────────
 
@@ -307,12 +352,47 @@ interface MetricsStoreState {
   assignRunToProject: (runId: string, projectId: string) => Promise<void>
   cancelRun: (runId: string) => Promise<void>
   cloneRun: (runId: string) => Promise<string | null>
+
+  // Monitor View (Session 6)
+  monitorRunId: string | null
+  pipelineId: string | null
+  runName: string | null
+  paperId: string | null
+  runStatus: 'live' | 'recorded' | 'cancelled' | 'idle'
+  startedAt: string | null
+  elapsed: number
+  monitorEta: number | null
+  monitorExecutionOrder: BlockStatus[]
+  monitorActiveBlockId: string | null
+  viewedBlockId: string | null
+  metrics: Record<string, Record<string, MetricSeries[]>>
+  metricEvents: MetricEvent[]
+  system: SystemMetrics
+  systemHistory: { timestamp: string; cpu: number; memory: number; gpuMemory?: number }[]
+  configSnapshot: Record<string, any>
+  logs: { timestamp: string; blockId: string; message: string; level: 'info' | 'warn' | 'error' }[]
+  setRun: (runId: string, pipelineId: string, runName: string, paperId?: string) => void
+  setRunStatus: (status: 'live' | 'recorded' | 'cancelled' | 'idle') => void
+  setExecutionOrder: (blocks: BlockStatus[]) => void
+  updateBlockStatus: (blockId: string, updates: Partial<BlockStatus>) => void
+  setActiveBlock: (blockId: string) => void
+  setViewedBlock: (blockId: string | null) => void
+  pushMetric: (event: MetricEvent) => void
+  pushLog: (log: { timestamp: string; blockId: string; message: string; level: 'info' | 'warn' | 'error' }) => void
+  updateSystem: (metrics: SystemMetrics) => void
+  setConfigSnapshot: (config: Record<string, any>) => void
+  setElapsed: (seconds: number) => void
+  setMonitorEta: (seconds: number | null) => void
+  loadMonitorMetricsLog: (events: MetricEvent[], blocks: BlockStatus[], config?: Record<string, any>) => void
+  getBlockMetrics: (blockId: string) => Record<string, MetricSeries[]>
+  getBlockEvents: (blockId: string) => MetricEvent[]
+  resetMonitor: () => void
 }
 
 // ── Store ───────────────────────────────────────────────────────────────────
 
 export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
-  // ── Per-run monitoring state ──────────────────────────────────────────
+  // ── Per-run monitoring state (Session 4) ────────────────────────────
   runs: {},
 
   ensureRun: (runId: string) => {
@@ -580,7 +660,7 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
     })
   },
 
-  // ── Dashboard state ───────────────────────────────────────────────────
+  // ── Dashboard state (Session 5) ────────────────────────────────────
   dashboard: null,
   liveMetrics: {},
   loading: false,
@@ -683,4 +763,131 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
       return null
     }
   },
+
+  // ── Monitor View state (Session 6) ─────────────────────────────────
+  monitorRunId: null,
+  pipelineId: null,
+  runName: null,
+  paperId: null,
+  runStatus: 'idle',
+  startedAt: null,
+  elapsed: 0,
+  monitorEta: null,
+
+  monitorExecutionOrder: [],
+  monitorActiveBlockId: null,
+  viewedBlockId: null,
+
+  metrics: {},
+  metricEvents: [],
+
+  system: INITIAL_SYSTEM,
+  systemHistory: [],
+
+  configSnapshot: {},
+  logs: [],
+
+  setRun: (runId, pipelineId, runName, paperId) =>
+    set({ monitorRunId: runId, pipelineId, runName, paperId: paperId || null, startedAt: new Date().toISOString(), runStatus: 'live' }),
+
+  setRunStatus: (status) => set({ runStatus: status }),
+
+  setExecutionOrder: (blocks) => set({ monitorExecutionOrder: blocks }),
+
+  updateBlockStatus: (blockId, updates) =>
+    set((s) => ({
+      monitorExecutionOrder: s.monitorExecutionOrder.map((b) =>
+        b.id === blockId ? { ...b, ...updates } : b
+      ),
+    })),
+
+  setActiveBlock: (blockId) =>
+    set((s) => ({
+      monitorActiveBlockId: blockId,
+      viewedBlockId: s.viewedBlockId === s.monitorActiveBlockId || s.viewedBlockId === null ? blockId : s.viewedBlockId,
+    })),
+
+  setViewedBlock: (blockId) => set({ viewedBlockId: blockId }),
+
+  pushMetric: (event) =>
+    set((s) => {
+      const blockMetrics = s.metrics[event.blockId] || {}
+      const series = blockMetrics[event.name] || []
+      const step = event.step ?? series.length
+      const newSeries = [...series, { step, value: event.value, timestamp: event.timestamp }]
+
+      return {
+        metrics: {
+          ...s.metrics,
+          [event.blockId]: {
+            ...blockMetrics,
+            [event.name]: newSeries,
+          },
+        },
+        metricEvents: [...s.metricEvents, event],
+      }
+    }),
+
+  pushLog: (log) =>
+    set((s) => ({
+      logs: [...s.logs.slice(-999), log],
+    })),
+
+  updateSystem: (metrics) =>
+    set((s) => ({
+      system: metrics,
+      systemHistory: [
+        ...s.systemHistory.slice(-119),
+        { timestamp: new Date().toISOString(), cpu: metrics.cpu, memory: metrics.memory, gpuMemory: metrics.gpuMemory },
+      ],
+    })),
+
+  setConfigSnapshot: (config) => set({ configSnapshot: config }),
+
+  setElapsed: (seconds) => set({ elapsed: seconds }),
+
+  setMonitorEta: (seconds) => set({ monitorEta: seconds }),
+
+  loadMonitorMetricsLog: (events, blocks, config) => {
+    const metrics: Record<string, Record<string, MetricSeries[]>> = {}
+    for (const event of events) {
+      if (!metrics[event.blockId]) metrics[event.blockId] = {}
+      if (!metrics[event.blockId][event.name]) metrics[event.blockId][event.name] = []
+      const series = metrics[event.blockId][event.name]
+      series.push({ step: event.step ?? series.length, value: event.value, timestamp: event.timestamp })
+    }
+    set({
+      metrics,
+      metricEvents: events,
+      monitorExecutionOrder: blocks,
+      configSnapshot: config || {},
+      runStatus: 'recorded',
+      viewedBlockId: blocks[0]?.id || null,
+    })
+  },
+
+  getBlockMetrics: (blockId) => get().metrics[blockId] || {},
+
+  getBlockEvents: (blockId) => get().metricEvents.filter((e) => e.blockId === blockId),
+
+  resetMonitor: () =>
+    set({
+      monitorRunId: null,
+      pipelineId: null,
+      runName: null,
+      paperId: null,
+      runStatus: 'idle',
+      startedAt: null,
+      elapsed: 0,
+      monitorEta: null,
+      monitorExecutionOrder: [],
+      monitorActiveBlockId: null,
+      viewedBlockId: null,
+      metrics: {},
+      metricEvents: [],
+      system: INITIAL_SYSTEM,
+      systemHistory: [],
+      configSnapshot: {},
+      logs: [],
+    }),
 }))

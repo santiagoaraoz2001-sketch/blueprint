@@ -18,6 +18,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Home,
+  Activity,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -40,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'marketplace', label: 'Blocks', icon: Blocks },
   { id: 'workshop', label: 'Workshop', icon: Wrench },
   { id: 'inference', label: 'Inference', icon: MessageSquare },
+  { id: 'monitor', label: 'Monitor', icon: Activity },
   { id: 'results', label: 'Results', icon: BarChart3 },
   { id: 'visualization', label: 'Charts', icon: LineChart },
   { id: 'paper', label: 'Paper', icon: FileText },
