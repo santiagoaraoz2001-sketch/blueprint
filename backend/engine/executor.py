@@ -544,25 +544,36 @@ async def execute_pipeline(
                     except Exception:
                         pass
                     return
-                except Exception as e:
-                    tb = traceback.format_exc()
-                    # Structured error for BlockError subclasses
-                    if isinstance(e, BlockError):
-                        error_msg = e.message
-                        if e.details:
-                            error_msg += f"\n{e.details}"
-                    else:
-                        error_msg = str(e)
+                except BlockError as e:
+                    error_payload = {
+                        "node_id": node_id,
+                        "error": e.message,
+                        "error_type": type(e).__name__,
+                        "recoverable": e.recoverable,
+                        "details": e.details,
+                    }
+                    if isinstance(e, BlockConfigError):
+                        error_payload["config_field"] = e.field
                     try:
-                        event_data = {"node_id": node_id, "error": error_msg}
-                        if isinstance(e, BlockError):
-                            event_data["error_type"] = type(e).__name__
-                            event_data["recoverable"] = e.recoverable
-                        publish_event(run_id, "node_failed", event_data)
+                        publish_event(run_id, "node_failed", error_payload)
                     except Exception:
                         pass
                     run.status = "failed"
-                    run.error_message = f"Block {block_type} failed: {error_msg}\n\n{tb}"
+                    run.error_message = f"[{type(e).__name__}] {e.message}"
+                    if e.details:
+                        run.error_message += f"\n\nDetails: {e.details}"
+                    run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    live.status = "failed"
+                    db.commit()
+                    return
+                except Exception as e:
+                    tb = traceback.format_exc()
+                    try:
+                        publish_event(run_id, "node_failed", {"node_id": node_id, "error": str(e)})
+                    except Exception:
+                        pass
+                    run.status = "failed"
+                    run.error_message = f"Block {block_type} failed: {str(e)}\n\n{tb}"
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     live.status = "failed"
                     db.commit()
