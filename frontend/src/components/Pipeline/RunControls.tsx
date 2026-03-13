@@ -6,6 +6,7 @@ import { validatePipelineClient } from '@/lib/pipeline-validator'
 import { useSSE } from '@/hooks/useSSE'
 import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Check, AlertTriangle, Gauge, FileDown } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useUIStore } from '@/stores/uiStore'
 import PipelineAnalysisPanel from './PipelineAnalysisPanel'
 import { getBlockDefinition } from '@/lib/block-registry'
 import { generateRequirements } from '@/lib/block-dependencies'
@@ -100,6 +101,12 @@ export default function RunControls() {
 
     reset()
     await startRun(pipelineId)
+
+    // Auto-navigate to Monitor view
+    const runId = useRunStore.getState().activeRunId
+    if (runId) {
+      useUIStore.getState().openMonitor(runId)
+    }
   }
 
   const handleStop = async () => {

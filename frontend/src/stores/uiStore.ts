@@ -11,6 +11,8 @@ interface UIState {
   selectedRunId: string | null
   /** Navigation parameter for paper-detail view */
   selectedPaperProjectId: string | null
+  monitorRunId: string | null
+  compareRunIds: string[] | null
   setView: (view: View) => void
   toggleSidebar: () => void
   setSelectedProject: (id: string | null) => void
@@ -20,6 +22,10 @@ interface UIState {
   navigateToMonitor: (runId?: string | null) => void
   /** Navigate to the paper detail view for a project */
   navigateToPaperDetail: (projectId: string) => void
+  setMonitorRunId: (id: string | null) => void
+  setCompareRunIds: (ids: string[] | null) => void
+  openMonitor: (runId: string) => void
+  openComparison: (runIds: string[]) => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -29,6 +35,8 @@ export const useUIStore = create<UIState>((set) => ({
   selectedPipelineId: null,
   selectedRunId: null,
   selectedPaperProjectId: null,
+  monitorRunId: null,
+  compareRunIds: null,
   setView: (view) => set({ activeView: view }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSelectedProject: (id) => set({ selectedProjectId: id }),
@@ -36,4 +44,8 @@ export const useUIStore = create<UIState>((set) => ({
   setSelectedRunId: (id) => set({ selectedRunId: id }),
   navigateToMonitor: (runId) => set({ activeView: 'monitor', selectedRunId: runId ?? null }),
   navigateToPaperDetail: (projectId) => set({ activeView: 'research-detail', selectedProjectId: projectId, selectedPaperProjectId: projectId }),
+  setMonitorRunId: (id) => set({ monitorRunId: id }),
+  setCompareRunIds: (ids) => set({ compareRunIds: ids }),
+  openMonitor: (runId) => set({ activeView: 'monitor', monitorRunId: runId, compareRunIds: null }),
+  openComparison: (runIds) => set({ activeView: 'monitor', compareRunIds: runIds, monitorRunId: null }),
 }))

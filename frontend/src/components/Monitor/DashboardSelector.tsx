@@ -1,65 +1,83 @@
 import { useState, useEffect, useRef } from 'react'
+import { T, F, FS } from '@/lib/design-tokens'
 import { useMetricsStore } from '@/stores/metricsStore'
 import TrainingDashboard from './TrainingDashboard'
 import EvaluationDashboard from './EvaluationDashboard'
-import InferenceDashboard from './InferenceDashboard'
-import MergeDashboard from './MergeDashboard'
-import DataDashboard from './DataDashboard'
 import DefaultDashboard from './DefaultDashboard'
-import { T, F, FS } from '@/lib/design-tokens'
+import { Loader } from 'lucide-react'
 
-const DASHBOARD_MAP: Record<string, React.ComponentType<{ blockId: string }>> = {
-  training: TrainingDashboard,
-  evaluation: EvaluationDashboard,
-  inference: InferenceDashboard,
-  merge: MergeDashboard,
-  data: DataDashboard,
+interface DashboardSelectorProps {
+  runId: string
+  viewedBlockId: string | null
 }
 
-export default function DashboardSelector() {
-  const viewedBlockId = useMetricsStore((s) => s.viewedBlockId)
-  const executionOrder = useMetricsStore((s) => s.monitorExecutionOrder)
+function WaitingState() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        gap: 8,
+      }}
+    >
+      <Loader size={16} color={T.dim} style={{ animation: 'spin 1s linear infinite' }} />
+      <span style={{ fontFamily: F, fontSize: FS.xs, color: T.dim }}>
+        Waiting for block to start...
+      </span>
+    </div>
+  )
+}
+
+function selectDashboard(category: string, runId: string, blockId: string) {
+  switch (category) {
+    case 'training':
+      return <TrainingDashboard runId={runId} blockId={blockId} />
+    case 'evaluate':
+    case 'metrics':
+    case 'evaluation':
+      return <EvaluationDashboard runId={runId} blockId={blockId} />
+    default:
+      return <DefaultDashboard runId={runId} blockId={blockId} />
+  }
+}
+
+export default function DashboardSelector({ runId, viewedBlockId }: DashboardSelectorProps) {
+  const viewedBlock = useMetricsStore((s) =>
+    viewedBlockId ? s.runs[runId]?.blocks[viewedBlockId] : null
+  )
+  const activeBlock = useMetricsStore((s) => s.getActiveBlock(runId))
   const [opacity, setOpacity] = useState(1)
-  const [renderedBlockId, setRenderedBlockId] = useState(viewedBlockId)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>()
+  const prevCategoryRef = useRef<string | null>(null)
 
-  // Smooth fade transition on block change
+  const block = viewedBlock || activeBlock
+
+  // Fade transition when category changes
   useEffect(() => {
-    if (viewedBlockId !== renderedBlockId) {
+    const newCategory = block?.category || null
+    if (prevCategoryRef.current !== null && prevCategoryRef.current !== newCategory) {
       setOpacity(0)
-      timerRef.current = setTimeout(() => {
-        setRenderedBlockId(viewedBlockId)
-        setOpacity(1)
-      }, 200)
-      return () => {
-        if (timerRef.current) clearTimeout(timerRef.current)
-      }
+      const timer = setTimeout(() => setOpacity(1), 50)
+      return () => clearTimeout(timer)
     }
-  }, [viewedBlockId, renderedBlockId])
+    prevCategoryRef.current = newCategory
+  }, [block?.category])
 
-  if (!renderedBlockId) {
-    return (
-      <div style={{
-        height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <span style={{ fontFamily: F, fontSize: FS.xs, color: T.dim }}>
-          Select a block from the pipeline strip
-        </span>
-      </div>
-    )
+  if (!block) {
+    return <WaitingState />
   }
 
-  const block = executionOrder.find(b => b.id === renderedBlockId)
-  const category = block?.category || 'default'
-  const Dashboard = DASHBOARD_MAP[category] || DefaultDashboard
-
   return (
-    <div style={{
-      height: '100%',
-      opacity,
-      transition: 'opacity 200ms ease',
-    }}>
-      <Dashboard blockId={renderedBlockId} />
+    <div
+      style={{
+        height: '100%',
+        opacity,
+        transition: 'opacity 200ms ease-in-out',
+      }}
+    >
+      {selectDashboard(block.category, runId, block.nodeId)}
     </div>
   )
 }

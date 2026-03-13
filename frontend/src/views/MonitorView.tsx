@@ -1,312 +1,335 @@
 import { useState, useEffect, useCallback } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
-import { useMetricsStore } from '@/stores/metricsStore'
+import { useRunMonitor } from '@/hooks/useRunMonitor'
 import { useRunStore } from '@/stores/runStore'
-import { useSettingsStore } from '@/stores/settingsStore'
-import { useMonitorView } from '@/hooks/useRunMonitor'
+import { useMetricsStore } from '@/stores/metricsStore'
+import { useUIStore } from '@/stores/uiStore'
+import { api } from '@/api/client'
 import PipelineStrip from '@/components/Monitor/PipelineStrip'
 import DashboardSelector from '@/components/Monitor/DashboardSelector'
 import SystemPanel from '@/components/Monitor/SystemPanel'
 import LogStream from '@/components/Monitor/LogStream'
 import ComparisonView from '@/components/Monitor/ComparisonView'
-import PopoutBar from '@/components/Monitor/PopoutBar'
-import { ExternalLink, Square, GitCompare, Circle, Radio, Play } from 'lucide-react'
-import { motion } from 'framer-motion'
-
-function getUrlParams(): { runId?: string; popout?: boolean; compare?: boolean; runs?: string[] } {
-  const params = new URLSearchParams(window.location.search)
-  const hash = window.location.hash
-  return {
-    runId: params.get('runId') || undefined,
-    popout: params.get('popout') === 'true',
-    compare: hash === '#compare' || params.get('compare') === 'true',
-    runs: params.get('runs')?.split(',').filter(Boolean),
-  }
-}
+import { Activity, ExternalLink, Wifi, WifiOff, Radio, Archive } from 'lucide-react'
 
 export default function MonitorView() {
-  const [compareMode, setCompareMode] = useState(false)
-  const [demoRunId, setDemoRunId] = useState<string | null>(null)
+  const monitorRunId = useUIStore((s) => s.monitorRunId)
+  const compareRunIds = useUIStore((s) => s.compareRunIds)
 
-  const urlParams = getUrlParams()
-  const isPopout = urlParams.popout
-
-  // Use SELECTORS — never subscribe to the whole store
-  const runStatus = useMetricsStore((s) => s.runStatus)
-  const runName = useMetricsStore((s) => s.runName)
-  const elapsed = useMetricsStore((s) => s.elapsed)
-  const paperId = useMetricsStore((s) => s.paperId)
-  const executionOrder = useMetricsStore((s) => s.monitorExecutionOrder)
-
+  // If no run specified, try to get the active run from runStore
   const activeRunId = useRunStore((s) => s.activeRunId)
-  const isDemoMode = useSettingsStore((s) => s.demoMode)
+  const runId = monitorRunId || activeRunId
 
-  // Use active run from runStore if no specific run selected
-  const monitorRunId = demoRunId || activeRunId || urlParams.runId || null
-  useMonitorView(monitorRunId)
+  // Comparison mode
+  if (compareRunIds && compareRunIds.length >= 2) {
+    return <ComparisonView runIds={compareRunIds} />
+  }
 
-  // Handle compare mode from URL
+  if (!runId) {
+    return <NoRunState />
+  }
+
+  return <MonitorContent runId={runId} />
+}
+
+function NoRunState() {
+  const [recentRuns, setRecentRuns] = useState<any[]>([])
+  const setMonitorRunId = useUIStore((s) => s.setMonitorRunId)
+
   useEffect(() => {
-    if (urlParams.compare) setCompareMode(true)
+    api
+      .get<any[]>('/runs?limit=10')
+      .then((runs) => setRecentRuns(runs || []))
+      .catch(() => {})
   }, [])
 
-  // Status badge
-  const statusConfig = {
-    live: { label: 'LIVE', color: T.green, pulse: true },
-    recorded: { label: 'RECORDED', color: T.dim, pulse: false },
-    cancelled: { label: 'CANCELLED', color: T.amber, pulse: false },
-    idle: { label: 'IDLE', color: T.dim, pulse: false },
-  }
-  const status = statusConfig[runStatus]
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        gap: 16,
+        padding: 32,
+      }}
+    >
+      <Activity size={24} color={T.dim} />
+      <span style={{ fontFamily: F, fontSize: FS.sm, color: T.dim }}>
+        No active run to monitor
+      </span>
+      <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
+        Start a pipeline run or select a recent run below
+      </span>
+      {recentRuns.length > 0 && (
+        <div style={{ marginTop: 8, width: '100%', maxWidth: 400 }}>
+          <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.1em', marginBottom: 6 }}>
+            RECENT RUNS
+          </div>
+          {recentRuns.map((run: any) => (
+            <button
+              key={run.id}
+              onClick={() => setMonitorRunId(run.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                padding: '8px 12px',
+                background: 'transparent',
+                border: `1px solid ${T.border}`,
+                borderBottom: 'none',
+                cursor: 'pointer',
+                fontFamily: F,
+                fontSize: FS.xs,
+                color: T.text,
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = T.surface2 }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+            >
+              <div
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: run.status === 'complete' ? '#22c55e' : run.status === 'running' ? '#f59e0b' : run.status === 'failed' ? '#ff433d' : T.dim,
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {run.id.slice(0, 8)}
+              </span>
+              <span style={{ color: T.dim, fontSize: FS.xxs }}>
+                {run.status}
+              </span>
+              {run.started_at && (
+                <span style={{ color: T.dim, fontSize: FS.xxs }}>
+                  {new Date(run.started_at).toLocaleDateString()}
+                </span>
+              )}
+            </button>
+          ))}
+          <div style={{ borderBottom: `1px solid ${T.border}` }} />
+        </div>
+      )}
+    </div>
+  )
+}
 
-  const handlePopout = () => {
-    const url = `${window.location.origin}?view=monitor&runId=${monitorRunId || ''}&popout=true`
-    window.open(url, 'blueprint-monitor', 'width=900,height=700')
-  }
+function MonitorContent({ runId }: { runId: string }) {
+  const { isConnected, overallProgress, eta, status } = useRunMonitor(runId)
+  const [viewedBlockId, setViewedBlockId] = useState<string | null>(null)
+  const run = useMetricsStore((s) => s.runs[runId])
+  const pipelineName = run?.pipelineName || ''
+  const isReplay = status === 'complete' || status === 'failed'
 
-  const handleStop = useCallback(async () => {
-    await useRunStore.getState().stopRun()
-    useMetricsStore.getState().setRunStatus('cancelled')
+  // Default to active block when not manually selected; for historical runs, use first block
+  const activeBlockId = useMetricsStore((s) => s.runs[runId]?.activeBlockId)
+  const firstBlockId = useMetricsStore((s) => s.runs[runId]?.executionOrder[0] ?? null)
+  const effectiveBlockId = viewedBlockId || activeBlockId || firstBlockId
+
+  const handleSelectBlock = useCallback((blockId: string) => {
+    setViewedBlockId(blockId)
   }, [])
 
-  const formatElapsed = (s: number) => {
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const sec = s % 60
-    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
-    return `${m}:${sec.toString().padStart(2, '0')}`
-  }
+  const handlePopout = useCallback(() => {
+    const url = `${window.location.origin}?view=monitor&runId=${runId}&popout=true`
+    window.open(url, `monitor-${runId}`, 'width=1200,height=800')
+  }, [runId])
 
-  // Popout layout
-  if (isPopout) {
-    return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: T.bg }}>
-        <PopoutBar
-          runName={runName}
-          paperId={paperId}
-          status={status}
-          elapsed={formatElapsed(elapsed)}
-          phase={executionOrder.find(b => b.status === 'running')?.name || 'Idle'}
-        />
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          <div style={{ width: 160, borderRight: `1px solid ${T.border}` }}>
-            <PipelineStrip />
-          </div>
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <DashboardSelector />
-          </div>
-        </div>
-        <div style={{ height: 120, borderTop: `1px solid ${T.border}` }}>
-          <LogStream compact />
-        </div>
-      </div>
-    )
-  }
+  const pct = Math.round(overallProgress * 100)
 
-  // Compare mode
-  if (compareMode) {
-    return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: T.bg }}>
-        {/* Top bar */}
-        <div style={{
-          height: 36,
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Context bar */}
+      <div
+        style={{
           display: 'flex',
           alignItems: 'center',
-          padding: '0 12px',
           gap: 10,
+          padding: '6px 12px',
           borderBottom: `1px solid ${T.border}`,
+          flexShrink: 0,
           background: T.surface1,
-        }}>
-          <span style={{ fontFamily: F, fontSize: FS.xs, fontWeight: 700, color: T.text, letterSpacing: '0.08em' }}>
-            COMPARE RUNS
+        }}
+      >
+        <Activity size={12} color={T.cyan} />
+        <span
+          style={{
+            fontFamily: F,
+            fontSize: FS.sm,
+            fontWeight: 700,
+            color: T.text,
+            letterSpacing: '0.06em',
+          }}
+        >
+          MONITOR
+        </span>
+        {pipelineName && (
+          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec }}>
+            {pipelineName}
           </span>
-          <div style={{ flex: 1 }} />
-          <button
-            onClick={() => setCompareMode(false)}
-            style={{
-              padding: '3px 10px', background: T.surface2, border: `1px solid ${T.border}`,
-              color: T.sec, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer', letterSpacing: '0.06em',
-            }}
-          >
-            EXIT COMPARE
-          </button>
-        </div>
-        <ComparisonView initialRunIds={urlParams.runs} />
-      </div>
-    )
-  }
-
-  // Empty state
-  const hasRun = monitorRunId || runStatus !== 'idle'
-  if (!hasRun) {
-    return (
-      <div style={{
-        height: '100%', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', background: T.bg, gap: 12,
-      }}>
-        <Radio size={32} color={T.dim} />
-        <span style={{ fontFamily: F, fontSize: FS.md, color: T.dim, letterSpacing: '0.06em' }}>
-          No experiments running
-        </span>
-        <span style={{ fontFamily: F, fontSize: FS.xs, color: T.dim, opacity: 0.6 }}>
-          Launch from a paper or the pipeline editor
-        </span>
-        {isDemoMode && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              useMetricsStore.getState().resetMonitor()
-              setDemoRunId(`demo-monitor-${Date.now()}`)
-            }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              marginTop: 8, padding: '6px 16px',
-              background: `${T.cyan}15`, border: `1px solid ${T.cyan}40`,
-              color: T.cyan, fontFamily: F, fontSize: FS.xs,
-              cursor: 'pointer', letterSpacing: '0.06em', fontWeight: 700,
-            }}
-          >
-            <Play size={12} fill={T.cyan} />
-            START DEMO RUN
-          </motion.button>
         )}
-      </div>
-    )
-  }
 
-  // Main monitor layout
-  return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: T.bg }}>
-      {/* Top bar */}
-      <div style={{
-        height: 36,
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 12px',
-        gap: 10,
-        borderBottom: `1px solid ${T.border}`,
-        background: T.surface1,
-        flexShrink: 0,
-      }}>
-        {/* Run selector */}
-        <span style={{ fontFamily: F, fontSize: FS.xs, fontWeight: 700, color: T.text, letterSpacing: '0.06em' }}>
-          {runName || 'Run'}
-        </span>
+        {/* Progress bar */}
+        <div style={{ width: 120, height: 4, background: T.surface3, overflow: 'hidden' }}>
+          <div
+            style={{
+              width: `${pct}%`,
+              height: '100%',
+              background: T.cyan,
+              transition: 'width 0.3s ease',
+            }}
+          />
+        </div>
+        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.cyan }}>{pct}%</span>
 
-        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
-          {formatElapsed(elapsed)}
-        </span>
+        {eta != null && eta > 0 && (
+          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
+            ETA {Math.round(eta)}s
+          </span>
+        )}
 
         <div style={{ flex: 1 }} />
 
-        {/* Compare toggle */}
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setCompareMode(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: '3px 8px', background: T.surface2, border: `1px solid ${T.border}`,
-            color: T.sec, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer', letterSpacing: '0.06em',
-          }}
-        >
-          <GitCompare size={10} />
-          COMPARE
-        </motion.button>
-
-        {/* Pop out */}
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={handlePopout}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: '3px 8px', background: T.surface2, border: `1px solid ${T.border}`,
-            color: T.sec, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer', letterSpacing: '0.06em',
-          }}
-        >
-          <ExternalLink size={10} />
-          POP OUT
-        </motion.button>
-
-        {/* Stop button */}
-        {runStatus === 'live' && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleStop}
+        {/* Status badges */}
+        {isReplay && (
+          <span
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '3px 8px', background: `${T.red}15`, border: `1px solid ${T.red}40`,
-              color: T.red, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer', letterSpacing: '0.06em',
-              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontFamily: F,
+              fontSize: FS.xxs,
+              color: T.dim,
+              background: T.surface3,
+              padding: '2px 8px',
             }}
           >
-            <Square size={8} fill={T.red} />
-            STOP
-          </motion.button>
-        )}
-
-        {/* Status badge */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 5,
-          padding: '2px 8px',
-          background: `${status.color}10`,
-          border: `1px solid ${status.color}30`,
-        }}>
-          <Circle
-            size={6}
-            fill={status.color}
-            color={status.color}
-            style={status.pulse ? { animation: 'pulse-glow 1.5s ease-in-out infinite' } : undefined}
-          />
-          <span style={{
-            fontFamily: F, fontSize: FS.xxs, fontWeight: 900,
-            color: status.color, letterSpacing: '0.1em',
-          }}>
-            {status.label}
+            <Archive size={9} />
+            Recorded
           </span>
-        </div>
-
-        {/* Pulse animation */}
-        {status.pulse && (
-          <style>{`
-            @keyframes pulse-glow {
-              0%, 100% { opacity: 1; }
-              50% { opacity: 0.4; }
-            }
-          `}</style>
         )}
+
+        {!isReplay && (
+          <span
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontFamily: F,
+              fontSize: FS.xxs,
+              color: isConnected ? '#22c55e' : '#ff433d',
+            }}
+          >
+            {isConnected ? <Wifi size={9} /> : <WifiOff size={9} />}
+            {isConnected ? 'Live' : 'Disconnected'}
+          </span>
+        )}
+
+        {status === 'running' && (
+          <span
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontFamily: F,
+              fontSize: FS.xxs,
+              color: T.cyan,
+            }}
+          >
+            <Radio size={9} style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
+          </span>
+        )}
+
+        <button
+          onClick={handlePopout}
+          title="Pop out to new window"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: T.dim,
+            cursor: 'pointer',
+            padding: 2,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <ExternalLink size={12} />
+        </button>
       </div>
 
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Pipeline Strip - 200px */}
-        <div style={{ width: 200, minWidth: 200, borderRight: `1px solid ${T.border}`, overflow: 'auto' }}>
-          <PipelineStrip />
-        </div>
-
-        {/* Center - Adaptive Dashboard */}
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          <DashboardSelector />
-        </div>
-
-        {/* System Panel - 280px */}
-        <div style={{ width: 280, minWidth: 280, borderLeft: `1px solid ${T.border}`, overflow: 'auto' }}>
-          <SystemPanel
-            runId={monitorRunId}
-            paperId={paperId}
-            elapsed={elapsed}
-            formatElapsed={formatElapsed}
+        {/* Left: Pipeline strip */}
+        <div
+          style={{
+            width: 200,
+            minWidth: 200,
+            borderRight: `1px solid ${T.border}`,
+            overflowY: 'auto',
+            background: T.surface0,
+            flexShrink: 0,
+          }}
+        >
+          <PipelineStrip
+            runId={runId}
+            viewedBlockId={effectiveBlockId}
+            onSelectBlock={handleSelectBlock}
           />
         </div>
+
+        {/* Center: Dashboard */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <DashboardSelector runId={runId} viewedBlockId={effectiveBlockId} />
+          </div>
+        </div>
+
+        {/* Right: System + Logs */}
+        <div
+          style={{
+            width: 260,
+            minWidth: 260,
+            borderLeft: `1px solid ${T.border}`,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            flexShrink: 0,
+          }}
+        >
+          {/* System gauges */}
+          <div
+            style={{
+              borderBottom: `1px solid ${T.border}`,
+              flexShrink: 0,
+            }}
+          >
+            <SystemPanel runId={runId} />
+          </div>
+
+          {/* Log stream */}
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <LogStream runId={runId} />
+          </div>
+        </div>
       </div>
 
-      {/* Log Stream - 150px */}
-      <div style={{ height: 150, minHeight: 150, borderTop: `1px solid ${T.border}`, flexShrink: 0 }}>
-        <LogStream />
-      </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
     </div>
   )
 }
