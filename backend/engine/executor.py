@@ -41,6 +41,7 @@ from ..utils.structured_logger import (
     log_run_start, log_run_complete, log_run_failed,
     log_block_start, log_block_complete, log_block_failed,
 )
+from .config_resolver import resolve_configs
 from .metrics_schema import create_metric
 
 # Cancel events: threading.Event per run_id, protected by lock for thread safety
@@ -383,6 +384,13 @@ async def execute_pipeline(
     start_time = time.time()
 
     try:
+        # Resolve config inheritance across the DAG (inside try so failures
+        # are recorded as run errors instead of leaving the run stuck as "running")
+        resolved_configs = resolve_configs(
+            nodes, edges, order,
+            find_block_dir_fn=_find_block_module,
+        )
+
         for idx, node_id in enumerate(order):
             node = node_map.get(node_id)
             if not node:
@@ -414,7 +422,11 @@ async def execute_pipeline(
 
             node_data = node.get("data", {})
             block_type = node_data.get("type", "")
-            config = node_data.get("config", {})
+            config = resolved_configs.get(node_id, node_data.get("config", {}))
+
+            # Strip provenance metadata before passing config to blocks —
+            # _inherited is for UI/debugging only, not for block consumption.
+            config = {k: v for k, v in config.items() if k != "_inherited"}
 
             # Update live run
             live.current_block = node_data.get("label", block_type)
