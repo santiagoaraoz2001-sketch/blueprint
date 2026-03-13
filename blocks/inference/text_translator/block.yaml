@@ -3,6 +3,8 @@ type: text_translator
 category: inference
 description: Translate text between languages using LLM or transformers models
 version: "2.0.0"
+deprecated: true
+deprecated_message: "Use LLM Inference block with a translation prompt."
 
 inputs:
   - id: model

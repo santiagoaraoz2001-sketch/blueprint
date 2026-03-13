@@ -1,313 +1,232 @@
-import { useState, useEffect, useCallback } from 'react'
-import { T, F, FD, FS, STATUS_COLORS } from '@/lib/design-tokens'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { T, F, FD, FS } from '@/lib/design-tokens'
 import { useUIStore } from '@/stores/uiStore'
 import { useProjectStore } from '@/stores/projectStore'
-import { usePipelineStore } from '@/stores/pipelineStore'
 import { api } from '@/api/client'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { DEMO_RUNS } from '@/lib/demo-data'
-import StatusBadge from '@/components/shared/StatusBadge'
+import PaperBadge, { PAPER_STATUS_COLORS } from '@/components/Research/PaperBadge'
+import EditableField from '@/components/Research/EditableField'
+import PhaseTimeline from '@/components/Research/PhaseTimeline'
+import type { Phase } from '@/components/Research/PhaseTimeline'
+import ResearchNotes from '@/components/Research/ResearchNotes'
 import EmptyState from '@/components/shared/EmptyState'
-import {
-  ArrowLeft, FileText, GitBranch, Eye, Copy,
-  Rocket, Activity, GitCompare, Plus, ChevronRight, XCircle, AlertTriangle,
-} from 'lucide-react'
-import toast from 'react-hot-toast'
+import { ArrowLeft, FileText } from 'lucide-react'
 
-interface RunRecord {
-  id: string
-  pipeline_id: string
-  status: string
-  started_at: string
-  completed_at: string | null
-  error_message?: string | null
-  metrics: Record<string, any>
+function isDemoMode() {
+  return useSettingsStore.getState().demoMode
 }
 
+const DEMO_PHASES: Phase[] = [
+  {
+    phase_id: 'P1',
+    name: 'Baseline Evaluation',
+    status: 'complete',
+    research_question: 'What is the base model performance on our target benchmarks?',
+    runs: [
+      { id: 'r1', name: 'baseline-llama3-8b', status: 'complete', loss: 0.52, accuracy: 0.73, elapsed: 3600 },
+      { id: 'r2', name: 'baseline-llama3-8b-v2', status: 'complete', loss: 0.48, accuracy: 0.76, elapsed: 3800 },
+    ],
+  },
+  {
+    phase_id: 'P2',
+    name: 'LoRA Rank Ablation',
+    status: 'active',
+    research_question: 'How does LoRA rank affect downstream performance?',
+    runs: [
+      { id: 'r3', name: 'lora-r8-alpha16', status: 'complete', loss: 0.34, accuracy: 0.84, elapsed: 7200 },
+      { id: 'r4', name: 'lora-r16-alpha32', status: 'running', progress: 0.65, loss: 0.29, elapsed: 4800, eta: 2400 },
+      { id: 'r5', name: 'lora-r32-alpha64', status: 'pending' },
+    ],
+  },
+  {
+    phase_id: 'P3',
+    name: 'Data Mix Optimization',
+    status: 'planned',
+    research_question: 'Which data composition yields the best generalization?',
+    runs: [],
+  },
+]
+
+const STATUS_OPTIONS = Object.keys(PAPER_STATUS_COLORS).map((s) => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }))
+
 export default function PaperDetailView() {
-  const selectedPaperProjectId = useUIStore((s) => s.selectedPaperProjectId)
-  const setView = useUIStore((s) => s.setView)
-  const navigateToMonitor = useUIStore((s) => s.navigateToMonitor)
+  const { selectedProjectId, setView } = useUIStore()
   const projects = useProjectStore((s) => s.projects)
-  const fetchProjects = useProjectStore((s) => s.fetchProjects)
-  const demoMode = useSettingsStore((s) => s.demoMode)
+  const updateProject = useProjectStore((s) => s.updateProject)
+  const project = projects.find((p) => p.id === selectedProjectId)
 
-  const pipelines = usePipelineStore((s) => s.pipelines)
-  const fetchPipelines = usePipelineStore((s) => s.fetchPipelines)
-  const loadPipeline = usePipelineStore((s) => s.loadPipeline)
-  const duplicatePipeline = usePipelineStore((s) => s.duplicatePipeline)
-
-  const [runs, setRuns] = useState<RunRecord[]>([])
-
-  const project = projects.find((p) => p.id === selectedPaperProjectId)
-
-  const fetchRuns = useCallback(async () => {
-    if (demoMode) {
-      setRuns(DEMO_RUNS.map((r) => ({
-        id: r.id,
-        pipeline_id: r.pipeline_id,
-        status: r.status,
-        started_at: r.started_at,
-        completed_at: r.completed_at,
-        metrics: r.metrics as Record<string, any>,
-      })))
-      return
-    }
-    try {
-      const data = await api.get<RunRecord[]>(`/runs?limit=30`)
-      setRuns(data)
-    } catch { /* silently fail */ }
-  }, [demoMode])
+  const [phases, setPhases] = useState<Phase[]>([])
+  const [notes, setNotes] = useState('')
+  const [extFields, setExtFields] = useState<Record<string, string>>({})
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    fetchProjects()
-    fetchPipelines()
-    fetchRuns()
-  }, [fetchProjects, fetchPipelines, fetchRuns])
+    if (!project) return
+    setNotes(project.notes || '')
 
-  const handleBack = () => setView('dashboard')
-
-  const handleCloneRun = async (pipelineId: string) => {
-    await duplicatePipeline(pipelineId)
-    setView('editor')
-  }
-
-  const handleResults = (runId: string) => navigateToMonitor(runId)
-
-  const handleCompareAll = () => {
-    const completedRunIds = runs.filter((r) => r.status === 'complete').map((r) => r.id)
-    if (completedRunIds.length < 2) {
-      toast.error('Need at least 2 completed runs to compare')
+    if (isDemoMode()) {
+      setPhases(DEMO_PHASES)
+      setExtFields({
+        priority: '7',
+        venue: 'NeurIPS 2026',
+        blocked_by: '',
+        hypothesis: 'LoRA fine-tuning with rank 16+ achieves competitive performance with full fine-tuning on domain-specific tasks.',
+        criteria: 'Beat baseline by >5% on MMLU, maintain perplexity < 12.',
+        key_result: 'LoRA r=16 achieves 87.1% accuracy with 0.289 loss.',
+      })
       return
     }
-    setView('results')
-  }
 
-  const handleLaunchNext = async (pipelineId: string) => {
-    await duplicatePipeline(pipelineId)
-    setView('editor')
-    toast.success('Pipeline cloned — ready to configure and launch')
-  }
+    api.get<{ phases: Phase[] }>(`/projects/${project.id}/phases`)
+      .then((data) => setPhases(data.phases || []))
+      .catch(() => setPhases([]))
+  }, [project])
 
-  const handleOpenPipeline = async (id: string) => {
-    await loadPipeline(id)
-    setView('editor')
-  }
+  const handleFieldSave = useCallback(
+    (field: string, value: string) => {
+      if (!project) return
+      if (field === 'status' || field === 'name' || field === 'description') {
+        updateProject(project.id, { [field]: value })
+      } else {
+        setExtFields((prev) => ({ ...prev, [field]: value }))
+        if (!isDemoMode()) {
+          api.patch(`/projects/${project.id}`, { [field]: value }).catch(() => {})
+        }
+      }
+    },
+    [project, updateProject]
+  )
+
+  const handleNotesChange = useCallback(
+    (val: string) => {
+      setNotes(val)
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => {
+        if (project) {
+          updateProject(project.id, { notes: val })
+        }
+      }, 500)
+    },
+    [project, updateProject]
+  )
 
   if (!project) {
     return (
       <div style={{ padding: 20 }}>
-        <button
-          onClick={handleBack}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'none', border: 'none', color: T.dim, fontFamily: F, fontSize: FS.md, padding: 0,
-          }}
-        >
-          <ArrowLeft size={12} /> BACK TO DASHBOARD
-        </button>
-        <EmptyState icon={FileText} title="Project not found" description="The project may have been deleted" />
+        <EmptyState
+          icon={FileText}
+          title="No paper selected"
+          description="Select a paper from the research dashboard"
+          action={{ label: 'Back to Research', onClick: () => setView('research') }}
+        />
       </div>
     )
   }
 
-  const accent = STATUS_COLORS[project.status] || T.dim
-  const runningRuns = runs.filter((r) => r.status === 'running')
-  const completedRuns = runs.filter((r) => r.status === 'complete')
-  const failedRuns = runs.filter((r) => r.status === 'failed' || r.status === 'cancelled')
-
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.border}` }}>
-        <button
-          onClick={handleBack}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'none', border: 'none', color: T.dim, fontFamily: F, fontSize: FS.xs,
-            padding: 0, marginBottom: 8, letterSpacing: '0.08em',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = T.sec)}
-          onMouseLeave={(e) => (e.currentTarget.style.color = T.dim)}
-        >
-          <ArrowLeft size={10} /> BACK TO DASHBOARD
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <FileText size={16} color={accent} />
-          <h2 style={{ fontFamily: FD, fontSize: FS.h2, fontWeight: 600, color: T.text, margin: 0, letterSpacing: '0.04em' }}>
-            {project.name}
-          </h2>
-          <StatusBadge status={project.status} size="md" />
-          {project.paper_number && (
-            <span style={{ fontFamily: F, fontSize: FS.xs, color: accent, fontWeight: 600 }}>{project.paper_number}</span>
-          )}
-        </div>
-        {project.description && (
-          <p style={{ fontFamily: F, fontSize: FS.sm, color: T.dim, margin: '4px 0 0' }}>{project.description}</p>
-        )}
-      </div>
-
-      <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-        {/* Running experiments */}
-        {runningRuns.length > 0 && (
-          <Section title="RUNNING EXPERIMENTS">
-            {runningRuns.map((run) => (
-              <RunRow key={run.id} run={run}>
-                <ActionBtn label="MONITOR" icon={Activity} color={T.cyan} onClick={() => navigateToMonitor(run.id)} />
-              </RunRow>
-            ))}
-          </Section>
-        )}
-
-        {/* Pipelines */}
-        <Section title="PIPELINES" action={
-          <button
-            onClick={() => { usePipelineStore.getState().newPipeline(); setView('editor') }}
-            style={{
-              padding: '3px 8px', background: `${T.cyan}14`, border: `1px solid ${T.cyan}33`,
-              color: T.cyan, fontFamily: F, fontSize: FS.xxs, display: 'flex', alignItems: 'center', gap: 3,
-            }}
-          >
-            <Plus size={8} /> NEW
-          </button>
-        }>
-          {pipelines.length === 0 ? (
-            <div style={{ padding: 12, textAlign: 'center', fontFamily: F, fontSize: FS.sm, color: T.dim }}>No pipelines</div>
-          ) : pipelines.map((p) => (
-            <div key={p.id} className="hover-glow" onClick={() => handleOpenPipeline(p.id)} style={{
-              padding: '10px 14px', background: T.surface1, border: `1px solid ${T.border}`,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <GitBranch size={12} color={T.cyan} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: F, fontSize: FS.sm, color: T.text, fontWeight: 600 }}>{p.name}</div>
-                <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, marginTop: 2 }}>{p.block_count} blocks</div>
-              </div>
-              <ActionBtn label="CLONE" icon={Copy} color={T.purple} onClick={(e) => { e.stopPropagation(); handleCloneRun(p.id) }} />
-              <ActionBtn label="LAUNCH" icon={Rocket} color={T.green} onClick={(e) => { e.stopPropagation(); handleLaunchNext(p.id) }} />
-            </div>
-          ))}
-        </Section>
-
-        {/* Completed Runs */}
-        <Section title="COMPLETED RUNS" action={
-          completedRuns.length >= 2 ? (
-            <button
-              onClick={handleCompareAll}
-              style={{
-                padding: '3px 8px', background: `${T.blue}14`, border: `1px solid ${T.blue}33`,
-                color: T.blue, fontFamily: F, fontSize: FS.xxs, display: 'flex', alignItems: 'center', gap: 3,
-              }}
-            >
-              <GitCompare size={8} /> COMPARE ALL
-            </button>
-          ) : null
-        }>
-          {completedRuns.length === 0 ? (
-            <div style={{ padding: 12, textAlign: 'center', fontFamily: F, fontSize: FS.sm, color: T.dim }}>No completed runs</div>
-          ) : completedRuns.map((run) => (
-            <RunRow key={run.id} run={run}>
-              <ActionBtn label="RESULTS" icon={Eye} color={T.cyan} onClick={() => handleResults(run.id)} />
-              <ActionBtn label="CLONE" icon={Copy} color={T.purple} onClick={() => handleCloneRun(run.pipeline_id)} />
-            </RunRow>
-          ))}
-        </Section>
-
-        {/* Failed / Cancelled Runs */}
-        {failedRuns.length > 0 && (
-          <Section title="FAILED / CANCELLED">
-            {failedRuns.map((run) => {
-              const isCancelled = run.status === 'cancelled' || run.error_message === 'Stopped by user'
-              const displayStatus = isCancelled ? 'cancelled' : 'failed'
-              return (
-                <RunRow key={run.id} run={run} overrideStatus={displayStatus}>
-                  <ActionBtn label="RESULTS" icon={Eye} color={T.cyan} onClick={() => handleResults(run.id)} />
-                  {run.error_message && (
-                    <ErrorPreview error={run.error_message} isCancelled={isCancelled} />
-                  )}
-                </RunRow>
-              )
-            })}
-          </Section>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <span style={{ fontFamily: F, fontSize: FS.xs, color: T.dim, letterSpacing: '0.12em', fontWeight: 900 }}>{title}</span>
-        {action}
-      </div>
-      <div style={{ display: 'grid', gap: 6 }}>{children}</div>
-    </div>
-  )
-}
-
-function RunRow({ run, children, overrideStatus }: { run: RunRecord; children: React.ReactNode; overrideStatus?: string }) {
-  const status = overrideStatus || run.status
-  return (
-    <div style={{
-      padding: '10px 14px', background: T.surface1, border: `1px solid ${T.border}`,
-      display: 'flex', alignItems: 'center', gap: 10,
-    }}>
-      <StatusBadge status={status} />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: F, fontSize: FS.sm, color: T.text }}>{run.id.slice(0, 20)}</div>
-        <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, marginTop: 2 }}>
-          {new Date(run.started_at).toLocaleString()}
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>{children}</div>
-    </div>
-  )
-}
-
-function ActionBtn({ label, icon: Icon, color, onClick }: {
-  label: string; icon: React.ComponentType<any>; color: string; onClick: (e: React.MouseEvent) => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: '3px 8px', background: `${color}1A`, border: `1px solid ${color}33`,
-        color, fontFamily: F, fontSize: FS.xxs, display: 'flex', alignItems: 'center', gap: 3,
-      }}
-    >
-      <Icon size={8} /> {label}
-    </button>
-  )
-}
-
-function ErrorPreview({ error, isCancelled }: { error: string; isCancelled: boolean }) {
-  const [expanded, setExpanded] = useState(false)
-  const color = isCancelled ? STATUS_COLORS.cancelled : STATUS_COLORS.failed
-
-  return (
-    <div>
+    <div style={{ padding: 20, overflow: 'auto', height: '100%' }}>
+      {/* Back button */}
       <button
-        onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
+        onClick={() => setView('research')}
         style={{
-          padding: '2px 6px', background: `${color}0A`, border: `1px solid ${color}33`,
-          color, fontFamily: F, fontSize: FS.xxs, display: 'flex', alignItems: 'center', gap: 3,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '4px 8px',
+          background: 'none',
+          border: `1px solid ${T.border}`,
+          color: T.sec,
+          fontFamily: F,
+          fontSize: FS.xs,
+          letterSpacing: '0.06em',
+          cursor: 'pointer',
+          marginBottom: 16,
+          transition: 'all 0.15s',
         }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.borderHi; e.currentTarget.style.color = T.text }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.sec }}
       >
-        {isCancelled ? <AlertTriangle size={8} /> : <XCircle size={8} />}
-        <ChevronRight size={8} style={{ transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+        <ArrowLeft size={12} />
+        Research
       </button>
-      {expanded && (
-        <div style={{
-          position: 'absolute', right: 16, marginTop: 4, zIndex: 50,
-          padding: 10, background: T.surface0, border: `1px solid ${color}33`,
-          fontFamily: F, fontSize: FS.xxs, color: T.sec, whiteSpace: 'pre-wrap',
-          maxWidth: 400, maxHeight: 200, overflow: 'auto', lineHeight: 1.6,
-        }}>
-          {error}
+
+      {/* Top: Badge + Editable fields */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+        <div style={{ flexShrink: 0 }}>
+          <PaperBadge paperNumber={project.paper_number} status={project.status} size="lg" />
         </div>
-      )}
+        <div style={{ flex: 1, minWidth: 300, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <EditableField
+            label="Status"
+            value={project.status}
+            onSave={(v) => handleFieldSave('status', v)}
+            type="select"
+            options={STATUS_OPTIONS}
+          />
+          <EditableField
+            label="Priority (1-10)"
+            value={extFields.priority || ''}
+            onSave={(v) => handleFieldSave('priority', v)}
+            placeholder="1-10"
+          />
+          <EditableField
+            label="Venue"
+            value={extFields.venue || ''}
+            onSave={(v) => handleFieldSave('venue', v)}
+            placeholder="Target venue"
+          />
+          <EditableField
+            label="Blocked By"
+            value={extFields.blocked_by || ''}
+            onSave={(v) => handleFieldSave('blocked_by', v)}
+            placeholder="Nothing"
+          />
+        </div>
+        <div style={{ flex: 1, minWidth: 300, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <EditableField
+            label="Hypothesis"
+            value={extFields.hypothesis || ''}
+            onSave={(v) => handleFieldSave('hypothesis', v)}
+            type="textarea"
+            placeholder="Main research hypothesis"
+          />
+          <EditableField
+            label="Success Criteria"
+            value={extFields.criteria || ''}
+            onSave={(v) => handleFieldSave('criteria', v)}
+            type="textarea"
+            placeholder="How we know it worked"
+          />
+          <EditableField
+            label="Key Result"
+            value={extFields.key_result || ''}
+            onSave={(v) => handleFieldSave('key_result', v)}
+            type="textarea"
+            placeholder="Summary of findings"
+          />
+        </div>
+      </div>
+
+      {/* Middle: Phase Timeline */}
+      <div style={{ marginBottom: 24 }}>
+        <h2
+          style={{
+            fontFamily: FD,
+            fontSize: FS.lg,
+            fontWeight: 600,
+            color: T.text,
+            margin: '0 0 12px',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Experiment Phases
+        </h2>
+        <PhaseTimeline phases={phases} projectId={project.id} />
+      </div>
+
+      {/* Bottom: Research Notes */}
+      <ResearchNotes value={notes} onChange={handleNotesChange} />
     </div>
   )
 }

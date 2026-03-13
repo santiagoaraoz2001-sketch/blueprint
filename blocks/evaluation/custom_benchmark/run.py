@@ -105,9 +105,9 @@ def run(ctx):
     # ── Log metrics ───────────────────────────────────────────────────────
     for key, val in scores.items():
         if isinstance(val, (int, float)):
-            ctx.log_metric(key, float(round(val, 4)))
-    ctx.log_metric("num_samples", float(num_samples))
-    ctx.log_metric("passed", 1.0 if passed else 0.0)
+            ctx.log_metric(f"benchmark/{key}/score", float(round(val, 4)))
+    ctx.log_metric("benchmark/num_samples", float(num_samples))
+    ctx.log_metric("benchmark/passed", 1.0 if passed else 0.0)
     ctx.log_message(f"Result: {primary_metric}={primary_score:.4f} {'PASS' if passed else 'FAIL'}")
 
     # ── Build detailed report ─────────────────────────────────────────────

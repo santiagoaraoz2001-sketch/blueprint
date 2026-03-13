@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type View = 'dashboard' | 'editor' | 'results' | 'datasets' | 'data' | 'visualization' | 'marketplace' | 'settings' | 'paper' | 'help' | 'workshop' | 'inference' | 'monitor' | 'paper-detail'
+export type View = 'dashboard' | 'editor' | 'results' | 'datasets' | 'data' | 'visualization' | 'marketplace' | 'settings' | 'paper' | 'help' | 'workshop' | 'inference' | 'research' | 'research-detail' | 'monitor'
 
 interface UIState {
   activeView: View
@@ -23,7 +23,7 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  activeView: 'dashboard',
+  activeView: 'research',
   sidebarCollapsed: false,
   selectedProjectId: null,
   selectedPipelineId: null,
@@ -35,5 +35,5 @@ export const useUIStore = create<UIState>((set) => ({
   setSelectedPipeline: (id) => set({ selectedPipelineId: id }),
   setSelectedRunId: (id) => set({ selectedRunId: id }),
   navigateToMonitor: (runId) => set({ activeView: 'monitor', selectedRunId: runId ?? null }),
-  navigateToPaperDetail: (projectId) => set({ activeView: 'paper-detail', selectedPaperProjectId: projectId }),
+  navigateToPaperDetail: (projectId) => set({ activeView: 'research-detail', selectedProjectId: projectId, selectedPaperProjectId: projectId }),
 }))

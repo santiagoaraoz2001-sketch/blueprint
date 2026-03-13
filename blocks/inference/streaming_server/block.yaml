@@ -3,6 +3,8 @@ type: streaming_server
 category: inference
 description: Generate an OpenAI-compatible HTTP inference server configuration
 version: "1.0.0"
+deprecated: true
+deprecated_message: "Use LLM Inference block — streaming support built in."
 
 inputs:
   - id: model

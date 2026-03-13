@@ -16,7 +16,7 @@ import re
 
 
 def run(ctx):
-    provider = ctx.config.get("provider", "ollama")
+    provider = ctx.config.get("backend", ctx.config.get("provider", "ollama"))
     model_name = ctx.config.get("model_name", "llama3.2")
     output_schema = ctx.config.get("output_schema", '{"name": "string"}')
     user_prompt = ctx.config.get("user_prompt", "")

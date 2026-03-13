@@ -16,7 +16,7 @@ import os
 
 
 def run(ctx):
-    provider = ctx.config.get("provider", "openai")
+    provider = ctx.config.get("backend", ctx.config.get("provider", "openai"))
     model_name = ctx.config.get("model_name", "gpt-4o")
     prompt = ctx.config.get("prompt", "Describe this image in detail.")
     image_path = ctx.config.get("image_path", "")

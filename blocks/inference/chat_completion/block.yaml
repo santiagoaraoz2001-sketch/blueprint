@@ -3,6 +3,8 @@ type: chat_completion
 category: inference
 description: Multi-turn chat with system/user/assistant messages via any LLM provider
 version: "1.0.0"
+deprecated: true
+deprecated_message: "Use LLM Inference block with system_prompt and prompt inputs."
 
 inputs:
   - id: model

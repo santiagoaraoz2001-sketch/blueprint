@@ -1,9 +1,13 @@
-"""Chain of Thought — multi-step LLM reasoning with prompt chaining."""
+"""Chain of Thought — multi-step LLM reasoning with prompt chaining.
+
+Uses connected LLM Inference block for all model calls via shared utilities.
+"""
 
 import json
 import os
 import time
-from collections import Counter
+
+from blocks.inference._inference_utils import call_inference
 
 
 def run(ctx):
@@ -14,21 +18,24 @@ def run(ctx):
     self_consistency = int(ctx.config.get("self_consistency", 1))
     custom_steps_raw = ctx.config.get("custom_steps", "")
     output_mode = ctx.config.get("output_mode", "full_chain")
-    provider = ctx.config.get("provider", "ollama")
-    endpoint = ctx.config.get("endpoint", "http://localhost:11434")
 
-    # ── Load model info ─────────────────────────────────────────────────
-    model_name = ctx.config.get("model_name", "")
+    # ── Load LLM config from connected block ─────────────────────────
+    llm_config = None
     try:
-        model_info = ctx.load_input("model")
-        if isinstance(model_info, dict):
-            model_name = model_name or model_info.get(
-                "model_name", model_info.get("model_id", "")
-            )
-            provider = model_info.get("source", provider)
-            endpoint = model_info.get("endpoint", endpoint)
+        llm_config = ctx.load_input("llm")
     except (ValueError, Exception):
         pass
+
+    if llm_config and isinstance(llm_config, dict):
+        framework = llm_config.get("framework", "ollama")
+        model_name = llm_config.get("model", "")
+        inf_config = llm_config.get("config", {})
+        inf_config["max_tokens"] = max_tokens
+        inf_config["temperature"] = temperature
+    else:
+        framework = ""
+        model_name = ""
+        inf_config = {}
 
     # ── Load input ──────────────────────────────────────────────────────
     input_text = ""
@@ -52,10 +59,10 @@ def run(ctx):
     ctx.log_message(f"Chain of Thought: {num_steps} steps, {self_consistency} sample(s)")
     ctx.log_message(f"Input: {input_text[:100]}...")
 
-    # ── Check model availability ────────────────────────────────────────
-    use_real = _check_provider(provider, model_name, endpoint)
+    # ── Check if real inference is available ──────────────────────────
+    use_real = bool(llm_config and model_name)
     if not use_real:
-        ctx.log_message("Demo mode: simulating reasoning chain.")
+        ctx.log_message("Demo mode: no LLM connected or no model specified.")
 
     # ── Build step prompts ──────────────────────────────────────────────
     custom_prompts = [
@@ -98,9 +105,9 @@ def run(ctx):
 
             if use_real:
                 try:
-                    response = _call_model(
-                        provider, endpoint, model_name, prompt,
-                        temperature, max_tokens,
+                    response, _ = call_inference(
+                        framework, model_name, prompt,
+                        config=inf_config, log_fn=ctx.log_message,
                     )
                 except Exception as e:
                     response = f"[Error: {e}]"
@@ -129,7 +136,7 @@ def run(ctx):
     # ── Select final answer ─────────────────────────────────────────────
     if self_consistency > 1:
         final_answer = _majority_vote(all_chains)
-        ctx.log_message(f"Self-consistency: selected answer via majority vote")
+        ctx.log_message("Self-consistency: selected answer via majority vote")
     else:
         final_answer = all_chains[0]["final_answer"]
 
@@ -188,7 +195,7 @@ def run(ctx):
         "self_consistency_samples": self_consistency,
         "total_tokens": total_tokens,
         "model": model_name or "demo",
-        "provider": provider,
+        "framework": framework or "demo",
         "demo_mode": not use_real,
     }
     ctx.save_output("metrics", metrics)
@@ -231,77 +238,6 @@ def _default_step_prompts(num_steps):
     return prompts
 
 
-def _check_provider(provider, model_name, endpoint):
-    """Check if an LLM provider is reachable."""
-    if not model_name:
-        return False
-    if provider == "ollama":
-        try:
-            import urllib.request
-            with urllib.request.urlopen(f"{endpoint.rstrip('/')}/api/tags", timeout=5):
-                return True
-        except Exception:
-            return False
-    if provider == "openai":
-        return bool(os.environ.get("OPENAI_API_KEY"))
-    if provider == "anthropic":
-        return bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return False
-
-
-def _call_model(provider, endpoint, model, prompt, temperature, max_tokens):
-    """Call the configured LLM provider."""
-    import urllib.request
-
-    if provider == "ollama":
-        url = f"{endpoint.rstrip('/')}/api/generate"
-        payload = json.dumps({
-            "model": model,
-            "prompt": prompt,
-            "options": {"temperature": temperature, "num_predict": max_tokens},
-            "stream": False,
-        }).encode()
-        req = urllib.request.Request(
-            url, data=payload, headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            return json.loads(resp.read().decode()).get("response", "")
-
-    if provider == "openai":
-        url = "https://api.openai.com/v1/chat/completions"
-        payload = json.dumps({
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }).encode()
-        req = urllib.request.Request(url, data=payload, headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
-        })
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.loads(resp.read().decode())
-            return data["choices"][0]["message"]["content"]
-
-    if provider == "anthropic":
-        url = "https://api.anthropic.com/v1/messages"
-        payload = json.dumps({
-            "model": model,
-            "max_tokens": max_tokens,
-            "messages": [{"role": "user", "content": prompt}],
-        }).encode()
-        req = urllib.request.Request(url, data=payload, headers={
-            "Content-Type": "application/json",
-            "x-api-key": os.environ["ANTHROPIC_API_KEY"],
-            "anthropic-version": "2023-06-01",
-        })
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.loads(resp.read().decode())
-            return data["content"][0]["text"]
-
-    raise ValueError(f"Unsupported provider: {provider}")
-
-
 def _simulate_step(step_idx, num_steps, input_text):
     """Generate plausible demo reasoning for a step."""
     preview = input_text[:50].replace("\n", " ")
@@ -331,7 +267,6 @@ def _majority_vote(chains):
     if len(answers) <= 1:
         return answers[0] if answers else ""
 
-    # Use keyword-based similarity: pick the answer most similar to all others
     def keywords(text):
         return set(text.lower().split())
 

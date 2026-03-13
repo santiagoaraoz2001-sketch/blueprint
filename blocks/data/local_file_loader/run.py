@@ -65,6 +65,11 @@ def run(ctx):
 
     rows = []
 
+    # Determine total lines for progress reporting (estimate for large files)
+    _file_size = os.path.getsize(file_path)
+    _est_total = max_rows if max_rows > 0 else max(1, _file_size // 100)  # rough estimate
+    _progress_interval = max(1000, _est_total // 10)  # every 1000 rows or 10%
+
     if fmt in ("csv", "tsv"):
         sep = "\t" if fmt == "tsv" else delimiter
         with open(file_path, "r", encoding=encoding) as f:
@@ -82,6 +87,8 @@ def run(ctx):
                 if i < skip_rows:
                     continue
                 rows.append(row)
+                if len(rows) % _progress_interval == 0:
+                    ctx.report_progress(len(rows), _est_total)
                 if max_rows > 0 and len(rows) >= max_rows:
                     break
 
@@ -95,7 +102,13 @@ def run(ctx):
             if not isinstance(all_rows, list):
                 all_rows = [all_rows]
         else:
-            all_rows = [json.loads(line) for line in content.splitlines() if line.strip()]
+            lines = content.splitlines()
+            all_rows = []
+            for idx, line in enumerate(lines):
+                if line.strip():
+                    all_rows.append(json.loads(line))
+                if (idx + 1) % _progress_interval == 0:
+                    ctx.report_progress(idx + 1, len(lines))
 
         # Apply skip_rows and max_rows
         all_rows = all_rows[skip_rows:]
@@ -138,7 +151,11 @@ def run(ctx):
         lines = lines[skip_rows:]
         if max_rows > 0:
             lines = lines[:max_rows]
-        rows = [{"line_number": i + 1, "text": line.rstrip("\n\r")} for i, line in enumerate(lines)]
+        rows = []
+        for i, line in enumerate(lines):
+            rows.append({"line_number": i + 1, "text": line.rstrip("\n\r")})
+            if (i + 1) % _progress_interval == 0:
+                ctx.report_progress(i + 1, len(lines))
 
     else:
         ctx.log_message(f"WARNING: Unknown format '{fmt}', falling back to CSV")

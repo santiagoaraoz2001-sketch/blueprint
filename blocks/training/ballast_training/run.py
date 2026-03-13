@@ -215,10 +215,10 @@ def _run_real_training(
     class BallastCallback(TrainerCallback):
         def on_log(self, args, state, control, logs=None, **kwargs):
             if logs and "loss" in logs:
-                ctx.log_metric("train_loss", round(float(logs["loss"]), 4), state.global_step)
+                ctx.log_metric("train/loss", round(float(logs["loss"]), 4), state.global_step)
                 ctx.log_message(f"  Step {state.global_step} -- loss: {logs['loss']:.4f}")
             if logs and "eval_loss" in logs:
-                ctx.log_metric("eval_loss", round(float(logs["eval_loss"]), 4), state.global_step)
+                ctx.log_metric("eval/loss", round(float(logs["eval_loss"]), 4), state.global_step)
                 ctx.log_message(f"  Eval loss: {logs['eval_loss']:.4f}")
             if state.max_steps > 0:
                 ctx.report_progress(state.global_step, state.max_steps)
@@ -257,8 +257,8 @@ def _run_real_training(
         json.dump(ballast_meta, f, indent=2)
 
     final_loss = round(float(result.training_loss), 4)
-    ctx.log_metric("final_loss", final_loss)
-    ctx.log_metric("epochs_completed", float(epochs))
+    ctx.log_metric("train/loss", final_loss)
+    ctx.log_metric("train/epochs_completed", float(epochs))
     ctx.log_message(f"BALLAST training complete. Final loss: {final_loss}")
 
     ctx.save_output("model", output_dir)

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db, SessionLocal
 from ..models.pipeline import Pipeline
 from ..models.run import Run
-from ..engine.executor import execute_pipeline
+from ..engine.executor import execute_pipeline, request_cancel
 from ..engine.validator import validate_pipeline
 
 router = APIRouter(prefix="/api", tags=["execution"])
@@ -42,13 +42,37 @@ def start_pipeline_run(pipeline_id: str, db: Session = Depends(get_db)):
 
 @router.post("/runs/{run_id}/stop")
 def stop_run(run_id: str, db: Session = Depends(get_db)):
+    """Legacy stop endpoint — delegates to cancel."""
     run = db.query(Run).filter(Run.id == run_id).first()
     if not run:
         raise HTTPException(404, "Run not found")
-    run.status = "failed"
-    run.error_message = "Stopped by user"
-    db.commit()
-    return {"status": "stopped"}
+    request_cancel(run_id)
+    return {"status": "cancelling"}
+
+
+@router.post("/runs/{run_id}/cancel")
+def cancel_run(run_id: str, db: Session = Depends(get_db)):
+    """Signal a running pipeline to cancel. Returns immediately."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    if run.status not in ("running", "pending"):
+        raise HTTPException(400, f"Run is already {run.status}")
+    request_cancel(run_id)
+    return {"status": "cancelling", "run_id": run_id}
+
+
+@router.get("/runs/{run_id}/outputs")
+def get_run_outputs(run_id: str, db: Session = Depends(get_db)):
+    """Get partial or complete outputs for a run."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    return {
+        "run_id": run_id,
+        "status": run.status,
+        "outputs": run.outputs_snapshot or {},
+    }
 
 
 @router.post("/pipelines/{pipeline_id}/validate")

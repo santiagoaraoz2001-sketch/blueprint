@@ -20,9 +20,9 @@ import WorkshopView from '@/views/WorkshopView'
 import InferenceView from '@/views/InferenceView'
 import DataView from '@/views/DataView'
 import VisualizationView from '@/views/VisualizationView'
-import MonitorView from '@/views/MonitorView'
 import ResearchDashboardView from '@/views/ResearchDashboardView'
 import PaperDetailView from '@/views/PaperDetailView'
+import MonitorView from '@/views/MonitorView'
 
 // Lazy-loaded views
 const HelpView = lazy(() => import('@/views/HelpView'))
@@ -40,9 +40,9 @@ const viewComponents: Record<string, React.ComponentType> = {
   settings: SettingsView,
   paper: PaperView,
   help: HelpView,
+  research: ResearchDashboardView,
+  'research-detail': PaperDetailView,
   monitor: MonitorView,
-  'research-dashboard': ResearchDashboardView,
-  'paper-detail': PaperDetailView,
 }
 
 function ViewTransition({ viewKey, children }: { viewKey: string; children: React.ReactNode }) {
@@ -106,7 +106,7 @@ export default function App() {
     injectThemeCSSVars(theme)
   }, [theme])
 
-  const ViewComponent = viewComponents[activeView] || DashboardView
+  const ViewComponent = viewComponents[activeView] || ResearchDashboardView
 
   return (
     <SplashScreen>

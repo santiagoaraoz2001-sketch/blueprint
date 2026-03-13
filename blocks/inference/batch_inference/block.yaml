@@ -3,6 +3,8 @@ type: batch_inference
 category: inference
 description: Run model inference on every row of a dataset
 version: "1.0.0"
+deprecated: true
+deprecated_message: "Use LLM Inference block with a dataset input instead."
 
 inputs:
   - id: dataset

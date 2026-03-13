@@ -3,6 +3,8 @@ type: function_calling
 category: inference
 description: LLM with tool/function definitions for structured actions
 version: "1.0.0"
+deprecated: true
+deprecated_message: "Use Agent Orchestrator with Tool Registry for function calling."
 
 inputs:
   - id: model
