@@ -1,6 +1,7 @@
-import { useEffect, useRef, useCallback } from 'react'
-import { useSSE } from './useSSE'
+import { useEffect, useRef } from 'react'
+import { sseManager } from '@/services/sseManager'
 import { useMetricsStore } from '@/stores/metricsStore'
+import { useRunStore } from '@/stores/runStore'
 import { api } from '@/api/client'
 
 const SYSTEM_POLL_INTERVAL = 5000
@@ -19,36 +20,26 @@ export function useDashboardMonitor(_opts?: { enabled?: boolean }) {
 }
 
 export function useRunMonitor(runId: string | null): UseRunMonitorResult {
-  const connectedRef = useRef(false)
   const systemTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const handleEvent = useCallback(
-    (event: string, data: any) => {
-      if (!runId) return
-      connectedRef.current = true
+  // Subscribe to SSE events via the shared manager (metrics-specific handling)
+  useEffect(() => {
+    if (!runId) return
 
-      // Initialize run in store if not present
+    const unsubscribe = sseManager.subscribe(runId, (event, data) => {
+      // Skip internal meta-events — runStore handles those
+      if (event.startsWith('__sse_')) return
+
       const store = useMetricsStore.getState()
       if (!store.runs[runId]) {
         store.initRun(runId)
       }
 
       store.handleEvent(runId, event, data)
-    },
-    [runId]
-  )
+    })
 
-  const handleError = useCallback(() => {
-    connectedRef.current = false
-  }, [])
-
-  const sseUrl = runId ? `/api/events/runs/${runId}` : null
-
-  useSSE(sseUrl, {
-    onEvent: handleEvent,
-    onError: handleError,
-    enabled: !!runId,
-  })
+    return () => unsubscribe()
+  }, [runId])
 
   // Poll system hardware metrics while run is active
   useEffect(() => {
@@ -135,11 +126,12 @@ export function useRunMonitor(runId: string | null): UseRunMonitorResult {
     loadRunMeta()
   }, [runId])
 
-  // Read current state from store
+  // Read current state from stores
   const run = useMetricsStore((s) => (runId ? s.runs[runId] : null))
+  const sseStatus = useRunStore((s) => s.sseStatus)
 
   return {
-    isConnected: connectedRef.current,
+    isConnected: sseStatus === 'connected',
     activeBlockId: run?.activeBlockId ?? null,
     overallProgress: run?.overallProgress ?? 0,
     eta: run?.eta ?? null,
