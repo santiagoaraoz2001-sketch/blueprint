@@ -20,11 +20,11 @@ outputs:
   - id: scores
     label: Scores
     data_type: metrics
-    description: Aggregate: user-defined score keys aggregated by chosen method (mean/median/min/max/sum)
+    description: 'Aggregate: user-defined score keys aggregated by chosen method (mean/median/min/max/sum)'
   - id: report
     label: Detailed Report
     data_type: artifact
-    description: eval_report.json: aggregate_method, total_samples, aggregated_scores, per-sample details
+    description: 'eval_report.json: aggregate_method, total_samples, aggregated_scores, per-sample details'
 
   - id: dataset
     label: Scored Samples
