@@ -16,7 +16,7 @@ import random
 
 
 def run(ctx):
-    provider = ctx.config.get("backend", "ollama")
+    provider = ctx.config.get("backend", ctx.config.get("provider", "ollama"))
     model_name = ctx.config.get("model_name", "llama3.2")
     num_examples = int(ctx.config.get("num_examples", 3))
     input_column = ctx.config.get("input_column", "input")

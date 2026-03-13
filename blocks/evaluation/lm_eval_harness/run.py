@@ -70,10 +70,9 @@ def run(ctx):
     try:
         import lm_eval
     except ImportError:
-        raise ImportError(
-            "lm-eval not installed. Install with: pip install lm-eval\n"
-            "For vLLM backend: pip install lm-eval[vllm]"
-        )
+        ctx.log_message("lm-eval not installed; running in plan-only fallback mode")
+        _run_fallback(ctx, model_name, model_backend, tasks, num_fewshot, batch_size, device, limit)
+        return
 
     ctx.report_progress(0, len(tasks))
 
@@ -128,7 +127,7 @@ def run(ctx):
             if stderr is not None:
                 entry["acc_stderr"] = round(stderr, 4)
             task_results[task_name] = entry
-            ctx.log_metric(f"{task_name}_acc", round(acc, 4))
+            ctx.log_metric(f"benchmark/{task_name}/acc", round(acc, 4))
             msg = f"  {task_name}: acc={acc:.4f}"
             if stderr is not None:
                 msg += f" (±{stderr:.4f})"
@@ -138,7 +137,7 @@ def run(ctx):
     all_accs = [v["acc"] for v in task_results.values()]
     avg_acc = round(sum(all_accs) / len(all_accs), 4) if all_accs else 0.0
     task_results["_average_acc"] = avg_acc
-    ctx.log_metric("average_acc", avg_acc)
+    ctx.log_metric("benchmark/average/acc", avg_acc)
 
     ctx.report_progress(len(tasks), len(tasks))
 
@@ -160,6 +159,51 @@ def run(ctx):
     ctx.save_output("metrics", task_results)
     ctx.save_output("results", results_path)
     ctx.log_message(f"Evaluation complete: {len(task_results) - 1} tasks, avg acc={avg_acc:.4f}")
+
+
+def _run_fallback(ctx, model_name, model_backend, tasks, num_fewshot, batch_size, device, limit):
+    """Plan-only fallback when lm-eval is not installed.
+
+    Generates a benchmark plan with task list, model config, and
+    instructions for installing lm-eval.
+    """
+    ctx.log_message("Generating benchmark plan (lm-eval not available)")
+
+    benchmark_plan = {
+        "model": model_name,
+        "backend": model_backend,
+        "status": "plan_only",
+        "message": (
+            "lm-eval is not installed. This plan describes the benchmark that would run. "
+            "Install with: pip install lm-eval"
+        ),
+        "tasks": tasks,
+        "num_fewshot": num_fewshot,
+        "batch_size": batch_size,
+        "device": device,
+        "limit": limit,
+        "expected_metrics": {task: {"acc": "pending"} for task in tasks},
+        "requirements": [
+            "pip install lm-eval",
+            f"For vLLM backend: pip install lm-eval[vllm]",
+            f"Model: {model_name}",
+            f"Backend: {model_backend}",
+        ],
+    }
+
+    results_path = os.path.join(ctx.run_dir, "benchmark_plan.json")
+    with open(results_path, "w") as f:
+        json.dump(benchmark_plan, f, indent=2)
+
+    ctx.save_artifact("benchmark_plan", results_path)
+
+    ctx.log_message(f"Tasks: {', '.join(tasks)}")
+    ctx.log_message(f"Benchmark plan saved to {results_path}")
+    ctx.log_message("Install lm-eval to execute actual evaluation")
+
+    ctx.save_output("metrics", {"status": "plan_only", "tasks": tasks})
+    ctx.save_output("results", results_path)
+    ctx.report_progress(1, 1)
 
 
 def _detect_device():

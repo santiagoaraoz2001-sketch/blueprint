@@ -16,7 +16,7 @@ def run(ctx):
     host = ctx.config.get("host", "0.0.0.0")
     port = int(ctx.config.get("port", 8080))
     model_name = ctx.config.get("model_name", "")
-    provider = ctx.config.get("backend", "ollama")
+    provider = ctx.config.get("backend", ctx.config.get("provider", "ollama"))
     endpoint = ctx.config.get("endpoint", "http://localhost:11434")
     max_concurrent = int(ctx.config.get("max_concurrent", 4))
     cors_enabled = ctx.config.get("cors_enabled", True)

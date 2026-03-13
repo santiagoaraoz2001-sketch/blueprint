@@ -17,7 +17,7 @@ import time
 
 def run(ctx):
     dataset_input = ctx.load_input("dataset")
-    provider = ctx.config.get("backend", "ollama")
+    provider = ctx.config.get("backend", ctx.config.get("provider", "ollama"))
     model_name = ctx.config.get("model_name", "")
     text_column = ctx.config.get("text_column", "text")
     prompt_template = ctx.config.get("prompt_template", "{text}")
