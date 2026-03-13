@@ -1,35 +1,43 @@
+import logging
 import os
+import threading
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone, timedelta
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database import init_db
+from .database import init_db, SessionLocal
 from .config import ensure_dirs
+from .models.run import Run, LiveRun
+from .utils.structured_logger import (
+    init_structured_logging, log_recovery, log_event,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference
 
+_recovery_logger = logging.getLogger("blueprint.recovery")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    ensure_dirs()
-    init_db()
+# Configurable heartbeat timeout (seconds). Default: 5 minutes.
+HEARTBEAT_TIMEOUT = int(os.environ.get("BLUEPRINT_HEARTBEAT_TIMEOUT", "300"))
 
-    # Recover stale runs from previous crash
+# Periodic recovery check interval (seconds). Default: 2 minutes.
+RECOVERY_CHECK_INTERVAL = int(os.environ.get("BLUEPRINT_RECOVERY_INTERVAL", "120"))
+
+_recovery_stop = threading.Event()
+
+
+def _recover_stale_runs():
+    """Find running runs with stale heartbeats and mark them as failed."""
+    session = SessionLocal()
     try:
-        from datetime import datetime, timezone, timedelta
-        from .database import SessionLocal
-        from .models.run import Run, LiveRun
-        import logging
-        _recovery_logger = logging.getLogger("blueprint.recovery")
-        session = SessionLocal()
-        stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+        stale_cutoff = datetime.now(timezone.utc) - timedelta(seconds=HEARTBEAT_TIMEOUT)
         stale_runs = session.query(Run).filter(Run.status == "running").all()
-        recovered = 0
+        recovered_ids = []
         for stale_run in stale_runs:
             if stale_run.last_heartbeat is None or stale_run.last_heartbeat < stale_cutoff:
+                original_status = stale_run.status
                 stale_run.status = "failed"
                 stale_run.error_message = "Recovered: process terminated unexpectedly"
                 stale_run.finished_at = datetime.now(timezone.utc)
@@ -37,19 +45,63 @@ async def lifespan(app: FastAPI):
                 live = session.query(LiveRun).filter(LiveRun.run_id == stale_run.id).first()
                 if live:
                     live.status = "failed"
-                recovered += 1
-        if recovered:
+                log_recovery(stale_run.id, original_status)
+                recovered_ids.append(stale_run.id)
+        if recovered_ids:
             session.commit()
-            _recovery_logger.info("Recovered %d stale run(s) from previous session", recovered)
-        session.close()
+            _recovery_logger.info("Recovered %d stale run(s)", len(recovered_ids))
+            # Notify connected frontends via SSE
+            try:
+                from .routers.events import publish_event
+                for run_id in recovered_ids:
+                    publish_event(run_id, "run_failed", {
+                        "run_id": run_id,
+                        "error": "Recovered: process terminated unexpectedly",
+                    })
+            except Exception:
+                pass  # SSE notification is best-effort
     except Exception as e:
-        import logging
-        logging.getLogger("blueprint.recovery").warning("Stale run recovery failed: %s", e)
+        try:
+            session.rollback()
+        except Exception:
+            pass
+        _recovery_logger.warning("Stale run recovery failed: %s", e)
+    finally:
+        session.close()
+
+
+def _periodic_recovery_loop():
+    """Background thread that checks for stale runs every RECOVERY_CHECK_INTERVAL seconds."""
+    while not _recovery_stop.is_set():
+        _recovery_stop.wait(RECOVERY_CHECK_INTERVAL)
+        if _recovery_stop.is_set():
+            break
+        try:
+            _recover_stale_runs()
+        except Exception as e:
+            _recovery_logger.warning("Periodic recovery check failed: %s", e)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    ensure_dirs()
+    init_db()
+    init_structured_logging()
+    log_event("server_start", message="Blueprint server starting",
+              data={"heartbeat_timeout_s": HEARTBEAT_TIMEOUT})
+
+    # Recover stale runs from previous crash
+    _recover_stale_runs()
+
+    # Start periodic stale-run recovery thread
+    _recovery_stop.clear()
+    recovery_thread = threading.Thread(target=_periodic_recovery_loop, daemon=True)
+    recovery_thread.start()
 
     # Start background model directory watcher
     try:
         from .utils.model_watcher import start_watcher
-        import logging
         _logger = logging.getLogger(__name__)
         start_watcher(
             on_change=lambda models: _logger.info("Model watcher: %d models detected", len(models)),
@@ -59,6 +111,8 @@ async def lifespan(app: FastAPI):
         pass  # Non-critical — watcher is a convenience feature
     yield
     # Shutdown
+    log_event("server_stop", message="Blueprint server shutting down")
+    _recovery_stop.set()
     try:
         from .routers.execution import shutdown_executor
         shutdown_executor()

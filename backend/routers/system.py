@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import json
 import re
 import subprocess
 import sys
@@ -13,7 +14,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Query, HTTPException
 
-from ..config import BUILTIN_BLOCKS_DIR, BLOCKS_DIR
+from ..config import BASE_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR
 
 SAFE_MODEL_ID = re.compile(r'^[a-zA-Z0-9_\-./]+$')
 
@@ -308,3 +309,77 @@ def install_packages(body: dict):
         return {'success': False, 'error': 'Installation timed out after 5 minutes'}
     except Exception as e:
         return {'success': False, 'error': str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Run Diagnostics
+# ---------------------------------------------------------------------------
+
+SAFE_RUN_ID = re.compile(r'^[a-zA-Z0-9_\-]+$')
+
+# Maximum events returned per diagnostics query to prevent unbounded memory use.
+_MAX_DIAGNOSTICS_EVENTS = 5000
+
+
+def _iter_log_files(log_dir: Path) -> list[Path]:
+    """Return all structured log files in chronological order (oldest first).
+
+    Includes rotated backups (blueprint.jsonl.1, .2, etc.) so that events
+    from older rotations are not lost.
+    """
+    main_file = log_dir / "blueprint.jsonl"
+    # Rotated files: blueprint.jsonl.1 (newest backup) ... blueprint.jsonl.5 (oldest)
+    backups = sorted(
+        log_dir.glob("blueprint.jsonl.[0-9]*"),
+        key=lambda p: int(p.suffix.lstrip(".")),
+        reverse=True,  # highest number = oldest, read oldest first
+    )
+    files = []
+    for f in backups:
+        if f.is_file():
+            files.append(f)
+    if main_file.is_file():
+        files.append(main_file)
+    return files
+
+
+@router.get("/diagnostics/{run_id}")
+def get_run_diagnostics(run_id: str):
+    """Parse structured logs for a specific run — shows timeline of events."""
+    if not SAFE_RUN_ID.match(run_id):
+        raise HTTPException(400, "Invalid run ID")
+
+    log_dir = BASE_DIR / "logs"
+    log_files = _iter_log_files(log_dir) if log_dir.is_dir() else []
+    if not log_files:
+        return {"events": [], "error": "No log file found"}
+
+    events = []
+    truncated = False
+    for log_file in log_files:
+        try:
+            with open(log_file) as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line)
+                        if entry.get("run_id") == run_id:
+                            events.append(entry)
+                            if len(events) >= _MAX_DIAGNOSTICS_EVENTS:
+                                truncated = True
+                                break
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        continue
+        except OSError:
+            continue  # File may have been rotated away between glob and open
+        if truncated:
+            break
+
+    result = {
+        "run_id": run_id,
+        "events": events,
+        "event_count": len(events),
+    }
+    if truncated:
+        result["truncated"] = True
+        result["max_events"] = _MAX_DIAGNOSTICS_EVENTS
+    return result
