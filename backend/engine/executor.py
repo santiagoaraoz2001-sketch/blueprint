@@ -528,6 +528,17 @@ async def execute_pipeline(
         live.overall_progress = 1.0
         db.commit()
 
+        # Auto-generate run export JSON (never crashes execution)
+        try:
+            from .run_export import generate_run_export
+            export = generate_run_export(run, ARTIFACTS_DIR)
+            export_path = ARTIFACTS_DIR / run_id / "run-export.json"
+            export_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(export_path, "w") as f:
+                json.dump(export, f, indent=2)
+        except Exception:
+            pass
+
         # Auto-lifecycle: update phase/project counters (never crashes execution)
         try:
             from ..services.project_lifecycle import on_run_completed

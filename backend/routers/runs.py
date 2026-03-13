@@ -216,6 +216,40 @@ def get_artifact(run_id: str, filename: str, db: Session = Depends(get_db)):
     return FileResponse(str(file_path), filename=filename)
 
 
+@router.get("/{run_id}/export")
+def get_run_export(run_id: str, db: Session = Depends(get_db)):
+    """Get the structured export for a run."""
+    from ..engine.run_export import generate_run_export
+
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    return generate_run_export(run, ARTIFACTS_DIR)
+
+
+@router.get("/{run_id}/export/download")
+def download_run_export(run_id: str, db: Session = Depends(get_db)):
+    """Download run-export.json as a file."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    # Use the validated run.id (from DB) to construct the path, not raw input
+    export_path = ARTIFACTS_DIR / run.id / "run-export.json"
+
+    # Prevent path traversal
+    try:
+        export_path.resolve().relative_to(ARTIFACTS_DIR.resolve())
+    except ValueError:
+        raise HTTPException(400, "Invalid run ID")
+
+    if not export_path.exists():
+        raise HTTPException(404, "Export not yet generated")
+
+    from fastapi.responses import FileResponse
+    return FileResponse(str(export_path), filename=f"blueprint-run-{run.id[:8]}.json")
+
+
 @router.post("/{run_id}/clone-pipeline", response_model=PipelineResponse)
 def clone_pipeline_from_run(run_id: str, db: Session = Depends(get_db)):
     """Create a new pipeline from a run's config_snapshot."""
