@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      port: parseInt(env.VITE_PORT || '5173', 10),
+      port: parseInt(process.env.PORT || env.VITE_PORT || '5173', 10),
       proxy: {
         '/api': {
           target: env.VITE_API_TARGET || 'http://127.0.0.1:8000',

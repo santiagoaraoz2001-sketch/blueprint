@@ -173,6 +173,49 @@ def assign_run(run_id: str, data: AssignRequest, db: Session = Depends(get_db)):
     return {"status": "assigned", "run_id": run_id, "experiment_phase_id": data.experiment_phase_id}
 
 
+@router.get("/{run_id}/artifacts")
+def list_artifacts(run_id: str, db: Session = Depends(get_db)):
+    """List files in a run's artifact directory."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    artifact_dir = ARTIFACTS_DIR / run_id
+    if not artifact_dir.exists():
+        return []
+
+    files = []
+    for f in sorted(artifact_dir.iterdir()):
+        if f.is_file():
+            files.append({
+                "name": f.name,
+                "size": f.stat().st_size,
+                "modified": f.stat().st_mtime,
+            })
+    return files
+
+
+@router.get("/{run_id}/artifacts/{filename}")
+def get_artifact(run_id: str, filename: str, db: Session = Depends(get_db)):
+    """Download a specific artifact file."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    file_path = ARTIFACTS_DIR / run_id / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(404, "Artifact not found")
+
+    # Prevent path traversal
+    try:
+        file_path.resolve().relative_to((ARTIFACTS_DIR / run_id).resolve())
+    except ValueError:
+        raise HTTPException(400, "Invalid file path")
+
+    from fastapi.responses import FileResponse
+    return FileResponse(str(file_path), filename=filename)
+
+
 @router.post("/{run_id}/clone-pipeline", response_model=PipelineResponse)
 def clone_pipeline_from_run(run_id: str, db: Session = Depends(get_db)):
     """Create a new pipeline from a run's config_snapshot."""
