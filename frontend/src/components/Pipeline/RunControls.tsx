@@ -54,6 +54,8 @@ export default function RunControls() {
     }
   }, [isRunning])
 
+  const [showTraceback, setShowTraceback] = useState(false)
+
   // Reset node statuses when run completes
   useEffect(() => {
     if (status === 'complete') {
@@ -61,6 +63,8 @@ export default function RunControls() {
     } else if (status === 'failed') {
       const error = useRunStore.getState().error
       toast.error(error || 'Pipeline run failed')
+    } else if (status === 'cancelled') {
+      toast('Pipeline run cancelled', { icon: '\u26A0\uFE0F' })
     }
   }, [status])
 
@@ -242,6 +246,38 @@ export default function RunControls() {
             {Math.round(overallProgress * 100)}%
           </span>
         </div>
+      )}
+
+      {/* Status badge for failed/cancelled (GAP 13) */}
+      {status === 'failed' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 4 }}>
+          <span style={{
+            padding: '1px 6px', background: `${T.red}14`, border: `1px solid ${T.red}33`,
+            fontFamily: F, fontSize: FS.xxs, color: T.red, fontWeight: 600, letterSpacing: '0.08em',
+          }}>
+            FAILED
+          </span>
+          {useRunStore.getState().error && (
+            <button
+              onClick={() => setShowTraceback(!showTraceback)}
+              style={{
+                padding: '1px 6px', background: 'transparent', border: `1px solid ${T.border}`,
+                fontFamily: F, fontSize: FS.xxs, color: T.dim, cursor: 'pointer',
+              }}
+            >
+              {showTraceback ? 'HIDE' : 'DETAILS'}
+            </button>
+          )}
+        </div>
+      )}
+      {status === 'cancelled' && (
+        <span style={{
+          padding: '1px 6px', background: '#F59E0B14', border: '1px solid #F59E0B33',
+          fontFamily: F, fontSize: FS.xxs, color: '#F59E0B', fontWeight: 600,
+          letterSpacing: '0.08em', marginRight: 4,
+        }}>
+          CANCELLED
+        </span>
       )}
 
       {!isRunning ? (
@@ -550,6 +586,22 @@ export default function RunControls() {
 
       {/* Pipeline Analysis Panel */}
       <PipelineAnalysisPanel open={showAnalysis} onClose={() => setShowAnalysis(false)} />
+
+      {/* Traceback expansion (GAP 13) */}
+      {showTraceback && status === 'failed' && useRunStore.getState().error && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+          marginTop: 4, padding: 10, background: T.surface1,
+          border: `1px solid ${T.red}33`, maxHeight: 200, overflow: 'auto',
+        }}>
+          <pre style={{
+            fontFamily: F, fontSize: FS.xxs, color: T.red,
+            whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0,
+          }}>
+            {useRunStore.getState().error}
+          </pre>
+        </div>
+      )}
     </div>
   )
 }
