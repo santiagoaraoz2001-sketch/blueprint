@@ -1,10 +1,15 @@
-"""Code Agent — generate code solutions and optionally execute them."""
+"""Code Agent — generate code solutions and optionally execute them.
+
+Uses connected LLM Inference block for all model calls via shared utilities.
+"""
 
 import json
 import os
 import subprocess
 import tempfile
 import time
+
+from blocks.inference._inference_utils import call_inference
 
 
 LANG_EXTENSIONS = {
@@ -28,26 +33,28 @@ def run(ctx):
     execute = ctx.config.get("execute", False)
     timeout = int(ctx.config.get("timeout", 30))
     max_iterations = int(ctx.config.get("max_iterations", 1))
-    provider = ctx.config.get("provider", "ollama")
-    endpoint = ctx.config.get("endpoint", "http://localhost:11434")
-
     system_prompt = ctx.config.get("system_prompt", "")
 
     if isinstance(execute, str):
         execute = execute.lower() in ("true", "1", "yes")
 
-    # ── Load model info ─────────────────────────────────────────────────
-    model_name = ctx.config.get("model_name", "")
+    # ── Load LLM config from connected block ─────────────────────────
+    llm_config = None
     try:
-        model_info = ctx.load_input("model")
-        if isinstance(model_info, dict):
-            model_name = model_name or model_info.get(
-                "model_name", model_info.get("model_id", "")
-            )
-            provider = model_info.get("source", provider)
-            endpoint = model_info.get("endpoint", endpoint)
+        llm_config = ctx.load_input("llm")
     except (ValueError, Exception):
         pass
+
+    if llm_config and isinstance(llm_config, dict):
+        framework = llm_config.get("framework", "ollama")
+        model_name = llm_config.get("model", "")
+        inf_config = llm_config.get("config", {})
+        inf_config["max_tokens"] = 2048
+        inf_config["temperature"] = 0.1
+    else:
+        framework = ""
+        model_name = ""
+        inf_config = {}
 
     # ── Load task ───────────────────────────────────────────────────────
     task = ctx.config.get("task", "")
@@ -77,10 +84,10 @@ def run(ctx):
     ctx.log_message(f"Code Agent: generating {language} code")
     ctx.log_message(f"Task: {task[:100]}...")
 
-    # ── Check model availability ────────────────────────────────────────
-    use_real = _check_provider(provider, model_name, endpoint)
+    # ── Check if real inference is available ──────────────────────────
+    use_real = bool(llm_config and model_name)
     if not use_real:
-        ctx.log_message("Demo mode: generating sample code.")
+        ctx.log_message("Demo mode: no LLM connected or no model specified.")
 
     # ── Generate (with optional retry loop) ─────────────────────────────
     generated_code = ""
@@ -96,8 +103,8 @@ def run(ctx):
         # Generate code
         if use_real:
             generated_code = _generate_code(
-                provider, endpoint, model_name, task, language, error_context,
-                system_prompt, context_text,
+                framework, model_name, inf_config,
+                task, language, error_context, system_prompt, context_text,
             )
         else:
             generated_code = _demo_code(task, language)
@@ -136,10 +143,8 @@ def run(ctx):
     with open(code_path, "w") as f:
         f.write(generated_code)
 
-    # Always save raw code as artifact
     ctx.save_output("artifact", code_path)
 
-    # Apply output format for text output
     output_format = ctx.config.get("output_format", "raw")
     if output_format == "markdown":
         formatted = f"```{language}\n{generated_code}\n```"
@@ -185,7 +190,7 @@ def run(ctx):
         "execution_success": execution_success if execute else None,
         "iterations_used": iterations_used,
         "model": model_name or "demo",
-        "provider": provider,
+        "framework": framework or "demo",
     }
     ctx.save_output("metrics", metrics)
     for k, v in metrics.items():
@@ -199,27 +204,8 @@ def run(ctx):
 # ── Helpers ─────────────────────────────────────────────────────────────
 
 
-def _check_provider(provider, model_name, endpoint):
-    if not model_name:
-        return False
-    if provider == "ollama":
-        try:
-            import urllib.request
-            with urllib.request.urlopen(f"{endpoint.rstrip('/')}/api/tags", timeout=5):
-                return True
-        except Exception:
-            return False
-    if provider == "openai":
-        return bool(os.environ.get("OPENAI_API_KEY"))
-    if provider == "anthropic":
-        return bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return False
-
-
-def _generate_code(provider, endpoint, model_name, task, language, error_context, system_prompt="", context_text=""):
-    """Generate code using an LLM."""
-    import urllib.request
-
+def _generate_code(framework, model_name, inf_config, task, language, error_context, system_prompt="", context_text=""):
+    """Generate code using the connected LLM."""
     if system_prompt:
         prompt = f"{system_prompt}\n\n"
     else:
@@ -234,65 +220,13 @@ def _generate_code(provider, endpoint, model_name, task, language, error_context
         prompt += f"\n{error_context}\n"
     prompt += "\nCode:"
 
-    if provider == "ollama":
-        url = f"{endpoint.rstrip('/')}/api/generate"
-        payload = json.dumps({
-            "model": model_name,
-            "prompt": prompt,
-            "options": {"temperature": 0.1, "num_predict": 2048},
-            "stream": False,
-        }).encode()
-        req = urllib.request.Request(
-            url, data=payload, headers={"Content-Type": "application/json"},
+    try:
+        response, _ = call_inference(
+            framework, model_name, prompt, config=inf_config,
         )
-        try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                code = json.loads(resp.read().decode()).get("response", "")
-                return _strip_markdown_fences(code)
-        except Exception as e:
-            return f"# Error generating code: {e}"
-
-    if provider == "openai":
-        url = "https://api.openai.com/v1/chat/completions"
-        payload = json.dumps({
-            "model": model_name,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.1,
-            "max_tokens": 2048,
-        }).encode()
-        req = urllib.request.Request(url, data=payload, headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
-        })
-        try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                data = json.loads(resp.read().decode())
-                code = data["choices"][0]["message"]["content"]
-                return _strip_markdown_fences(code)
-        except Exception as e:
-            return f"# Error generating code: {e}"
-
-    if provider == "anthropic":
-        url = "https://api.anthropic.com/v1/messages"
-        payload = json.dumps({
-            "model": model_name,
-            "max_tokens": 2048,
-            "messages": [{"role": "user", "content": prompt}],
-        }).encode()
-        req = urllib.request.Request(url, data=payload, headers={
-            "Content-Type": "application/json",
-            "x-api-key": os.environ["ANTHROPIC_API_KEY"],
-            "anthropic-version": "2023-06-01",
-        })
-        try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                data = json.loads(resp.read().decode())
-                code = data["content"][0]["text"]
-                return _strip_markdown_fences(code)
-        except Exception as e:
-            return f"# Error generating code: {e}"
-
-    return f"# Unsupported provider: {provider}"
+        return _strip_markdown_fences(response)
+    except Exception as e:
+        return f"# Error generating code: {e}"
 
 
 def _strip_markdown_fences(code):
@@ -414,10 +348,7 @@ def _execute_code(code, language, timeout):
     except subprocess.TimeoutExpired:
         return {"error": "timeout", "timeout": timeout, "returncode": 1}
     except FileNotFoundError:
-        return {
-            "error": f"Runtime not found: {runner[0]}",
-            "returncode": 1,
-        }
+        return {"error": f"Runtime not found: {runner[0]}", "returncode": 1}
     except Exception as e:
         return {"error": str(e), "returncode": 1}
     finally:
