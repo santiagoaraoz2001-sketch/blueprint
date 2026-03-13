@@ -72,4 +72,4 @@ config:
     type: string
     label: Root Key
     default: ""
-    description: Wrap data under a root key (e.g. "results" produces {"results": [...]})
+    description: 'Wrap data under a root key (e.g. "results" produces {"results": [...]})'

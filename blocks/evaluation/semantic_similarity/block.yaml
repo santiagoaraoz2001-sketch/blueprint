@@ -15,11 +15,11 @@ outputs:
   - id: metrics
     label: Similarity Scores
     data_type: metrics
-    description: Aggregate: total_pairs, avg/min/max/median/std similarity, above_threshold count/rate, threshold
+    description: 'Aggregate: total_pairs, avg/min/max/median/std similarity, above_threshold count/rate, threshold'
   - id: dataset
     label: Annotated Pairs
     data_type: data
-    description: Per-pair: index, text_a, text_b, similarity score, is_similar (bool) — filterable
+    description: 'Per-pair: index, text_a, text_b, similarity score, is_similar (bool) — filterable'
 
   - id: report
     label: Similarity Report

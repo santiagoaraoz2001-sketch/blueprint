@@ -257,6 +257,53 @@ def get_artifact(run_id: str, filename: str, db: Session = Depends(get_db)):
     return FileResponse(str(file_path), filename=filename)
 
 
+@router.get("/{run_id}/data-provenance")
+def get_data_provenance(run_id: str, db: Session = Depends(get_db)):
+    """Return data fingerprints for a run, showing which datasets were used."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    return {
+        "run_id": run_id,
+        "fingerprints": run.data_fingerprints or {},
+    }
+
+
+@router.post("/compare-data")
+def compare_run_data(
+    run_id_a: str = Query(..., description="First run ID"),
+    run_id_b: str = Query(..., description="Second run ID"),
+    db: Session = Depends(get_db),
+):
+    """Compare data fingerprints between two runs."""
+    run_a = db.query(Run).filter(Run.id == run_id_a).first()
+    run_b = db.query(Run).filter(Run.id == run_id_b).first()
+    if not run_a or not run_b:
+        raise HTTPException(404, "Run not found")
+
+    fp_a = run_a.data_fingerprints or {}
+    fp_b = run_b.data_fingerprints or {}
+
+    diffs = []
+    all_nodes = set(fp_a.keys()) | set(fp_b.keys())
+    for node_id in sorted(all_nodes):
+        a_inputs = fp_a.get(node_id, {})
+        b_inputs = fp_b.get(node_id, {})
+        for input_name in sorted(set(a_inputs.keys()) | set(b_inputs.keys())):
+            hash_a = a_inputs.get(input_name, {}).get("hash")
+            hash_b = b_inputs.get(input_name, {}).get("hash")
+            if hash_a != hash_b:
+                diffs.append({
+                    "node_id": node_id,
+                    "input": input_name,
+                    "run_a_hash": hash_a,
+                    "run_b_hash": hash_b,
+                    "changed": True,
+                })
+
+    return {"identical": len(diffs) == 0, "diffs": diffs}
+
+
 @router.post("/{run_id}/clone-pipeline", response_model=PipelineResponse)
 def clone_pipeline_from_run(run_id: str, db: Session = Depends(get_db)):
     """Create a new pipeline from a run's config_snapshot."""

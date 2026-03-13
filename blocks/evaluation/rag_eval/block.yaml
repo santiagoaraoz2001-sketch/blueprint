@@ -20,15 +20,15 @@ outputs:
   - id: metrics
     label: RAG Scores
     data_type: metrics
-    description: Aggregate: total_samples, method, avg_faithfulness, avg_answer_relevance, avg_context_relevance, avg_answer_correctness
+    description: 'Aggregate: total_samples, method, avg_faithfulness, avg_answer_relevance, avg_context_relevance, avg_answer_correctness'
   - id: dataset
     label: Annotated Results
     data_type: data
-    description: Per-sample: question, answer_preview, faithfulness, answer_relevance, context_relevance, answer_correctness scores
+    description: 'Per-sample: question, answer_preview, faithfulness, answer_relevance, context_relevance, answer_correctness scores'
   - id: report
     label: RAG Report
     data_type: artifact
-    description: rag_report.json: metrics summary + per-sample scores with question, answer_preview, all metric scores
+    description: 'rag_report.json: metrics summary + per-sample scores with question, answer_preview, all metric scores'
 
 config:
   question_column:

@@ -30,12 +30,17 @@ BLOCK_ALIASES = {
 from sqlalchemy.orm import Session
 
 from ..config import ARTIFACTS_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR
+from ..database import SessionLocal
 from ..models.run import Run, LiveRun
 from ..block_sdk.context import BlockContext
 from ..block_sdk.exceptions import BlockError, BlockInputError, BlockConfigError, BlockTimeoutError
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
 from .schema_validator import load_block_schema, validate_inputs, validate_config
+from ..utils.structured_logger import (
+    log_run_start, log_run_complete, log_run_failed,
+    log_block_start, log_block_complete, log_block_failed,
+)
 from .metrics_schema import create_metric
 
 # Cancel events: threading.Event per run_id, protected by lock for thread safety
@@ -114,8 +119,8 @@ def _load_and_run_block(
     progress_cb=None,
     message_cb=None,
     metric_cb=None,
-) -> dict[str, Any]:
-    """Load a block's run.py and execute it."""
+) -> tuple[dict[str, Any], dict[str, dict]]:
+    """Load a block's run.py and execute it. Returns (outputs, data_fingerprints)."""
     run_py = block_dir / "run.py"
     spec = importlib.util.spec_from_file_location(f"block_{node_id}", str(run_py))
     if spec is None or spec.loader is None:
@@ -137,7 +142,7 @@ def _load_and_run_block(
     )
 
     module.run(ctx)
-    return ctx.get_outputs()
+    return ctx.get_outputs(), ctx.get_data_fingerprints()
 
 
 def _load_and_run_block_with_timeout(
@@ -151,12 +156,15 @@ def _load_and_run_block_with_timeout(
     message_cb=None,
     metric_cb=None,
     timeout_seconds=None,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[str, dict]]:
     """Wrapper that enforces a timeout on block execution.
 
     Args:
         timeout_seconds: Maximum execution time. None means no timeout.
             Caller should read this from the block schema to avoid redundant I/O.
+
+    Returns:
+        (outputs, data_fingerprints) tuple from _load_and_run_block.
     """
     if timeout_seconds is None:
         # No timeout configured, run directly (no thread overhead)
@@ -165,12 +173,12 @@ def _load_and_run_block_with_timeout(
             run_id, node_id, progress_cb, message_cb, metric_cb,
         )
 
-    result = {}
+    result: list[tuple[dict, dict]] = []
     error = [None]
 
     def target():
         try:
-            result.update(
+            result.append(
                 _load_and_run_block(
                     block_dir, config, inputs, run_dir,
                     run_id, node_id, progress_cb, message_cb, metric_cb,
@@ -195,7 +203,7 @@ def _load_and_run_block_with_timeout(
     if error[0]:
         raise error[0]
 
-    return result
+    return result[0]
 
 
 def _resolve_secrets(config: dict) -> dict:
@@ -256,6 +264,38 @@ def _safe_commit(db: Session):
         db.rollback()
 
 
+def _start_heartbeat(run_id: str, interval: float = 30.0):
+    """Start a background thread that updates last_heartbeat every `interval` seconds.
+
+    Uses its own DB session to avoid thread-safety issues with the executor's session.
+    """
+    stop_event = threading.Event()
+
+    def heartbeat():
+        hb_session = SessionLocal()
+        try:
+            while not stop_event.is_set():
+                stop_event.wait(interval)
+                if stop_event.is_set():
+                    break
+                try:
+                    run = hb_session.query(Run).filter(Run.id == run_id).first()
+                    if run and run.status == "running":
+                        run.last_heartbeat = datetime.now(timezone.utc)
+                        hb_session.commit()
+                except Exception:
+                    try:
+                        hb_session.rollback()
+                    except Exception:
+                        pass
+        finally:
+            hb_session.close()
+
+    thread = threading.Thread(target=heartbeat, daemon=True)
+    thread.start()
+    return stop_event
+
+
 async def execute_pipeline(
     pipeline_id: str,
     run_id: str,
@@ -292,11 +332,17 @@ async def execute_pipeline(
     db.add(live)
     db.commit()
 
+    log_run_start(run_id, pipeline_id, len(nodes))
+
+    # Start continuous heartbeat thread (every 30s, own DB session)
+    heartbeat_stop = _start_heartbeat(run_id)
+
     # Topological sort
     order = _topological_sort(nodes, edges)
     node_map = {n["id"]: n for n in nodes}
     outputs: dict[str, dict[str, Any]] = {}
     all_metrics: dict[str, Any] = {}
+    all_fingerprints: dict[str, dict] = {}
 
     # --- Layer 1: JSONL file failsafe (opened here so finally can close it) ---
     metrics_dir = ARTIFACTS_DIR / run_id
@@ -353,6 +399,7 @@ async def execute_pipeline(
                 run.finished_at = datetime.now(timezone.utc)
                 run.duration_seconds = time.time() - start_time
                 run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                run.data_fingerprints = all_fingerprints
                 live.status = "cancelled"
                 db.commit()
                 try:
@@ -392,6 +439,9 @@ async def execute_pipeline(
             metrics_log_buffer.append({"type": "node_started", "timestamp": time.time(), **started_event})
             metrics_file.write(json.dumps({"type": "node_started", "timestamp": time.time(), **started_event}) + "\n")
             metrics_file.flush()
+
+            log_block_start(run_id, node_id, block_type, idx, len(nodes))
+            block_start_time = time.time()
 
             # Gather inputs from upstream edges
             # When multiple edges connect to the same target handle, collect values into a list
@@ -504,12 +554,14 @@ async def execute_pipeline(
                 try:
                     for attempt in range(max_retries + 1):
                         try:
-                            node_outputs = _load_and_run_block_with_timeout(
+                            node_outputs, data_fingerprints = _load_and_run_block_with_timeout(
                                 block_dir, config, node_inputs, run_dir,
                                 run_id, node_id, progress_cb, message_cb, metric_cb,
                                 timeout_seconds=timeout_seconds,
                             )
                             outputs[node_id] = node_outputs
+                            if data_fingerprints:
+                                all_fingerprints[node_id] = data_fingerprints
                             break  # Success
                         except BlockError as e:
                             if not e.recoverable or attempt == max_retries:
@@ -531,6 +583,7 @@ async def execute_pipeline(
                     run.finished_at = datetime.now(timezone.utc)
                     run.duration_seconds = time.time() - start_time
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    run.data_fingerprints = all_fingerprints
                     live.status = "cancelled"
                     db.commit()
                     try:
@@ -542,6 +595,7 @@ async def execute_pipeline(
                         pass
                     return
                 except BlockError as e:
+                    log_block_failed(run_id, node_id, block_type, e.message)
                     error_payload = {
                         "node_id": node_id,
                         "error": e.message,
@@ -562,9 +616,11 @@ async def execute_pipeline(
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     live.status = "failed"
                     db.commit()
+                    log_run_failed(run_id, e.message, node_id)
                     return
                 except Exception as e:
                     tb = traceback.format_exc()
+                    log_block_failed(run_id, node_id, block_type, str(e), tb)
                     try:
                         publish_event(run_id, "node_failed", {"node_id": node_id, "error": str(e)})
                     except Exception:
@@ -572,20 +628,26 @@ async def execute_pipeline(
                     run.status = "failed"
                     run.error_message = f"Block {block_type} failed: {str(e)}\n\n{tb}"
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    run.data_fingerprints = all_fingerprints
                     live.status = "failed"
                     db.commit()
                     _write_error_log(run_id, tb)
+                    log_run_failed(run_id, str(e), node_id)
                     return
             else:
+                error_msg = f"Block type '{block_type}' not found. No run.py available."
+                log_block_failed(run_id, node_id, block_type, error_msg)
                 try:
                     publish_event(run_id, "node_failed", {"node_id": node_id, "error": f"Block type '{block_type}' not found"})
                 except Exception:
                     pass
                 run.status = "failed"
-                run.error_message = f"Block type '{block_type}' not found. No run.py available."
+                run.error_message = error_msg
                 run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                run.data_fingerprints = all_fingerprints
                 live.status = "failed"
                 db.commit()
+                log_run_failed(run_id, error_msg, node_id)
                 return
 
             # Heartbeat after each block completes
@@ -606,6 +668,8 @@ async def execute_pipeline(
                 publish_event(run_id, "node_output", {"node_id": node_id, "outputs": safe_outputs})
             except Exception:
                 pass
+
+            log_block_complete(run_id, node_id, block_type, time.time() - block_start_time)
 
             completed_event = {"node_id": node_id, "index": idx}
             try:
@@ -630,9 +694,12 @@ async def execute_pipeline(
         run.metrics = all_metrics
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
         run.metrics_log = list(metrics_log_buffer)
+        run.data_fingerprints = all_fingerprints
         live.status = "complete"
         live.overall_progress = 1.0
         db.commit()
+
+        log_run_complete(run_id, run.duration_seconds, all_metrics)
 
         # Auto-lifecycle: update phase/project counters (never crashes execution)
         try:
@@ -656,9 +723,11 @@ async def execute_pipeline(
         run.error_message = f"{str(e)}\n\n{tb}"
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
         run.metrics_log = list(metrics_log_buffer)
+        run.data_fingerprints = all_fingerprints
         live.status = "failed"
         db.commit()
         _write_error_log(run_id, tb)
+        log_run_failed(run_id, str(e))
 
         # Auto-lifecycle: update counts only on failure (never crashes execution)
         try:
@@ -675,6 +744,8 @@ async def execute_pipeline(
         # Clean up cancel event
         with _cancel_lock:
             _cancel_events.pop(run_id, None)
+        # Stop heartbeat thread
+        heartbeat_stop.set()
         # Stop system metrics publisher
         system_metrics_stop.set()
         # Close JSONL file

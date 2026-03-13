@@ -19,6 +19,7 @@ class Run(Base):
     metrics = Column(JSON, default=dict)
     outputs_snapshot = Column(JSON, nullable=True)
     metrics_log = Column(JSON, nullable=True)
+    data_fingerprints = Column(JSON, nullable=True)  # {node_id: {input_name: fingerprint}}
 
 
 class LiveRun(Base):

@@ -24,11 +24,11 @@ outputs:
   - id: metrics
     label: Quality Scores
     data_type: metrics
-    description: Aggregate: avg_word_count, avg_flesch_kincaid, avg_repetition_ratio, avg_vocabulary_diversity, degenerate count/rate
+    description: 'Aggregate: avg_word_count, avg_flesch_kincaid, avg_repetition_ratio, avg_vocabulary_diversity, degenerate count/rate'
   - id: dataset
     label: Annotated Data
     data_type: data
-    description: Per-text: text, word_count, flesch_kincaid_grade, repetition_ratio, vocabulary_diversity, too_short, is_degenerate
+    description: 'Per-text: text, word_count, flesch_kincaid_grade, repetition_ratio, vocabulary_diversity, too_short, is_degenerate'
 
   - id: report
     label: Quality Report
