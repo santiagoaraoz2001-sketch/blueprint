@@ -113,8 +113,8 @@ def _load_and_run_block(
     progress_cb=None,
     message_cb=None,
     metric_cb=None,
-) -> dict[str, Any]:
-    """Load a block's run.py and execute it."""
+) -> tuple[dict[str, Any], dict[str, dict]]:
+    """Load a block's run.py and execute it. Returns (outputs, data_fingerprints)."""
     run_py = block_dir / "run.py"
     spec = importlib.util.spec_from_file_location(f"block_{node_id}", str(run_py))
     if spec is None or spec.loader is None:
@@ -136,7 +136,7 @@ def _load_and_run_block(
     )
 
     module.run(ctx)
-    return ctx.get_outputs()
+    return ctx.get_outputs(), ctx.get_data_fingerprints()
 
 
 def _resolve_secrets(config: dict) -> dict:
@@ -238,6 +238,7 @@ async def execute_pipeline(
     node_map = {n["id"]: n for n in nodes}
     outputs: dict[str, dict[str, Any]] = {}
     all_metrics: dict[str, Any] = {}
+    all_fingerprints: dict[str, dict] = {}
 
     # --- Layer 1: JSONL file failsafe (opened here so finally can close it) ---
     metrics_dir = ARTIFACTS_DIR / run_id
@@ -294,6 +295,7 @@ async def execute_pipeline(
                 run.finished_at = datetime.now(timezone.utc)
                 run.duration_seconds = time.time() - start_time
                 run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                run.data_fingerprints = all_fingerprints
                 live.status = "cancelled"
                 db.commit()
                 try:
@@ -432,11 +434,13 @@ async def execute_pipeline(
                     metrics_log_buffer.append(event_dict)
 
                 try:
-                    node_outputs = _load_and_run_block(
+                    node_outputs, data_fingerprints = _load_and_run_block(
                         block_dir, config, node_inputs, run_dir,
                         run_id, node_id, progress_cb, message_cb, metric_cb,
                     )
                     outputs[node_id] = node_outputs
+                    if data_fingerprints:
+                        all_fingerprints[node_id] = data_fingerprints
                 except InterruptedError:
                     # Cancellation via progress_cb
                     run.status = "cancelled"
@@ -444,6 +448,7 @@ async def execute_pipeline(
                     run.finished_at = datetime.now(timezone.utc)
                     run.duration_seconds = time.time() - start_time
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    run.data_fingerprints = all_fingerprints
                     live.status = "cancelled"
                     db.commit()
                     try:
@@ -485,6 +490,7 @@ async def execute_pipeline(
                     run.status = "failed"
                     run.error_message = f"Block {block_type} failed: {str(e)}\n\n{tb}"
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    run.data_fingerprints = all_fingerprints
                     live.status = "failed"
                     db.commit()
                     # Write traceback to error.log
@@ -498,6 +504,7 @@ async def execute_pipeline(
                 run.status = "failed"
                 run.error_message = f"Block type '{block_type}' not found. No run.py available."
                 run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                run.data_fingerprints = all_fingerprints
                 live.status = "failed"
                 db.commit()
                 return
@@ -544,6 +551,7 @@ async def execute_pipeline(
         run.metrics = all_metrics
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
         run.metrics_log = list(metrics_log_buffer)
+        run.data_fingerprints = all_fingerprints
         live.status = "complete"
         live.overall_progress = 1.0
         db.commit()
@@ -570,6 +578,7 @@ async def execute_pipeline(
         run.error_message = f"{str(e)}\n\n{tb}"
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
         run.metrics_log = list(metrics_log_buffer)
+        run.data_fingerprints = all_fingerprints
         live.status = "failed"
         db.commit()
         _write_error_log(run_id, tb)

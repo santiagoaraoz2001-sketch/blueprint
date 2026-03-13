@@ -15,6 +15,8 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
+from ..utils.data_fingerprint import fingerprint_dataset
+
 
 class BlockContext:
     def __init__(
@@ -42,14 +44,22 @@ class BlockContext:
         self._metric_callback = metric_callback
         self._outputs: dict[str, Any] = {}
         self._metrics: dict[str, Any] = {}
+        self._data_fingerprints: dict[str, dict] = {}
 
         os.makedirs(run_dir, exist_ok=True)
 
     def load_input(self, name: str) -> Any:
-        """Load an input by name. Returns path or data from upstream block."""
+        """Load an input by name. Auto-fingerprints dataset inputs."""
         if name not in self._inputs:
             raise ValueError(f"Input '{name}' not connected")
-        return self._inputs[name]
+        value = self._inputs[name]
+        if value is not None:
+            try:
+                self._data_fingerprints[name] = fingerprint_dataset(value)
+            except Exception:
+                # Fingerprinting is best-effort — never crash block execution
+                pass
+        return value
 
     def report_progress(self, current: int, total: int):
         """Report execution progress (updates progress bar and ETA)."""
@@ -86,3 +96,6 @@ class BlockContext:
 
     def get_metrics(self) -> dict[str, Any]:
         return self._metrics
+
+    def get_data_fingerprints(self) -> dict[str, dict]:
+        return self._data_fingerprints
