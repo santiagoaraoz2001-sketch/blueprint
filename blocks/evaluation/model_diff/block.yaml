@@ -1,0 +1,80 @@
+name: Model Diff
+type: model_diff
+category: evaluation
+description: Compare two models side-by-side — token probabilities, attention patterns, layer activations
+version: "2.0.0"
+
+inputs:
+  - id: model_a
+    label: Model A
+    data_type: model
+    required: true
+    description: First model to compare
+  - id: model_b
+    label: Model B
+    data_type: model
+    required: true
+    description: Second model to compare
+
+outputs:
+  - id: diff_report
+    label: Diff Report
+    data_type: artifact
+    description: "JSON diff report: token probs, KL divergence, cosine similarity"
+  - id: metrics
+    label: Diff Metrics
+    data_type: metrics
+    description: "Aggregate: kl_divergence, cosine_similarity, top1_agreement_rate"
+  - id: dataset
+    label: Token Comparisons
+    data_type: data
+    description: Per-position token probability comparisons
+
+config:
+  prompt:
+    type: text_area
+    label: Test Prompt
+    default: "The capital of France is"
+    description: Prompt to run through both models
+  max_tokens:
+    type: integer
+    label: Max Tokens
+    default: 50
+    min: 1
+    max: 512
+    description: Maximum tokens to generate for comparison
+  top_k:
+    type: integer
+    label: Top-K Probabilities
+    default: 5
+    min: 1
+    max: 20
+    description: Number of top token probabilities to compare per position
+  compare_layers:
+    type: boolean
+    label: Compare Layer Activations
+    default: false
+    description: "Slower but shows per-layer cosine similarity between hidden states"
+  model_a_name:
+    type: string
+    label: Model A Name Override
+    default: ""
+    description: "Override name for Model A (uses connected model name if empty)"
+  model_b_name:
+    type: string
+    label: Model B Name Override
+    default: ""
+    description: "Override name for Model B (uses connected model name if empty)"
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: Format for dataset and report outputs
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: Decimal places for computed scores

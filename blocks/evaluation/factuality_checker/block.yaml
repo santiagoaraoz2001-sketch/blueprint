@@ -20,15 +20,15 @@ outputs:
   - id: metrics
     label: Factuality Scores
     data_type: metrics
-    description: Aggregate: accuracy, correct, total, errors count, method used
+    description: 'Aggregate: accuracy, correct, total, errors count, method used'
   - id: dataset
     label: Annotated Results
     data_type: data
-    description: Per-item: index, output, reference, correct (bool), score, question — filterable
+    description: 'Per-item: index, output, reference, correct (bool), score, question — filterable'
   - id: report
     label: Error Report
     data_type: artifact
-    description: error_report.json: metrics summary + full error list with question, output, reference, score
+    description: 'error_report.json: metrics summary + full error list with question, output, reference, score'
 
 config:
   method:

@@ -11,7 +11,7 @@ import SystemPanel from '@/components/Monitor/SystemPanel'
 import LogStream from '@/components/Monitor/LogStream'
 import ComparisonView from '@/components/Monitor/ComparisonView'
 import { runMetricsToTable } from '@/services/metricsBridge'
-import { Activity, ExternalLink, Wifi, WifiOff, Radio, Archive, TableProperties } from 'lucide-react'
+import { Activity, ExternalLink, Wifi, WifiOff, Radio, Archive, TableProperties, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function MonitorView() {
@@ -231,21 +231,7 @@ function MonitorContent({ runId }: { runId: string }) {
           </span>
         )}
 
-        {!isReplay && (
-          <span
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontFamily: F,
-              fontSize: FS.xxs,
-              color: isConnected ? '#22c55e' : '#ff433d',
-            }}
-          >
-            {isConnected ? <Wifi size={9} /> : <WifiOff size={9} />}
-            {isConnected ? 'Live' : 'Disconnected'}
-          </span>
-        )}
+        {!isReplay && <SSEStatusBadge />}
 
         {status === 'running' && (
           <span
@@ -363,5 +349,32 @@ function MonitorContent({ runId }: { runId: string }) {
         }
       `}</style>
     </div>
+  )
+}
+
+function SSEStatusBadge() {
+  const sseStatus = useRunStore((s) => s.sseStatus)
+
+  const config = {
+    connected: { color: '#22c55e', icon: <Wifi size={9} />, label: 'Live' },
+    reconnecting: { color: '#f59e0b', icon: <Loader2 size={9} style={{ animation: 'spin 1s linear infinite' }} />, label: 'Reconnecting...' },
+    stale: { color: '#ff433d', icon: <WifiOff size={9} />, label: 'Connection lost' },
+    disconnected: { color: T.dim, icon: <WifiOff size={9} />, label: 'Disconnected' },
+  }[sseStatus]
+
+  return (
+    <span
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        fontFamily: F,
+        fontSize: FS.xxs,
+        color: config.color,
+      }}
+    >
+      {config.icon}
+      {config.label}
+    </span>
   )
 }

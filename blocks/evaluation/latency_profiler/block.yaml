@@ -21,11 +21,11 @@ outputs:
   - id: metrics
     label: Performance Metrics
     data_type: metrics
-    description: Aggregate: best/worst avg_latency_ms, best_throughput, num_configs, model, provider
+    description: 'Aggregate: best/worst avg_latency_ms, best_throughput, num_configs, model, provider'
   - id: results
     label: Detailed Profiles
     data_type: artifact
-    description: latency_profiles.json: per batch_size x input_length: avg/min/max/p50/p95 ms, throughput
+    description: 'latency_profiles.json: per batch_size x input_length: avg/min/max/p50/p95 ms, throughput'
 
   - id: dataset
     label: Timing Data

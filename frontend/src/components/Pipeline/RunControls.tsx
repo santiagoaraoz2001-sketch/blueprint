@@ -3,7 +3,6 @@ import { T, F, FS } from '@/lib/design-tokens'
 import { useRunStore } from '@/stores/runStore'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { validatePipelineClient } from '@/lib/pipeline-validator'
-import { useSSE } from '@/hooks/useSSE'
 import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Check, AlertTriangle, Gauge, FileDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useUIStore } from '@/stores/uiStore'
@@ -14,7 +13,7 @@ import Editor from '@monaco-editor/react'
 
 export default function RunControls() {
   const { id: pipelineId, nodes, saveAsTemplate } = usePipelineStore()
-  const { status, activeRunId, overallProgress, startRun, stopRun, handleSSEEvent, reset } =
+  const { status, activeRunId, overallProgress, startRun, stopRun, connectSSE, disconnectSSE, reset } =
     useRunStore()
   const elapsedRef = useRef(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -31,12 +30,15 @@ export default function RunControls() {
 
   const isRunning = status === 'running'
 
-  // SSE subscription for live events
-  const sseUrl = activeRunId ? `/api/events/runs/${activeRunId}` : null
-  useSSE(sseUrl, {
-    onEvent: handleSSEEvent,
-    enabled: isRunning,
-  })
+  // SSE subscription via centralized manager
+  useEffect(() => {
+    if (activeRunId && isRunning) {
+      connectSSE(activeRunId)
+    } else {
+      disconnectSSE()
+    }
+    return () => disconnectSSE()
+  }, [activeRunId, isRunning, connectSSE, disconnectSSE])
 
   // Elapsed timer
   useEffect(() => {
