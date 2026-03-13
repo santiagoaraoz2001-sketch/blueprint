@@ -49,7 +49,7 @@ def run(ctx):
     limit = int(ctx.config.get("limit", 0)) or None
     seed = int(ctx.config.get("seed", 42))
     device = ctx.config.get("device", "auto")
-    trust_remote = ctx.config.get("trust_remote_code", False)
+    trust_remote = ctx.config.get("trust_remote_code", "")
 
     # ── Output format config ───────────────────────────────────────────────
     output_format = ctx.config.get("output_format", "json")
@@ -57,6 +57,7 @@ def run(ctx):
 
 
     # ── Resolve model from input port ─────────────────────────────────────
+    model_info = None
     try:
         model_info = ctx.load_input("model")
         if isinstance(model_info, dict):
@@ -67,6 +68,15 @@ def run(ctx):
             model_name = model_info or model_name
     except (ValueError, Exception):
         pass
+
+    # ── Resolve trust_remote_code: config first, then model metadata ──────
+    if trust_remote is None or trust_remote == "":
+        if isinstance(model_info, dict):
+            trust_remote = model_info.get("trust_remote_code", False)
+        else:
+            trust_remote = False
+    if isinstance(trust_remote, str):
+        trust_remote = trust_remote.lower() in ("true", "1", "yes")
 
     if not model_name:
         raise ValueError(

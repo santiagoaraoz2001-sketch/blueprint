@@ -14,6 +14,15 @@ import time
 
 
 def run(ctx):
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     provider = ctx.config.get("backend", ctx.config.get("provider", "ollama"))
     model_name = ctx.config.get("model_name", "")
     endpoint = ctx.config.get("endpoint", "http://localhost:11434")
@@ -21,7 +30,7 @@ def run(ctx):
     temperature = float(ctx.config.get("temperature", 0.7))
     max_tokens = int(ctx.config.get("max_tokens", 256))
     prompts_text = ctx.config.get("prompts", "")
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     warmup_runs = int(ctx.config.get("warmup_runs", 0))
 
     # Override from connected model input

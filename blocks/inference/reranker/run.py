@@ -14,9 +14,19 @@ import os
 
 def run(ctx):
     dataset_input = ctx.load_input("dataset")
+
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     model_name = ctx.config.get("model_name", "cross-encoder/ms-marco-MiniLM-L-6-v2")
     query_column = ctx.config.get("query_column", "query")
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     top_k = int(ctx.config.get("top_k", 10))
     score_column = ctx.config.get("score_column", "_rerank_score")
     score_threshold = float(ctx.config.get("score_threshold", 0.0))

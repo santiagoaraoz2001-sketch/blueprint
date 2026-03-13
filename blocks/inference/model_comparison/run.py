@@ -14,13 +14,22 @@ import time
 
 
 def run(ctx):
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     models_text = ctx.config.get("models", "ollama:llama3.2\nollama:mistral")
     endpoint = ctx.config.get("endpoint", "http://localhost:11434")
     api_key = ctx.config.get("api_key", "")
     temperature = float(ctx.config.get("temperature", 0.7))
     max_tokens = int(ctx.config.get("max_tokens", 256))
     prompts_text = ctx.config.get("prompts", "")
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
 
     # Parse model list
     model_configs = []

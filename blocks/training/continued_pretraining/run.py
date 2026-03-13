@@ -13,13 +13,23 @@ import time
 
 def run(ctx):
     dataset_path = ctx.load_input("dataset")
+
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     model_name = ctx.config.get("model_name", "")
     lr = float(ctx.config.get("lr", 1e-5))
     epochs = int(ctx.config.get("epochs", 1))
     batch_size = int(ctx.config.get("batch_size", 4))
     max_seq_length = int(ctx.config.get("max_seq_length", 2048))
     warmup_ratio = float(ctx.config.get("warmup_ratio", 0.05))
-    text_column = ctx.config.get("text_column", "")
+    text_column = ctx.config.get("text_column") or _dataset_meta.get("text_column", "")
     eval_split = float(ctx.config.get("eval_split", 0.0))
 
     # Try to get model from input

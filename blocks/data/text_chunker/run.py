@@ -74,10 +74,20 @@ def _chunk_token(text, chunk_size, overlap, chars_per_token=4):
 
 def run(ctx):
     dataset_path = ctx.load_input("dataset")
+
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     chunk_size = int(ctx.config.get("chunk_size", 1000))
     overlap = int(ctx.config.get("chunk_overlap", 200))
     strategy = ctx.config.get("strategy", "recursive")
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     keep_metadata = ctx.config.get("keep_metadata", True)
     min_chunk_size = int(ctx.config.get("min_chunk_size", 0))
     chars_per_token = int(ctx.config.get("chars_per_token", 4))
@@ -163,6 +173,11 @@ def run(ctx):
         "min_chunk_size": min(chunk_sizes) if chunk_sizes else 0,
         "max_chunk_size": max(chunk_sizes) if chunk_sizes else 0,
     }
+
+    # Pass through dataset metadata
+    if _dataset_meta:
+        _dataset_meta["num_rows"] = len(chunked_data)
+        ctx.save_output("dataset_meta", _dataset_meta)
 
     ctx.save_output("dataset", out_path)
     ctx.save_output("stats", stats)

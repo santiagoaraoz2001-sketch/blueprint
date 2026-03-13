@@ -13,6 +13,10 @@ inputs:
     label: Prompt Dataset
     data_type: dataset
     required: false
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
 
 outputs:
   - id: dataset

@@ -15,6 +15,10 @@ inputs:
     data_type: data
     required: false
     description: "Optional dataset for attention capture — uses sample texts if not provided"
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
 
 outputs:
   - id: telemetry

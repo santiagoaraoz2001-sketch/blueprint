@@ -5,6 +5,15 @@ import os
 
 
 def run(ctx):
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     # Config
     model_name = ctx.config.get("model_name", "")
     r = int(ctx.config.get("r", 16))
@@ -15,8 +24,8 @@ def run(ctx):
     epochs = int(ctx.config.get("epochs", 3))
     batch_size = int(ctx.config.get("batch_size", 4))
     max_seq_length = int(ctx.config.get("max_seq_length", 512))
-    text_column = ctx.config.get("text_column", "")
-    prompt_template = ctx.config.get("prompt_template", "")
+    text_column = ctx.config.get("text_column") or _dataset_meta.get("text_column", "")
+    training_format = ctx.config.get("training_format", ctx.config.get("prompt_template", ""))
     eval_split = float(ctx.config.get("eval_split", 0.0))
     save_merged = ctx.config.get("save_merged", False)
     if isinstance(save_merged, str):
@@ -70,7 +79,7 @@ def run(ctx):
 
         _run_real_training(
             ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
-            lr, epochs, batch_size, max_seq_length, text_column, prompt_template,
+            lr, epochs, batch_size, max_seq_length, text_column, training_format,
             eval_split, save_merged,
             torch, AutoModelForCausalLM, AutoTokenizer, TrainingArguments,
             Trainer, TrainerCallback, DataCollatorForLanguageModeling,
@@ -86,7 +95,7 @@ def run(ctx):
 
 def _run_real_training(
     ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
-    lr, epochs, batch_size, max_seq_length, text_column, prompt_template,
+    lr, epochs, batch_size, max_seq_length, text_column, training_format,
     eval_split, save_merged,
     torch, AutoModelForCausalLM, AutoTokenizer, TrainingArguments,
     Trainer, TrainerCallback, DataCollatorForLanguageModeling,
@@ -127,14 +136,14 @@ def _run_real_training(
 
     # Determine text field
     if isinstance(raw_data[0], dict):
-        if prompt_template:
+        if training_format:
             texts = []
             for row in raw_data:
                 try:
-                    texts.append(prompt_template.format(**row))
+                    texts.append(training_format.format(**row))
                 except KeyError as e:
                     raise ValueError(
-                        f"prompt_template references missing column {e}. "
+                        f"training_format references missing column {e}. "
                         f"Available columns: {list(row.keys())}"
                     )
         else:

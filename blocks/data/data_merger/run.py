@@ -84,13 +84,26 @@ def _dedup(rows, dedup_columns_str):
 
 
 def run(ctx):
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     method = ctx.config.get("method", "concat")
     join_key = ctx.config.get("join_key", "")
     join_type = ctx.config.get("join_type", "inner")
     dedup_columns_str = ctx.config.get("dedup_columns", "")
     add_source = ctx.config.get("add_source_column", False)
-    shuffle = ctx.config.get("shuffle", False)
-    seed = int(ctx.config.get("seed", 42))
+    shuffle = ctx.config.get("shuffle")
+    if shuffle is None or shuffle == "":
+        shuffle = _dataset_meta.get("shuffle", False)
+    if isinstance(shuffle, str):
+        shuffle = shuffle.lower() in ("true", "1", "yes")
+    seed = int(ctx.config.get("seed") or _dataset_meta.get("seed", 42))
     weight_a = int(ctx.config.get("weight_a", 1))
     weight_b = int(ctx.config.get("weight_b", 1))
     weight_c = int(ctx.config.get("weight_c", 1))
@@ -178,6 +191,11 @@ def run(ctx):
         "merged_rows": len(merged),
         "method": method,
     }
+
+    # Pass through dataset metadata
+    if _dataset_meta:
+        _dataset_meta["num_rows"] = len(merged)
+        ctx.save_output("dataset_meta", _dataset_meta)
 
     ctx.save_output("dataset", out_dir)
     ctx.save_output("stats", stats)

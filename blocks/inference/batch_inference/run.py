@@ -17,9 +17,19 @@ import time
 
 def run(ctx):
     dataset_input = ctx.load_input("dataset")
+
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     provider = ctx.config.get("backend", ctx.config.get("provider", "ollama"))
     model_name = ctx.config.get("model_name", "")
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     prompt_template = ctx.config.get("prompt_template", "{text}")
     system_prompt = ctx.config.get("system_prompt", "")
     endpoint = ctx.config.get("endpoint", "http://localhost:11434")

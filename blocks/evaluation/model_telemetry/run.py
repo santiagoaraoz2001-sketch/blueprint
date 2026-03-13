@@ -11,6 +11,15 @@ import time
 
 
 def run(ctx):
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     # ── Configuration ─────────────────────────────────────────────────────
     model_path = ctx.config.get("model_path", "")
     capture_attention = ctx.config.get("capture_attention", True)
@@ -18,15 +27,16 @@ def run(ctx):
     capture_memory = ctx.config.get("capture_memory", True)
     capture_layer_stats = ctx.config.get("capture_layer_stats", True)
     sample_size = int(ctx.config.get("sample_size", 10))
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     max_seq_length = int(ctx.config.get("max_seq_length", 128))
-    trust_remote_code = ctx.config.get("trust_remote_code", True)
+    trust_remote_code = ctx.config.get("trust_remote_code", "")
 
     # ── Output format config ───────────────────────────────────────────────
     output_format = ctx.config.get("output_format", "json")
     decimal_precision = int(ctx.config.get("decimal_precision", 4))
 
     # ── Resolve model from input ──────────────────────────────────────────
+    model_info = None
     if ctx.inputs.get("model"):
         model_info = ctx.load_input("model")
         if isinstance(model_info, dict):
@@ -35,6 +45,15 @@ def run(ctx):
                          model_info.get("model_id", ""))) or model_path
         elif isinstance(model_info, str):
             model_path = model_info or model_path
+
+    # ── Resolve trust_remote_code: config first, then model metadata ──────
+    if trust_remote_code is None or trust_remote_code == "":
+        if isinstance(model_info, dict):
+            trust_remote_code = model_info.get("trust_remote_code", False)
+        else:
+            trust_remote_code = False
+    if isinstance(trust_remote_code, str):
+        trust_remote_code = trust_remote_code.lower() in ("true", "1", "yes")
 
     if not model_path:
         raise ValueError(

@@ -13,8 +13,17 @@ from collections import Counter
 
 
 def run(ctx):
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     # ── Configuration ─────────────────────────────────────────────────────
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     metrics_str = ctx.config.get("metrics_to_compute", "readability,repetition,length,vocabulary")
     min_length = int(ctx.config.get("min_length", 10))
     max_rep_ratio = float(ctx.config.get("max_repetition_ratio", 0.3))

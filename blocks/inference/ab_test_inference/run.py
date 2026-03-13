@@ -15,6 +15,15 @@ import time
 
 
 def run(ctx):
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     provider_a = ctx.config.get("provider_a", "ollama")
     model_a = ctx.config.get("model_a", "llama3.2")
     provider_b = ctx.config.get("provider_b", "ollama")
@@ -30,7 +39,7 @@ def run(ctx):
     seed_a = seed_a if seed_a >= 0 else None
     seed_b = int(ctx.config.get("seed_b", -1))
     seed_b = seed_b if seed_b >= 0 else None
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     system_prompt = ctx.config.get("system_prompt", "")
     single_prompt = ctx.config.get("single_prompt", "")
     num_runs = int(ctx.config.get("num_runs", 1))

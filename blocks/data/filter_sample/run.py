@@ -9,8 +9,18 @@ import re
 
 def run(ctx):
     dataset_path = ctx.load_input("dataset")
+
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     method = ctx.config.get("method", "length")
-    text_column = ctx.config.get("text_column", "text")
+    text_column = _dataset_meta.get("text_column", ctx.config.get("text_column", "text"))
     min_length = int(ctx.config.get("min_length", 10))
     max_length = int(ctx.config.get("max_length", 0))
     regex_pattern = ctx.config.get("regex_pattern", "")
@@ -21,7 +31,7 @@ def run(ctx):
     top_k = int(ctx.config.get("top_k", 100))
     match_values_str = ctx.config.get("match_values", "")
     sample_size = int(ctx.config.get("sample_size", 0))
-    seed = int(ctx.config.get("seed", 42))
+    seed = int(ctx.config.get("seed") or _dataset_meta.get("seed", 42))
 
     random.seed(seed)
 
@@ -152,6 +162,11 @@ def run(ctx):
         "rejected": len(rejected),
         "drop_rate": drop_rate,
     }
+
+    # Pass through dataset metadata
+    if _dataset_meta:
+        _dataset_meta["num_rows"] = len(kept)
+        ctx.save_output("dataset_meta", _dataset_meta)
 
     ctx.save_output("dataset", out_path)
     ctx.save_output("rejected", rej_path)

@@ -17,6 +17,10 @@ inputs:
     label: Student Model
     data_type: model
     required: true
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
 
 outputs:
   - id: model

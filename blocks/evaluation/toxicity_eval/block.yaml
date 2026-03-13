@@ -15,6 +15,10 @@ inputs:
     data_type: model
     required: false
     description: "Optional: generate responses from prompts before evaluating toxicity"
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
 
 outputs:
   - id: metrics

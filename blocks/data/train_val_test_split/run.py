@@ -8,12 +8,26 @@ from collections import defaultdict
 
 def run(ctx):
     dataset_path = ctx.load_input("dataset")
+
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     train_ratio = float(ctx.config.get("train_ratio", 0.8))
     val_ratio = float(ctx.config.get("val_ratio", 0.1))
     test_ratio = float(ctx.config.get("test_ratio", 0.1))
-    seed = int(ctx.config.get("seed", 42))
+    seed = int(ctx.config.get("seed") or _dataset_meta.get("seed", 42))
     stratify_column = ctx.config.get("stratify_column", "")
-    shuffle = ctx.config.get("shuffle", True)
+    shuffle = ctx.config.get("shuffle")
+    if shuffle is None or shuffle == "":
+        shuffle = _dataset_meta.get("shuffle", True)
+    if isinstance(shuffle, str):
+        shuffle = shuffle.lower() in ("true", "1", "yes")
     group_column = ctx.config.get("group_column", "")
     sort_column = ctx.config.get("sort_column", "")
 
@@ -113,6 +127,11 @@ def run(ctx):
     ctx.save_output("train", os.path.join(ctx.run_dir, "train"))
     ctx.save_output("val", os.path.join(ctx.run_dir, "val"))
     ctx.save_output("test", os.path.join(ctx.run_dir, "test"))
+
+    # Pass through dataset metadata
+    if _dataset_meta:
+        _dataset_meta["num_rows"] = len(rows)
+        ctx.save_output("dataset_meta", _dataset_meta)
 
     stats = {k: len(v) for k, v in splits.items()}
     stats["total"] = len(rows)

@@ -224,6 +224,27 @@ def run(ctx):
         ctx.log_message(f"Demo: generated {row_count} rows")
         ctx.save_output("dataset", out_path)
 
+    # Propagate dataset metadata for downstream blocks
+    _text_col = "text"  # default column name
+    if col_names:
+        # Prefer 'text' if available, otherwise first text-like column
+        if "text" in col_names:
+            _text_col = "text"
+        elif "content" in col_names:
+            _text_col = "content"
+        elif "instruction" in col_names:
+            _text_col = "instruction"
+        elif col_names:
+            _text_col = col_names[0]
+    ctx.save_output("dataset_meta", {
+        "text_column": _text_col,
+        "columns": col_names,
+        "num_rows": row_count,
+        "seed": seed,
+        "shuffle": shuffle,
+        "source": "huggingface",
+    })
+
     # Save metrics output
     _metrics = {
         "dataset_name": dataset_name,

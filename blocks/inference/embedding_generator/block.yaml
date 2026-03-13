@@ -9,6 +9,10 @@ inputs:
     label: Dataset
     data_type: dataset
     required: true
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
 
 outputs:
   - id: dataset

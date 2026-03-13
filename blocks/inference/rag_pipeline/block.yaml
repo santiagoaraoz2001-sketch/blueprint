@@ -13,6 +13,10 @@ inputs:
     label: Model
     data_type: model
     required: false
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
 
 outputs:
   - id: text

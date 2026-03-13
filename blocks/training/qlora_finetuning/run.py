@@ -5,6 +5,15 @@ import os
 
 
 def run(ctx):
+    # Read upstream dataset metadata
+    _dataset_meta = {}
+    try:
+        _meta_input = ctx.load_input("dataset_meta")
+        if isinstance(_meta_input, dict):
+            _dataset_meta = _meta_input
+    except (ValueError, KeyError):
+        pass
+
     # Config
     model_name = ctx.config.get("model_name", "")
     r = int(ctx.config.get("r", 16))
@@ -17,8 +26,8 @@ def run(ctx):
     max_seq_length = int(ctx.config.get("max_seq_length", 512))
     lora_dropout = float(ctx.config.get("lora_dropout", 0.05))
     target_modules_str = ctx.config.get("target_modules", "q_proj,v_proj")
-    text_column = ctx.config.get("text_column", "")
-    prompt_template = ctx.config.get("prompt_template", "")
+    text_column = ctx.config.get("text_column") or _dataset_meta.get("text_column", "")
+    training_format = ctx.config.get("training_format", ctx.config.get("prompt_template", ""))
     eval_split = float(ctx.config.get("eval_split", 0.0))
     save_merged = ctx.config.get("save_merged", False)
     if isinstance(save_merged, str):
@@ -126,14 +135,14 @@ def run(ctx):
 
     if isinstance(raw_data, list) and len(raw_data) > 0:
         if isinstance(raw_data[0], dict):
-            if prompt_template:
+            if training_format:
                 texts = []
                 for row in raw_data:
                     try:
-                        texts.append(prompt_template.format(**row))
+                        texts.append(training_format.format(**row))
                     except KeyError as e:
                         raise ValueError(
-                            f"prompt_template references missing column {e}. "
+                            f"training_format references missing column {e}. "
                             f"Available columns: {list(row.keys())}"
                         )
             else:
