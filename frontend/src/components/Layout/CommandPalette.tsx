@@ -13,6 +13,9 @@ import {
   Plus,
   Undo2,
   Redo2,
+  Activity,
+  FileText,
+  CornerDownLeft,
 } from 'lucide-react'
 import { BLOCK_REGISTRY } from '@/lib/block-registry'
 import { usePipelineStore } from '@/stores/pipelineStore'
@@ -40,6 +43,8 @@ export default function CommandPalette() {
     { id: 'nav-results', label: 'Go to Results', category: 'Navigation', icon: <BarChart3 size={12} />, action: () => setView('results') },
     { id: 'nav-datasets', label: 'Go to Datasets', category: 'Navigation', icon: <Database size={12} />, action: () => setView('datasets') },
     { id: 'nav-marketplace', label: 'Go to Blocks', category: 'Navigation', icon: <Blocks size={12} />, action: () => setView('marketplace') },
+    { id: 'nav-monitor', label: 'Go to Monitor', category: 'Navigation', icon: <Activity size={12} />, action: () => setView('monitor') },
+    { id: 'nav-research', label: 'Go to Research Dashboard', category: 'Navigation', icon: <FileText size={12} />, action: () => setView('research') },
     { id: 'toggle-guide', label: 'Toggle Guide', category: 'Actions', icon: <BookOpen size={12} />, action: () => toggleGuide() },
     { id: 'toggle-sidebar', label: 'Toggle Sidebar', category: 'Actions', icon: <PanelLeftClose size={12} />, action: () => toggleSidebar() },
     { id: 'action-undo', label: 'Undo', category: 'Actions', icon: <Undo2 size={12} />, action: () => usePipelineStore.getState().undo() },
@@ -138,7 +143,7 @@ export default function CommandPalette() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Type a command..."
+            placeholder="Search papers, pipelines, runs..."
             style={{
               width: '100%',
               background: 'none',
@@ -152,8 +157,8 @@ export default function CommandPalette() {
           />
         </div>
 
-        {/* Results */}
-        <div style={{ maxHeight: 300, overflow: 'auto', padding: '4px 0' }}>
+        {/* Results — max 8 visible, scrollable */}
+        <div style={{ maxHeight: 8 * 32, overflow: 'auto', padding: '4px 0' }}>
           {filtered.map((cmd, i) => (
             <div
               key={cmd.id}
@@ -194,6 +199,9 @@ export default function CommandPalette() {
               >
                 {cmd.category}
               </span>
+              {i === selectedIndex && (
+                <CornerDownLeft size={10} color={T.dim} style={{ flexShrink: 0, marginLeft: 4 }} />
+              )}
             </div>
           ))}
           {filtered.length === 0 && (

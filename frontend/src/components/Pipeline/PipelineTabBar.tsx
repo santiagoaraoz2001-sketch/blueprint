@@ -9,6 +9,7 @@ const STATUS_COLORS: Record<PipelineTab['runStatus'], string> = {
   running: T.cyan,
   complete: T.green,
   failed: T.red,
+  cancelled: T.amber,
 }
 
 export default function PipelineTabBar() {
