@@ -18,7 +18,7 @@ def run(ctx):
     dataset_path = ctx.load_input("dataset")
     text_column = ctx.config.get("text_column", "text")
     model_name = ctx.config.get("model_name", "all-MiniLM-L6-v2")
-    provider = ctx.config.get("backend", "sentence-transformers")
+    provider = ctx.config.get("backend", ctx.config.get("provider", "sentence-transformers"))
     endpoint = ctx.config.get("endpoint", "http://localhost:11434")
     api_key = ctx.config.get("api_key", "") or os.environ.get("OPENAI_API_KEY", "")
     batch_size = int(ctx.config.get("batch_size", 32))

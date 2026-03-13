@@ -99,7 +99,7 @@ def run(ctx):
     method = ctx.config.get("method", "llm")
     source_lang = ctx.config.get("source_lang", "auto")
     target_lang = ctx.config.get("target_lang", "en")
-    provider = ctx.config.get("backend", "ollama")
+    provider = ctx.config.get("backend", ctx.config.get("provider", "ollama"))
     model_name = ctx.config.get("model_name", "llama3.2")
     endpoint = ctx.config.get("endpoint", "http://localhost:11434")
     api_key = ctx.config.get("api_key", "")
