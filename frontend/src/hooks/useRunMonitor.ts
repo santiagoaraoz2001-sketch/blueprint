@@ -2,6 +2,8 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useSSE } from './useSSE'
 import { useMetricsStore } from '@/stores/metricsStore'
 
+// ── Per-Run Monitor (Session 4) ─────────────────────────────────────────────
+
 interface UseRunMonitorResult {
   isConnected: boolean
   activeBlock: string | null
@@ -116,4 +118,100 @@ export function useRunMonitor(runId: string | null): UseRunMonitorResult {
     eta: runState?.eta ?? null,
     status: runState?.status ?? 'idle',
   }
+}
+
+// ── Dashboard Monitor (Session 5) ───────────────────────────────────────────
+
+interface UseDashboardMonitorOptions {
+  enabled?: boolean
+}
+
+/**
+ * Subscribes to the global SSE stream for run events.
+ * Updates metricsStore with live progress, metrics, and status changes.
+ * Triggers dashboard re-fetch on run_completed / run_failed.
+ */
+export function useDashboardMonitor(options: UseDashboardMonitorOptions = {}) {
+  const { enabled = true } = options
+  const updateRunMetrics = useMetricsStore((s) => s.updateRunMetrics)
+  const fetchDashboard = useMetricsStore((s) => s.fetchDashboard)
+
+  const handleEvent = useCallback(
+    (event: string, data: any) => {
+      const runId = data.run_id
+      if (!runId) return
+
+      switch (event) {
+        case 'run_started':
+          updateRunMetrics(runId, {
+            runId,
+            status: 'running',
+            progress: 0,
+            eta: data.eta ?? null,
+            currentBlock: data.block_name ?? null,
+            loss: [],
+            accuracy: [],
+          })
+          break
+
+        case 'node_started':
+          updateRunMetrics(runId, {
+            runId,
+            currentBlock: data.block_name ?? data.node_id ?? null,
+          })
+          break
+
+        case 'node_progress':
+        case 'run_progress':
+          updateRunMetrics(runId, {
+            runId,
+            progress: data.progress ?? data.overall ?? 0,
+            eta: data.eta ?? null,
+            currentBlock: data.block_name ?? data.node_id ?? null,
+            status: 'running',
+          })
+          break
+
+        case 'metric': {
+          const store = useMetricsStore.getState()
+          const existing = store.liveMetrics[runId]
+          if (data.name === 'loss' && existing) {
+            store.appendLossPoint(runId, {
+              step: data.step ?? (existing.loss?.length ?? 0),
+              value: data.value,
+              timestamp: Date.now(),
+            })
+          }
+          break
+        }
+
+        case 'run_completed':
+          updateRunMetrics(runId, {
+            runId,
+            status: 'complete',
+            progress: 1,
+            eta: 0,
+          })
+          fetchDashboard()
+          break
+
+        case 'run_failed':
+          updateRunMetrics(runId, {
+            runId,
+            status: 'failed',
+            error: data.error,
+          })
+          fetchDashboard()
+          break
+      }
+    },
+    [updateRunMetrics, fetchDashboard]
+  )
+
+  const sseUrl = enabled ? '/api/runs/stream' : null
+
+  return useSSE(sseUrl, {
+    onEvent: handleEvent,
+    enabled,
+  })
 }
