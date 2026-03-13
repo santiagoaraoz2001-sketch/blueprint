@@ -36,6 +36,7 @@ from ..block_sdk.exceptions import BlockError, BlockInputError, BlockConfigError
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
 from .schema_validator import load_block_schema, validate_inputs, validate_config
+from .metrics_schema import create_metric
 
 # Cancel events: threading.Event per run_id, protected by lock for thread safety
 _cancel_events: dict[str, threading.Event] = {}
@@ -468,30 +469,26 @@ async def execute_pipeline(
                         pass
 
                 def metric_cb(name, value, step):
+                    metric_event_obj = create_metric(
+                        node_id=node_id,
+                        name=name,
+                        value=value,
+                        category=category,
+                        step=step,
+                    )
+                    event_dict = metric_event_obj.to_dict()
+
                     all_metrics[f"{block_type}.{name}"] = value
-                    metric_event = {
-                        "type": "metric",
-                        "node_id": node_id,
-                        "name": name,
-                        "value": value,
-                        "category": category,
-                        "timestamp": time.time(),
-                    }
+
                     try:
-                        publish_event(run_id, "metric", {
-                            "node_id": node_id,
-                            "name": name,
-                            "value": value,
-                            "category": category,
-                            "timestamp": metric_event["timestamp"],
-                        })
+                        publish_event(run_id, "metric", event_dict)
                     except Exception:
                         pass
                     # Layer 1: JSONL
-                    metrics_file.write(json.dumps(metric_event) + "\n")
+                    metrics_file.write(json.dumps(event_dict) + "\n")
                     metrics_file.flush()
                     # Layer 2: buffer
-                    metrics_log_buffer.append(metric_event)
+                    metrics_log_buffer.append(event_dict)
 
                 # --- Load schema once for validation, timeout, and retry ---
                 block_schema = load_block_schema(block_dir)
