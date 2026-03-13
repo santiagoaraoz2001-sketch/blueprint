@@ -24,11 +24,11 @@ outputs:
   - id: telemetry
     label: Telemetry
     data_type: artifact
-    description: telemetry.json: model, timestamp, layers [{name, shape, dtype, numel, mean, std, min, max, norm}], memory {gpu_mb, cpu_mb}, attention patterns, config
+    description: 'telemetry.json: model, timestamp, layers [{name, shape, dtype, numel, mean, std, min, max, norm}], memory {gpu_mb, cpu_mb}, attention patterns, config'
   - id: metrics
     label: Summary Metrics
     data_type: metrics
-    description: Summary: total_parameters, trainable_parameters, model_size_mb, num_layers, num_attention_heads
+    description: 'Summary: total_parameters, trainable_parameters, model_size_mb, num_layers, num_attention_heads'
 
 config:
   model_path:

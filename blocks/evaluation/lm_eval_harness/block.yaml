@@ -15,11 +15,11 @@ outputs:
   - id: metrics
     label: Benchmark Scores
     data_type: metrics
-    description: Aggregate scores: {task}_acc, _average_acc — piped to dashboards and downstream blocks
+    description: 'Aggregate scores: {task}_acc, _average_acc — piped to dashboards and downstream blocks'
   - id: results
     label: Full Results
     data_type: artifact
-    description: Full eval_results.json: model, backend, task_results with acc, acc_stderr, samples per task
+    description: 'Full eval_results.json: model, backend, task_results with acc, acc_stderr, samples per task'
 
   - id: dataset
     label: Per-Task Scores

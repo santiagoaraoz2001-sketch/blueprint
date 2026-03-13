@@ -30,11 +30,11 @@ outputs:
   - id: metrics
     label: Comparison Results
     data_type: metrics
-    description: Aggregate: total_pairs, model_a/b_wins, ties, model_a/b_win_rate, tie_rate, method
+    description: 'Aggregate: total_pairs, model_a/b_wins, ties, model_a/b_win_rate, tie_rate, method'
   - id: dataset
     label: Annotated Comparisons
     data_type: data
-    description: Per-item: index, input, response_a, response_b, score_a, score_b, winner (A/B/tie)
+    description: 'Per-item: index, input, response_a, response_b, score_a, score_b, winner (A/B/tie)'
 
   - id: report
     label: Comparison Report

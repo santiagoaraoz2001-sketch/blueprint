@@ -21,11 +21,11 @@ outputs:
   - id: metrics
     label: Summarization Scores
     data_type: metrics
-    description: Aggregate: total_samples, avg_rouge1/2/L, avg_compression_ratio, avg_coverage, avg_novelty
+    description: 'Aggregate: total_samples, avg_rouge1/2/L, avg_compression_ratio, avg_coverage, avg_novelty'
   - id: report
     label: Detailed Report
     data_type: artifact
-    description: summarization_report.json: metrics summary + per-sample rouge/compression/coverage/novelty scores
+    description: 'summarization_report.json: metrics summary + per-sample rouge/compression/coverage/novelty scores'
 
   - id: dataset
     label: Scored Summaries

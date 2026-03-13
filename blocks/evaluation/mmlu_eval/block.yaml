@@ -15,11 +15,11 @@ outputs:
   - id: metrics
     label: MMLU Scores
     data_type: metrics
-    description: Aggregate: mmlu_overall, mmlu_{category} for STEM/humanities/social/other, num_subjects, num_fewshot
+    description: 'Aggregate: mmlu_overall, mmlu_{category} for STEM/humanities/social/other, num_subjects, num_fewshot'
   - id: results
     label: Detailed Results
     data_type: artifact
-    description: mmlu_results.json: model, overall, category_scores, subject_scores with acc per subject
+    description: 'mmlu_results.json: model, overall, category_scores, subject_scores with acc per subject'
 
   - id: dataset
     label: Subject Scores
