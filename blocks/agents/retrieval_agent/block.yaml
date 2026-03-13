@@ -5,10 +5,11 @@ description: Retrieval-Augmented Generation agent that searches a vector store a
 version: "1.1.0"
 
 inputs:
-  - id: model
-    label: Generator Model
-    data_type: model
-    required: false
+  - id: llm
+    label: LLM
+    data_type: config
+    required: true
+    description: "Connected LLM Inference block for model calls"
   - id: store
     label: Vector Store Config
     data_type: config
@@ -76,12 +77,3 @@ config:
     options: [plain, markdown, json]
     default: plain
     description: "Format for the response text output"
-  provider:
-    type: select
-    label: Provider
-    options: [ollama, openai, anthropic, mlx, transformers]
-    default: ollama
-  endpoint:
-    type: string
-    label: Endpoint URL
-    default: "http://localhost:11434"

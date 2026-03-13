@@ -5,10 +5,11 @@ description: Generate code solutions from natural language tasks with optional e
 version: "1.1.0"
 
 inputs:
-  - id: model
-    label: Code Model
-    data_type: model
-    required: false
+  - id: llm
+    label: LLM
+    data_type: config
+    required: true
+    description: "Connected LLM Inference block for model calls"
   - id: input
     label: Task Description
     data_type: text
@@ -73,12 +74,3 @@ config:
     options: [raw, markdown, json]
     default: raw
     description: "raw: code only, markdown: fenced code block, json: structured object"
-  provider:
-    type: select
-    label: Provider
-    options: [ollama, openai, anthropic, mlx]
-    default: ollama
-  endpoint:
-    type: string
-    label: Endpoint URL
-    default: "http://localhost:11434"

@@ -62,6 +62,8 @@ export interface BlockDefinition {
   defaultConfig: Record<string, any>
   configFields: ConfigField[]
   detail?: BlockDetail
+  deprecated?: boolean
+  deprecatedMessage?: string
 }
 
 /** Backward-compat aliases — map old type names to new 9-type system */
@@ -1781,7 +1783,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#F43F5E',
     maturity: 'beta',
     inputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
+      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
       { id: 'input', label: 'Task / Prompt', dataType: 'text', required: true },
       { id: 'tools', label: 'Tool Registry', dataType: 'config', required: false },
       { id: 'memory', label: 'Agent Memory', dataType: 'config', required: false },
@@ -1791,15 +1793,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Step Log', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Run Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { system_prompt: 'You are a helpful assistant that breaks down tasks into steps and uses tools when needed. Think step by step.', max_steps: 10, strategy: 'sequential', temperature: 0.3, max_tokens: 1024, output_format: 'plain', provider: 'ollama', endpoint: 'http://localhost:11434', stop_phrase: 'FINAL ANSWER:' },
+    defaultConfig: { system_prompt: 'You are a helpful assistant that breaks down tasks into steps and uses tools when needed. Think step by step.', max_steps: 10, strategy: 'sequential', temperature: 0.3, max_tokens: 1024, output_format: 'plain', stop_phrase: 'FINAL ANSWER:' },
     configFields: [
       { name: 'system_prompt', label: 'System Prompt', type: 'text_area', default: 'You are a helpful assistant that breaks down tasks into steps and uses tools when needed. Think step by step.' },
       { name: 'max_steps', label: 'Max Steps', type: 'integer', default: 10, min: 1, max: 50 },
       { name: 'strategy', label: 'Strategy', type: 'select', options: ['sequential', 'react', 'plan_and_execute'], default: 'sequential', description: 'sequential: step-by-step, react: Thought/Action/Observation loop, plan_and_execute: plan first then execute' },
       { name: 'temperature', label: 'Temperature', type: 'float', default: 0.3, min: 0, max: 2 },
       { name: 'max_tokens', label: 'Max Tokens per Step', type: 'integer', default: 1024, min: 64, max: 8192 },
-      { name: 'provider', label: 'Provider', type: 'select', options: ['ollama', 'openai', 'anthropic', 'mlx'], default: 'ollama' },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
       { name: 'output_format', label: 'Output Format', type: 'select', options: ['plain', 'markdown', 'json'], default: 'plain', description: 'plain: raw text, markdown: formatted with headers, json: structured JSON object' },
       { name: 'stop_phrase', label: 'Completion Signal', type: 'string', default: 'FINAL ANSWER:', description: 'Agent output after this phrase is treated as the final answer' },
     ],
@@ -1867,7 +1867,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#F43F5E',
     maturity: 'beta',
     inputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
+      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
       { id: 'input', label: 'Question / Prompt', dataType: 'text', required: true },
     ],
     outputs: [
@@ -1875,7 +1875,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Reasoning Chain', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Reasoning Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { num_steps: 3, temperature: 0.3, max_tokens: 512, self_consistency: 1, output_mode: 'full_chain', output_format: 'markdown', custom_steps: '', provider: 'ollama', endpoint: 'http://localhost:11434' },
+    defaultConfig: { num_steps: 3, temperature: 0.3, max_tokens: 512, self_consistency: 1, output_mode: 'full_chain', output_format: 'markdown', custom_steps: '' },
     configFields: [
       { name: 'num_steps', label: 'Reasoning Steps', type: 'integer', default: 3, min: 1, max: 10 },
       { name: 'temperature', label: 'Temperature', type: 'float', default: 0.3, min: 0, max: 2 },
@@ -1884,8 +1884,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { name: 'output_mode', label: 'Output Mode', type: 'select', options: ['full_chain', 'final_only'], default: 'full_chain', description: 'full_chain: all reasoning steps in output, final_only: only the last step answer' },
       { name: 'custom_steps', label: 'Custom Step Prompts', type: 'text_area', default: '', description: 'One prompt per line. Use {input}, {previous}, {step_num} placeholders' },
       { name: 'output_format', label: 'Output Format', type: 'select', options: ['plain', 'markdown', 'json'], default: 'markdown', description: 'plain: raw text, markdown: headers per step, json: structured {steps, final_answer, metadata}' },
-      { name: 'provider', label: 'Provider', type: 'select', options: ['ollama', 'openai', 'anthropic', 'mlx'], default: 'ollama' },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
     ],
     detail: {
       format: 'Text — plain, markdown (step headers), or JSON ({steps, final_answer, metadata})',
@@ -1914,7 +1912,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#F43F5E',
     maturity: 'beta',
     inputs: [
-      { id: 'model', label: 'Debate Model', dataType: 'model', required: false },
+      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
       { id: 'input', label: 'Topic / Prompt', dataType: 'text', required: true },
     ],
     outputs: [
@@ -1922,7 +1920,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Debate Log', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Consensus Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { num_agents: 3, num_rounds: 3, temperature: 0.7, max_tokens: 256, format: 'free_form', custom_personas: '', moderator_prompt: '', output_format: 'markdown', provider: 'ollama', endpoint: 'http://localhost:11434', seed: 42 },
+    defaultConfig: { num_agents: 3, num_rounds: 3, temperature: 0.7, max_tokens: 256, format: 'free_form', custom_personas: '', moderator_prompt: '', output_format: 'markdown', seed: 42 },
     configFields: [
       { name: 'num_agents', label: 'Number of Agents', type: 'integer', default: 3, min: 2, max: 10 },
       { name: 'num_rounds', label: 'Debate Rounds', type: 'integer', default: 3, min: 1, max: 10 },
@@ -1932,8 +1930,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { name: 'custom_personas', label: 'Custom Personas', type: 'text_area', default: '', description: 'One per line, format: Name: description of style and perspective' },
       { name: 'moderator_prompt', label: 'Moderator Prompt', type: 'text_area', default: '', description: 'Custom summary template. Use {topic}, {agents}, {rounds}, {consensus} placeholders' },
       { name: 'output_format', label: 'Output Format', type: 'select', options: ['markdown', 'plain', 'json'], default: 'markdown', description: 'markdown: formatted summary, plain: text only, json: structured debate object' },
-      { name: 'provider', label: 'Provider', type: 'select', options: ['ollama', 'openai', 'anthropic', 'mlx'], default: 'ollama' },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
       { name: 'seed', label: 'Random Seed', type: 'integer', default: 42 },
     ],
     detail: {
@@ -2050,7 +2046,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#F43F5E',
     maturity: 'beta',
     inputs: [
-      { id: 'model', label: 'Generator Model', dataType: 'model', required: false },
+      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
       { id: 'store', label: 'Vector Store Config', dataType: 'config', required: true },
       { id: 'dataset', label: 'Queries', dataType: 'dataset', required: false },
       { id: 'query', label: 'Single Query', dataType: 'text', required: false },
@@ -2060,7 +2056,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Responses', dataType: 'dataset', required: true },
       { id: 'metrics', label: 'RAG Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { top_k: 5, rerank: false, temperature: 0.3, include_sources: false, output_format: 'plain', max_tokens: 1024, prompt_template: 'Context:\n{context}\n\nQuestion: {query}\n\nAnswer based on the context above:', provider: 'ollama', endpoint: 'http://localhost:11434' },
+    defaultConfig: { top_k: 5, rerank: false, temperature: 0.3, include_sources: false, output_format: 'plain', max_tokens: 1024, prompt_template: 'Context:\n{context}\n\nQuestion: {query}\n\nAnswer based on the context above:' },
     configFields: [
       { name: 'top_k', label: 'Top K', type: 'integer', default: 5, min: 1, max: 50 },
       { name: 'rerank', label: 'Rerank Results', type: 'boolean', default: false, description: 'Re-score and reorder retrieved documents by keyword relevance' },
@@ -2069,8 +2065,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { name: 'output_format', label: 'Output Format', type: 'select', options: ['plain', 'markdown', 'json'], default: 'plain', description: 'plain: raw response, markdown: with source headers, json: full response objects' },
       { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 1024, min: 64, max: 8192 },
       { name: 'prompt_template', label: 'Prompt Template', type: 'text_area', default: 'Context:\n{context}\n\nQuestion: {query}\n\nAnswer based on the context above:' },
-      { name: 'provider', label: 'Provider', type: 'select', options: ['ollama', 'openai', 'anthropic', 'mlx', 'transformers'], default: 'ollama' },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
     ],
     detail: {
       format: 'Text — plain response, markdown (with sources), or JSON ({query, response, context_retrieved, num_docs})',
@@ -2099,7 +2093,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#F43F5E',
     maturity: 'beta',
     inputs: [
-      { id: 'model', label: 'Code Model', dataType: 'model', required: false },
+      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
       { id: 'input', label: 'Task Description', dataType: 'text', required: true },
       { id: 'context', label: 'Code Context', dataType: 'text', required: false },
     ],
@@ -2109,7 +2103,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Full Results', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Code Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { system_prompt: '', language: 'python', execute: false, timeout: 30, max_iterations: 1, output_format: 'raw', provider: 'ollama', endpoint: 'http://localhost:11434' },
+    defaultConfig: { system_prompt: '', language: 'python', execute: false, timeout: 30, max_iterations: 1, output_format: 'raw' },
     configFields: [
       { name: 'system_prompt', label: 'System Prompt', type: 'text_area', default: '', description: 'Custom code generation instructions. Leave empty for default behavior.' },
       { name: 'language', label: 'Language', type: 'select', options: ['python', 'javascript', 'bash', 'typescript'], default: 'python' },
@@ -2117,8 +2111,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { name: 'timeout', label: 'Execution Timeout (sec)', type: 'integer', default: 30, min: 5, max: 300, depends_on: { field: 'execute', value: true } },
       { name: 'max_iterations', label: 'Max Retry Iterations', type: 'integer', default: 1, min: 1, max: 5, depends_on: { field: 'execute', value: true } },
       { name: 'output_format', label: 'Output Format', type: 'select', options: ['raw', 'markdown', 'json'], default: 'raw', description: 'raw: code only, markdown: fenced block with lang tag, json: {code, language, execution_result}' },
-      { name: 'provider', label: 'Provider', type: 'select', options: ['ollama', 'openai', 'anthropic', 'mlx'], default: 'ollama' },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
     ],
     detail: {
       format: 'Text — raw code, markdown (fenced block with lang tag), or JSON ({code, language, execution_result})',
@@ -2146,6 +2138,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     name: 'Batch Inference',
     description: 'Run batch inference on a dataset',
     category: 'inference',
+    deprecated: true,
+    deprecatedMessage: 'Use LLM Inference block with a dataset input instead.',
     tags: ['inference', 'batch', 'prediction', 'generation'],
     aliases: ['batch predict', 'bulk inference', 'batch generation', 'run model', 'batch processing'],
     icon: 'PlayCircle',
@@ -2175,6 +2169,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     name: 'Streaming Server',
     description: 'Deploy model as OpenAI-compatible streaming server',
     category: 'inference',
+    deprecated: true,
+    deprecatedMessage: 'Use LLM Inference block — streaming support built in.',
     tags: ['inference', 'deployment', 'streaming', 'server', 'api'],
     aliases: ['model server', 'OpenAI API', 'deploy model', 'inference server', 'model hosting', 'serve model'],
     icon: 'Radio',
@@ -2700,56 +2696,45 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     type: 'llm_inference',
     maturity: 'stable',
     name: 'LLM Inference',
-    description: 'Send a prompt to any local or cloud LLM. Supports Ollama, MLX, GGUF, HuggingFace, OpenAI, and Anthropic.',
+    description: 'Universal inference block — auto-detects frameworks and models. Supports Ollama, MLX, and PyTorch.',
     category: 'inference',
     tags: ['inference', 'llm', 'generation', 'chat', 'prompting'],
-    aliases: ['LLM', 'chat', 'generate text', 'Ollama', 'MLX', 'GGUF', 'OpenAI', 'Anthropic', 'GPT', 'Claude', 'Llama'],
+    aliases: ['LLM', 'chat', 'generate text', 'Ollama', 'MLX', 'PyTorch', 'GPT', 'Claude', 'Llama'],
     icon: 'MessageSquare',
     accent: '#A3E635',
     inputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
-      { id: 'context', label: 'Context', dataType: 'text', required: false },
+      { id: 'prompt', label: 'Prompt', dataType: 'text', required: true },
+      { id: 'system_prompt', label: 'System Prompt', dataType: 'text', required: false },
+      { id: 'context', label: 'Context', dataType: 'any', required: false },
     ],
     outputs: [
       { id: 'response', label: 'Response', dataType: 'text', required: true },
-      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
+      { id: 'metadata', label: 'Metadata', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'config', required: false },
     ],
     defaultConfig: {
-      backend: 'ollama', model_name: 'llama3.2', base_url: DEFAULT_OLLAMA_URL,
-      prompt_template: 'You are a helpful assistant.\n\n{context}\n\nUser: {input}\nAssistant:',
+      framework: 'auto', model: '', prompt_template: '{input}',
       user_input: '', temperature: 0.7, max_tokens: 512,
-      model_path: '', trust_remote_code: false,
-      file_path: '', n_ctx: 2048, n_gpu_layers: -1,
+      system_prompt: '', output_format: 'text',
     },
     configFields: [
-      { name: 'backend', label: 'Backend', type: 'select', options: ['ollama', 'mlx', 'gguf', 'huggingface', 'openai', 'anthropic'], default: 'ollama', description: 'Inference backend to use' },
-      // Ollama-specific
-      { name: 'model_name', label: 'Model Name', type: 'string', default: 'llama3.2', description: "e.g. 'llama3.2', 'mistral'", depends_on: { field: 'backend', value: 'ollama' } },
-      { name: 'base_url', label: 'Ollama URL', type: 'string', default: DEFAULT_OLLAMA_URL, depends_on: { field: 'backend', value: 'ollama' } },
-      // MLX-specific
-      { name: 'model_path', label: 'Model Path / Repo', type: 'string', description: "e.g. 'mlx-community/Llama-3.2-3B'", depends_on: { field: 'backend', value: 'mlx' } },
-      { name: 'trust_remote_code', label: 'Trust Remote Code', type: 'boolean', default: false, depends_on: { field: 'backend', value: 'mlx' } },
-      // GGUF-specific
-      { name: 'file_path', label: 'GGUF File Path', type: 'file_path', depends_on: { field: 'backend', value: 'gguf' } },
-      { name: 'n_ctx', label: 'Context Size', type: 'integer', default: 2048, min: 256, depends_on: { field: 'backend', value: 'gguf' } },
-      { name: 'n_gpu_layers', label: 'GPU Layers (-1=all)', type: 'integer', default: -1, depends_on: { field: 'backend', value: 'gguf' } },
-      // HuggingFace-specific
-      { name: 'model_name', label: 'Model ID', type: 'string', description: "e.g. 'meta-llama/Llama-3.2-3B'", depends_on: { field: 'backend', value: 'huggingface' } },
-      // OpenAI-specific
-      { name: 'model_name', label: 'Model', type: 'string', description: "e.g. 'gpt-4o', 'gpt-4o-mini'", depends_on: { field: 'backend', value: 'openai' } },
-      // Anthropic-specific
-      { name: 'model_name', label: 'Model', type: 'string', description: "e.g. 'claude-sonnet-4-20250514'", depends_on: { field: 'backend', value: 'anthropic' } },
-      // Common fields
-      { name: 'prompt_template', label: 'Prompt Template', type: 'text_area', description: 'Use {context} and {input} as placeholders' },
+      { name: 'framework', label: 'Framework', type: 'select', options: ['auto', 'ollama', 'mlx', 'pytorch'], default: 'auto', description: 'Inference framework (auto = detect best available)' },
+      { name: 'model', label: 'Model', type: 'string', default: '', description: "Model identifier (e.g. 'llama3.2' for Ollama, 'mlx-community/Llama-3.2-3B' for MLX)" },
+      { name: 'prompt_template', label: 'Prompt Template', type: 'text_area', default: '{input}', description: 'Use {context} and {input} as placeholders' },
       { name: 'user_input', label: 'User Input', type: 'text_area', description: 'The user prompt to send' },
-      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.7, min: 0, max: 2 },
-      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 512, min: 1, max: 8192 },
+      { name: 'system_prompt', label: 'System Prompt', type: 'text_area', default: '', description: 'System message (ignored by MLX)' },
+      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.7, min: 0, max: 2, description: 'Leave empty to use framework default' },
+      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 512, min: 1, max: 32768, description: 'Leave empty to use framework default' },
+      { name: 'top_p', label: 'Top P', type: 'float', min: 0, max: 1, description: 'Nucleus sampling' },
+      { name: 'stop_sequences', label: 'Stop Sequences', type: 'string', default: '', description: 'Comma-separated stop strings' },
+      { name: 'repeat_penalty', label: 'Repeat Penalty', type: 'float', min: 0, max: 3 },
+      { name: 'output_format', label: 'Output Format', type: 'select', options: ['text', 'json'], default: 'text', description: 'text = raw response, json = wrapped with metadata' },
     ],
     detail: {
       tips: [
-        'Set backend to match your installed models',
-        'Use {context} and {input} in prompt template',
-        'Ollama models auto-detected from localhost:11434',
+        'Framework "auto" picks the best available backend for your model',
+        'Connect llm_config output to agent blocks for shared inference config',
+        'Model dropdown auto-populates from /api/system/models',
       ],
     },
   },
@@ -2964,6 +2949,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     name: 'Text Classifier',
     description: 'Classify text into categories using a model or rules',
     category: 'inference',
+    deprecated: true,
+    deprecatedMessage: 'Use LLM Inference block with a classification prompt.',
     tags: ['inference', 'classification', 'nlp', 'text-processing'],
     aliases: ['classify', 'text classification', 'sentiment analysis', 'zero-shot classification', 'labeling', 'categorize'],
     icon: 'Tags',
@@ -2992,6 +2979,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     name: 'Text Summarizer',
     description: 'Summarize long text into concise output',
     category: 'inference',
+    deprecated: true,
+    deprecatedMessage: 'Use LLM Inference block with a summarization prompt.',
     tags: ['inference', 'summarization', 'nlp', 'text-processing'],
     aliases: ['summarize', 'text summary', 'TL;DR', 'abstract', 'condensed text', 'bullet points'],
     icon: 'AlignLeft',
@@ -3020,6 +3009,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     name: 'Text Translator',
     description: 'Translate text between languages using a model',
     category: 'inference',
+    deprecated: true,
+    deprecatedMessage: 'Use LLM Inference block with a translation prompt.',
     tags: ['inference', 'translation', 'nlp', 'multilingual'],
     aliases: ['translate', 'translation', 'language translation', 'multilingual', 'machine translation', 'MT'],
     icon: 'Languages',
@@ -3958,6 +3949,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     name: 'Chat Completion',
     description: 'Multi-turn chat with system/user/assistant message roles',
     category: 'inference',
+    deprecated: true,
+    deprecatedMessage: 'Use LLM Inference block with system_prompt and prompt inputs.',
     tags: ['inference', 'chat', 'conversation', 'multi-turn', 'dialogue'],
     aliases: ['chat', 'conversation', 'multi-turn', 'dialogue', 'chatbot', 'assistant'],
     icon: 'MessagesSquare',
@@ -3987,6 +3980,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     name: 'Structured Output',
     description: 'Generate JSON or structured data from LLM using a schema',
     category: 'inference',
+    deprecated: true,
+    deprecatedMessage: 'Use LLM Inference block with output_format set to json.',
     tags: ['inference', 'json', 'structured', 'schema', 'extraction'],
     aliases: ['JSON output', 'structured generation', 'schema output', 'data extraction', 'JSON mode'],
     icon: 'Braces',
@@ -4044,6 +4039,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     name: 'Function Calling',
     description: 'LLM with tool/function definitions for structured actions',
     category: 'inference',
+    deprecated: true,
+    deprecatedMessage: 'Use Agent Orchestrator with Tool Registry for function calling.',
     tags: ['inference', 'tools', 'function-calling', 'actions', 'structured'],
     aliases: ['tool use', 'function call', 'tool calling', 'actions', 'API calling', 'structured actions'],
     icon: 'Wrench',
@@ -4074,6 +4071,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     name: 'Few-Shot Prompting',
     description: 'Example-based prompting for in-context learning',
     category: 'inference',
+    deprecated: true,
+    deprecatedMessage: 'Use LLM Inference block with examples in the prompt template.',
     tags: ['inference', 'few-shot', 'in-context', 'examples', 'learning'],
     aliases: ['few shot', 'in-context learning', 'example prompting', 'ICL', 'example-based'],
     icon: 'ListChecks',

@@ -1,8 +1,13 @@
-"""Agent Orchestrator — multi-step agent workflow with tool use and reasoning."""
+"""Agent Orchestrator — multi-step agent workflow with tool use and reasoning.
+
+Uses connected LLM Inference block for all model calls via shared utilities.
+"""
 
 import json
 import os
 import time
+
+from blocks.inference._inference_utils import call_inference
 
 
 def run(ctx):
@@ -16,23 +21,26 @@ def run(ctx):
     )
     temperature = float(ctx.config.get("temperature", 0.3))
     max_tokens = int(ctx.config.get("max_tokens", 1024))
-    provider = ctx.config.get("provider", "ollama")
-    endpoint = ctx.config.get("endpoint", "http://localhost:11434")
     stop_phrase = ctx.config.get("stop_phrase", "FINAL ANSWER:")
     output_format = ctx.config.get("output_format", "plain")
 
-    # ── Load model info ─────────────────────────────────────────────────
-    model_name = ctx.config.get("model_name", "")
+    # ── Load LLM config from connected block ─────────────────────────
+    llm_config = None
     try:
-        model_info = ctx.load_input("model")
-        if isinstance(model_info, dict):
-            model_name = model_name or model_info.get(
-                "model_name", model_info.get("model_id", "")
-            )
-            provider = model_info.get("source", provider)
-            endpoint = model_info.get("endpoint", endpoint)
+        llm_config = ctx.load_input("llm")
     except (ValueError, Exception):
         pass
+
+    if llm_config and isinstance(llm_config, dict):
+        framework = llm_config.get("framework", "ollama")
+        model_name = llm_config.get("model", "")
+        inf_config = llm_config.get("config", {})
+        inf_config["max_tokens"] = max_tokens
+        inf_config["temperature"] = temperature
+    else:
+        framework = ""
+        model_name = ""
+        inf_config = {}
 
     # ── Load task input ─────────────────────────────────────────────────
     input_text = ""
@@ -88,11 +96,10 @@ def run(ctx):
     ctx.log_message(f"Task: {input_text[:100]}...")
     ctx.log_message(f"Available tools: {len(tools)}")
 
-    # ── Check model availability ────────────────────────────────────────
-    use_real = _check_provider(provider, model_name, endpoint)
-
+    # ── Check if real inference is available ──────────────────────────
+    use_real = bool(llm_config and model_name)
     if not use_real:
-        ctx.log_message("Demo mode: simulating agent orchestration.")
+        ctx.log_message("Demo mode: no LLM connected or no model specified.")
 
     # ── Build initial conversation ──────────────────────────────────────
     full_system = system_prompt
@@ -120,25 +127,23 @@ def run(ctx):
             f"When done, write '{stop_phrase}' followed by your answer."
         )
 
-    conversation = [
-        {"role": "system", "content": full_system},
-        {"role": "user", "content": input_text},
-    ]
-
     # ── Agent loop ──────────────────────────────────────────────────────
     steps = []
     final_answer = ""
     total_tokens = 0
+    conversation_prompt = f"SYSTEM: {full_system}\n\nUSER: {input_text}"
 
     for step_num in range(max_steps):
         ctx.log_message(f"\n--- Step {step_num + 1}/{max_steps} ---")
 
         if use_real:
             try:
-                response = _call_model(
-                    provider, endpoint, model_name, conversation,
-                    temperature, max_tokens,
+                response, meta = call_inference(
+                    framework, model_name, conversation_prompt,
+                    system_prompt="", config=inf_config,
+                    log_fn=ctx.log_message,
                 )
+                total_tokens += meta.get("total_tokens", 0)
             except Exception as e:
                 ctx.log_message(f"Model error: {e}")
                 response = f"[Error calling model: {e}]"
@@ -148,14 +153,11 @@ def run(ctx):
             )
             time.sleep(0.2)
 
-        approx_tokens = len(response.split())
-        total_tokens += approx_tokens
-
-        conversation.append({"role": "assistant", "content": response})
+        conversation_prompt += f"\n\nASSISTANT: {response}"
         step_record = {
             "step": step_num + 1,
             "response": response,
-            "tokens_approx": approx_tokens,
+            "tokens_approx": len(response.split()),
             "strategy": strategy,
         }
 
@@ -164,7 +166,7 @@ def run(ctx):
             tool_result = _execute_tool_call(response, tools)
             step_record["tool_call"] = True
             step_record["tool_result"] = tool_result
-            conversation.append({"role": "user", "content": f"Tool result: {tool_result}"})
+            conversation_prompt += f"\n\nUSER: Tool result: {tool_result}"
 
         steps.append(step_record)
         ctx.log_message(f"Response: {response[:150]}...")
@@ -181,7 +183,7 @@ def run(ctx):
 
         # Also check natural conclusion phrases
         if any(p in response.lower() for p in ["in conclusion", "to summarize", "final answer"]):
-            if step_num >= 1:  # Allow at least 2 steps
+            if step_num >= 1:
                 final_answer = response
                 ctx.log_message("Agent reached natural conclusion.")
                 break
@@ -219,7 +221,7 @@ def run(ctx):
         "total_steps": len(steps),
         "total_tokens": total_tokens,
         "model": model_name or "demo",
-        "provider": provider,
+        "framework": framework or "demo",
         "strategy": strategy,
         "tools_available": len(tools),
         "demo_mode": not use_real,
@@ -234,83 +236,6 @@ def run(ctx):
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────
-
-
-def _check_provider(provider, model_name, endpoint):
-    """Check if an LLM provider is reachable."""
-    if not model_name:
-        return False
-    if provider == "ollama":
-        try:
-            import urllib.request
-            with urllib.request.urlopen(f"{endpoint.rstrip('/')}/api/tags", timeout=5):
-                return True
-        except Exception:
-            return False
-    if provider == "openai":
-        return bool(os.environ.get("OPENAI_API_KEY"))
-    if provider == "anthropic":
-        return bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return False
-
-
-def _call_model(provider, endpoint, model, messages, temperature, max_tokens):
-    """Dispatch to the correct provider API."""
-    import urllib.request
-
-    if provider == "ollama":
-        prompt = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
-        url = f"{endpoint.rstrip('/')}/api/generate"
-        payload = json.dumps({
-            "model": model,
-            "prompt": prompt,
-            "options": {"temperature": temperature, "num_predict": max_tokens},
-            "stream": False,
-        }).encode()
-        req = urllib.request.Request(
-            url, data=payload, headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            return json.loads(resp.read().decode()).get("response", "")
-
-    if provider == "openai":
-        url = "https://api.openai.com/v1/chat/completions"
-        payload = json.dumps({
-            "model": model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }).encode()
-        req = urllib.request.Request(url, data=payload, headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
-        })
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.loads(resp.read().decode())
-            return data["choices"][0]["message"]["content"]
-
-    if provider == "anthropic":
-        url = "https://api.anthropic.com/v1/messages"
-        api_msgs = [m for m in messages if m["role"] != "system"]
-        system_text = next(
-            (m["content"] for m in messages if m["role"] == "system"), "",
-        )
-        payload = json.dumps({
-            "model": model,
-            "max_tokens": max_tokens,
-            "system": system_text,
-            "messages": api_msgs,
-        }).encode()
-        req = urllib.request.Request(url, data=payload, headers={
-            "Content-Type": "application/json",
-            "x-api-key": os.environ["ANTHROPIC_API_KEY"],
-            "anthropic-version": "2023-06-01",
-        })
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.loads(resp.read().decode())
-            return data["content"][0]["text"]
-
-    raise ValueError(f"Unsupported provider: {provider}")
 
 
 def _simulate_step(step_num, max_steps, input_text, strategy, tools, stop_phrase):

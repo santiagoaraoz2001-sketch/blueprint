@@ -3,6 +3,8 @@ type: structured_output
 category: inference
 description: Generate JSON/structured data from LLM using a schema
 version: "1.0.0"
+deprecated: true
+deprecated_message: "Use LLM Inference block with output_format set to json."
 
 inputs:
   - id: model

@@ -5,10 +5,11 @@ description: Multi-step agent that reasons through tasks using tools and memory
 version: "1.1.0"
 
 inputs:
-  - id: model
-    label: Model
-    data_type: model
-    required: false
+  - id: llm
+    label: LLM
+    data_type: config
+    required: true
+    description: "Connected LLM Inference block for model calls"
   - id: input
     label: Task / Prompt
     data_type: text
@@ -64,16 +65,6 @@ config:
     default: 1024
     min: 64
     max: 8192
-  provider:
-    type: select
-    label: Provider
-    options: [ollama, openai, anthropic, mlx]
-    default: ollama
-  endpoint:
-    type: string
-    label: Endpoint URL
-    default: "http://localhost:11434"
-    description: Provider API endpoint
   stop_phrase:
     type: string
     label: Completion Signal
