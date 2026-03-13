@@ -5,11 +5,14 @@ Takes a pipeline graph (nodes + edges), topologically sorts blocks,
 and executes them sequentially, passing outputs between blocks.
 """
 
+import json
 import re
+import traceback
 import uuid
 import time
 import asyncio
 import importlib.util
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -31,6 +34,16 @@ from ..models.run import Run, LiveRun
 from ..block_sdk.context import BlockContext
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
+
+# Cancel events: threading.Event per run_id
+_cancel_events: dict[str, threading.Event] = {}
+
+
+def request_cancel(run_id: str):
+    """Signal a running pipeline to cancel. Called from the cancel endpoint."""
+    event = _cancel_events.get(run_id)
+    if event:
+        event.set()
 
 
 def _topological_sort(nodes: list[dict], edges: list[dict]) -> list[str]:
@@ -139,6 +152,12 @@ def _resolve_secrets(config: dict) -> dict:
     return resolved
 
 
+def _check_cancelled(run_id: str) -> bool:
+    """Check if a run has been cancelled."""
+    event = _cancel_events.get(run_id)
+    return event is not None and event.is_set()
+
+
 async def execute_pipeline(
     pipeline_id: str,
     run_id: str,
@@ -151,6 +170,10 @@ async def execute_pipeline(
 
     if not nodes:
         return
+
+    # Register cancel event for this run
+    _cancel_events[run_id] = threading.Event()
+
     run = Run(
         id=run_id,
         pipeline_id=pipeline_id,
@@ -183,10 +206,29 @@ async def execute_pipeline(
             node = node_map.get(node_id)
             if not node:
                 continue
-            
+
             # Skip visual grouping nodes
             if node.get("type") == "groupNode":
                 continue
+
+            # Check for cancellation before each block
+            if _check_cancelled(run_id):
+                run.status = "cancelled"
+                run.error_message = "Cancelled by user"
+                run.finished_at = datetime.now(timezone.utc)
+                run.duration_seconds = time.time() - start_time
+                run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                live.status = "cancelled"
+                db.commit()
+                try:
+                    publish_event(run_id, "run_cancelled", {
+                        "run_id": run_id,
+                        "duration": run.duration_seconds,
+                        "completed_blocks": idx,
+                    })
+                except Exception:
+                    pass
+                return
 
             node_data = node.get("data", {})
             block_type = node_data.get("type", "")
@@ -199,12 +241,15 @@ async def execute_pipeline(
             live.overall_progress = idx / len(nodes)
             db.commit()
 
-            publish_event(run_id, "node_started", {
-                "node_id": node_id,
-                "block_type": block_type,
-                "index": idx,
-                "total": len(nodes),
-            })
+            try:
+                publish_event(run_id, "node_started", {
+                    "node_id": node_id,
+                    "block_type": block_type,
+                    "index": idx,
+                    "total": len(nodes),
+                })
+            except Exception:
+                pass
 
             # Gather inputs from upstream edges
             # When multiple edges connect to the same target handle, collect values into a list
@@ -243,27 +288,50 @@ async def execute_pipeline(
             config = _resolve_secrets(config)
 
             if block_dir:
+                # Progress commit throttling: commit at most every 2 seconds
+                _last_progress_commit = time.time()
+
                 def progress_cb(current, total):
+                    nonlocal _last_progress_commit
+
+                    # Check for cancellation in progress callback
+                    if _check_cancelled(run_id):
+                        raise InterruptedError("Run cancelled by user")
+
                     progress = current / total if total > 0 else 0
                     live.block_progress = progress
                     live.overall_progress = (idx + progress) / len(nodes)
                     elapsed = time.time() - start_time
                     if progress > 0:
                         live.eta_seconds = (elapsed / ((idx + progress) / len(nodes))) - elapsed
-                    db.commit()
-                    publish_event(run_id, "node_progress", {
-                        "node_id": node_id,
-                        "progress": progress,
-                        "overall": live.overall_progress,
-                        "eta": live.eta_seconds,
-                    })
+
+                    now = time.time()
+                    if now - _last_progress_commit >= 2.0:
+                        db.commit()
+                        _last_progress_commit = now
+
+                    try:
+                        publish_event(run_id, "node_progress", {
+                            "node_id": node_id,
+                            "progress": progress,
+                            "overall": live.overall_progress,
+                            "eta": live.eta_seconds,
+                        })
+                    except Exception:
+                        pass
 
                 def message_cb(msg):
-                    publish_event(run_id, "node_log", {"node_id": node_id, "message": msg})
+                    try:
+                        publish_event(run_id, "node_log", {"node_id": node_id, "message": msg})
+                    except Exception:
+                        pass
 
                 def metric_cb(name, value, step):
                     all_metrics[f"{block_type}.{name}"] = value
-                    publish_event(run_id, "metric", {"node_id": node_id, "name": name, "value": value})
+                    try:
+                        publish_event(run_id, "metric", {"node_id": node_id, "name": name, "value": value})
+                    except Exception:
+                        pass
 
                 try:
                     node_outputs = _load_and_run_block(
@@ -271,42 +339,78 @@ async def execute_pipeline(
                         run_id, node_id, progress_cb, message_cb, metric_cb,
                     )
                     outputs[node_id] = node_outputs
+                except InterruptedError:
+                    # Cancellation via progress_cb
+                    run.status = "cancelled"
+                    run.error_message = "Cancelled by user"
+                    run.finished_at = datetime.now(timezone.utc)
+                    run.duration_seconds = time.time() - start_time
+                    run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    live.status = "cancelled"
+                    db.commit()
+                    try:
+                        publish_event(run_id, "run_cancelled", {
+                            "run_id": run_id,
+                            "duration": run.duration_seconds,
+                        })
+                    except Exception:
+                        pass
+                    return
                 except Exception as e:
-                    publish_event(run_id, "node_failed", {"node_id": node_id, "error": str(e)})
+                    tb = traceback.format_exc()
+                    try:
+                        publish_event(run_id, "node_failed", {"node_id": node_id, "error": str(e)})
+                    except Exception:
+                        pass
                     run.status = "failed"
-                    run.error_message = f"Block {block_type} failed: {str(e)}"
+                    run.error_message = f"Block {block_type} failed: {str(e)}\n\n{tb}"
+                    run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     live.status = "failed"
                     db.commit()
+                    # Write traceback to error.log
+                    _write_error_log(run_id, tb)
                     return
             else:
-                publish_event(run_id, "node_failed", {"node_id": node_id, "error": f"Block type '{block_type}' not found"})
+                try:
+                    publish_event(run_id, "node_failed", {"node_id": node_id, "error": f"Block type '{block_type}' not found"})
+                except Exception:
+                    pass
                 run.status = "failed"
                 run.error_message = f"Block type '{block_type}' not found. No run.py available."
+                run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                 live.status = "failed"
                 db.commit()
                 return
 
             # Heartbeat after each block completes
             run.last_heartbeat = datetime.now(timezone.utc)
+            # Save partial outputs after each block
+            run.outputs_snapshot = _safe_outputs_snapshot(outputs)
             db.commit()
 
             # Publish outputs so frontend can display them
             safe_outputs = {}
             for k, v in node_outputs.items():
                 try:
-                    import json
                     json.dumps(v)
                     safe_outputs[k] = v if not isinstance(v, str) or len(v) < 200 else v[:200] + '...'
                 except Exception:
                     safe_outputs[k] = str(v)[:200]
-            publish_event(run_id, "node_output", {"node_id": node_id, "outputs": safe_outputs})
-            publish_event(run_id, "node_completed", {"node_id": node_id, "index": idx})
+            try:
+                publish_event(run_id, "node_output", {"node_id": node_id, "outputs": safe_outputs})
+            except Exception:
+                pass
+            try:
+                publish_event(run_id, "node_completed", {"node_id": node_id, "index": idx})
+            except Exception:
+                pass
 
         # Pipeline complete
         run.status = "complete"
         run.finished_at = datetime.now(timezone.utc)
         run.duration_seconds = time.time() - start_time
         run.metrics = all_metrics
+        run.outputs_snapshot = _safe_outputs_snapshot(outputs)
         live.status = "complete"
         live.overall_progress = 1.0
         db.commit()
@@ -318,17 +422,23 @@ async def execute_pipeline(
         except Exception:
             pass
 
-        publish_event(run_id, "run_completed", {
-            "run_id": run_id,
-            "duration": run.duration_seconds,
-            "metrics": all_metrics,
-        })
+        try:
+            publish_event(run_id, "run_completed", {
+                "run_id": run_id,
+                "duration": run.duration_seconds,
+                "metrics": all_metrics,
+            })
+        except Exception:
+            pass
 
     except Exception as e:
+        tb = traceback.format_exc()
         run.status = "failed"
-        run.error_message = str(e)
+        run.error_message = f"{str(e)}\n\n{tb}"
+        run.outputs_snapshot = _safe_outputs_snapshot(outputs)
         live.status = "failed"
         db.commit()
+        _write_error_log(run_id, tb)
 
         # Auto-lifecycle: update counts only on failure (never crashes execution)
         try:
@@ -337,4 +447,35 @@ async def execute_pipeline(
         except Exception:
             pass
 
-        publish_event(run_id, "run_failed", {"run_id": run_id, "error": str(e)})
+        try:
+            publish_event(run_id, "run_failed", {"run_id": run_id, "error": str(e)})
+        except Exception:
+            pass
+    finally:
+        # Clean up cancel event
+        _cancel_events.pop(run_id, None)
+
+
+def _safe_outputs_snapshot(outputs: dict[str, dict[str, Any]]) -> dict:
+    """Create a JSON-safe snapshot of outputs for persistence."""
+    snapshot = {}
+    for node_id, node_outputs in outputs.items():
+        safe = {}
+        for k, v in node_outputs.items():
+            try:
+                json.dumps(v)
+                safe[k] = v if not isinstance(v, str) or len(v) < 500 else v[:500] + '...'
+            except Exception:
+                safe[k] = str(v)[:500]
+        snapshot[node_id] = safe
+    return snapshot
+
+
+def _write_error_log(run_id: str, tb: str):
+    """Write traceback to {ARTIFACTS_DIR}/{run_id}/error.log."""
+    try:
+        error_dir = ARTIFACTS_DIR / run_id
+        error_dir.mkdir(parents=True, exist_ok=True)
+        (error_dir / "error.log").write_text(tb)
+    except Exception:
+        pass

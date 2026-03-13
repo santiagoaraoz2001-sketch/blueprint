@@ -9,7 +9,7 @@ class Run(Base):
     id = Column(String, primary_key=True)
     pipeline_id = Column(String, ForeignKey("blueprint_pipelines.id"), nullable=False)
     mlflow_run_id = Column(String, nullable=True)
-    status = Column(String, default="pending")  # pending | running | paused | complete | failed
+    status = Column(String, default="pending")  # pending | running | paused | complete | failed | cancelled
     started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     finished_at = Column(DateTime, nullable=True)
     duration_seconds = Column(Float, nullable=True)
@@ -17,6 +17,7 @@ class Run(Base):
     last_heartbeat = Column(DateTime, nullable=True)
     config_snapshot = Column(JSON, default=dict)
     metrics = Column(JSON, default=dict)
+    outputs_snapshot = Column(JSON, nullable=True)
 
 
 class LiveRun(Base):
