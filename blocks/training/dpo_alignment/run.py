@@ -132,10 +132,10 @@ def run(ctx):
         def on_log(self, args, state, control, logs=None, **kwargs):
             if logs:
                 if "loss" in logs:
-                    ctx.log_metric("dpo_loss", round(logs["loss"], 4), state.global_step)
+                    ctx.log_metric("train/loss", round(logs["loss"], 4), state.global_step)
                     ctx.log_message(f"  Step {state.global_step} — loss: {logs['loss']:.4f}")
                 if "eval_loss" in logs:
-                    ctx.log_metric("eval_loss", round(logs["eval_loss"], 4), state.global_step)
+                    ctx.log_metric("eval/loss", round(logs["eval_loss"], 4), state.global_step)
                     ctx.log_message(f"  Eval loss: {logs['eval_loss']:.4f}")
                 reward_margin_keys = [
                     ("rewards/chosen", "rewards/rejected"),

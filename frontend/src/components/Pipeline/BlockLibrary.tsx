@@ -134,6 +134,14 @@ export default function BlockLibrary() {
           .sort((a, b) => b.score - a.score)
         filtered = scored.map(({ block }) => block)
       }
+      // Sort: recommended first, deprecated last
+      filtered = [...filtered].sort((a, b) => {
+        if (a.recommended && !b.recommended) return -1
+        if (!a.recommended && b.recommended) return 1
+        if (a.deprecated && !b.deprecated) return 1
+        if (!a.deprecated && b.deprecated) return -1
+        return 0
+      })
       return { category, blocks: filtered }
     })
     .filter(({ blocks }) => blocks.length > 0)
@@ -455,16 +463,39 @@ function BlockItem({
           style={{
             fontFamily: F,
             fontSize: FS.sm,
-            color: hovered ? T.text : T.sec,
+            color: block.deprecated ? T.dim : (hovered ? T.text : T.sec),
             fontWeight: 600,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            transition: 'color 0.2s'
+            transition: 'color 0.2s',
+            opacity: block.deprecated ? 0.6 : 1,
           }}
         >
           {block.name}
-          {('maturity' in block) && (block as any).maturity && (block as any).maturity !== 'stable' && (
+          {block.deprecated && (
+            <span style={{
+              fontFamily: F, fontSize: '7px', fontWeight: 700,
+              padding: '1px 4px', borderRadius: 3, marginLeft: 4,
+              letterSpacing: '0.06em', textTransform: 'uppercase' as const,
+              display: 'inline-block', verticalAlign: 'middle',
+              color: '#F59E0B', background: '#F59E0B15', border: '1px solid #F59E0B30',
+            }}>
+              DEPRECATED
+            </span>
+          )}
+          {block.recommended && (
+            <span style={{
+              fontFamily: F, fontSize: '7px', fontWeight: 700,
+              padding: '1px 4px', borderRadius: 3, marginLeft: 4,
+              letterSpacing: '0.06em', textTransform: 'uppercase' as const,
+              display: 'inline-block', verticalAlign: 'middle',
+              color: '#2DD4BF', background: '#2DD4BF15', border: '1px solid #2DD4BF30',
+            }}>
+              RECOMMENDED
+            </span>
+          )}
+          {!block.deprecated && ('maturity' in block) && (block as any).maturity && (block as any).maturity !== 'stable' && (
             <span style={{
               fontFamily: F, fontSize: '7px', fontWeight: 700,
               padding: '1px 4px', borderRadius: 3, marginLeft: 4,
@@ -486,6 +517,7 @@ function BlockItem({
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             marginTop: 2,
+            opacity: block.deprecated ? 0.5 : 1,
           }}
         >
           {block.description}
@@ -759,10 +791,30 @@ function CategoryDetailPopup({
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
               >
                 <IconComp size={11} color={color} style={{ flexShrink: 0 }} />
-                <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec, fontWeight: 500 }}>
+                <span style={{ fontFamily: F, fontSize: FS.xxs, color: b.deprecated ? T.dim : T.sec, fontWeight: 500, opacity: b.deprecated ? 0.6 : 1 }}>
                   {b.name}
                 </span>
-                {('maturity' in b) && (b as any).maturity && (b as any).maturity !== 'stable' && (
+                {b.deprecated && (
+                  <span style={{
+                    fontFamily: F, fontSize: '6px', fontWeight: 700,
+                    padding: '0px 3px', borderRadius: 2, marginLeft: 'auto',
+                    letterSpacing: '0.06em', textTransform: 'uppercase' as const,
+                    color: '#F59E0B', background: '#F59E0B15', border: '1px solid #F59E0B30',
+                  }}>
+                    DEPRECATED
+                  </span>
+                )}
+                {b.recommended && (
+                  <span style={{
+                    fontFamily: F, fontSize: '6px', fontWeight: 700,
+                    padding: '0px 3px', borderRadius: 2, marginLeft: 'auto',
+                    letterSpacing: '0.06em', textTransform: 'uppercase' as const,
+                    color: '#2DD4BF', background: '#2DD4BF15', border: '1px solid #2DD4BF30',
+                  }}>
+                    RECOMMENDED
+                  </span>
+                )}
+                {!b.deprecated && ('maturity' in b) && (b as any).maturity && (b as any).maturity !== 'stable' && (
                   <span style={{
                     fontFamily: F, fontSize: '6px', fontWeight: 700,
                     padding: '0px 3px', borderRadius: 2, marginLeft: 'auto',

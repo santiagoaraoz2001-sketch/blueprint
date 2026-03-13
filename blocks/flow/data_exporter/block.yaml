@@ -3,6 +3,8 @@ type: data_exporter
 category: endpoints
 description: Export pipeline data to JSON, JSONL, CSV, TSV, Markdown, or LaTeX format.
 version: "2.0.0"
+deprecated: true
+deprecated_message: "Use 'Save to Local Path' for files or 'Results Formatter' for metrics. This block will be removed in v0.3."
 
 inputs:
   - id: data

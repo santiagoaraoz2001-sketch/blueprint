@@ -64,6 +64,7 @@ export interface BlockDefinition {
   detail?: BlockDetail
   deprecated?: boolean
   deprecatedMessage?: string
+  recommended?: boolean
 }
 
 /** Backward-compat aliases — map old type names to new 9-type system */
@@ -2294,6 +2295,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     icon: 'FileOutput',
     accent: '#34D399',
     maturity: 'stable',
+    recommended: true,
     inputs: [{ id: 'metrics', label: 'Metrics', dataType: 'metrics', required: true }],
     outputs: [{ id: 'artifact', label: 'Report', dataType: 'artifact', required: true }],
     defaultConfig: { format: 'csv', include_config: true },
@@ -3162,6 +3164,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   {
     type: 'data_exporter',
     maturity: 'stable',
+    deprecated: true,
+    deprecatedMessage: "Use 'Save to Local Path' or 'Results Formatter' instead.",
     name: 'Data Exporter',
     description: 'Export pipeline data to JSON, JSONL, CSV, TSV, Markdown, or LaTeX format.',
     category: 'endpoints',
@@ -3224,6 +3228,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   {
     type: 'results_exporter',
     maturity: 'stable',
+    deprecated: true,
+    deprecatedMessage: "Use 'Save to Local Path' or 'Results Formatter' instead.",
     name: 'Results Exporter',
     description: 'Export pipeline results to CSV, JSON, JSONL, or Parquet with format selection',
     category: 'endpoints',
@@ -3797,6 +3803,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     icon: 'FolderDown',
     accent: '#38BDF8',
     maturity: 'stable',
+    recommended: true,
     inputs: [{ id: 'data', label: 'Input', dataType: 'any', required: true }],
     outputs: [
       { id: 'file_path', label: 'File Path', dataType: 'text', required: true },
