@@ -1399,6 +1399,38 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { name: 'decimal_precision', label: 'Decimal Precision', type: 'integer', default: 4, min: 1, max: 6, description: 'Decimal places for computed scores' },
     ],
   },
+  // 8b. Model Diff
+  {
+    type: 'model_diff',
+    name: 'Model Diff',
+    description: 'Compare two models side-by-side — token probabilities, attention patterns, layer activations. Outputs: diff report artifact, comparison metrics, per-token dataset.',
+    category: 'metrics',
+    tags: ['metrics', 'comparison', 'diff', 'model-diff', 'kl-divergence', 'merge-analysis'],
+    aliases: ['model diff', 'model comparison', 'weight diff', 'merge diff', 'token probabilities', 'layer comparison'],
+    icon: 'GitCompareArrows',
+    accent: '#34D399',
+    maturity: 'beta',
+    inputs: [
+      { id: 'model_a', label: 'Model A', dataType: 'model', required: true },
+      { id: 'model_b', label: 'Model B', dataType: 'model', required: true },
+    ],
+    outputs: [
+      { id: 'diff_report', label: 'Diff Report', dataType: 'artifact', required: true },
+      { id: 'metrics', label: 'Diff Metrics', dataType: 'metrics', required: true },
+      { id: 'dataset', label: 'Token Comparisons', dataType: 'dataset', required: false },
+    ],
+    defaultConfig: { prompt: 'The capital of France is', max_tokens: 50, top_k: 5, compare_layers: false, model_a_name: '', model_b_name: '', output_format: 'json', decimal_precision: 4 },
+    configFields: [
+      { name: 'prompt', label: 'Test Prompt', type: 'text_area', default: 'The capital of France is', description: 'Prompt to run through both models' },
+      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 50, min: 1, max: 512 },
+      { name: 'top_k', label: 'Top-K Probabilities', type: 'integer', default: 5, min: 1, max: 20, description: 'Number of top token probabilities to compare per position' },
+      { name: 'compare_layers', label: 'Compare Layer Activations', type: 'boolean', default: false, description: 'Slower but shows per-layer cosine similarity' },
+      { name: 'model_a_name', label: 'Model A Name Override', type: 'string', default: '' },
+      { name: 'model_b_name', label: 'Model B Name Override', type: 'string', default: '' },
+      { name: 'output_format', label: 'Output Format', type: 'select', options: ['json', 'csv'], default: 'json', description: 'Format for dataset and report outputs' },
+      { name: 'decimal_precision', label: 'Decimal Precision', type: 'integer', default: 4, min: 1, max: 6, description: 'Decimal places for computed scores' },
+    ],
+  },
   // 9. Custom Eval
   {
     type: 'custom_eval',
