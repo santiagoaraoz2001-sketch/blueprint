@@ -34,6 +34,7 @@ from ..models.run import Run, LiveRun
 from ..block_sdk.context import BlockContext
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
+from .metrics_schema import create_metric
 
 # Cancel events: threading.Event per run_id, protected by lock for thread safety
 _cancel_events: dict[str, threading.Event] = {}
@@ -408,30 +409,26 @@ async def execute_pipeline(
                         pass
 
                 def metric_cb(name, value, step):
+                    metric_event_obj = create_metric(
+                        node_id=node_id,
+                        name=name,
+                        value=value,
+                        category=category,
+                        step=step,
+                    )
+                    event_dict = metric_event_obj.to_dict()
+
                     all_metrics[f"{block_type}.{name}"] = value
-                    metric_event = {
-                        "type": "metric",
-                        "node_id": node_id,
-                        "name": name,
-                        "value": value,
-                        "category": category,
-                        "timestamp": time.time(),
-                    }
+
                     try:
-                        publish_event(run_id, "metric", {
-                            "node_id": node_id,
-                            "name": name,
-                            "value": value,
-                            "category": category,
-                            "timestamp": metric_event["timestamp"],
-                        })
+                        publish_event(run_id, "metric", event_dict)
                     except Exception:
                         pass
                     # Layer 1: JSONL
-                    metrics_file.write(json.dumps(metric_event) + "\n")
+                    metrics_file.write(json.dumps(event_dict) + "\n")
                     metrics_file.flush()
                     # Layer 2: buffer
-                    metrics_log_buffer.append(metric_event)
+                    metrics_log_buffer.append(event_dict)
 
                 try:
                     node_outputs = _load_and_run_block(
