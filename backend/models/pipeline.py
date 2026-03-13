@@ -9,6 +9,7 @@ class Pipeline(Base):
     id = Column(String, primary_key=True)
     experiment_id = Column(String, ForeignKey("blueprint_experiments.id"), nullable=True)
     project_id = Column(String, ForeignKey("blueprint_projects.id"), nullable=True)
+    experiment_phase_id = Column(String, ForeignKey("experiment_phases.id"), nullable=True)
     name = Column(String, nullable=False)
     description = Column(Text, default="")
     definition = Column(JSON, default=dict)  # Full DAG: nodes, edges, block configs

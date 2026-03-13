@@ -7,6 +7,7 @@ class PipelineCreate(BaseModel):
     name: str
     project_id: str | None = None
     experiment_id: str | None = None
+    experiment_phase_id: str | None = None
     description: str = ""
     definition: dict[str, Any] = {}
 
@@ -14,6 +15,7 @@ class PipelineCreate(BaseModel):
 class PipelineUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
+    experiment_phase_id: str | None = None
     definition: dict[str, Any] | None = None
 
 
@@ -22,6 +24,7 @@ class PipelineResponse(BaseModel):
     name: str
     project_id: str | None
     experiment_id: str | None
+    experiment_phase_id: str | None
     description: str
     definition: dict[str, Any]
     created_at: datetime

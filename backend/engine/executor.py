@@ -311,6 +311,13 @@ async def execute_pipeline(
         live.overall_progress = 1.0
         db.commit()
 
+        # Auto-lifecycle: update phase/project counters (never crashes execution)
+        try:
+            from ..services.project_lifecycle import on_run_completed
+            on_run_completed(run_id, db)
+        except Exception:
+            pass
+
         publish_event(run_id, "run_completed", {
             "run_id": run_id,
             "duration": run.duration_seconds,
@@ -322,4 +329,12 @@ async def execute_pipeline(
         run.error_message = str(e)
         live.status = "failed"
         db.commit()
+
+        # Auto-lifecycle: update counts only on failure (never crashes execution)
+        try:
+            from ..services.project_lifecycle import on_run_failed
+            on_run_failed(run_id, db)
+        except Exception:
+            pass
+
         publish_event(run_id, "run_failed", {"run_id": run_id, "error": str(e)})
