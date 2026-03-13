@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
-import { AlertTriangle, RotateCcw } from 'lucide-react'
+import { AlertTriangle, RotateCcw, Copy, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface Props {
   children: ReactNode
@@ -10,12 +10,14 @@ interface Props {
 interface State {
   hasError: boolean
   error: Error | null
+  showDetails: boolean
+  copied: boolean
 }
 
 export default class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false, error: null }
+  state: State = { hasError: false, error: null, showDetails: false, copied: false }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error }
   }
 
@@ -24,7 +26,24 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null })
+    this.setState({ hasError: false, error: null, showDetails: false, copied: false })
+  }
+
+  handleCopyError = async () => {
+    const { error } = this.state
+    if (!error) return
+    const text = `${error.name}: ${error.message}\n\n${error.stack || 'No stack trace available'}`
+    try {
+      await navigator.clipboard.writeText(text)
+      this.setState({ copied: true })
+      setTimeout(() => this.setState({ copied: false }), 2000)
+    } catch {
+      // Fallback for environments without clipboard API
+    }
+  }
+
+  toggleDetails = () => {
+    this.setState((s) => ({ showDetails: !s.showDetails }))
   }
 
   render() {
@@ -67,27 +86,94 @@ export default class ErrorBoundary extends Component<Props, State> {
           >
             {this.state.error?.message || 'An unexpected error occurred.'}
           </div>
-          <button
-            onClick={this.handleReset}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 16px',
-              background: T.surface2,
-              border: `1px solid ${T.border}`,
-              borderRadius: 4,
-              color: T.sec,
-              fontFamily: F,
-              fontSize: FS.xs,
-              fontWeight: 700,
-              cursor: 'pointer',
-              letterSpacing: '0.08em',
-            }}
-          >
-            <RotateCcw size={12} />
-            RETRY
-          </button>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={this.handleReset}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 16px',
+                background: T.surface2,
+                border: `1px solid ${T.border}`,
+                borderRadius: 4,
+                color: T.sec,
+                fontFamily: F,
+                fontSize: FS.xs,
+                fontWeight: 700,
+                cursor: 'pointer',
+                letterSpacing: '0.08em',
+              }}
+            >
+              <RotateCcw size={12} />
+              RETRY
+            </button>
+            <button
+              onClick={this.handleCopyError}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 16px',
+                background: T.surface2,
+                border: `1px solid ${T.border}`,
+                borderRadius: 4,
+                color: this.state.copied ? T.green : T.sec,
+                fontFamily: F,
+                fontSize: FS.xs,
+                fontWeight: 700,
+                cursor: 'pointer',
+                letterSpacing: '0.08em',
+              }}
+            >
+              <Copy size={12} />
+              {this.state.copied ? 'COPIED' : 'COPY ERROR'}
+            </button>
+          </div>
+
+          {this.state.error?.stack && (
+            <>
+              <button
+                onClick={this.toggleDetails}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  background: 'none',
+                  border: 'none',
+                  color: T.dim,
+                  fontFamily: F,
+                  fontSize: FS.xxs,
+                  cursor: 'pointer',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                {this.state.showDetails ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                {this.state.showDetails ? 'HIDE DETAILS' : 'SHOW DETAILS'}
+              </button>
+              {this.state.showDetails && (
+                <pre
+                  style={{
+                    fontFamily: F,
+                    fontSize: FS.xxs,
+                    color: T.dim,
+                    background: T.surface1,
+                    border: `1px solid ${T.border}`,
+                    padding: 12,
+                    maxWidth: 600,
+                    maxHeight: 200,
+                    overflow: 'auto',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {this.state.error.stack}
+                </pre>
+              )}
+            </>
+          )}
         </div>
       )
     }

@@ -1,10 +1,25 @@
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { T } from '@/lib/design-tokens'
 import { useSettingsStore } from '@/stores/settingsStore'
 import TopBar from './TopBar'
 import GuideBar from '@/components/shared/GuideBar'
 import Sidebar from './Sidebar'
 import StatusBar from './StatusBar'
+
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const handler = (e: MediaQueryListEvent) => setReduced(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  return reduced
+}
 
 interface AppShellProps {
   children: React.ReactNode
@@ -56,6 +71,7 @@ function AmbientParticles() {
 
 export default function AppShell({ children }: AppShellProps) {
   const theme = useSettingsStore((s) => s.theme)
+  const prefersReducedMotion = useReducedMotion()
 
   // Sync body background with current theme
   useEffect(() => {
@@ -90,8 +106,8 @@ export default function AppShell({ children }: AppShellProps) {
       </div>
       <StatusBar />
 
-      {/* Ambient floating particles */}
-      <AmbientParticles />
+      {/* Ambient floating particles — disabled for users who prefer reduced motion */}
+      {!prefersReducedMotion && <AmbientParticles />}
 
       {/* Vignette overlay — subtle in light mode */}
       <div

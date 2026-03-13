@@ -60,6 +60,11 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     try:
+        from .routers.execution import shutdown_executor
+        shutdown_executor()
+    except Exception:
+        pass
+    try:
         from .utils.model_watcher import stop_watcher
         stop_watcher()
     except Exception:
@@ -104,7 +109,19 @@ app.include_router(inference.router)
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "blueprint"}
+    from .database import SessionLocal
+    from sqlalchemy import text
+    from fastapi.responses import JSONResponse
+    try:
+        session = SessionLocal()
+        session.execute(text("SELECT 1"))
+        session.close()
+        return {"status": "ok", "service": "blueprint", "db": "connected"}
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "service": "blueprint", "db": str(e)},
+        )
 
 
 # ── Serve Frontend SPA ──────────────────────────────────────────────

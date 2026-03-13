@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import toast from 'react-hot-toast'
 
 const RETRY_DELAY_MS = 3000
 
@@ -36,6 +37,7 @@ export function useAutoSave() {
                   '[useAutoSave] Retry save also failed:',
                   retryError
                 )
+                toast.error('Auto-save failed. Save manually with \u2318S / Ctrl+S.')
               }
             }, RETRY_DELAY_MS)
           }

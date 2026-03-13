@@ -32,11 +32,12 @@ export default function StatusBar() {
         gap: 12,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }} role="status" aria-live="polite">
         <Circle
           size={4}
           fill={isRunning ? T.cyan : status === 'failed' ? T.red : T.green}
           color={isRunning ? T.cyan : status === 'failed' ? T.red : T.green}
+          aria-hidden="true"
         />
         <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.1em', fontWeight: 900 }}>
           {isRunning

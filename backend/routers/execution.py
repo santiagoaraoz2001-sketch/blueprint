@@ -1,5 +1,6 @@
 import uuid
-import threading
+import logging
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,17 @@ from ..engine.executor import execute_pipeline, request_cancel
 from ..engine.validator import validate_pipeline
 
 router = APIRouter(prefix="/api", tags=["execution"])
+_logger = logging.getLogger("blueprint.execution")
+
+# Bounded thread pool prevents resource exhaustion from concurrent runs
+_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="pipeline-run")
+
+
+def shutdown_executor():
+    """Gracefully shut down the pipeline executor pool. Called during app shutdown."""
+    _logger.info("Shutting down pipeline executor pool...")
+    _executor.shutdown(wait=True, cancel_futures=False)
+    _logger.info("Pipeline executor pool shut down.")
 
 
 @router.post("/pipelines/{pipeline_id}/execute")
@@ -34,8 +46,10 @@ def start_pipeline_run(pipeline_id: str, db: Session = Depends(get_db)):
         finally:
             session.close()
 
-    thread = threading.Thread(target=run_in_thread, daemon=False)
-    thread.start()
+    try:
+        _executor.submit(run_in_thread)
+    except RuntimeError:
+        raise HTTPException(503, "Pipeline executor is shutting down. Please try again later.")
 
     return {"status": "started", "pipeline_id": pipeline_id, "run_id": run_id}
 
