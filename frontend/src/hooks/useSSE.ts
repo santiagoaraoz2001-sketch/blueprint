@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 
 interface SSEOptions {
   onEvent: (event: string, data: any) => void
@@ -6,6 +6,8 @@ interface SSEOptions {
   enabled?: boolean
   maxRetries?: number
 }
+
+type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
 const BASE_DELAY_MS = 1000
 const MAX_DELAY_MS = 30000
@@ -17,9 +19,13 @@ export function useSSE(url: string | null, options: SSEOptions) {
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onEventRef = useRef(onEvent)
   const onErrorRef = useRef(onError)
+  const lastEventIdRef = useRef<string | null>(null)
+  const urlRef = useRef(url)
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
 
   onEventRef.current = onEvent
   onErrorRef.current = onError
+  urlRef.current = url
 
   const clearRetryTimer = useCallback(() => {
     if (retryTimerRef.current) {
@@ -34,6 +40,7 @@ export function useSSE(url: string | null, options: SSEOptions) {
       sourceRef.current.close()
       sourceRef.current = null
     }
+    setConnectionStatus('disconnected')
   }, [clearRetryTimer])
 
   const connect = useCallback(
@@ -44,12 +51,30 @@ export function useSSE(url: string | null, options: SSEOptions) {
         sourceRef.current = null
       }
 
-      const es = new EventSource(targetUrl)
+      // Append lastEventId as query parameter for replay
+      let connectUrl = targetUrl
+      if (lastEventIdRef.current) {
+        const separator = targetUrl.includes('?') ? '&' : '?'
+        connectUrl = `${targetUrl}${separator}lastEventId=${lastEventIdRef.current}`
+      }
+
+      setConnectionStatus('connecting')
+      const es = new EventSource(connectUrl)
       sourceRef.current = es
+
+      es.onopen = () => {
+        setConnectionStatus('connected')
+        retryCountRef.current = 0
+      }
 
       es.onmessage = (e) => {
         // Successful message received — reset retry count
         retryCountRef.current = 0
+
+        // Track last event ID for reconnection
+        if (e.lastEventId) {
+          lastEventIdRef.current = e.lastEventId
+        }
 
         try {
           const data = JSON.parse(e.data)
@@ -61,6 +86,7 @@ export function useSSE(url: string | null, options: SSEOptions) {
 
       es.onerror = (e) => {
         onErrorRef.current?.(e)
+        setConnectionStatus('error')
 
         // Close the broken connection — don't rely on built-in reconnect
         es.close()
@@ -93,6 +119,27 @@ export function useSSE(url: string | null, options: SSEOptions) {
     [maxRetries]
   )
 
+  // visibilitychange handler: reconnect when tab becomes visible
+  useEffect(() => {
+    if (!url || !enabled) return
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Check if EventSource is closed (browser may have killed it while backgrounded)
+        if (!sourceRef.current || sourceRef.current.readyState === EventSource.CLOSED) {
+          console.warn('[useSSE] Tab became visible, reconnecting (connection was closed)')
+          retryCountRef.current = 0 // Bypass backoff — this is browser-initiated
+          connect(url)
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [url, enabled, connect])
+
   useEffect(() => {
     if (!url || !enabled) {
       disconnect()
@@ -108,5 +155,9 @@ export function useSSE(url: string | null, options: SSEOptions) {
     }
   }, [url, enabled, connect, disconnect])
 
-  return { disconnect }
+  return {
+    disconnect,
+    connectionStatus,
+    lastEventId: lastEventIdRef.current,
+  }
 }
