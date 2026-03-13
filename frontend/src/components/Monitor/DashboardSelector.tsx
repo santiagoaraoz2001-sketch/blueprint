@@ -4,6 +4,7 @@ import { useMetricsStore } from '@/stores/metricsStore'
 import TrainingDashboard from './TrainingDashboard'
 import EvaluationDashboard from './EvaluationDashboard'
 import DefaultDashboard from './DefaultDashboard'
+import ModelDiffDashboard from '@/components/Results/ModelDiffView'
 import { Loader } from 'lucide-react'
 
 interface DashboardSelectorProps {
@@ -31,7 +32,14 @@ function WaitingState() {
   )
 }
 
-function selectDashboard(category: string, runId: string, blockId: string) {
+function selectDashboard(category: string, blockType: string, runId: string, blockId: string) {
+  // Block-type-specific dashboards take priority over category
+  switch (blockType) {
+    case 'model_diff':
+      return <ModelDiffDashboard runId={runId} blockId={blockId} />
+  }
+
+  // Category-based fallback
   switch (category) {
     case 'training':
       return <TrainingDashboard runId={runId} blockId={blockId} />
@@ -77,7 +85,7 @@ export default function DashboardSelector({ runId, viewedBlockId }: DashboardSel
         transition: 'opacity 200ms ease-in-out',
       }}
     >
-      {selectDashboard(block.category, runId, block.nodeId)}
+      {selectDashboard(block.category, block.blockType, runId, block.nodeId)}
     </div>
   )
 }

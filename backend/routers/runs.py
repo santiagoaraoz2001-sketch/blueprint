@@ -136,6 +136,47 @@ def get_metrics_log(run_id: str, db: Session = Depends(get_db)):
     return []
 
 
+@router.get("/{run_id}/metrics-typed")
+def get_typed_metrics(run_id: str, db: Session = Depends(get_db)):
+    """Get metrics with schema version and aggregation.
+
+    Layer 2 (SQLite metrics_log) is preferred.  Falls back to Layer 1
+    (JSONL file) when metrics_log is null -- e.g. crash recovery or
+    old runs that pre-date the column.
+    """
+    from ..engine.metrics_schema import (
+        CURRENT_SCHEMA_VERSION, parse_metrics_log, aggregate_metrics,
+    )
+
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    raw_log = run.metrics_log
+    if not raw_log:
+        # Layer 1 fallback: JSONL file
+        jsonl_path = ARTIFACTS_DIR / run_id / "metrics.jsonl"
+        if jsonl_path.exists():
+            raw_log = []
+            for line in jsonl_path.read_text().splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        raw_log.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+
+    events = parse_metrics_log(raw_log or [])
+    summary = aggregate_metrics(events)
+
+    return {
+        "schema_version": CURRENT_SCHEMA_VERSION,
+        "events": [e.to_dict() for e in events],
+        "summary": summary,
+        "event_count": len(events),
+    }
+
+
 @router.get("/{run_id}", response_model=RunResponse)
 def get_run(run_id: str, db: Session = Depends(get_db)):
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -214,6 +255,87 @@ def get_artifact(run_id: str, filename: str, db: Session = Depends(get_db)):
 
     from fastapi.responses import FileResponse
     return FileResponse(str(file_path), filename=filename)
+
+
+@router.get("/{run_id}/export")
+def get_run_export(run_id: str, db: Session = Depends(get_db)):
+    """Get the structured export for a run."""
+    from ..engine.run_export import generate_run_export
+
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    return generate_run_export(run, ARTIFACTS_DIR)
+
+
+@router.get("/{run_id}/export/download")
+def download_run_export(run_id: str, db: Session = Depends(get_db)):
+    """Download run-export.json as a file."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    # Use the validated run.id (from DB) to construct the path, not raw input
+    export_path = ARTIFACTS_DIR / run.id / "run-export.json"
+
+    # Prevent path traversal
+    try:
+        export_path.resolve().relative_to(ARTIFACTS_DIR.resolve())
+    except ValueError:
+        raise HTTPException(400, "Invalid run ID")
+
+    if not export_path.exists():
+        raise HTTPException(404, "Export not yet generated")
+
+    from fastapi.responses import FileResponse
+    return FileResponse(str(export_path), filename=f"blueprint-run-{run.id[:8]}.json")
+
+
+@router.get("/{run_id}/data-provenance")
+def get_data_provenance(run_id: str, db: Session = Depends(get_db)):
+    """Return data fingerprints for a run, showing which datasets were used."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    return {
+        "run_id": run_id,
+        "fingerprints": run.data_fingerprints or {},
+    }
+
+
+@router.post("/compare-data")
+def compare_run_data(
+    run_id_a: str = Query(..., description="First run ID"),
+    run_id_b: str = Query(..., description="Second run ID"),
+    db: Session = Depends(get_db),
+):
+    """Compare data fingerprints between two runs."""
+    run_a = db.query(Run).filter(Run.id == run_id_a).first()
+    run_b = db.query(Run).filter(Run.id == run_id_b).first()
+    if not run_a or not run_b:
+        raise HTTPException(404, "Run not found")
+
+    fp_a = run_a.data_fingerprints or {}
+    fp_b = run_b.data_fingerprints or {}
+
+    diffs = []
+    all_nodes = set(fp_a.keys()) | set(fp_b.keys())
+    for node_id in sorted(all_nodes):
+        a_inputs = fp_a.get(node_id, {})
+        b_inputs = fp_b.get(node_id, {})
+        for input_name in sorted(set(a_inputs.keys()) | set(b_inputs.keys())):
+            hash_a = a_inputs.get(input_name, {}).get("hash")
+            hash_b = b_inputs.get(input_name, {}).get("hash")
+            if hash_a != hash_b:
+                diffs.append({
+                    "node_id": node_id,
+                    "input": input_name,
+                    "run_a_hash": hash_a,
+                    "run_b_hash": hash_b,
+                    "changed": True,
+                })
+
+    return {"identical": len(diffs) == 0, "diffs": diffs}
 
 
 @router.post("/{run_id}/clone-pipeline", response_model=PipelineResponse)
