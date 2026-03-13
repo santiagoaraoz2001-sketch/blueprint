@@ -32,8 +32,10 @@ from sqlalchemy.orm import Session
 from ..config import ARTIFACTS_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR
 from ..models.run import Run, LiveRun
 from ..block_sdk.context import BlockContext
+from ..block_sdk.exceptions import BlockError, BlockInputError, BlockConfigError, BlockTimeoutError
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
+from .schema_validator import load_block_schema, validate_inputs, validate_config
 
 # Cancel events: threading.Event per run_id, protected by lock for thread safety
 _cancel_events: dict[str, threading.Event] = {}
@@ -135,6 +137,64 @@ def _load_and_run_block(
 
     module.run(ctx)
     return ctx.get_outputs()
+
+
+def _load_and_run_block_with_timeout(
+    block_dir: Path,
+    config: dict,
+    inputs: dict[str, Any],
+    run_dir: str,
+    run_id: str,
+    node_id: str,
+    progress_cb=None,
+    message_cb=None,
+    metric_cb=None,
+    timeout_seconds=None,
+) -> dict[str, Any]:
+    """Wrapper that enforces a timeout on block execution.
+
+    Args:
+        timeout_seconds: Maximum execution time. None means no timeout.
+            Caller should read this from the block schema to avoid redundant I/O.
+    """
+    if timeout_seconds is None:
+        # No timeout configured, run directly (no thread overhead)
+        return _load_and_run_block(
+            block_dir, config, inputs, run_dir,
+            run_id, node_id, progress_cb, message_cb, metric_cb,
+        )
+
+    result = {}
+    error = [None]
+
+    def target():
+        try:
+            result.update(
+                _load_and_run_block(
+                    block_dir, config, inputs, run_dir,
+                    run_id, node_id, progress_cb, message_cb, metric_cb,
+                )
+            )
+        except Exception as e:
+            error[0] = e
+
+    thread = threading.Thread(target=target, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout_seconds)
+
+    if thread.is_alive():
+        # Thread keeps running (Python can't force-kill threads), but daemon=True
+        # ensures it won't block process exit. The cancel event mechanism will
+        # terminate it on the next progress_cb call if the block cooperates.
+        raise BlockTimeoutError(
+            timeout_seconds,
+            f"Block '{block_dir.name}' exceeded {timeout_seconds}s timeout",
+        )
+
+    if error[0]:
+        raise error[0]
+
+    return result
 
 
 def _resolve_secrets(config: dict) -> dict:
@@ -433,12 +493,40 @@ async def execute_pipeline(
                     # Layer 2: buffer
                     metrics_log_buffer.append(metric_event)
 
+                # --- Load schema once for validation, timeout, and retry ---
+                block_schema = load_block_schema(block_dir)
+                timeout_seconds = block_schema.get("timeout") if block_schema else None
+                max_retries = block_schema.get("max_retries", 0) if block_schema else 0
+
+                # --- Pre-execution validation ---
+                if block_schema:
+                    validate_inputs(block_schema, node_inputs)
+                    config = validate_config(block_schema, config)
+
+                # --- Execute with retry + timeout ---
                 try:
-                    node_outputs = _load_and_run_block(
-                        block_dir, config, node_inputs, run_dir,
-                        run_id, node_id, progress_cb, message_cb, metric_cb,
-                    )
-                    outputs[node_id] = node_outputs
+                    for attempt in range(max_retries + 1):
+                        try:
+                            node_outputs = _load_and_run_block_with_timeout(
+                                block_dir, config, node_inputs, run_dir,
+                                run_id, node_id, progress_cb, message_cb, metric_cb,
+                                timeout_seconds=timeout_seconds,
+                            )
+                            outputs[node_id] = node_outputs
+                            break  # Success
+                        except BlockError as e:
+                            if not e.recoverable or attempt == max_retries:
+                                raise
+                            try:
+                                publish_event(run_id, "node_retry", {
+                                    "node_id": node_id,
+                                    "block_type": block_type,
+                                    "attempt": attempt + 1,
+                                    "max_retries": max_retries,
+                                    "error": e.message,
+                                })
+                            except Exception:
+                                pass
                 except InterruptedError:
                     # Cancellation via progress_cb
                     run.status = "cancelled"
@@ -458,16 +546,26 @@ async def execute_pipeline(
                     return
                 except Exception as e:
                     tb = traceback.format_exc()
+                    # Structured error for BlockError subclasses
+                    if isinstance(e, BlockError):
+                        error_msg = e.message
+                        if e.details:
+                            error_msg += f"\n{e.details}"
+                    else:
+                        error_msg = str(e)
                     try:
-                        publish_event(run_id, "node_failed", {"node_id": node_id, "error": str(e)})
+                        event_data = {"node_id": node_id, "error": error_msg}
+                        if isinstance(e, BlockError):
+                            event_data["error_type"] = type(e).__name__
+                            event_data["recoverable"] = e.recoverable
+                        publish_event(run_id, "node_failed", event_data)
                     except Exception:
                         pass
                     run.status = "failed"
-                    run.error_message = f"Block {block_type} failed: {str(e)}\n\n{tb}"
+                    run.error_message = f"Block {block_type} failed: {error_msg}\n\n{tb}"
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     live.status = "failed"
                     db.commit()
-                    # Write traceback to error.log
                     _write_error_log(run_id, tb)
                     return
             else:
