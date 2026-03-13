@@ -35,13 +35,15 @@ from ..block_sdk.context import BlockContext
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
 
-# Cancel events: threading.Event per run_id
+# Cancel events: threading.Event per run_id, protected by lock for thread safety
 _cancel_events: dict[str, threading.Event] = {}
+_cancel_lock = threading.Lock()
 
 
 def request_cancel(run_id: str):
     """Signal a running pipeline to cancel. Called from the cancel endpoint."""
-    event = _cancel_events.get(run_id)
+    with _cancel_lock:
+        event = _cancel_events.get(run_id)
     if event:
         event.set()
 
@@ -154,7 +156,8 @@ def _resolve_secrets(config: dict) -> dict:
 
 def _check_cancelled(run_id: str) -> bool:
     """Check if a run has been cancelled."""
-    event = _cancel_events.get(run_id)
+    with _cancel_lock:
+        event = _cancel_events.get(run_id)
     return event is not None and event.is_set()
 
 
@@ -206,7 +209,8 @@ async def execute_pipeline(
         return
 
     # Register cancel event for this run
-    _cancel_events[run_id] = threading.Event()
+    with _cancel_lock:
+        _cancel_events[run_id] = threading.Event()
 
     run = Run(
         id=run_id,
@@ -233,10 +237,10 @@ async def execute_pipeline(
     outputs: dict[str, dict[str, Any]] = {}
     all_metrics: dict[str, Any] = {}
 
-    # --- Layer 1: JSONL file failsafe ---
+    # --- Layer 1: JSONL file failsafe (opened here so finally can close it) ---
     metrics_dir = ARTIFACTS_DIR / run_id
     metrics_dir.mkdir(parents=True, exist_ok=True)
-    metrics_file = open(metrics_dir / "metrics.jsonl", "a")
+    metrics_file = open(metrics_dir / "metrics.jsonl", "a")  # noqa: SIM115 — closed in finally
 
     # --- Layer 2: In-memory buffer for SQLite checkpoints ---
     metrics_log_buffer: list[dict] = []
@@ -563,7 +567,8 @@ async def execute_pipeline(
             pass
     finally:
         # Clean up cancel event
-        _cancel_events.pop(run_id, None)
+        with _cancel_lock:
+            _cancel_events.pop(run_id, None)
         # Stop system metrics publisher
         system_metrics_stop.set()
         # Close JSONL file

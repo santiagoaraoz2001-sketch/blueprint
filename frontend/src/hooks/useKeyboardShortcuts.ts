@@ -66,6 +66,26 @@ export function useKeyboardShortcuts() {
         return
       }
 
+      // Cmd+Z — Undo (global, works in editor view)
+      if (meta && !e.shiftKey && e.key === 'z' && !isInput) {
+        const view = useUIStore.getState().activeView
+        if (view === 'editor') {
+          e.preventDefault()
+          usePipelineStore.getState().undo()
+          return
+        }
+      }
+
+      // Cmd+Shift+Z — Redo (global, works in editor view)
+      if (meta && e.shiftKey && (e.key === 'z' || e.key === 'Z') && !isInput) {
+        const view = useUIStore.getState().activeView
+        if (view === 'editor') {
+          e.preventDefault()
+          usePipelineStore.getState().redo()
+          return
+        }
+      }
+
       // Cmd+1-7 — Switch views
       if (meta && !e.shiftKey && e.key >= '1' && e.key <= '7') {
         e.preventDefault()

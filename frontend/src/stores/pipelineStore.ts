@@ -47,6 +47,8 @@ export interface PipelineTab {
   pipelineId: string | null  // backend pipeline ID
   isDirty: boolean
   runStatus: 'idle' | 'running' | 'complete' | 'failed' | 'cancelled'
+  past: { nodes: Node<BlockNodeData>[]; edges: Edge[] }[]
+  future: { nodes: Node<BlockNodeData>[]; edges: Edge[] }[]
 }
 
 export interface PipelineSnapshot {
@@ -183,7 +185,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   isDirty: false,
   pipelines: [],
   pipelinesLoading: false,
-  tabs: [{ id: DEFAULT_TAB_ID, name: 'Pipeline 1', nodes: [], edges: [], pipelineId: null, isDirty: false, runStatus: 'idle' }],
+  tabs: [{ id: DEFAULT_TAB_ID, name: 'Pipeline 1', nodes: [], edges: [], pipelineId: null, isDirty: false, runStatus: 'idle', past: [], future: [] }],
   activeTabId: DEFAULT_TAB_ID,
   versions: [],
   past: [],
@@ -707,16 +709,19 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       toast.success('Pipeline deleted')
       return
     }
+
+    // Optimistic removal: instantly update the UI, rollback on API failure
+    const previousPipelines = [...get().pipelines]
+    const wasActive = get().id === id
+    set((s) => ({ pipelines: s.pipelines.filter((p) => p.id !== id) }))
+    if (wasActive) get().newPipeline()
+
     try {
       await api.delete(`/pipelines/${id}`)
-      set((s) => ({
-        pipelines: s.pipelines.filter((p) => p.id !== id),
-      }))
-      if (get().id === id) {
-        get().newPipeline()
-      }
       toast.success('Pipeline deleted')
     } catch {
+      // Rollback: restore the pipeline list on failure
+      set({ pipelines: previousPipelines })
       toast.error('Failed to delete pipeline')
     }
   },
@@ -841,10 +846,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   // ── Pipeline Tab Actions ──
 
   addTab: (tabName?: string) => {
-    const { tabs, nodes, edges, id, name, isDirty, activeTabId } = get()
-    // Save current tab state
+    const { tabs, nodes, edges, id, name, isDirty, activeTabId, past, future } = get()
+    // Save current tab state including undo/redo history
     const updatedTabs = tabs.map((t) =>
-      t.id === activeTabId ? { ...t, nodes, edges, pipelineId: id, isDirty, name } : t
+      t.id === activeTabId ? { ...t, nodes, edges, pipelineId: id, isDirty, name, past, future } : t
     )
     const newTabId = _makeTabId()
     const newTab: PipelineTab = {
@@ -855,6 +860,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       pipelineId: null,
       isDirty: false,
       runStatus: 'idle',
+      past: [],
+      future: [],
     }
     set({
       tabs: [...updatedTabs, newTab],
@@ -880,7 +887,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     const newTabs = tabs.filter((t) => t.id !== tabId)
 
     if (tabId === activeTabId) {
-      // Switch to adjacent tab
+      // Switch to adjacent tab and restore its undo/redo history
       const nextTab = newTabs[Math.min(idx, newTabs.length - 1)]
       set({
         tabs: newTabs,
@@ -891,8 +898,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         edges: nextTab.edges,
         isDirty: nextTab.isDirty,
         selectedNodeId: null,
-        past: [],
-        future: [],
+        past: nextTab.past || [],
+        future: nextTab.future || [],
       })
     } else {
       // Just remove the tab, keep current active
@@ -901,12 +908,12 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   },
 
   switchTab: (tabId: string) => {
-    const { tabs, activeTabId, nodes, edges, id, name, isDirty } = get()
+    const { tabs, activeTabId, nodes, edges, id, name, isDirty, past, future } = get()
     if (tabId === activeTabId) return
 
-    // Save current tab state
+    // Save current tab state including undo/redo history
     const updatedTabs = tabs.map((t) =>
-      t.id === activeTabId ? { ...t, nodes, edges, pipelineId: id, isDirty, name } : t
+      t.id === activeTabId ? { ...t, nodes, edges, pipelineId: id, isDirty, name, past, future } : t
     )
 
     // Load target tab
@@ -922,8 +929,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       edges: target.edges,
       isDirty: target.isDirty,
       selectedNodeId: null,
-      past: [],
-      future: [],
+      past: target.past || [],
+      future: target.future || [],
     })
   },
 
@@ -936,10 +943,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   },
 
   duplicateTab: (tabId: string) => {
-    const { tabs, nodes, edges, id, name, isDirty, activeTabId } = get()
-    // Save current state into tabs first
+    const { tabs, nodes, edges, id, name, isDirty, activeTabId, past, future } = get()
+    // Save current state into tabs first (including undo/redo history)
     const savedTabs = tabs.map((t) =>
-      t.id === activeTabId ? { ...t, nodes, edges, pipelineId: id, isDirty, name } : t
+      t.id === activeTabId ? { ...t, nodes, edges, pipelineId: id, isDirty, name, past, future } : t
     )
     const sourceTab = savedTabs.find((t) => t.id === tabId)
     if (!sourceTab) return
@@ -953,6 +960,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       pipelineId: null, // new tab = unsaved
       isDirty: true,
       runStatus: 'idle',
+      past: [],
+      future: [],
     }
 
     set({

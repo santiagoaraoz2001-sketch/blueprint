@@ -84,6 +84,7 @@ export default function Sidebar() {
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           onClick={toggleSidebar}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           style={{
             display: 'flex',
@@ -123,6 +124,8 @@ export default function Sidebar() {
               transition={{ delay: index * 0.06, duration: 0.3 }}
               whileHover={{ scale: 1.02, x: 3 }}
               onClick={() => setView(item.id)}
+              aria-label={item.label}
+              aria-current={active ? 'page' : undefined}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -179,7 +182,11 @@ export default function Sidebar() {
 
       {/* Active Project Indicator */}
       <div
+        role="button"
+        tabIndex={0}
+        aria-label={activeProject ? `Active project: ${activeProject.name}` : 'No active project'}
         onClick={() => setView('dashboard')}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setView('dashboard') }}
         style={{
           padding: sidebarCollapsed ? '8px 4px' : '8px 12px',
           borderTop: `1px solid ${T.border}`,

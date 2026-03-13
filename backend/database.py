@@ -15,10 +15,25 @@ engine = create_engine(
 
 @sa_event.listens_for(engine, "connect")
 def _set_sqlite_pragma(dbapi_conn, connection_record):
-    """Enable WAL mode for safe concurrent reads and busy timeout."""
+    """Enable WAL mode and performance-safe PRAGMAs for concurrent access.
+
+    All PRAGMAs are individually wrapped to gracefully handle environments
+    where the database path is unavailable (e.g., in-memory test databases).
+    """
     cursor = dbapi_conn.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA busy_timeout=5000")
+    for pragma in [
+        "PRAGMA journal_mode=WAL",
+        "PRAGMA busy_timeout=5000",
+        "PRAGMA synchronous=NORMAL",       # Safe in WAL mode, major write speedup
+        "PRAGMA cache_size=-65536",         # 64MB page cache (vs default 2MB)
+        "PRAGMA temp_store=MEMORY",         # Keep temp tables in RAM
+        "PRAGMA mmap_size=268435456",       # 256MB memory-mapped I/O
+        "PRAGMA foreign_keys=ON",           # Enforce referential integrity
+    ]:
+        try:
+            cursor.execute(pragma)
+        except Exception:
+            pass
     cursor.close()
 
 

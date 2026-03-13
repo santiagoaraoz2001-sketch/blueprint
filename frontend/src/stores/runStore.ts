@@ -33,6 +33,7 @@ interface RunState {
   error: string | null
   logs: string[]
   _demoTimer: number | null
+  _elapsedTimer: number | null
 
   // Actions
   startRun: (pipelineId: string) => Promise<void>
@@ -43,6 +44,17 @@ interface RunState {
 
 function isDemoMode() {
   return useSettingsStore.getState().demoMode
+}
+
+function _startElapsedTimer(set: (fn: (s: RunState) => Partial<RunState>) => void): number {
+  return window.setInterval(() => {
+    set((s) => s.status === 'running' ? { elapsed: s.elapsed + 1 } : {})
+  }, 1000)
+}
+
+function _clearElapsedTimer(get: () => RunState) {
+  const timer = get()._elapsedTimer
+  if (timer) window.clearInterval(timer)
 }
 
 export const useRunStore = create<RunState>((set, get) => ({
@@ -57,6 +69,7 @@ export const useRunStore = create<RunState>((set, get) => ({
   error: null,
   logs: [],
   _demoTimer: null,
+  _elapsedTimer: null,
 
   startRun: async (pipelineId: string) => {
     if (isDemoMode()) {
@@ -90,9 +103,11 @@ export const useRunStore = create<RunState>((set, get) => ({
       return
     }
     try {
+      _clearElapsedTimer(get)
       await api.post<{ status: string; pipeline_id: string }>(
         `/pipelines/${pipelineId}/execute`
       )
+      const elapsedTimer = _startElapsedTimer(set)
       set({
         pipelineId,
         status: 'running',
@@ -103,6 +118,7 @@ export const useRunStore = create<RunState>((set, get) => ({
         elapsed: 0,
         error: null,
         logs: [],
+        _elapsedTimer: elapsedTimer,
       })
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to start run'
@@ -113,14 +129,15 @@ export const useRunStore = create<RunState>((set, get) => ({
   stopRun: async () => {
     const { activeRunId, _demoTimer } = get()
     if (!activeRunId) return
+    _clearElapsedTimer(get)
     if (isDemoMode()) {
       if (_demoTimer) window.clearInterval(_demoTimer)
-      set({ status: 'cancelled', error: 'Stopped by user', _demoTimer: null })
+      set({ status: 'cancelled', error: 'Stopped by user', _demoTimer: null, _elapsedTimer: null })
       return
     }
     try {
       await api.post(`/runs/${activeRunId}/stop`)
-      set({ status: 'cancelled', error: 'Stopped by user' })
+      set({ status: 'cancelled', error: 'Stopped by user', _elapsedTimer: null })
     } catch {
       // Ignore stop errors
     }
@@ -188,10 +205,12 @@ export const useRunStore = create<RunState>((set, get) => ({
         break
 
       case 'run_completed':
+        _clearElapsedTimer(get)
         set({
           activeRunId: data.run_id,
           status: 'complete',
           overallProgress: 1,
+          _elapsedTimer: null,
         })
         playSound('pipeline_complete')
         break
@@ -219,10 +238,12 @@ export const useRunStore = create<RunState>((set, get) => ({
         break
 
       case 'run_failed':
+        _clearElapsedTimer(get)
         set({
           activeRunId: data.run_id,
           status: 'failed',
           error: data.error,
+          _elapsedTimer: null,
         })
         playSound('error')
         break
@@ -230,9 +251,10 @@ export const useRunStore = create<RunState>((set, get) => ({
   },
 
   reset: () => {
-    // Clear demo timer on reset to prevent leaks
+    // Clear timers on reset to prevent leaks
     const { _demoTimer } = get()
     if (_demoTimer) window.clearInterval(_demoTimer)
+    _clearElapsedTimer(get)
     set({
       activeRunId: null,
       pipelineId: null,
@@ -245,6 +267,7 @@ export const useRunStore = create<RunState>((set, get) => ({
       error: null,
       logs: [],
       _demoTimer: null,
+      _elapsedTimer: null,
     })
   },
 }))

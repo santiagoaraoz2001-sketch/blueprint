@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { api } from '@/api/client'
 
 export type ThemeMode = 'dark' | 'light'
@@ -81,96 +82,99 @@ interface SettingsState {
   setAudioOnError: (enabled: boolean) => void
 }
 
-function loadFromStorage<T>(key: string, fallback: T): T {
-  try {
-    const stored = localStorage.getItem(`blueprint_${key}`)
-    return stored ? JSON.parse(stored) : fallback
-  } catch {
-    return fallback
-  }
-}
+export const useSettingsStore = create<SettingsState>()(
+  persist(
+    (set, get) => ({
+      theme: 'dark' as ThemeMode,
+      accentColor: 'cyan' as AccentColor,
+      font: 'jetbrains' as FontChoice,
+      fontSize: 'default' as FontSizeScale,
+      demoMode: false,
+      autoSaveInterval: 5000,
+      apiKeys: {} as Record<string, string>,
+      hardware: null,
+      hardwareLoading: false,
 
-function saveToStorage(key: string, value: unknown) {
-  localStorage.setItem(`blueprint_${key}`, JSON.stringify(value))
-}
+      audioAlertsEnabled: false,
+      audioVolume: 0.5,
+      audioOnStepComplete: true,
+      audioOnPipelineComplete: true,
+      audioOnError: true,
 
-export const useSettingsStore = create<SettingsState>((set, get) => ({
-  theme: loadFromStorage<ThemeMode>('theme', 'dark'),
-  accentColor: loadFromStorage<AccentColor>('accentColor', 'cyan'),
-  font: loadFromStorage<FontChoice>('font', 'jetbrains'),
-  fontSize: loadFromStorage<FontSizeScale>('fontSize', 'default'),
-  demoMode: loadFromStorage<boolean>('demoMode', false),
-  autoSaveInterval: loadFromStorage<number>('autoSaveInterval', 5000),
-  apiKeys: loadFromStorage<Record<string, string>>('apiKeys', {}),
-  hardware: null,
-  hardwareLoading: false,
+      setTheme: (theme) => set({ theme }),
+      setAccentColor: (accentColor) => set({ accentColor }),
+      setFont: (font) => set({ font }),
+      setFontSize: (fontSize) => set({ fontSize }),
+      setDemoMode: (demoMode) => set({ demoMode }),
+      setAutoSaveInterval: (autoSaveInterval) => set({ autoSaveInterval }),
+      setApiKey: (provider, key) => {
+        const apiKeys = { ...get().apiKeys, [provider]: key }
+        set({ apiKeys })
+      },
+      getApiKey: (provider) => {
+        return get().apiKeys[provider] ?? ''
+      },
+      fetchHardware: async () => {
+        set({ hardwareLoading: true })
+        try {
+          const data = await api.get<HardwareCapabilities>('/system/capabilities')
+          set({ hardware: data, hardwareLoading: false })
+        } catch {
+          set({ hardwareLoading: false })
+        }
+      },
 
-  audioAlertsEnabled: loadFromStorage<boolean>('audioAlertsEnabled', false),
-  audioVolume: loadFromStorage<number>('audioVolume', 0.5),
-  audioOnStepComplete: loadFromStorage<boolean>('audioOnStepComplete', true),
-  audioOnPipelineComplete: loadFromStorage<boolean>('audioOnPipelineComplete', true),
-  audioOnError: loadFromStorage<boolean>('audioOnError', true),
-
-  setTheme: (theme) => {
-    saveToStorage('theme', theme)
-    set({ theme })
-  },
-  setAccentColor: (accentColor) => {
-    saveToStorage('accentColor', accentColor)
-    set({ accentColor })
-  },
-  setFont: (font) => {
-    saveToStorage('font', font)
-    set({ font })
-  },
-  setFontSize: (fontSize) => {
-    saveToStorage('fontSize', fontSize)
-    set({ fontSize })
-  },
-  setDemoMode: (demoMode) => {
-    saveToStorage('demoMode', demoMode)
-    set({ demoMode })
-  },
-  setAutoSaveInterval: (autoSaveInterval) => {
-    saveToStorage('autoSaveInterval', autoSaveInterval)
-    set({ autoSaveInterval })
-  },
-  setApiKey: (provider, key) => {
-    const apiKeys = { ...get().apiKeys, [provider]: key }
-    saveToStorage('apiKeys', apiKeys)
-    set({ apiKeys })
-  },
-  getApiKey: (provider) => {
-    return get().apiKeys[provider] ?? ''
-  },
-  fetchHardware: async () => {
-    set({ hardwareLoading: true })
-    try {
-      const data = await api.get<HardwareCapabilities>('/system/capabilities')
-      set({ hardware: data, hardwareLoading: false })
-    } catch {
-      set({ hardwareLoading: false })
+      setAudioAlertsEnabled: (enabled) => set({ audioAlertsEnabled: enabled }),
+      setAudioVolume: (volume) => set({ audioVolume: volume }),
+      setAudioOnStepComplete: (enabled) => set({ audioOnStepComplete: enabled }),
+      setAudioOnPipelineComplete: (enabled) => set({ audioOnPipelineComplete: enabled }),
+      setAudioOnError: (enabled) => set({ audioOnError: enabled }),
+    }),
+    {
+      name: 'blueprint-settings',
+      version: 1,
+      partialize: (state) => ({
+        theme: state.theme,
+        accentColor: state.accentColor,
+        font: state.font,
+        fontSize: state.fontSize,
+        demoMode: state.demoMode,
+        autoSaveInterval: state.autoSaveInterval,
+        apiKeys: state.apiKeys,
+        audioAlertsEnabled: state.audioAlertsEnabled,
+        audioVolume: state.audioVolume,
+        audioOnStepComplete: state.audioOnStepComplete,
+        audioOnPipelineComplete: state.audioOnPipelineComplete,
+        audioOnError: state.audioOnError,
+      }),
+      migrate: (persisted, version) => {
+        // Backward compat: read from old per-key localStorage if no persisted state yet
+        if (!persisted || version === 0) {
+          const load = <T,>(key: string, fallback: T): T => {
+            try {
+              const stored = localStorage.getItem(`blueprint_${key}`)
+              return stored ? JSON.parse(stored) : fallback
+            } catch {
+              return fallback
+            }
+          }
+          return {
+            theme: load<ThemeMode>('theme', 'dark'),
+            accentColor: load<AccentColor>('accentColor', 'cyan'),
+            font: load<FontChoice>('font', 'jetbrains'),
+            fontSize: load<FontSizeScale>('fontSize', 'default'),
+            demoMode: load<boolean>('demoMode', false),
+            autoSaveInterval: load<number>('autoSaveInterval', 5000),
+            apiKeys: load<Record<string, string>>('apiKeys', {}),
+            audioAlertsEnabled: load<boolean>('audioAlertsEnabled', false),
+            audioVolume: load<number>('audioVolume', 0.5),
+            audioOnStepComplete: load<boolean>('audioOnStepComplete', true),
+            audioOnPipelineComplete: load<boolean>('audioOnPipelineComplete', true),
+            audioOnError: load<boolean>('audioOnError', true),
+          }
+        }
+        return persisted as Record<string, unknown>
+      },
     }
-  },
-
-  setAudioAlertsEnabled: (enabled) => {
-    saveToStorage('audioAlertsEnabled', enabled)
-    set({ audioAlertsEnabled: enabled })
-  },
-  setAudioVolume: (volume) => {
-    saveToStorage('audioVolume', volume)
-    set({ audioVolume: volume })
-  },
-  setAudioOnStepComplete: (enabled) => {
-    saveToStorage('audioOnStepComplete', enabled)
-    set({ audioOnStepComplete: enabled })
-  },
-  setAudioOnPipelineComplete: (enabled) => {
-    saveToStorage('audioOnPipelineComplete', enabled)
-    set({ audioOnPipelineComplete: enabled })
-  },
-  setAudioOnError: (enabled) => {
-    saveToStorage('audioOnError', enabled)
-    set({ audioOnError: enabled })
-  },
-}))
+  )
+)
