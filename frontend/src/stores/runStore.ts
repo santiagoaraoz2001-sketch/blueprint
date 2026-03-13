@@ -115,12 +115,12 @@ export const useRunStore = create<RunState>((set, get) => ({
     if (!activeRunId) return
     if (isDemoMode()) {
       if (_demoTimer) window.clearInterval(_demoTimer)
-      set({ status: 'cancelled', error: null, _demoTimer: null })
+      set({ status: 'cancelled', error: 'Stopped by user', _demoTimer: null })
       return
     }
     try {
       await api.post(`/runs/${activeRunId}/stop`)
-      set({ status: 'cancelled', error: null })
+      set({ status: 'cancelled', error: 'Stopped by user' })
     } catch {
       // Ignore stop errors
     }

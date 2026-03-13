@@ -1,119 +1,101 @@
 name: LLM Inference
 type: llm_inference
 category: inference
-description: Send a prompt to a local or cloud LLM and get a response
-version: "1.1.0"
+description: "Universal inference block — auto-detects frameworks and models"
+version: "2.0.0"
 
 inputs:
-  - id: model
-    label: Model
-    data_type: model
-    required: false
-  - id: context
-    label: Context
+  - id: prompt
+    label: Prompt
+    data_type: text
+    required: true
+    description: "Input prompt or message"
+  - id: system_prompt
+    label: System Prompt
     data_type: text
     required: false
+    description: "System prompt (ignored by frameworks that don't support it)"
+  - id: context
+    label: Context
+    data_type: any
+    required: false
+    description: "Additional context from upstream blocks (RAG, agent state, etc.)"
 
 outputs:
   - id: response
     label: Response
     data_type: text
-    description: >
-      Plain text file (response.txt) containing the raw LLM response when output_format=text.
-      When output_format=json, a JSON file (response.json) with schema:
-      {"response": str, "model": str, "provider": str, "timestamp": str (ISO 8601), "usage": {"prompt_tokens": int, "completion_tokens": int, "total_tokens": int} (optional)}
-  - id: metrics
-    label: Metrics
+    description: "Model response text"
+  - id: metadata
+    label: Metadata
     data_type: metrics
-    description: >
-      Dictionary with fields: latency_s (float, seconds), response_length (int, chars),
-      prompt_length (int, chars), model (str), provider (str),
-      prompt_tokens (int, optional), completion_tokens (int, optional), total_tokens (int, optional)
+    description: "Inference metadata: tokens, latency, model used, framework"
+  - id: llm_config
+    label: LLM Config
+    data_type: config
+    description: "Framework + model + config for downstream blocks to make their own calls"
 
 config:
-  model_name:
+  framework:
+    type: select
+    label: Framework
+    options: [auto, ollama, mlx, pytorch]
+    default: auto
+    description: "Inference framework (auto = detect best available)"
+  model:
     type: string
-    label: Model Name
+    label: Model
     default: ""
-    description: "Model identifier (e.g. 'llama3.2', 'gpt-4o', 'claude-sonnet-4-20250514')"
+    description: "Model to use (e.g. 'llama3.2' for Ollama, 'mlx-community/Llama-3.2-3B' for MLX)"
   prompt_template:
     type: text_area
     label: Prompt Template
-    default: "You are a helpful assistant.\n\n{context}\n\nUser: {input}\nAssistant:"
+    default: "{input}"
     description: "Use {context} for upstream context, {input} for user_input"
   user_input:
     type: text_area
     label: User Input
     default: ""
     description: "The user prompt to send to the model"
-  provider:
-    type: select
-    label: Provider
-    options: [ollama, mlx, openai, anthropic, manual]
-    default: ollama
-    description: "Inference backend — ollama/mlx for local, openai/anthropic for cloud"
-  endpoint:
-    type: string
-    label: Endpoint URL
-    default: "http://localhost:11434"
-    description: "API base URL (Ollama: http://localhost:11434, OpenAI: https://api.openai.com)"
-  api_key:
-    type: string
-    label: API Key
-    default: ""
-    description: "API key for cloud providers. Supports $secret:OPENAI_API_KEY syntax"
-  temperature:
-    type: float
-    label: Temperature
-    default: 0.7
-    min: 0.0
-    max: 2.0
   max_tokens:
     type: integer
     label: Max Tokens
-    default: 512
+    default: null
     min: 1
     max: 32768
+    description: "null = use framework default"
+  temperature:
+    type: float
+    label: Temperature
+    default: null
+    min: 0.0
+    max: 2.0
+    description: "null = use framework default"
   system_prompt:
     type: text_area
     label: System Prompt
     default: ""
-    description: "Optional system message (used with chat-style APIs)"
-  top_p:
-    type: float
-    label: Top P
-    default: 1.0
-    min: 0.0
-    max: 1.0
-    description: "Nucleus sampling — lower values (0.1-0.9) for focused output, 1.0 for full diversity"
+    description: "System message (ignored by MLX)"
   stop_sequences:
     type: string
     label: Stop Sequences
     default: ""
-    description: "Comma-separated stop strings (e.g. '\\n\\n,###,END'). Generation halts when produced"
-  seed:
-    type: integer
-    label: Seed
-    default: -1
-    min: -1
-    description: "Random seed for reproducible outputs (-1 = random). For model comparison workflows"
-  frequency_penalty:
+    description: "Comma-separated stop strings"
+  top_p:
     type: float
-    label: Frequency Penalty
-    default: 0.0
-    min: -2.0
-    max: 2.0
-    description: "Penalize repeated tokens (positive = less repetition)"
-  presence_penalty:
+    label: Top P
+    default: null
+    min: 0.0
+    max: 1.0
+  repeat_penalty:
     type: float
-    label: Presence Penalty
-    default: 0.0
-    min: -2.0
-    max: 2.0
-    description: "Penalize tokens already present (positive = more diverse topics)"
+    label: Repeat Penalty
+    default: null
+    min: 0.0
+    max: 3.0
   output_format:
     type: select
     label: Output Format
-    description: "Format for the response output — text returns raw LLM response, json wraps it with metadata (model, provider, tokens, timestamp)"
     default: text
     options: [text, json]
+    description: "text = raw response, json = wrapped with metadata"

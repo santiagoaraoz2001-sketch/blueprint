@@ -1,32 +1,30 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
-import { Pencil, Check, Loader2 } from 'lucide-react'
+import { Pencil, Check } from 'lucide-react'
 
 interface EditableFieldProps {
   value: string
-  onSave: (value: string) => Promise<void> | void
+  onSave: (value: string) => void
+  type?: 'text' | 'textarea' | 'select'
+  options?: { label: string; value: string }[]
   placeholder?: string
-  multiline?: boolean
-  fontSize?: number
-  fontStyle?: 'normal' | 'italic'
-  color?: string
+  label?: string
 }
 
 export default function EditableField({
   value,
   onSave,
-  placeholder = 'Click to edit...',
-  multiline = false,
-  fontSize = FS.sm,
-  fontStyle = 'normal',
-  color = T.text,
+  type = 'text',
+  options,
+  placeholder,
+  label,
 }: EditableFieldProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [hovered, setHovered] = useState(false)
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null)
 
   useEffect(() => {
     setDraft(value)
@@ -35,106 +33,147 @@ export default function EditableField({
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus()
-      // Select all text
-      if ('select' in inputRef.current) inputRef.current.select()
+      if (type !== 'select' && 'select' in inputRef.current) {
+        (inputRef.current as HTMLInputElement).select()
+      }
     }
-  }, [editing])
+  }, [editing, type])
 
-  const handleSave = async () => {
-    if (draft === value) {
-      setEditing(false)
-      return
+  const handleSave = useCallback(() => {
+    if (draft !== value) {
+      setSaving(true)
+      onSave(draft)
+      setTimeout(() => {
+        setSaving(false)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 1000)
+      }, 300)
     }
-    setSaving(true)
-    try {
-      await onSave(draft)
-      setSaving(false)
-      setSaved(true)
-      setEditing(false)
-      // Show checkmark for 1 second
-      setTimeout(() => setSaved(false), 1000)
-    } catch {
-      setSaving(false)
-    }
-  }
+    setEditing(false)
+  }, [draft, value, onSave])
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !multiline) {
-      e.preventDefault()
-      handleSave()
-    }
-    if (e.key === 'Escape') {
-      setDraft(value)
-      setEditing(false)
-    }
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && type !== 'textarea') {
+        handleSave()
+      }
+      if (e.key === 'Escape') {
+        setDraft(value)
+        setEditing(false)
+      }
+    },
+    [handleSave, type, value]
+  )
+
+  const sharedInputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '4px 6px',
+    background: T.surface2,
+    border: `1px solid ${T.cyan}55`,
+    color: T.text,
+    fontFamily: F,
+    fontSize: FS.sm,
+    outline: 'none',
+    borderRadius: 2,
   }
 
   if (editing) {
-    const inputStyle: React.CSSProperties = {
-      width: '100%',
-      padding: '4px 6px',
-      background: T.surface3,
-      border: `1px solid ${T.cyan}`,
-      color: T.text,
-      fontFamily: F,
-      fontSize,
-      fontStyle,
-      outline: 'none',
-      resize: multiline ? 'vertical' : 'none',
-    }
-
     return (
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-        {multiline ? (
+      <div style={{ width: '100%' }}>
+        {label && (
+          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2, display: 'block' }}>
+            {label}
+          </span>
+        )}
+        {type === 'textarea' ? (
           <textarea
             ref={inputRef as React.RefObject<HTMLTextAreaElement>}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={handleKeyDown}
             onBlur={handleSave}
+            onKeyDown={handleKeyDown}
             rows={3}
-            style={inputStyle}
+            style={{ ...sharedInputStyle, resize: 'vertical', minHeight: 60 }}
           />
+        ) : type === 'select' ? (
+          <select
+            ref={inputRef as React.RefObject<HTMLSelectElement>}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value)
+              setTimeout(() => {
+                onSave(e.target.value)
+                setEditing(false)
+              }, 0)
+            }}
+            onBlur={handleSave}
+            onKeyDown={handleKeyDown}
+            style={{ ...sharedInputStyle, cursor: 'pointer' }}
+          >
+            {options?.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         ) : (
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={handleKeyDown}
             onBlur={handleSave}
-            style={inputStyle}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            style={sharedInputStyle}
           />
         )}
-        {saving && <Loader2 size={12} color={T.cyan} style={{ animation: 'spin 1s linear infinite', marginTop: 4 }} />}
       </div>
     )
   }
 
   return (
     <div
+      style={{ width: '100%' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={() => setEditing(true)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        cursor: 'pointer',
-        padding: '2px 4px',
-        border: `1px solid ${hovered ? T.borderHi : 'transparent'}`,
-        transition: 'border-color 0.05s',
-        minHeight: 20,
-      }}
     >
-      <span style={{
-        fontFamily: F, fontSize, fontStyle, color: value ? color : T.dim,
-        flex: 1,
-      }}>
-        {value || placeholder}
-      </span>
-      {hovered && !saved && <Pencil size={10} color={T.dim} />}
-      {saved && <Check size={10} color={T.green} />}
-      {saving && <Loader2 size={10} color={T.cyan} style={{ animation: 'spin 1s linear infinite' }} />}
+      {label && (
+        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2, display: 'block' }}>
+          {label}
+        </span>
+      )}
+      <div
+        onClick={() => setEditing(true)}
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 6,
+          padding: '4px 6px',
+          border: `1px solid ${hovered ? T.border : 'transparent'}`,
+          borderRadius: 2,
+          cursor: 'pointer',
+          transition: 'border-color 0.15s',
+          minHeight: 20,
+        }}
+      >
+        <span
+          style={{
+            flex: 1,
+            fontFamily: F,
+            fontSize: FS.sm,
+            color: value ? T.text : T.dim,
+            whiteSpace: type === 'textarea' ? 'pre-wrap' : 'nowrap',
+            overflow: type === 'textarea' ? 'visible' : 'hidden',
+            textOverflow: type === 'textarea' ? 'clip' : 'ellipsis',
+          }}
+        >
+          {saving ? 'Saving...' : saved ? '' : (type === 'select' ? (options?.find((o) => o.value === value)?.label || value) : (value || placeholder || 'Click to edit'))}
+        </span>
+        {saved && <Check size={10} color={T.green} />}
+        {hovered && !saving && !saved && (
+          <Pencil size={10} color={T.dim} style={{ flexShrink: 0, marginTop: 2 }} />
+        )}
+      </div>
     </div>
   )
 }

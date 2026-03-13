@@ -3,6 +3,8 @@ type: few_shot_prompting
 category: inference
 description: In-context learning with example-based prompting for any LLM
 version: "1.0.0"
+deprecated: true
+deprecated_message: "Use LLM Inference block with examples in the prompt template."
 
 inputs:
   - id: model

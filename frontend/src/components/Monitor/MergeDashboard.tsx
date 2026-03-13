@@ -1,101 +1,83 @@
-import { useState } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
-import { useMetricsStore } from '@/stores/metricsStore'
-import AutoLineChart from './AutoLineChart'
-import ProgressBar from '@/components/shared/ProgressBar'
-import { Eye, EyeOff } from 'lucide-react'
+import { useMetricsStore, EMPTY_BLOCK_METRICS } from '@/stores/metricsStore'
+import RawDataToggle from './RawDataToggle'
 
-interface Props { runId: string; blockId: string }
+interface Props { blockId: string }
 
-export default function MergeDashboard({ runId, blockId }: Props) {
-  const [showRaw, setShowRaw] = useState(false)
-  const block = useMetricsStore((s) => s.runs[runId]?.blocks[blockId])
-  if (!block) return null
+export default function MergeDashboard({ blockId }: Props) {
+  const blockMetrics = useMetricsStore((s) => s.metrics[blockId] ?? EMPTY_BLOCK_METRICS)
 
-  const metrics = block.metrics
-  const compatibility = metrics['merge/compatibility_score'] || metrics['compatibility_score'] || []
-  const metricNames = Object.keys(metrics).filter((n) => n !== '__started')
+  const layerSeries = blockMetrics['layer'] || []
+  const sizeSeries = blockMetrics['output_size_gb'] || []
 
-  const allEvents = Object.entries(metrics).flatMap(([name, points]) =>
-    points.map((p) => ({ name, ...p }))
-  ).sort((a, b) => a.timestamp - b.timestamp)
-
-  const latestCompat = compatibility.length > 0 ? compatibility[compatibility.length - 1].value : null
+  const currentLayer = layerSeries.length > 0 ? layerSeries[layerSeries.length - 1].value : 0
+  const totalLayers = 32 // Default, can be overridden by metrics
+  const outputSize = sizeSeries.length > 0 ? sizeSeries[sizeSeries.length - 1].value : null
+  const progress = Math.min(1, currentLayer / totalLayers)
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <span style={{ fontFamily: F, fontSize: FS.md, color: T.text, fontWeight: 700 }}>
-          Merge Dashboard
-        </span>
-        <button
-          onClick={() => setShowRaw(!showRaw)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: '3px 8px', background: showRaw ? `${T.cyan}14` : 'transparent',
-            border: `1px solid ${showRaw ? T.cyan : T.border}`, color: showRaw ? T.cyan : T.dim,
-            fontFamily: F, fontSize: FS.xxs, cursor: 'pointer',
-          }}
-        >
-          {showRaw ? <EyeOff size={10} /> : <Eye size={10} />}
-          {showRaw ? 'HIDE RAW' : 'RAW DATA'}
-        </button>
-      </div>
-
-      {showRaw ? (
-        <div style={{ overflow: 'auto', maxHeight: 500 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: F, fontSize: FS.xxs }}>
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${T.border}` }}>
-                <th style={{ padding: '4px 8px', textAlign: 'left', color: T.dim }}>Step</th>
-                <th style={{ padding: '4px 8px', textAlign: 'left', color: T.dim }}>Metric</th>
-                <th style={{ padding: '4px 8px', textAlign: 'right', color: T.dim }}>Value</th>
-                <th style={{ padding: '4px 8px', textAlign: 'right', color: T.dim }}>Timestamp</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allEvents.map((e, i) => (
-                <tr key={i} style={{ borderBottom: `1px solid ${T.surface4}` }}>
-                  <td style={{ padding: '3px 8px', color: T.sec }}>{e.step ?? '—'}</td>
-                  <td style={{ padding: '3px 8px', color: T.text }}>{e.name}</td>
-                  <td style={{ padding: '3px 8px', color: T.cyan, textAlign: 'right' }}>{e.value.toFixed(6)}</td>
-                  <td style={{ padding: '3px 8px', color: T.dim, textAlign: 'right' }}>{new Date(e.timestamp).toLocaleTimeString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <>
-          <div style={{ marginBottom: 16 }}>
-            <ProgressBar value={block.progress * 100} showLabel />
+    <RawDataToggle blockId={blockId}>
+      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Progress header */}
+        <div style={{
+          display: 'flex', gap: 16, padding: '8px 12px',
+          background: T.surface1, border: `1px solid ${T.border}`,
+          alignItems: 'center',
+        }}>
+          <div>
+            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.06em' }}>Layer</span>
+            <div style={{ fontFamily: F, fontSize: FS.lg, color: T.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              {currentLayer}/{totalLayers}
+            </div>
           </div>
-
-          {latestCompat != null && (
-            <div style={{
-              padding: 12, background: T.surface1, border: `1px solid ${T.border}`,
-              marginBottom: 16,
-            }}>
-              <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, marginBottom: 4 }}>COMPATIBILITY SCORE</div>
-              <div style={{ fontFamily: F, fontSize: FS.lg, color: latestCompat > 0.8 ? T.green : T.amber, fontWeight: 700 }}>
-                {(latestCompat * 100).toFixed(1)}%
+          {outputSize !== null && (
+            <div>
+              <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.06em' }}>Output Size</span>
+              <div style={{ fontFamily: F, fontSize: FS.lg, color: T.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                {outputSize.toFixed(1)} GB
               </div>
             </div>
           )}
+          <div style={{ flex: 1 }} />
+          <span style={{ fontFamily: F, fontSize: FS.md, color: T.cyan, fontWeight: 700 }}>
+            {Math.round(progress * 100)}%
+          </span>
+        </div>
 
-          {metricNames.filter((n) => !n.includes('compatibility')).map((name) => (
-            <div key={name} style={{ marginBottom: 16 }}>
-              <AutoLineChart data={metrics[name]} color={T.purple} height={180} label={name} />
-            </div>
-          ))}
-
-          {metricNames.length === 0 && (
-            <div style={{ fontFamily: F, fontSize: FS.sm, color: T.dim, textAlign: 'center', padding: 40, animation: 'pulse 2s ease-in-out infinite' }}>
-              Waiting for merge metrics...
-            </div>
-          )}
-        </>
-      )}
-    </div>
+        {/* Large progress bar */}
+        <div style={{
+          padding: '16px 12px',
+          background: T.surface1, border: `1px solid ${T.border}`,
+        }}>
+          <div style={{
+            width: '100%', height: 16, background: T.surface3,
+            borderRadius: 4, overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${Math.round(progress * 100)}%`,
+              height: '100%',
+              background: `linear-gradient(90deg, #00BFA5, ${T.cyan})`,
+              transition: 'width 0.3s ease',
+              borderRadius: 4,
+            }} />
+          </div>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', marginTop: 6,
+          }}>
+            {Array.from({ length: Math.min(totalLayers, 8) }, (_, i) => {
+              const layerNum = Math.round((i / 7) * totalLayers)
+              return (
+                <span key={i} style={{
+                  fontFamily: F, fontSize: FS.xxs, color: layerNum <= currentLayer ? T.sec : T.dim,
+                  fontVariantNumeric: 'tabular-nums',
+                }}>
+                  L{layerNum}
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </RawDataToggle>
   )
 }

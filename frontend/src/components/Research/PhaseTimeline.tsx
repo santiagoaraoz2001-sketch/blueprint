@@ -1,322 +1,233 @@
 import { useState } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useUIStore } from '@/stores/uiStore'
-import EditableField from './EditableField'
-import RunRow, { type RunRowData } from './RunRow'
-import PaperBadge from './PaperBadge'
-import { Play, GitCompare, Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { useMetricsStore } from '@/stores/metricsStore'
+import RunRow from './RunRow'
+import { PAPER_STATUS_COLORS } from './PaperBadge'
+import {
+  ChevronDown,
+  ChevronRight,
+  Play,
+  GitCompare,
+  Plus,
+} from 'lucide-react'
 
-// ── Types ─────────────────────────────────────────────────────────
+export interface Phase {
+  phase_id: string
+  name: string
+  status: string
+  research_question: string
+  runs: PhaseRun[]
+}
 
-export interface PhaseData {
+export interface PhaseRun {
   id: string
   name: string
-  status: 'complete' | 'active' | 'blocked' | 'planned'
-  researchQuestion?: string
-  finding?: string
-  blockedBy?: string
-  totalRuns: number
-  completedRuns: number
-  runningRuns: number
-  plannedRuns: number
-  runs: RunRowData[]
-  bestRun?: { id: string; metrics: Record<string, number> }
+  status: string
+  progress?: number
+  loss?: number | null
+  accuracy?: number | null
+  elapsed?: number
+  eta?: number | null
 }
 
 interface PhaseTimelineProps {
-  phases: PhaseData[]
-  paperId: string
-  onFindingChange?: (phaseId: string, value: string) => Promise<void>
-  onLaunchNextRun?: (phaseId: string) => void
-  onCompareAll?: (phaseId: string) => void
-  onAddRun?: (phaseId: string) => void
-  onRunClick?: (runId: string) => void
+  phases: Phase[]
+  projectId: string
 }
 
-// ── Phase Card ────────────────────────────────────────────────────
-
-function PhaseCard({
-  phase,
-  isLast,
-  onFindingChange,
-  onLaunchNextRun,
-  onCompareAll,
-  onAddRun,
-  onRunClick,
-}: {
-  phase: PhaseData
-  isLast: boolean
-  onFindingChange?: (value: string) => Promise<void>
-  onLaunchNextRun?: () => void
-  onCompareAll?: () => void
-  onAddRun?: () => void
-  onRunClick?: (runId: string) => void
-}) {
-  // Expand run list: active phases default open, others closed
-  const [expanded, setExpanded] = useState(phase.status === 'active')
-
-  const statusColor =
-    phase.status === 'complete' ? T.green :
-    phase.status === 'active' ? T.cyan :
-    phase.status === 'blocked' ? T.amber : T.dim
-
-  const progressText = [
-    phase.completedRuns > 0 ? `${phase.completedRuns}/${phase.totalRuns} runs complete` : null,
-    phase.runningRuns > 0 ? `${phase.runningRuns} running` : null,
-    phase.plannedRuns > 0 ? `${phase.plannedRuns} planned` : null,
-  ].filter(Boolean).join(', ')
-
-  return (
-    <div style={{ position: 'relative' }}>
-      {/* Vertical connector line */}
-      {!isLast && (
-        <div style={{
-          position: 'absolute',
-          left: 20,
-          top: '100%',
-          width: 2,
-          height: 20,
-          background: T.border,
-        }} />
-      )}
-
-      {/* Phase card */}
-      <div style={{
-        border: `1px solid ${statusColor}33`,
-        background: T.surface1,
-        marginBottom: isLast ? 0 : 20,
-      }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '8px 12px',
-          borderBottom: `1px solid ${T.border}`,
-        }}>
-          <span style={{ fontFamily: F, fontSize: FS.xs, color: statusColor, fontWeight: 700 }}>
-            {phase.id}: {phase.name}
-          </span>
-          <div style={{ flex: 1 }} />
-          <PaperBadge status={phase.status} />
-        </div>
-
-        {/* Body */}
-        <div style={{ padding: '8px 12px' }}>
-          {/* Progress text */}
-          {progressText && (
-            <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec, marginBottom: 4 }}>
-              {progressText}
-            </div>
-          )}
-
-          {/* Research question */}
-          {phase.researchQuestion && (
-            <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec, fontStyle: 'italic', marginBottom: 6 }}>
-              "{phase.researchQuestion}"
-            </div>
-          )}
-
-          {/* Blocked by */}
-          {phase.status === 'blocked' && phase.blockedBy && (
-            <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.amber, marginBottom: 6 }}>
-              Blocked by: {phase.blockedBy}
-            </div>
-          )}
-
-          {/* Finding (editable for complete phases) */}
-          {phase.status === 'complete' && (
-            <div style={{ marginBottom: 6 }}>
-              <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, marginRight: 4 }}>Finding:</span>
-              <EditableField
-                value={phase.finding || ''}
-                onSave={(v) => onFindingChange?.(v) || Promise.resolve()}
-                placeholder="Add finding..."
-                fontSize={FS.xxs}
-                fontStyle="italic"
-                color={T.green}
-              />
-            </div>
-          )}
-
-          {/* Best run */}
-          {phase.bestRun && (
-            <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, marginBottom: 6 }}>
-              Best run: <span style={{ color: T.sec }}>{phase.bestRun.id.substring(0, 8)}</span>
-              {Object.entries(phase.bestRun.metrics).map(([k, v]) => (
-                <span key={k} style={{ marginLeft: 6 }}>
-                  ({k}=<span style={{ color: T.cyan }}>{v.toFixed(2)}</span>)
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Running experiment highlight */}
-          {phase.runs.filter((r) => r.status === 'running').map((run) => (
-            <div key={run.id} style={{
-              padding: '4px 8px', background: `${T.cyan}06`, border: `1px solid ${T.cyan}15`,
-              marginBottom: 6, fontFamily: F, fontSize: FS.xxs, color: T.text,
-            }}>
-              Running: {run.name}
-              {run.progress != null && ` (${Math.round(run.progress * 100)}%`}
-              {run.eta && `, ETA ${run.eta}`}
-              {run.progress != null && ')'}
-            </div>
-          ))}
-
-          {/* Expandable run list */}
-          {phase.runs.length > 0 && (
-            <div style={{ marginTop: 4 }}>
-              <button
-                onClick={() => setExpanded(!expanded)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  background: 'none', border: 'none', color: T.dim,
-                  fontFamily: F, fontSize: FS.xxs, cursor: 'pointer', padding: 0,
-                  marginBottom: 4,
-                }}
-              >
-                {expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-                {expanded ? 'Hide runs' : `Show ${phase.runs.length} runs`}
-              </button>
-
-              {expanded && (
-                <div style={{
-                  border: `1px solid ${T.border}`,
-                  background: T.surface0,
-                  maxHeight: 300,
-                  overflow: 'auto',
-                }}>
-                  {phase.runs.map((run) => (
-                    <RunRow
-                      key={run.id}
-                      run={run}
-                      onClick={() => onRunClick?.(run.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        {phase.status !== 'blocked' && (
-          <div style={{
-            display: 'flex', gap: 6, padding: '6px 12px',
-            borderTop: `1px solid ${T.border}`,
-          }}>
-            {phase.status === 'active' && onLaunchNextRun && (
-              <button
-                onClick={onLaunchNextRun}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '3px 8px', background: `${T.green}14`, border: `1px solid ${T.green}33`,
-                  color: T.green, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer',
-                }}
-              >
-                <Play size={8} /> Launch Next Run
-              </button>
-            )}
-            {phase.completedRuns >= 2 && onCompareAll && (
-              <button
-                onClick={onCompareAll}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '3px 8px', background: `${T.purple}14`, border: `1px solid ${T.purple}33`,
-                  color: T.purple, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer',
-                }}
-              >
-                <GitCompare size={8} /> Compare All
-              </button>
-            )}
-            {onAddRun && (
-              <button
-                onClick={onAddRun}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '3px 8px', background: 'transparent', border: `1px solid ${T.border}`,
-                  color: T.dim, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer',
-                }}
-              >
-                <Plus size={8} /> Add Run
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Main PhaseTimeline ────────────────────────────────────────────
-
-export default function PhaseTimeline({
-  phases,
-  paperId: _paperId,
-  onFindingChange,
-  onLaunchNextRun,
-  onCompareAll,
-  onAddRun,
-  onRunClick,
-}: PhaseTimelineProps) {
+export default function PhaseTimeline({ phases, projectId: _projectId }: PhaseTimelineProps) {
+  const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set())
+  const [compareSelections, setCompareSelections] = useState<Set<string>>(new Set())
   const setView = useUIStore((s) => s.setView)
+  const cloneRun = useMetricsStore((s) => s.cloneRun)
 
-  const handleLaunchNextRun = (phaseId: string) => {
-    if (onLaunchNextRun) {
-      onLaunchNextRun(phaseId)
-    } else {
-      // Default: navigate to pipeline editor
-      setView('editor')
-    }
+  const togglePhase = (id: string) => {
+    setExpandedPhases((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
-  const handleCompareAll = (phaseId: string) => {
-    if (onCompareAll) {
-      onCompareAll(phaseId)
-    } else {
-      // Default: collect completed run IDs and navigate
-      const phase = phases.find((p) => p.id === phaseId)
-      if (!phase) return
-      const completedIds = phase.runs
-        .filter((r) => r.status === 'complete')
-        .map((r) => r.id)
-      if (completedIds.length > 0) {
-        setView('monitor' as any)
-        window.history.replaceState(null, '', `?compare=true&runs=${completedIds.join(',')}`)
-      }
-    }
+  const toggleCompare = (runId: string) => {
+    setCompareSelections((prev) => {
+      const next = new Set(prev)
+      if (next.has(runId)) next.delete(runId)
+      else next.add(runId)
+      return next
+    })
   }
 
-  const handleRunClick = (runId: string) => {
-    if (onRunClick) {
-      onRunClick(runId)
-    } else {
-      setView('monitor' as any)
-      window.history.replaceState(null, '', `?runId=${runId}`)
-    }
+  const handleClone = async (runId: string) => {
+    await cloneRun(runId)
+    setView('editor')
+  }
+
+  const btnStyle: React.CSSProperties = {
+    padding: '3px 8px',
+    background: `${T.cyan}14`,
+    border: `1px solid ${T.cyan}33`,
+    color: T.cyan,
+    fontFamily: F,
+    fontSize: FS.xxs,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'all 0.15s',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
   }
 
   if (phases.length === 0) {
     return (
-      <div style={{ padding: 20, fontFamily: F, fontSize: FS.sm, color: T.dim, textAlign: 'center' }}>
-        No phases defined for this paper. Add phases to organize your experiments.
+      <div style={{ fontFamily: F, fontSize: FS.sm, color: T.dim, padding: '20px 0', textAlign: 'center' }}>
+        No phases defined yet
       </div>
     )
   }
 
   return (
-    <div>
-      {phases.map((phase, i) => (
-        <PhaseCard
-          key={phase.id}
-          phase={phase}
-          isLast={i === phases.length - 1}
-          onFindingChange={onFindingChange ? (v) => onFindingChange(phase.id, v) : undefined}
-          onLaunchNextRun={() => handleLaunchNextRun(phase.id)}
-          onCompareAll={() => handleCompareAll(phase.id)}
-          onAddRun={onAddRun ? () => onAddRun(phase.id) : undefined}
-          onRunClick={handleRunClick}
-        />
-      ))}
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {phases.map((phase, idx) => {
+        const expanded = expandedPhases.has(phase.phase_id)
+        const completedRuns = phase.runs.filter((r) => r.status === 'complete').length
+        const color = PAPER_STATUS_COLORS[phase.status] || '#64748B'
+
+        return (
+          <div key={phase.phase_id} style={{ display: 'flex', gap: 12 }}>
+            {/* Vertical timeline line */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 20, flexShrink: 0 }}>
+              <div
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  background: color,
+                  border: `2px solid ${T.surface1}`,
+                  flexShrink: 0,
+                  zIndex: 1,
+                }}
+              />
+              {idx < phases.length - 1 && (
+                <div style={{ width: 2, flex: 1, background: T.border }} />
+              )}
+            </div>
+
+            {/* Phase card */}
+            <div
+              style={{
+                flex: 1,
+                marginBottom: 12,
+                border: `1px solid ${T.border}`,
+                background: T.surface1,
+              }}
+            >
+              {/* Phase header */}
+              <div
+                onClick={() => togglePhase(phase.phase_id)}
+                style={{
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = T.surface2 }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+              >
+                {expanded ? <ChevronDown size={12} color={T.dim} /> : <ChevronRight size={12} color={T.dim} />}
+                <span
+                  style={{
+                    display: 'inline-block',
+                    padding: '1px 6px',
+                    background: `${color}33`,
+                    fontFamily: F,
+                    fontSize: FS.xxs,
+                    fontWeight: 700,
+                    color,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    borderRadius: 2,
+                  }}
+                >
+                  {phase.status}
+                </span>
+                <span style={{ fontFamily: F, fontSize: FS.xs, color: T.dim, letterSpacing: '0.06em' }}>
+                  {phase.phase_id}
+                </span>
+                <span style={{ fontFamily: F, fontSize: FS.sm, color: T.text, flex: 1 }}>
+                  {phase.name}
+                </span>
+                <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
+                  {completedRuns}/{phase.runs.length} runs
+                </span>
+              </div>
+
+              {/* Research question (always visible in collapsed) */}
+              {phase.research_question && (
+                <div style={{ padding: '0 12px 8px 32px' }}>
+                  <span style={{ fontFamily: F, fontSize: FS.xs, color: T.sec, fontStyle: 'italic' }}>
+                    {phase.research_question}
+                  </span>
+                </div>
+              )}
+
+              {/* Expanded content */}
+              {expanded && (
+                <div style={{ padding: '0 12px 10px' }}>
+                  {phase.runs.map((run) => (
+                    <RunRow
+                      key={run.id}
+                      run={run}
+                      onClone={handleClone}
+                      onCompareToggle={toggleCompare}
+                      compareSelected={compareSelections.has(run.id)}
+                    />
+                  ))}
+
+                  {/* Phase actions */}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    <button
+                      onClick={() => setView('editor')}
+                      style={btnStyle}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}22` }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = `${T.cyan}14` }}
+                    >
+                      <Play size={9} />
+                      Launch Next
+                    </button>
+                    {compareSelections.size >= 2 && (
+                      <button
+                        onClick={() => setView('results')}
+                        style={btnStyle}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}22` }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = `${T.cyan}14` }}
+                      >
+                        <GitCompare size={9} />
+                        Compare ({compareSelections.size})
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setView('editor')}
+                      style={btnStyle}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}22` }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = `${T.cyan}14` }}
+                    >
+                      <Plus size={9} />
+                      Add Run
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

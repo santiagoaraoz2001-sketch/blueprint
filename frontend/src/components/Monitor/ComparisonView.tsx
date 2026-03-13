@@ -1,198 +1,383 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
-import { useMetricsStore } from '@/stores/metricsStore'
-import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from 'recharts'
+import { api } from '@/api/client'
+import { useSettingsStore } from '@/stores/settingsStore'
 import ConfigDiff from './ConfigDiff'
-import { Download, GitCompare } from 'lucide-react'
+import { Download } from 'lucide-react'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts'
 
-const COMPARISON_COLORS = ['#00BFA5', '#F59E0B', '#8B5CF6', '#EC4899', '#3B82F6', '#22C55E', '#FB7185', '#38BDF8']
-
-interface ComparisonViewProps {
-  runIds?: string[]
+interface Props {
+  initialRunIds?: string[]
 }
 
-export default function ComparisonView({ runIds: propRunIds }: ComparisonViewProps) {
-  const params = new URLSearchParams(window.location.search)
-  const runIds = propRunIds || (params.get('runs')?.split(',') ?? [])
-  const runs = useMetricsStore((s) => s.runs)
-  const [showDiff, setShowDiff] = useState(false)
+interface RunData {
+  id: string
+  name: string
+  status: string
+  metrics: Record<string, any>
+  config_snapshot: Record<string, any>
+}
 
-  // Collect all metric names across all runs
-  const allMetricNames = useMemo(() => {
-    const names = new Set<string>()
-    for (const id of runIds) {
-      const run = runs[id]
-      if (!run) continue
-      for (const block of Object.values(run.blocks)) {
-        for (const name of Object.keys(block.metrics)) {
-          if (name !== '__started') names.add(name)
+const COMPARE_COLORS = ['#00BFA5', '#F59E0B', '#3B82F6', '#EC4899', '#8B5CF6']
+
+// Demo data for comparison mode
+const DEMO_RUNS: RunData[] = [
+  {
+    id: 'demo-run-1', name: 'LR=2e-4', status: 'complete',
+    metrics: {
+      'train/loss': Array.from({ length: 50 }, (_, i) => ({ step: i, value: 2.5 * Math.exp(-i * 0.06) + 0.38 })),
+      'eval/acc': [{ step: 50, value: 0.71 }],
+    },
+    config_snapshot: { model: { name: 'llama-3.1-8b' }, training: { learning_rate: 2e-4, batch_size: 8, epochs: 3 }, optimizer: { type: 'adamw', weight_decay: 0.01 } },
+  },
+  {
+    id: 'demo-run-2', name: 'LR=1e-4', status: 'complete',
+    metrics: {
+      'train/loss': Array.from({ length: 50 }, (_, i) => ({ step: i, value: 2.5 * Math.exp(-i * 0.04) + 0.31 })),
+      'eval/acc': [{ step: 50, value: 0.74 }],
+    },
+    config_snapshot: { model: { name: 'llama-3.1-8b' }, training: { learning_rate: 1e-4, batch_size: 16, epochs: 5 }, optimizer: { type: 'adamw', weight_decay: 0.005 } },
+  },
+  {
+    id: 'demo-run-3', name: 'LR=5e-5', status: 'complete',
+    metrics: {
+      'train/loss': Array.from({ length: 50 }, (_, i) => ({ step: i, value: 2.5 * Math.exp(-i * 0.03) + 0.28 })),
+      'eval/acc': [{ step: 50, value: 0.76 }],
+    },
+    config_snapshot: { model: { name: 'llama-3.1-8b' }, training: { learning_rate: 5e-5, batch_size: 16, epochs: 10 }, optimizer: { type: 'adamw', weight_decay: 0.01 } },
+  },
+]
+
+export default function ComparisonView({ initialRunIds }: Props) {
+  const [allRuns, setAllRuns] = useState<RunData[]>([])
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(initialRunIds || []))
+  const [loading, setLoading] = useState(false)
+  const isDemoMode = useSettingsStore((s) => s.demoMode)
+
+  // Load available runs
+  useEffect(() => {
+    async function loadRuns() {
+      if (isDemoMode) {
+        setAllRuns(DEMO_RUNS)
+        if (selectedIds.size === 0) {
+          setSelectedIds(new Set(DEMO_RUNS.map(r => r.id)))
         }
+        return
       }
+      setLoading(true)
+      try {
+        const data = await api.get<any>('/runs?status=complete&limit=20')
+        const runs = (data.runs || data || []).map((r: any) => ({
+          id: r.id,
+          name: r.name || `Run ${r.id.slice(0, 8)}`,
+          status: r.status,
+          metrics: r.metrics || {},
+          config_snapshot: r.config_snapshot || {},
+        }))
+        setAllRuns(runs)
+        if (selectedIds.size === 0 && runs.length >= 2) {
+          setSelectedIds(new Set(runs.slice(0, 2).map((r: RunData) => r.id)))
+        }
+      } catch {
+        // Silently fail
+      }
+      setLoading(false)
     }
-    return Array.from(names).sort()
-  }, [runIds, runs])
+    loadRuns()
+  }, [isDemoMode])
 
-  // Build comparison table data
-  const tableData = useMemo(() => {
-    return allMetricNames.map((metric) => {
-      const row: Record<string, any> = { metric }
-      for (const id of runIds) {
-        const run = runs[id]
-        if (!run) continue
-        for (const block of Object.values(run.blocks)) {
-          const series = block.metrics[metric]
-          if (series && series.length > 0) {
-            row[id] = series[series.length - 1].value
-          }
+  const selectedRuns = allRuns.filter(r => selectedIds.has(r.id))
+
+  // Build shared metrics for overlaid charts
+  const sharedMetrics = useMemo(() => {
+    const metricNames = new Set<string>()
+    selectedRuns.forEach(run => {
+      Object.keys(run.metrics).forEach(name => {
+        if (Array.isArray(run.metrics[name]) && run.metrics[name].length > 1) {
+          metricNames.add(name)
         }
-      }
-      return row
+      })
     })
-  }, [allMetricNames, runIds, runs])
+    return Array.from(metricNames)
+  }, [selectedRuns])
 
-  const exportCSV = () => {
-    const headers = ['metric', ...runIds.map((id) => runs[id]?.pipelineName || id)]
-    const csvRows = [headers.join(',')]
-    for (const row of tableData) {
-      const vals = [row.metric, ...runIds.map((id) => row[id]?.toFixed(6) ?? '')]
-      csvRows.push(vals.join(','))
-    }
-    const csv = csvRows.join('\n')
+  // Build comparison table (metric rows x run columns)
+  const comparisonMetrics = useMemo(() => {
+    const metricNames = new Set<string>()
+    selectedRuns.forEach(run => {
+      Object.keys(run.metrics).forEach(name => metricNames.add(name))
+    })
+
+    return Array.from(metricNames).map(name => {
+      const values = selectedRuns.map(run => {
+        const series = run.metrics[name]
+        if (Array.isArray(series) && series.length > 0) {
+          return series[series.length - 1].value as number
+        }
+        return typeof series === 'number' ? series : null
+      })
+      return { name, values }
+    })
+  }, [selectedRuns])
+
+  const toggleRun = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        if (next.size > 1) next.delete(id) // Keep at least 1
+      } else {
+        if (next.size < 5) next.add(id)
+      }
+      return next
+    })
+  }
+
+  const exportCSV = useCallback(() => {
+    if (comparisonMetrics.length === 0) return
+    const header = ['Metric', ...selectedRuns.map(r => r.name)].join(',')
+    const rows = comparisonMetrics.map(m =>
+      [m.name, ...m.values.map(v => v !== null ? String(v) : '')].join(',')
+    )
+    const csv = [header, ...rows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    const date = new Date().toISOString().split('T')[0]
-    a.download = `comparison_${runIds.join('_')}_${date}.csv`
+    a.download = `comparison-${Date.now()}.csv`
     a.click()
     URL.revokeObjectURL(url)
-  }
-
-  if (runIds.length === 0) {
-    return (
-      <div style={{ padding: 20, fontFamily: F, fontSize: FS.sm, color: T.dim }}>
-        No runs selected for comparison. Select runs from the Research Dashboard.
-      </div>
-    )
-  }
+  }, [comparisonMetrics, selectedRuns])
 
   return (
-    <div style={{ padding: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <GitCompare size={14} color={T.cyan} />
-          <span style={{ fontFamily: F, fontSize: FS.md, color: T.text, fontWeight: 700 }}>
-            Run Comparison ({runIds.length} runs)
-          </span>
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      {/* Left: Run selector */}
+      <div style={{
+        width: 200, borderRight: `1px solid ${T.border}`,
+        overflow: 'auto', padding: 8,
+      }}>
+        <div style={{
+          fontFamily: F, fontSize: FS.xxs, fontWeight: 700,
+          color: T.dim, letterSpacing: '0.06em', marginBottom: 8,
+        }}>
+          SELECT RUNS (2-5)
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setShowDiff(!showDiff)}
+
+        {loading && (
+          <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, padding: 8 }}>
+            Loading runs...
+          </div>
+        )}
+
+        {allRuns.map(run => (
+          <label
+            key={run.id}
             style={{
-              padding: '3px 8px', background: showDiff ? `${T.purple}14` : 'transparent',
-              border: `1px solid ${showDiff ? T.purple : T.border}`,
-              color: showDiff ? T.purple : T.dim, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '4px 6px', cursor: 'pointer',
+              background: selectedIds.has(run.id) ? `${T.cyan}08` : 'transparent',
+              borderBottom: `1px solid ${T.border}`,
             }}
           >
-            CONFIG DIFF
-          </button>
-          <button
-            onClick={exportCSV}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '3px 8px', background: `${T.cyan}14`, border: `1px solid ${T.cyan}33`,
-              color: T.cyan, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer',
-            }}
-          >
-            <Download size={10} />
-            EXPORT CSV
-          </button>
-        </div>
+            <input
+              type="checkbox"
+              checked={selectedIds.has(run.id)}
+              onChange={() => toggleRun(run.id)}
+              style={{ accentColor: T.cyan }}
+            />
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: selectedIds.has(run.id)
+                ? COMPARE_COLORS[Array.from(selectedIds).indexOf(run.id) % COMPARE_COLORS.length]
+                : T.dim,
+            }} />
+            <span style={{
+              fontFamily: F, fontSize: FS.xxs, color: T.sec,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {run.name}
+            </span>
+          </label>
+        ))}
       </div>
 
-      {showDiff && <ConfigDiff runIds={runIds} />}
-
-      {/* Overlaid charts per metric */}
-      {allMetricNames.map((metricName) => {
-        // Build merged data: steps → { step, run1Value, run2Value, ... }
-        const mergedMap = new Map<number, Record<string, any>>()
-        runIds.forEach((id) => {
-          const run = runs[id]
-          if (!run) return
-          for (const block of Object.values(run.blocks)) {
-            const series = block.metrics[metricName]
-            if (!series) continue
-            series.forEach((p, i) => {
-              const step = p.step ?? i
-              if (!mergedMap.has(step)) mergedMap.set(step, { step })
-              mergedMap.get(step)![id] = p.value
-            })
-          }
-        })
-        const merged = Array.from(mergedMap.values()).sort((a, b) => a.step - b.step)
-
-        if (merged.length === 0) return null
-
-        return (
-          <div key={metricName} style={{ marginBottom: 24 }}>
-            <div style={{ fontFamily: F, fontSize: FS.xs, color: T.sec, marginBottom: 4 }}>{metricName}</div>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={merged}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1A2332" />
-                <XAxis dataKey="step" stroke="#64748B" tick={{ fontSize: 11, fontFamily: 'monospace' }} />
-                <YAxis stroke="#64748B" tick={{ fontSize: 11, fontFamily: 'monospace' }} />
-                <Tooltip contentStyle={{ background: '#1A2332', border: '1px solid #2D3748', fontFamily: F, fontSize: FS.xxs }} />
-                <Legend wrapperStyle={{ fontFamily: F, fontSize: FS.xxs }} />
-                {runIds.map((id, idx) => (
-                  <Line
-                    key={id}
-                    type="monotone"
-                    dataKey={id}
-                    stroke={COMPARISON_COLORS[idx % COMPARISON_COLORS.length]}
-                    dot={false}
-                    strokeWidth={2}
-                    name={runs[id]?.pipelineName || id.substring(0, 8)}
-                    connectNulls={false}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+      {/* Center: Charts + table + diff */}
+      <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+        {selectedRuns.length < 2 ? (
+          <div style={{
+            height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: F, fontSize: FS.xs, color: T.dim,
+          }}>
+            Select at least 2 runs to compare
           </div>
-        )
-      })}
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Overlaid charts for shared metrics */}
+            {sharedMetrics.map(metricName => {
+              // Build aligned data by step
+              const stepSet = new Set<number>()
+              selectedRuns.forEach(run => {
+                const series = run.metrics[metricName]
+                if (Array.isArray(series)) {
+                  series.forEach((pt: any) => stepSet.add(pt.step))
+                }
+              })
+              const steps = Array.from(stepSet).sort((a, b) => a - b)
+              const chartData = steps.map(step => {
+                const point: any = { step }
+                selectedRuns.forEach(run => {
+                  const series = run.metrics[metricName]
+                  if (Array.isArray(series)) {
+                    const match = series.find((pt: any) => pt.step === step)
+                    if (match) point[run.id] = match.value
+                  }
+                })
+                return point
+              })
 
-      {/* Summary table */}
-      {tableData.length > 0 && (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ fontFamily: F, fontSize: FS.xs, color: T.sec, marginBottom: 6, fontWeight: 600 }}>SUMMARY</div>
-          <div style={{ overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: F, fontSize: FS.xxs }}>
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${T.border}` }}>
-                  <th style={{ padding: '4px 8px', textAlign: 'left', color: T.dim }}>Metric</th>
-                  {runIds.map((id, idx) => (
-                    <th key={id} style={{ padding: '4px 8px', textAlign: 'right', color: COMPARISON_COLORS[idx % COMPARISON_COLORS.length] }}>
-                      {runs[id]?.pipelineName || id.substring(0, 8)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tableData.map((row) => (
-                  <tr key={row.metric} style={{ borderBottom: `1px solid ${T.surface4}` }}>
-                    <td style={{ padding: '3px 8px', color: T.text }}>{row.metric}</td>
-                    {runIds.map((id) => (
-                      <td key={id} style={{ padding: '3px 8px', color: T.sec, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        {row[id] != null ? row[id].toFixed(4) : '—'}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              return (
+                <div key={metricName} style={{
+                  background: T.surface1, border: `1px solid ${T.border}`, padding: 8,
+                }}>
+                  <div style={{
+                    fontFamily: F, fontSize: FS.xxs, fontWeight: 700,
+                    color: T.dim, letterSpacing: '0.06em', marginBottom: 4,
+                  }}>
+                    {metricName.toUpperCase()}
+                  </div>
+                  <div style={{ height: 200 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1A2332" />
+                        <XAxis dataKey="step" stroke={T.dim} tick={{ fill: T.dim, fontSize: 7, fontFamily: F }} />
+                        <YAxis stroke={T.dim} tick={{ fill: T.dim, fontSize: 7, fontFamily: F }} width={45} />
+                        <Tooltip
+                          contentStyle={{
+                            background: T.surface2, border: `1px solid ${T.borderHi}`,
+                            fontFamily: F, fontSize: 7, color: T.sec, padding: '4px 8px',
+                          }}
+                        />
+                        <Legend
+                          wrapperStyle={{ fontFamily: F, fontSize: 7 }}
+                        />
+                        {selectedRuns.map((run, i) => (
+                          <Line
+                            key={run.id}
+                            type="monotone"
+                            dataKey={run.id}
+                            name={run.name}
+                            stroke={COMPARE_COLORS[i % COMPARE_COLORS.length]}
+                            strokeWidth={1.5}
+                            dot={false}
+                            isAnimationActive={false}
+                          />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Comparison table */}
+            {comparisonMetrics.length > 0 && (
+              <div style={{
+                background: T.surface1, border: `1px solid ${T.border}`, padding: 8,
+              }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+                }}>
+                  <span style={{
+                    fontFamily: F, fontSize: FS.xxs, fontWeight: 700,
+                    color: T.dim, letterSpacing: '0.06em',
+                  }}>
+                    METRICS COMPARISON
+                  </span>
+                  <div style={{ flex: 1 }} />
+                  <button
+                    onClick={exportCSV}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '2px 8px', background: T.surface2, border: `1px solid ${T.border}`,
+                      color: T.sec, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer',
+                    }}
+                  >
+                    <Download size={9} /> Export CSV
+                  </button>
+                </div>
+
+                <table style={{
+                  width: '100%', borderCollapse: 'collapse',
+                  fontFamily: F, fontSize: FS.xxs,
+                }}>
+                  <thead>
+                    <tr>
+                      <th style={{
+                        padding: '4px 8px', textAlign: 'left',
+                        borderBottom: `1px solid ${T.borderHi}`, color: T.dim,
+                        fontWeight: 700, letterSpacing: '0.06em',
+                      }}>Metric</th>
+                      {selectedRuns.map((run, i) => (
+                        <th key={run.id} style={{
+                          padding: '4px 8px', textAlign: 'right',
+                          borderBottom: `1px solid ${T.borderHi}`,
+                          color: COMPARE_COLORS[i % COMPARE_COLORS.length],
+                          fontWeight: 700, letterSpacing: '0.06em',
+                        }}>{run.name}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparisonMetrics.map(({ name, values }) => {
+                      const numericValues = values.filter((v): v is number => v !== null)
+                      const bestIdx = numericValues.length > 0
+                        ? (name.toLowerCase().includes('loss')
+                          ? values.indexOf(Math.min(...numericValues))
+                          : values.indexOf(Math.max(...numericValues)))
+                        : -1
+                      const worstIdx = numericValues.length > 0
+                        ? (name.toLowerCase().includes('loss')
+                          ? values.indexOf(Math.max(...numericValues))
+                          : values.indexOf(Math.min(...numericValues)))
+                        : -1
+
+                      return (
+                        <tr key={name} style={{ borderBottom: `1px solid ${T.border}` }}>
+                          <td style={{ padding: '3px 8px', color: T.sec }}>{name}</td>
+                          {values.map((v, i) => (
+                            <td key={i} style={{
+                              padding: '3px 8px', textAlign: 'right',
+                              color: T.text, fontVariantNumeric: 'tabular-nums',
+                              fontWeight: i === bestIdx ? 700 : 400,
+                              background: i === bestIdx ? `${T.green}08`
+                                : i === worstIdx && numericValues.length > 1 ? `${T.red}06`
+                                  : 'transparent',
+                            }}>
+                              {v !== null ? v.toLocaleString(undefined, { maximumFractionDigits: 6 }) : '—'}
+                            </td>
+                          ))}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Config Diff */}
+            <div style={{ background: T.surface1, border: `1px solid ${T.border}` }}>
+              <ConfigDiff
+                configs={selectedRuns.map(r => ({
+                  runId: r.id,
+                  runName: r.name,
+                  config: r.config_snapshot,
+                }))}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

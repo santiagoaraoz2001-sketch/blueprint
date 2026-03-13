@@ -1,100 +1,78 @@
-import { useState } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
-import { useMetricsStore } from '@/stores/metricsStore'
+import { useMetricsStore, EMPTY_BLOCK_METRICS } from '@/stores/metricsStore'
 import AutoLineChart from './AutoLineChart'
-import { Eye, EyeOff } from 'lucide-react'
+import RawDataToggle from './RawDataToggle'
 
-interface Props { runId: string; blockId: string }
+interface Props { blockId: string }
 
-export default function TrainingDashboard({ runId, blockId }: Props) {
-  const [showRaw, setShowRaw] = useState(false)
-  const block = useMetricsStore((s) => s.runs[runId]?.blocks[blockId])
-  if (!block) return null
+export default function TrainingDashboard({ blockId }: Props) {
+  const blockMetrics = useMetricsStore((s) => s.metrics[blockId] ?? EMPTY_BLOCK_METRICS)
+  const block = useMetricsStore((s) => s.monitorExecutionOrder.find(b => b.id === blockId))
 
-  const metrics = block.metrics
-  const trainLoss = metrics['train/loss'] || []
-  const evalLoss = metrics['eval/loss'] || []
-  const gradNorm = metrics['train/grad_norm'] || []
-  const lr = metrics['train/lr'] || []
+  const lossSeries = blockMetrics['train/loss'] || []
+  const evalLossSeries = blockMetrics['eval/loss'] || []
+  const lrSeries = blockMetrics['train/lr'] || []
 
-  // Collect all raw events for the raw data view
-  const allEvents = Object.entries(metrics).flatMap(([name, points]) =>
-    points.map((p) => ({ name, ...p }))
-  ).sort((a, b) => a.timestamp - b.timestamp)
+  const latestLoss = lossSeries.length > 0 ? lossSeries[lossSeries.length - 1].value : null
+  const latestLR = lrSeries.length > 0 ? lrSeries[lrSeries.length - 1].value : null
+  const latestStep = lossSeries.length > 0 ? lossSeries[lossSeries.length - 1].step : 0
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <span style={{ fontFamily: F, fontSize: FS.md, color: T.text, fontWeight: 700 }}>
-          Training Dashboard
-        </span>
-        <button
-          onClick={() => setShowRaw(!showRaw)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: '3px 8px', background: showRaw ? `${T.cyan}14` : 'transparent',
-            border: `1px solid ${showRaw ? T.cyan : T.border}`, color: showRaw ? T.cyan : T.dim,
-            fontFamily: F, fontSize: FS.xxs, cursor: 'pointer',
-          }}
-        >
-          {showRaw ? <EyeOff size={10} /> : <Eye size={10} />}
-          {showRaw ? 'HIDE RAW' : 'RAW DATA'}
-        </button>
-      </div>
-
-      {showRaw ? (
-        <div style={{ overflow: 'auto', maxHeight: 500 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: F, fontSize: FS.xxs }}>
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${T.border}` }}>
-                <th style={{ padding: '4px 8px', textAlign: 'left', color: T.dim }}>Step</th>
-                <th style={{ padding: '4px 8px', textAlign: 'left', color: T.dim }}>Metric</th>
-                <th style={{ padding: '4px 8px', textAlign: 'right', color: T.dim }}>Value</th>
-                <th style={{ padding: '4px 8px', textAlign: 'right', color: T.dim }}>Timestamp</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allEvents.map((e, i) => (
-                <tr key={i} style={{ borderBottom: `1px solid ${T.surface4}` }}>
-                  <td style={{ padding: '3px 8px', color: T.sec }}>{e.step ?? '—'}</td>
-                  <td style={{ padding: '3px 8px', color: T.text }}>{e.name}</td>
-                  <td style={{ padding: '3px 8px', color: T.cyan, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                    {e.value.toFixed(6)}
-                  </td>
-                  <td style={{ padding: '3px 8px', color: T.dim, textAlign: 'right' }}>
-                    {new Date(e.timestamp).toLocaleTimeString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <RawDataToggle blockId={blockId}>
+      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Latest values */}
+        <div style={{
+          display: 'flex', gap: 16, padding: '8px 12px',
+          background: T.surface1, border: `1px solid ${T.border}`,
+        }}>
+          {latestLoss !== null && (
+            <div>
+              <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.06em' }}>Loss</span>
+              <div style={{ fontFamily: F, fontSize: FS.lg, color: T.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                {latestLoss.toFixed(4)}
+              </div>
+            </div>
+          )}
+          {latestLR !== null && (
+            <div>
+              <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.06em' }}>LR</span>
+              <div style={{ fontFamily: F, fontSize: FS.lg, color: T.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                {latestLR.toExponential(1)}
+              </div>
+            </div>
+          )}
+          <div style={{ flex: 1 }} />
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.06em' }}>Progress</span>
+            <div style={{ fontFamily: F, fontSize: FS.md, color: T.sec, fontVariantNumeric: 'tabular-nums' }}>
+              Step {latestStep.toLocaleString()}
+              {block && block.progress < 1 && ` — ${Math.round(block.progress * 100)}%`}
+            </div>
+          </div>
         </div>
-      ) : (
-        <>
-          {/* Loss chart */}
+
+        {/* Main loss chart */}
+        <AutoLineChart
+          metricName="train/loss"
+          blockId={blockId}
+          color="#00BFA5"
+          height={240}
+          title="TRAINING LOSS"
+          overlayMetric={evalLossSeries.length > 0 ? 'eval/loss' : undefined}
+          overlayColor="#F59E0B"
+        />
+
+        {/* Learning rate chart (if exists) */}
+        {lrSeries.length > 0 && (
           <AutoLineChart
-            data={trainLoss}
-            color="#00BFA5"
-            height={300}
-            label="Loss"
-            overlay={evalLoss.length > 0 ? { data: evalLoss, color: '#F59E0B', label: 'Eval Loss' } : undefined}
+            metricName="train/lr"
+            blockId={blockId}
+            color="#3B82F6"
+            height={120}
+            title="LEARNING RATE"
           />
-
-          {/* Gradient norm */}
-          {gradNorm.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <AutoLineChart data={gradNorm} color={T.purple} height={150} label="Grad Norm" />
-            </div>
-          )}
-
-          {/* Learning rate */}
-          {lr.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <AutoLineChart data={lr} color={T.blue} height={120} label="Learning Rate" />
-            </div>
-          )}
-        </>
-      )}
-    </div>
+        )}
+      </div>
+    </RawDataToggle>
   )
 }

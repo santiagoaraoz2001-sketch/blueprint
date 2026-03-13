@@ -1,11 +1,24 @@
+import json
+import uuid
+from pathlib import Path
+
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from ..config import ARTIFACTS_DIR
 from ..database import get_db
 from ..models.run import Run
+from ..models.pipeline import Pipeline
+from ..models.experiment_phase import ExperimentPhase
 from ..schemas.run import RunResponse
+from ..schemas.pipeline import PipelineResponse
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
+
+
+class AssignRequest(BaseModel):
+    experiment_phase_id: str
 
 
 def _flatten_dict(d: dict, prefix: str = '') -> dict:
@@ -92,9 +105,93 @@ def compare_runs(
     }
 
 
+@router.get("/{run_id}/metrics-log")
+def get_metrics_log(run_id: str, db: Session = Depends(get_db)):
+    """Return the full metrics event log for a run.
+
+    Layer 2 (SQLite) is preferred. Falls back to Layer 1 (JSONL file)
+    if metrics_log is null (crash recovery / old runs).
+    """
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    # Layer 2: SQLite metrics_log
+    if run.metrics_log:
+        return run.metrics_log
+
+    # Layer 1 fallback: JSONL file
+    jsonl_path = ARTIFACTS_DIR / run_id / "metrics.jsonl"
+    if jsonl_path.exists():
+        events = []
+        for line in jsonl_path.read_text().splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return events
+
+    return []
+
+
 @router.get("/{run_id}", response_model=RunResponse)
 def get_run(run_id: str, db: Session = Depends(get_db)):
     run = db.query(Run).filter(Run.id == run_id).first()
     if not run:
         raise HTTPException(404, "Run not found")
     return run
+
+
+@router.post("/{run_id}/assign")
+def assign_run(run_id: str, data: AssignRequest, db: Session = Depends(get_db)):
+    """Retroactively assign a run to an experiment phase via its pipeline."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    phase = db.query(ExperimentPhase).filter(ExperimentPhase.id == data.experiment_phase_id).first()
+    if not phase:
+        raise HTTPException(404, "Experiment phase not found")
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == run.pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+
+    pipeline.experiment_phase_id = data.experiment_phase_id
+    db.commit()
+
+    # Trigger lifecycle recalculation
+    try:
+        from ..services.project_lifecycle import on_run_completed
+        if run.status == "complete":
+            on_run_completed(run_id, db)
+    except Exception:
+        pass
+
+    return {"status": "assigned", "run_id": run_id, "experiment_phase_id": data.experiment_phase_id}
+
+
+@router.post("/{run_id}/clone-pipeline", response_model=PipelineResponse)
+def clone_pipeline_from_run(run_id: str, db: Session = Depends(get_db)):
+    """Create a new pipeline from a run's config_snapshot."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    original = db.query(Pipeline).filter(Pipeline.id == run.pipeline_id).first()
+    name = f"{original.name} (from run)" if original else "Pipeline from run"
+
+    new_pipeline = Pipeline(
+        id=str(uuid.uuid4()),
+        name=name,
+        project_id=original.project_id if original else None,
+        experiment_id=original.experiment_id if original else None,
+        description=f"Cloned from run {run_id[:8]}",
+        definition=run.config_snapshot or {},
+    )
+    db.add(new_pipeline)
+    db.commit()
+    db.refresh(new_pipeline)
+    return new_pipeline

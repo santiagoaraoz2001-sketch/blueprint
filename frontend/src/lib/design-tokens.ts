@@ -110,9 +110,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
 export const STATUS_COLORS: Record<string, string> = {
   planning: '#f59e0b', active: '#4af6c3', complete: '#22c55e',
   paused: '#EAB308', failed: '#ff433d', running: '#f59e0b',
-  cancelled: '#F59E0B', blocked: '#F59E0B',
-  pending: '#666666', idle: '#666666', planned: '#666666',
-  queued: '#666666',
+  pending: '#666666', idle: '#666666', cancelled: '#f59e0b',
 }
 
 /**

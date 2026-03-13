@@ -17,6 +17,8 @@ import {
   LineChart,
   PanelLeftClose,
   PanelLeftOpen,
+  Home,
+  Activity,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -31,6 +33,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { id: 'research', label: 'Research', icon: Home },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'editor', label: 'Pipelines', icon: GitBranch },
   { id: 'datasets', label: 'Datasets', icon: Database },
@@ -38,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'marketplace', label: 'Blocks', icon: Blocks },
   { id: 'workshop', label: 'Workshop', icon: Wrench },
   { id: 'inference', label: 'Inference', icon: MessageSquare },
+  { id: 'monitor', label: 'Monitor', icon: Activity },
   { id: 'results', label: 'Results', icon: BarChart3 },
   { id: 'visualization', label: 'Charts', icon: LineChart },
   { id: 'paper', label: 'Paper', icon: FileText },
@@ -109,7 +113,7 @@ export default function Sidebar() {
 
       <nav style={{ flex: 1, paddingTop: 6 }}>
         {NAV_ITEMS.map((item, index) => {
-          const active = activeView === item.id
+          const active = activeView === item.id || (item.id === 'research' && activeView === 'research-detail')
           const Icon = item.icon
           return (
             <motion.button

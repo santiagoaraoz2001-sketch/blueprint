@@ -1,111 +1,153 @@
-import { useState } from 'react'
+import { useMemo } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
-import { useMetricsStore } from '@/stores/metricsStore'
-import AutoLineChart from './AutoLineChart'
-import { Eye, EyeOff } from 'lucide-react'
+import { useMetricsStore, EMPTY_BLOCK_METRICS } from '@/stores/metricsStore'
+import RawDataToggle from './RawDataToggle'
+import { CheckCircle, Loader } from 'lucide-react'
 
-interface Props { runId: string; blockId: string }
+interface Props { blockId: string }
 
-export default function EvaluationDashboard({ runId, blockId }: Props) {
-  const [showRaw, setShowRaw] = useState(false)
-  const block = useMetricsStore((s) => s.runs[runId]?.blocks[blockId])
-  if (!block) return null
+interface BenchmarkResult {
+  name: string
+  score: number | null
+  complete: boolean
+}
 
-  const metrics = block.metrics
-  const metricNames = Object.keys(metrics).filter((n) => n !== '__started')
-  const benchmarkMetrics = metricNames.filter((n) => n.startsWith('benchmark/'))
-  const otherMetrics = metricNames.filter((n) => !n.startsWith('benchmark/'))
+export default function EvaluationDashboard({ blockId }: Props) {
+  const blockMetrics = useMetricsStore((s) => s.metrics[blockId] ?? EMPTY_BLOCK_METRICS)
 
-  const allEvents = Object.entries(metrics).flatMap(([name, points]) =>
-    points.map((p) => ({ name, ...p }))
-  ).sort((a, b) => a.timestamp - b.timestamp)
+  const benchmarks = useMemo(() => {
+    const results: BenchmarkResult[] = []
+
+    for (const [metricName, series] of Object.entries(blockMetrics)) {
+      // Parse benchmark/{name}/acc or benchmark/{name}/score patterns
+      const match = metricName.match(/benchmark\/([^/]+)\/(.+)/)
+      if (match) {
+        const latest = series.length > 0 ? series[series.length - 1].value : null
+        results.push({
+          name: match[1],
+          score: latest,
+          complete: latest !== null,
+        })
+      } else {
+        // Also accept direct metric names containing acc/score
+        if (metricName.includes('acc') || metricName.includes('score') || metricName.includes('f1')) {
+          const latest = series.length > 0 ? series[series.length - 1].value : null
+          results.push({
+            name: metricName,
+            score: latest,
+            complete: latest !== null,
+          })
+        }
+      }
+    }
+
+    return results
+  }, [blockMetrics])
+
+  const completedCount = benchmarks.filter(b => b.complete).length
+  const totalCount = benchmarks.length
+  const avgScore = completedCount > 0
+    ? benchmarks.filter(b => b.score !== null).reduce((sum, b) => sum + (b.score || 0), 0) / completedCount
+    : null
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <span style={{ fontFamily: F, fontSize: FS.md, color: T.text, fontWeight: 700 }}>
-          Evaluation Dashboard
-        </span>
-        <button
-          onClick={() => setShowRaw(!showRaw)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: '3px 8px', background: showRaw ? `${T.cyan}14` : 'transparent',
-            border: `1px solid ${showRaw ? T.cyan : T.border}`, color: showRaw ? T.cyan : T.dim,
-            fontFamily: F, fontSize: FS.xxs, cursor: 'pointer',
-          }}
-        >
-          {showRaw ? <EyeOff size={10} /> : <Eye size={10} />}
-          {showRaw ? 'HIDE RAW' : 'RAW DATA'}
-        </button>
-      </div>
+    <RawDataToggle blockId={blockId}>
+      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Summary */}
+        <div style={{
+          display: 'flex', gap: 16, padding: '8px 12px',
+          background: T.surface1, border: `1px solid ${T.border}`,
+          alignItems: 'center',
+        }}>
+          <div>
+            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.06em' }}>Completed</span>
+            <div style={{ fontFamily: F, fontSize: FS.lg, color: T.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              {completedCount}/{totalCount} benchmarks
+            </div>
+          </div>
+          {avgScore !== null && (
+            <div>
+              <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.06em' }}>Average</span>
+              <div style={{ fontFamily: F, fontSize: FS.lg, color: T.cyan, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                {(avgScore * 100).toFixed(1)}%
+              </div>
+            </div>
+          )}
+          {/* Progress bar */}
+          <div style={{ flex: 1 }}>
+            <div style={{
+              width: '100%', height: 4, background: T.surface3, borderRadius: 2,
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                width: totalCount > 0 ? `${(completedCount / totalCount) * 100}%` : '0%',
+                height: '100%', background: T.cyan,
+                transition: 'width 0.3s ease',
+              }} />
+            </div>
+          </div>
+        </div>
 
-      {showRaw ? (
-        <div style={{ overflow: 'auto', maxHeight: 500 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: F, fontSize: FS.xxs }}>
+        {/* Benchmark table */}
+        {benchmarks.length === 0 ? (
+          <div style={{
+            padding: 24, textAlign: 'center',
+            fontFamily: F, fontSize: FS.xs, color: T.dim,
+          }}>
+            Waiting for benchmark results...
+          </div>
+        ) : (
+          <table style={{
+            width: '100%', borderCollapse: 'collapse',
+            fontFamily: F, fontSize: FS.xs,
+          }}>
             <thead>
-              <tr style={{ borderBottom: `1px solid ${T.border}` }}>
-                <th style={{ padding: '4px 8px', textAlign: 'left', color: T.dim }}>Step</th>
-                <th style={{ padding: '4px 8px', textAlign: 'left', color: T.dim }}>Metric</th>
-                <th style={{ padding: '4px 8px', textAlign: 'right', color: T.dim }}>Value</th>
-                <th style={{ padding: '4px 8px', textAlign: 'right', color: T.dim }}>Timestamp</th>
+              <tr>
+                <th style={{
+                  padding: '6px 12px', textAlign: 'left',
+                  borderBottom: `1px solid ${T.borderHi}`,
+                  color: T.dim, fontWeight: 700, letterSpacing: '0.08em', fontSize: FS.xxs,
+                }}>Benchmark</th>
+                <th style={{
+                  padding: '6px 12px', textAlign: 'right',
+                  borderBottom: `1px solid ${T.borderHi}`,
+                  color: T.dim, fontWeight: 700, letterSpacing: '0.08em', fontSize: FS.xxs,
+                }}>Score</th>
+                <th style={{
+                  padding: '6px 12px', textAlign: 'center',
+                  borderBottom: `1px solid ${T.borderHi}`,
+                  color: T.dim, fontWeight: 700, letterSpacing: '0.08em', fontSize: FS.xxs,
+                  width: 40,
+                }}>Status</th>
               </tr>
             </thead>
             <tbody>
-              {allEvents.map((e, i) => (
-                <tr key={i} style={{ borderBottom: `1px solid ${T.surface4}` }}>
-                  <td style={{ padding: '3px 8px', color: T.sec }}>{e.step ?? '—'}</td>
-                  <td style={{ padding: '3px 8px', color: T.text }}>{e.name}</td>
-                  <td style={{ padding: '3px 8px', color: T.cyan, textAlign: 'right' }}>{e.value.toFixed(6)}</td>
-                  <td style={{ padding: '3px 8px', color: T.dim, textAlign: 'right' }}>{new Date(e.timestamp).toLocaleTimeString()}</td>
+              {benchmarks.map((b) => (
+                <tr key={b.name} style={{ borderBottom: `1px solid ${T.border}` }}>
+                  <td style={{ padding: '6px 12px', color: T.sec }}>{b.name}</td>
+                  <td style={{
+                    padding: '6px 12px', textAlign: 'right',
+                    color: T.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                  }}>
+                    {b.score !== null ? `${(b.score * 100).toFixed(1)}%` : '—'}
+                  </td>
+                  <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                    {b.complete ? (
+                      <CheckCircle size={12} color={T.green} />
+                    ) : (
+                      <Loader
+                        size={12}
+                        color={T.cyan}
+                        style={{ animation: 'spin 1.5s linear infinite' }}
+                      />
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      ) : (
-        <>
-          {/* Benchmark results table */}
-          {benchmarkMetrics.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontFamily: F, fontSize: FS.xs, color: T.sec, marginBottom: 6, fontWeight: 600 }}>BENCHMARKS</div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: F, fontSize: FS.xxs }}>
-                <thead>
-                  <tr style={{ borderBottom: `1px solid ${T.border}` }}>
-                    <th style={{ padding: '4px 8px', textAlign: 'left', color: T.dim }}>Benchmark</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'right', color: T.dim }}>Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {benchmarkMetrics.map((name) => {
-                    const pts = metrics[name]
-                    const latest = pts[pts.length - 1]
-                    return (
-                      <tr key={name} style={{ borderBottom: `1px solid ${T.surface4}` }}>
-                        <td style={{ padding: '3px 8px', color: T.text }}>{name.replace('benchmark/', '')}</td>
-                        <td style={{ padding: '3px 8px', color: T.cyan, textAlign: 'right' }}>{latest?.value.toFixed(4)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Other metric charts */}
-          {otherMetrics.map((name) => (
-            <div key={name} style={{ marginBottom: 16 }}>
-              <AutoLineChart data={metrics[name]} color={T.green} height={200} label={name} />
-            </div>
-          ))}
-
-          {metricNames.length === 0 && (
-            <div style={{ fontFamily: F, fontSize: FS.sm, color: T.dim, textAlign: 'center', padding: 40, animation: 'pulse 2s ease-in-out infinite' }}>
-              Waiting for evaluation metrics...
-            </div>
-          )}
-        </>
-      )}
-    </div>
+        )}
+      </div>
+    </RawDataToggle>
   )
 }

@@ -1,38 +1,37 @@
 import { T, F, FS } from '@/lib/design-tokens'
+import type { DashboardStats } from '@/stores/metricsStore'
 
 interface QuickStatsProps {
-  totalRuns: number
-  completedRuns: number
-  bestMetric?: { name: string; value: number }
-  totalComputeHours?: number
+  stats: DashboardStats
 }
 
-export default function QuickStats({ totalRuns, completedRuns, bestMetric, totalComputeHours }: QuickStatsProps) {
+export default function QuickStats({ stats }: QuickStatsProps) {
+  const pct = stats.total_experiments > 0
+    ? Math.round((stats.completed_experiments / stats.total_experiments) * 100)
+    : 0
+
   return (
-    <div style={{
-      display: 'flex', gap: 16, padding: '8px 12px',
-      background: T.surface1, border: `1px solid ${T.border}`,
-    }}>
-      <div>
-        <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>TOTAL RUNS</div>
-        <div style={{ fontFamily: F, fontSize: FS.md, color: T.text, fontWeight: 700 }}>{totalRuns}</div>
-      </div>
-      <div>
-        <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>COMPLETED</div>
-        <div style={{ fontFamily: F, fontSize: FS.md, color: T.green, fontWeight: 700 }}>{completedRuns}</div>
-      </div>
-      {bestMetric && (
-        <div>
-          <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>BEST {bestMetric.name.toUpperCase()}</div>
-          <div style={{ fontFamily: F, fontSize: FS.md, color: T.cyan, fontWeight: 700 }}>{bestMetric.value.toFixed(4)}</div>
-        </div>
-      )}
-      {totalComputeHours != null && (
-        <div>
-          <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>COMPUTE</div>
-          <div style={{ fontFamily: F, fontSize: FS.md, color: T.sec, fontWeight: 700 }}>{totalComputeHours.toFixed(1)}h</div>
-        </div>
-      )}
+    <div
+      style={{
+        padding: '8px 14px',
+        background: T.surface1,
+        borderTop: `1px solid ${T.border}`,
+        fontFamily: F,
+        fontSize: FS.xs,
+        color: T.dim,
+        letterSpacing: '0.04em',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+      }}
+    >
+      <span style={{ color: T.sec }}>{stats.total_papers}</span> papers
+      <span style={{ color: T.dim, margin: '0 4px' }}>|</span>
+      <span style={{ color: T.cyan }}>{stats.active_papers}</span> active
+      <span style={{ color: T.dim, margin: '0 4px' }}>|</span>
+      <span style={{ color: T.sec }}>{stats.completed_experiments}/{stats.total_experiments}</span> experiments ({pct}%)
+      <span style={{ color: T.dim, margin: '0 4px' }}>|</span>
+      <span style={{ color: T.sec }}>{(stats.compute_hours ?? 0).toFixed(0)}h</span> compute
     </div>
   )
 }

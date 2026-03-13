@@ -39,26 +39,17 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
     updateNodeConfig(node.id, { [name]: value })
   }
 
-  const [availableModels, setAvailableModels] = useState<Record<string, any[]>>({})
+  const [frameworkData, setFrameworkData] = useState<any[]>([])
 
   useEffect(() => {
     if (def?.type === 'llm_inference') {
-      api.get<Record<string, any[]>>('/models/available')
+      api.get<any[]>('/system/models')
         .then(data => {
-          if (data && typeof data === 'object') {
-            setAvailableModels(data)
+          if (Array.isArray(data)) {
+            setFrameworkData(data)
           }
         })
-        .catch(() => {
-          // Fallback to /models/local
-          api.get<any[]>('/models/local')
-            .then(data => {
-              if (Array.isArray(data)) {
-                setAvailableModels({ ollama: data.map(m => ({ name: typeof m === 'string' ? m : (m.name || m.id || '') })) })
-              }
-            })
-            .catch(err => console.error('Failed to fetch models', err))
-        })
+        .catch(err => console.error('Failed to fetch models', err))
     }
   }, [def?.type])
 
@@ -69,13 +60,17 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
       return node.data.config[f.depends_on.field] === f.depends_on.value
     })
     .map(f => {
-      // Auto-populate model_name / model_path with detected models
-      if (def.type === 'llm_inference' && (f.name === 'model_name' || f.name === 'model_path' || f.name === 'file_path')) {
-        const backend = node.data.config.backend || 'ollama'
-        const models = availableModels[backend] || []
-        if (models.length > 0) {
-          const modelNames = models.map((m: any) => m.name || m.path || String(m))
-          return { ...f, type: 'select' as const, options: modelNames } as ConfigField
+      // Auto-populate model field with discovered models for the selected framework
+      if (def.type === 'llm_inference' && f.name === 'model') {
+        const fw = node.data.config.framework || 'auto'
+        const fwEntry = frameworkData.find((d: any) => d.id === fw)
+        const models: string[] = fwEntry?.models || []
+        // If "auto", show all models from all available frameworks
+        const allModels = fw === 'auto'
+          ? frameworkData.filter((d: any) => d.available).flatMap((d: any) => (d.models || []).map((m: string) => `${d.id}/${m}`))
+          : models
+        if (allModels.length > 0) {
+          return { ...f, type: 'select' as const, options: allModels } as ConfigField
         }
       }
       return f
@@ -187,6 +182,25 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
           <X size={14} />
         </button>
       </div>
+
+      {/* Deprecation warning */}
+      {def?.deprecated && (
+        <div style={{
+          margin: '0 16px',
+          padding: '8px 12px',
+          background: 'rgba(251,191,36,0.08)',
+          border: '1px solid rgba(251,191,36,0.3)',
+          borderRadius: 8,
+          display: 'flex',
+          gap: 8,
+          alignItems: 'flex-start',
+        }}>
+          <AlertTriangle size={14} color="#FBBF24" style={{ marginTop: 2, flexShrink: 0 }} />
+          <span style={{ fontFamily: F, fontSize: FS.xxs, color: '#FBBF24', lineHeight: 1.4 }}>
+            <strong>Deprecated.</strong> {def.deprecatedMessage || 'Use LLM Inference block instead.'}
+          </span>
+        </div>
+      )}
 
       {/* Config fields */}
       <div style={{ flex: 1, overflow: 'auto', padding: '20px', scrollbarWidth: 'thin' }}>

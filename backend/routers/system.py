@@ -24,6 +24,22 @@ from ..engine.parallelizer import build_schedule, explain_schedule
 router = APIRouter(prefix="/api/system", tags=["system"])
 
 
+# ---------------------------------------------------------------------------
+# Model Discovery
+# ---------------------------------------------------------------------------
+
+
+@router.get("/models")
+def available_models():
+    """Return discovered frameworks and their locally available models.
+
+    Results are cached for 30 seconds to avoid repeated filesystem scanning.
+    """
+    from ..services.model_discovery import discover_frameworks
+
+    return discover_frameworks()
+
+
 @router.get("/hardware")
 def hardware():
     """Return the full hardware profile of the host machine."""

@@ -1,51 +1,65 @@
+import { useState, useEffect, useRef } from 'react'
 import { useMetricsStore } from '@/stores/metricsStore'
-import { T, F, FS } from '@/lib/design-tokens'
-import { Loader2 } from 'lucide-react'
 import TrainingDashboard from './TrainingDashboard'
 import EvaluationDashboard from './EvaluationDashboard'
 import InferenceDashboard from './InferenceDashboard'
 import MergeDashboard from './MergeDashboard'
 import DataDashboard from './DataDashboard'
 import DefaultDashboard from './DefaultDashboard'
+import { T, F, FS } from '@/lib/design-tokens'
 
-interface DashboardSelectorProps {
-  runId: string
-  viewedBlockId: string | null
+const DASHBOARD_MAP: Record<string, React.ComponentType<{ blockId: string }>> = {
+  training: TrainingDashboard,
+  evaluation: EvaluationDashboard,
+  inference: InferenceDashboard,
+  merge: MergeDashboard,
+  data: DataDashboard,
 }
 
-function WaitingForStart() {
+export default function DashboardSelector() {
+  const viewedBlockId = useMetricsStore((s) => s.viewedBlockId)
+  const executionOrder = useMetricsStore((s) => s.monitorExecutionOrder)
+  const [opacity, setOpacity] = useState(1)
+  const [renderedBlockId, setRenderedBlockId] = useState(viewedBlockId)
+  const timerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  // Smooth fade transition on block change
+  useEffect(() => {
+    if (viewedBlockId !== renderedBlockId) {
+      setOpacity(0)
+      timerRef.current = setTimeout(() => {
+        setRenderedBlockId(viewedBlockId)
+        setOpacity(1)
+      }, 200)
+      return () => {
+        if (timerRef.current) clearTimeout(timerRef.current)
+      }
+    }
+  }, [viewedBlockId, renderedBlockId])
+
+  if (!renderedBlockId) {
+    return (
+      <div style={{
+        height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <span style={{ fontFamily: F, fontSize: FS.xs, color: T.dim }}>
+          Select a block from the pipeline strip
+        </span>
+      </div>
+    )
+  }
+
+  const block = executionOrder.find(b => b.id === renderedBlockId)
+  const category = block?.category || 'default'
+  const Dashboard = DASHBOARD_MAP[category] || DefaultDashboard
+
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', height: 300, gap: 12,
+      height: '100%',
+      opacity,
+      transition: 'opacity 200ms ease',
     }}>
-      <Loader2 size={24} color={T.cyan} style={{ animation: 'spin 1s linear infinite' }} />
-      <span style={{ fontFamily: F, fontSize: FS.sm, color: T.dim }}>
-        Waiting for pipeline to start...
-      </span>
+      <Dashboard blockId={renderedBlockId} />
     </div>
   )
-}
-
-export default function DashboardSelector({ runId, viewedBlockId }: DashboardSelectorProps) {
-  const activeBlock = viewedBlockId
-    ? useMetricsStore((s) => s.runs[runId]?.blocks[viewedBlockId])
-    : useMetricsStore((s) => {
-        const run = s.runs[runId]
-        if (!run || !run.activeBlockId) return null
-        return run.blocks[run.activeBlockId]
-      })
-
-  if (!activeBlock) return <WaitingForStart />
-
-  const props = { runId, blockId: activeBlock.nodeId }
-
-  switch (activeBlock.category) {
-    case 'training': return <TrainingDashboard {...props} />
-    case 'evaluation': return <EvaluationDashboard {...props} />
-    case 'inference': return <InferenceDashboard {...props} />
-    case 'merge': return <MergeDashboard {...props} />
-    case 'data': return <DataDashboard {...props} />
-    default: return <DefaultDashboard {...props} />
-  }
 }

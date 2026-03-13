@@ -15,7 +15,7 @@ import time
 
 
 def run(ctx):
-    provider = ctx.config.get("provider", "ollama")
+    provider = ctx.config.get("backend", ctx.config.get("provider", "ollama"))
     model_name = ctx.config.get("model_name", "llama3.2")
     steps_json = ctx.config.get("steps", '["Analyze: {input}"]')
     pass_context = ctx.config.get("pass_context", True)

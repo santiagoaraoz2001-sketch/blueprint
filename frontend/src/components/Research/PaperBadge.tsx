@@ -1,43 +1,45 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { F, FS } from '@/lib/design-tokens'
+
+const PAPER_STATUS_COLORS: Record<string, string> = {
+  planned: '#64748B',
+  queued: '#8B5CF6',
+  active: '#00BFA5',
+  blocked: '#F59E0B',
+  analyzing: '#3B82F6',
+  writing: '#6366F1',
+  complete: '#10B981',
+}
 
 interface PaperBadgeProps {
+  paperNumber: string | null
   status: string
-  size?: 'sm' | 'md'
+  size?: 'sm' | 'lg'
 }
 
-const STATUS_MAP: Record<string, { color: string; label: string }> = {
-  active: { color: '#4af6c3', label: 'Active' },
-  complete: { color: '#22c55e', label: 'Complete' },
-  blocked: { color: '#F59E0B', label: 'Blocked' },
-  planning: { color: '#8B5CF6', label: 'Planning' },
-  paused: { color: '#EAB308', label: 'Paused' },
-  cancelled: { color: '#F59E0B', label: 'Cancelled' },
-  failed: { color: '#ff433d', label: 'Failed' },
-}
-
-export default function PaperBadge({ status, size = 'sm' }: PaperBadgeProps) {
-  const info = STATUS_MAP[status] || { color: T.dim, label: status }
+export default function PaperBadge({ paperNumber, status, size = 'sm' }: PaperBadgeProps) {
+  const color = PAPER_STATUS_COLORS[status] || '#64748B'
+  const isLarge = size === 'lg'
 
   return (
     <span
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 4,
-        padding: size === 'sm' ? '1px 6px' : '2px 8px',
-        background: `${info.color}14`,
-        border: `1px solid ${info.color}33`,
+        gap: isLarge ? 6 : 4,
+        padding: isLarge ? '4px 10px' : '2px 7px',
+        background: `${color}33`,
+        borderRadius: 4,
         fontFamily: F,
-        fontSize: size === 'sm' ? FS.xxs : FS.xs,
-        color: info.color,
-        letterSpacing: '0.12em',
-        textTransform: 'uppercase',
-        fontWeight: 600,
+        fontSize: isLarge ? FS.md : FS.xs,
+        fontWeight: 700,
+        color,
+        letterSpacing: '0.06em',
         whiteSpace: 'nowrap',
       }}
     >
-      <span style={{ width: 4, height: 4, borderRadius: '50%', background: info.color, flexShrink: 0 }} />
-      {info.label}
+      {paperNumber || '---'}
     </span>
   )
 }
+
+export { PAPER_STATUS_COLORS }

@@ -1,162 +1,147 @@
 import { useMemo } from 'react'
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ReferenceLine,
-} from 'recharts'
 import { T, F, FS } from '@/lib/design-tokens'
-import type { MetricPoint } from '@/stores/metricsStore'
+import { useMetricsStore, EMPTY_BLOCK_METRICS, type MetricSeries } from '@/stores/metricsStore'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts'
 
 interface AutoLineChartProps {
-  data: MetricPoint[]
+  metricName: string
+  blockId: string
   color?: string
   height?: number
-  xKey?: 'step' | 'timestamp'
-  label?: string
-  /** Second overlay series */
-  overlay?: { data: MetricPoint[]; color: string; label: string }
+  title?: string
   /** Show dashed lines for data gaps */
   showGaps?: boolean
+  /** Additional metric to overlay */
+  overlayMetric?: string
+  overlayColor?: string
 }
 
-interface ChartRow {
-  step: number
-  value: number | null
-  overlayValue?: number | null
-  isGap?: boolean
+/** Detects gaps in step sequence that are > 2x the average interval */
+function segmentWithGaps(series: MetricSeries[]): { data: any[]; gapIndices: number[] } {
+  if (series.length < 3) return { data: series.map(s => ({ step: s.step, value: s.value })), gapIndices: [] }
+
+  const intervals: number[] = []
+  for (let i = 1; i < series.length; i++) {
+    intervals.push(series[i].step - series[i - 1].step)
+  }
+  const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length
+
+  const data: any[] = []
+  const gapIndices: number[] = []
+
+  for (let i = 0; i < series.length; i++) {
+    if (i > 0 && (series[i].step - series[i - 1].step) > avgInterval * 2) {
+      gapIndices.push(data.length)
+      // Insert a gap marker
+      data.push({
+        step: Math.round((series[i - 1].step + series[i].step) / 2),
+        value: undefined,
+        gap: true,
+      })
+    }
+    data.push({ step: series[i].step, value: series[i].value })
+  }
+
+  return { data, gapIndices }
 }
 
 export default function AutoLineChart({
-  data,
-  color = '#00BFA5',
-  height = 300,
-  xKey = 'step',
-  label,
-  overlay,
-  showGaps = true,
+  metricName, blockId, color = '#00BFA5', height = 200,
+  title, showGaps = true, overlayMetric, overlayColor = '#F59E0B',
 }: AutoLineChartProps) {
+  const blockMetrics = useMetricsStore((s) => s.metrics[blockId] ?? EMPTY_BLOCK_METRICS)
+  const series = blockMetrics[metricName] || []
+  const overlaySeries = overlayMetric ? (blockMetrics[overlayMetric] || []) : []
+
   const chartData = useMemo(() => {
-    if (data.length === 0) return []
+    if (series.length === 0) return []
 
-    const rows: ChartRow[] = data.map((p, i) => ({
-      step: xKey === 'step' && p.step != null ? p.step : i,
-      value: p.value,
-    }))
+    const { data } = showGaps ? segmentWithGaps(series) : { data: series.map(s => ({ step: s.step, value: s.value })) }
 
-    // Detect gaps: if step difference > 2x average interval, mark as gap
-    if (showGaps && rows.length > 2) {
-      const intervals = rows.slice(1).map((r, i) => r.step - rows[i].step)
-      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length
-      for (let i = 1; i < rows.length; i++) {
-        if (rows[i].step - rows[i - 1].step > avgInterval * 2) {
-          rows[i].isGap = true
-        }
-      }
+    // Merge overlay data by step
+    if (overlaySeries.length > 0) {
+      const overlayMap = new Map(overlaySeries.map(s => [s.step, s.value]))
+      return data.map(d => ({
+        ...d,
+        overlay: overlayMap.get(d.step),
+      }))
     }
 
-    // Merge overlay data if present
-    if (overlay && overlay.data.length > 0) {
-      const overlayMap = new Map<number, number>()
-      overlay.data.forEach((p, i) => {
-        const key = xKey === 'step' && p.step != null ? p.step : i
-        overlayMap.set(key, p.value)
-      })
-      for (const row of rows) {
-        row.overlayValue = overlayMap.get(row.step) ?? null
-      }
-      // Add overlay-only points
-      overlay.data.forEach((p, i) => {
-        const key = xKey === 'step' && p.step != null ? p.step : i
-        if (!rows.find((r) => r.step === key)) {
-          rows.push({ step: key, value: null, overlayValue: p.value })
-        }
-      })
-      rows.sort((a, b) => a.step - b.step)
-    }
-
-    return rows
-  }, [data, overlay, xKey, showGaps])
-
-  const latestValue = data.length > 0 ? data[data.length - 1].value : null
+    return data
+  }, [series, overlaySeries, showGaps])
 
   if (chartData.length === 0) {
     return (
-      <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontFamily: F, fontSize: FS.sm, color: T.dim, animation: 'pulse 2s ease-in-out infinite' }}>
-          Waiting for metrics...
+      <div style={{
+        height, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
+          Waiting for {metricName}...
         </span>
       </div>
     )
   }
 
   return (
-    <div>
-      {/* Latest value label above chart */}
-      {label && latestValue != null && (
-        <div style={{ marginBottom: 4, fontFamily: F, fontSize: FS.sm, color: T.text }}>
-          {label}: <span style={{ color, fontWeight: 700 }}>{latestValue.toFixed(4)}</span>
+    <div style={{ height }}>
+      {title && (
+        <div style={{
+          padding: '4px 8px',
+          fontFamily: F, fontSize: FS.xxs, fontWeight: 700,
+          color: T.sec, letterSpacing: '0.06em',
+        }}>
+          {title}
         </div>
       )}
-
-      <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={chartData}>
+      <ResponsiveContainer width="100%" height={title ? height - 20 : height}>
+        <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1A2332" />
           <XAxis
             dataKey="step"
-            stroke="#64748B"
-            tick={{ fontSize: 11, fontFamily: 'monospace' }}
+            stroke={T.dim}
+            tick={{ fill: T.dim, fontSize: 7, fontFamily: F }}
           />
           <YAxis
-            stroke="#64748B"
-            tick={{ fontSize: 11, fontFamily: 'monospace' }}
+            stroke={T.dim}
+            tick={{ fill: T.dim, fontSize: 7, fontFamily: F }}
+            width={45}
           />
           <Tooltip
             contentStyle={{
-              background: '#1A2332',
-              border: '1px solid #2D3748',
-              fontFamily: F,
-              fontSize: FS.sm,
+              background: T.surface2,
+              border: `1px solid ${T.borderHi}`,
+              fontFamily: F, fontSize: 7, color: T.sec,
+              padding: '4px 8px',
             }}
+            labelStyle={{ fontFamily: F, fontSize: 7, color: T.dim }}
           />
           <Line
             type="monotone"
             dataKey="value"
             stroke={color}
+            strokeWidth={1.5}
             dot={false}
-            strokeWidth={2}
-            name={label || 'Value'}
+            activeDot={{ r: 3, fill: color }}
+            isAnimationActive={false}
             connectNulls={false}
+            name={metricName}
           />
-          {overlay && (
+          {overlayMetric && overlaySeries.length > 0 && (
             <Line
               type="monotone"
-              dataKey="overlayValue"
-              stroke={overlay.color}
+              dataKey="overlay"
+              stroke={overlayColor}
+              strokeWidth={1.5}
+              strokeDasharray="4 2"
               dot={false}
-              strokeWidth={2}
-              name={overlay.label}
+              activeDot={{ r: 3, fill: overlayColor }}
+              isAnimationActive={false}
               connectNulls={false}
-              strokeDasharray="5 3"
+              name={overlayMetric}
             />
           )}
-          {/* Render gap indicators */}
-          {showGaps &&
-            chartData
-              .filter((r) => r.isGap)
-              .map((r) => (
-                <ReferenceLine
-                  key={`gap-${r.step}`}
-                  x={r.step}
-                  stroke="#F59E0B"
-                  strokeDasharray="4 4"
-                  label={{ value: '(data gap)', fill: '#F59E0B', fontSize: 9, fontFamily: F }}
-                />
-              ))}
         </LineChart>
       </ResponsiveContainer>
     </div>

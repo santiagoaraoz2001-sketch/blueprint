@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { T, F, FS, FD } from '@/lib/design-tokens'
 import { api } from '@/api/client'
+import { useUIStore } from '@/stores/uiStore'
 import ResultsTable, { type RunRow } from '@/components/Results/ResultsTable'
 import MetricChart from '@/components/Results/MetricChart'
 import RunComparison from '@/components/Results/RunComparison'
@@ -113,6 +114,7 @@ export default function ResultsView() {
           <option value="complete">Complete</option>
           <option value="running">Running</option>
           <option value="failed">Failed</option>
+          <option value="cancelled">Cancelled</option>
         </select>
 
         {/* Refresh */}
@@ -206,7 +208,7 @@ export default function ResultsView() {
                 runs={runs}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
-                onRowClick={() => {}}
+                onRowClick={(run) => useUIStore.getState().navigateToMonitor(run.id)}
               />
             )}
             {activeTab === 'chart' && <MetricChart runs={runs} />}

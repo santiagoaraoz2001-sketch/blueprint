@@ -1,72 +1,141 @@
+import { T, F, FS, CATEGORY_COLORS } from '@/lib/design-tokens'
 import { useMetricsStore } from '@/stores/metricsStore'
-import { T, F, FS } from '@/lib/design-tokens'
-import { Check, Loader2, AlertTriangle, Clock } from 'lucide-react'
+import {
+  Database, Brain, BarChart3, MessageSquare, GitMerge, Blocks, CheckCircle, XCircle, Clock, Loader, StopCircle,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { motion } from 'framer-motion'
 
-interface PipelineStripProps {
-  runId: string
-  viewedBlockId: string | null
-  onBlockClick: (blockId: string) => void
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  data: Database,
+  training: Brain,
+  evaluation: BarChart3,
+  inference: MessageSquare,
+  merge: GitMerge,
+  default: Blocks,
 }
 
-const statusIcon = (status: string) => {
-  switch (status) {
-    case 'complete': return <Check size={10} color={T.green} />
-    case 'running': return <Loader2 size={10} color={T.cyan} style={{ animation: 'spin 1s linear infinite' }} />
-    case 'failed': return <AlertTriangle size={10} color={T.red} />
-    default: return <Clock size={10} color={T.dim} />
+export default function PipelineStrip() {
+  const executionOrder = useMetricsStore((s) => s.monitorExecutionOrder)
+  const viewedBlockId = useMetricsStore((s) => s.viewedBlockId)
+  const setViewedBlock = useMetricsStore((s) => s.setViewedBlock)
+
+  if (executionOrder.length === 0) {
+    return (
+      <div style={{
+        height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      }}>
+        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, textAlign: 'center', lineHeight: 1.5 }}>
+          Connected, waiting for first block...
+        </span>
+      </div>
+    )
   }
-}
-
-export default function PipelineStrip({ runId, viewedBlockId, onBlockClick }: PipelineStripProps) {
-  const run = useMetricsStore((s) => s.runs[runId])
-  if (!run) return null
-
-  const blocks = run.executionOrder.length > 0
-    ? run.executionOrder.map((id) => run.blocks[id]).filter(Boolean)
-    : Object.values(run.blocks)
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 2, padding: '6px 16px',
-      borderBottom: `1px solid ${T.border}`, background: T.surface0, overflowX: 'auto',
-    }}>
-      {blocks.map((block, i) => {
-        const isActive = block.nodeId === run.activeBlockId
-        const isViewed = block.nodeId === viewedBlockId
-        const statusColor =
-          block.status === 'complete' ? T.green :
-          block.status === 'running' ? T.cyan :
-          block.status === 'failed' ? T.red : T.dim
+    <div style={{ padding: '8px 0', height: '100%', overflow: 'auto' }}>
+      <div style={{
+        padding: '4px 12px 8px',
+        borderBottom: `1px solid ${T.border}`,
+        marginBottom: 4,
+      }}>
+        <span style={{
+          fontFamily: F, fontSize: FS.xxs, fontWeight: 900,
+          color: T.dim, letterSpacing: '0.1em',
+        }}>
+          PIPELINE
+        </span>
+      </div>
+
+      {executionOrder.map((block) => {
+        const CategoryIcon = CATEGORY_ICONS[block.category] || CATEGORY_ICONS.default
+        const isViewed = viewedBlockId === block.id
+        const categoryColor = CATEGORY_COLORS[block.category] || T.dim
 
         return (
-          <div key={block.nodeId} style={{ display: 'flex', alignItems: 'center' }}>
-            {i > 0 && (
-              <div style={{ width: 16, height: 1, background: T.border, margin: '0 2px' }} />
-            )}
-            <button
-              onClick={() => onBlockClick(block.nodeId)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                padding: '4px 8px', cursor: 'pointer',
-                background: isViewed ? `${statusColor}14` : isActive ? `${T.cyan}08` : 'transparent',
-                border: `1px solid ${isViewed ? statusColor : isActive ? `${T.cyan}33` : T.border}`,
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {statusIcon(block.status)}
-              <span style={{
-                fontFamily: F, fontSize: FS.xxs, color: isActive ? T.text : T.sec,
-                fontWeight: isActive ? 700 : 400, whiteSpace: 'nowrap',
+          <motion.button
+            key={block.id}
+            onClick={() => setViewedBlock(block.id)}
+            whileHover={{ x: 2 }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
+              padding: '8px 12px',
+              background: isViewed ? `${T.cyan}08` : 'transparent',
+              border: 'none',
+              borderLeft: isViewed ? `2px solid ${T.cyan}` : '2px solid transparent',
+              borderBottom: `1px solid ${T.border}`,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+              position: 'relative',
+            }}
+          >
+            {/* Category icon */}
+            <div style={{
+              width: 24, height: 24, borderRadius: 4,
+              background: `${categoryColor}15`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <CategoryIcon size={12} color={categoryColor} />
+            </div>
+
+            {/* Name + status */}
+            <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+              <div style={{
+                fontFamily: F, fontSize: FS.xs, fontWeight: isViewed ? 700 : 500,
+                color: isViewed ? T.text : T.sec,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                letterSpacing: '0.04em',
               }}>
-                {block.label}
-              </span>
-              {block.status === 'running' && block.progress > 0 && (
-                <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.cyan }}>
-                  {Math.round(block.progress * 100)}%
-                </span>
+                {block.name}
+              </div>
+              {block.status === 'running' && (
+                <div style={{
+                  width: '100%', height: 2, background: T.surface3,
+                  marginTop: 3, borderRadius: 1, overflow: 'hidden',
+                }}>
+                  <div style={{
+                    width: `${Math.round(block.progress * 100)}%`,
+                    height: '100%', background: '#00BFA5',
+                    transition: 'width 0.3s ease',
+                  }} />
+                </div>
               )}
-            </button>
-          </div>
+            </div>
+
+            {/* Status icon */}
+            <div style={{ flexShrink: 0 }}>
+              {block.status === 'running' ? (
+                <Loader
+                  size={12}
+                  color="#00BFA5"
+                  style={{ animation: 'spin 1.5s linear infinite' }}
+                />
+              ) : block.status === 'complete' ? (
+                <CheckCircle size={12} color={T.green} />
+              ) : block.status === 'failed' ? (
+                <XCircle size={12} color={T.red} />
+              ) : block.status === 'cancelled' ? (
+                <StopCircle size={12} color={T.amber} />
+              ) : (
+                <Clock size={12} color={T.dim} />
+              )}
+            </div>
+
+            {/* Running pulse animation */}
+            {block.status === 'running' && (
+              <style>{`
+                @keyframes spin {
+                  from { transform: rotate(0deg); }
+                  to { transform: rotate(360deg); }
+                }
+              `}</style>
+            )}
+          </motion.button>
         )
       })}
     </div>

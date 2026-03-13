@@ -1,95 +1,155 @@
-import { useState } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
-import StatusBadge from '@/components/shared/StatusBadge'
+import { useUIStore } from '@/stores/uiStore'
+import { useMetricsStore } from '@/stores/metricsStore'
 import ProgressBar from '@/components/shared/ProgressBar'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Loader,
+  Copy,
+  ExternalLink,
+} from 'lucide-react'
 
-export interface RunRowData {
+interface Run {
   id: string
   name: string
-  status: string // 'running' | 'complete' | 'failed' | 'cancelled' | 'planned'
+  status: string
   progress?: number
-  eta?: string
-  metrics?: Record<string, number>
-  errorMessage?: string
-  createdAt?: string
+  loss?: number | null
+  accuracy?: number | null
+  elapsed?: number
+  eta?: number | null
 }
 
 interface RunRowProps {
-  run: RunRowData
-  onClick?: () => void
+  run: Run
+  onClone?: (runId: string) => void
+  onCompareToggle?: (runId: string) => void
+  compareSelected?: boolean
 }
 
-export default function RunRow({ run, onClick }: RunRowProps) {
-  const [expanded, setExpanded] = useState(false)
-  const isFailed = run.status === 'failed'
-  const isRunning = run.status === 'running'
-  const isPlanned = run.status === 'planned'
+const STATUS_ICONS: Record<string, { icon: typeof CheckCircle2; color: string }> = {
+  complete: { icon: CheckCircle2, color: '#10B981' },
+  failed: { icon: XCircle, color: '#ff433d' },
+  running: { icon: Loader, color: '#00BFA5' },
+  pending: { icon: Clock, color: '#64748B' },
+}
+
+function formatDuration(seconds: number | undefined): string {
+  if (seconds == null) return ''
+  if (seconds < 60) return `${Math.round(seconds)}s`
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`
+  return `${(seconds / 3600).toFixed(1)}h`
+}
+
+export default function RunRow({ run, onClone, onCompareToggle, compareSelected }: RunRowProps) {
+  const setView = useUIStore((s) => s.setView)
+  const cloneRun = useMetricsStore((s) => s.cloneRun)
+  const statusDef = STATUS_ICONS[run.status] || STATUS_ICONS.pending
+  const Icon = statusDef.icon
+
+  const handleClone = async () => {
+    if (onClone) {
+      onClone(run.id)
+    } else {
+      await cloneRun(run.id)
+      setView('editor')
+    }
+  }
+
+  const btnStyle: React.CSSProperties = {
+    padding: '2px 6px',
+    background: `${T.cyan}14`,
+    border: `1px solid ${T.cyan}33`,
+    color: T.cyan,
+    fontFamily: F,
+    fontSize: FS.xxs,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'all 0.15s',
+  }
 
   return (
     <div
       style={{
-        borderBottom: `1px solid ${T.surface4}`,
-        background: isRunning ? `${T.cyan}04` : 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '6px 0',
+        borderBottom: `1px solid ${T.border}`,
       }}
     >
-      <div
-        onClick={() => (isFailed && run.errorMessage) ? setExpanded(!expanded) : onClick?.()}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '6px 10px',
-          cursor: isPlanned ? 'default' : 'pointer',
-        }}
-      >
-        {isFailed && run.errorMessage && (
-          expanded ? <ChevronDown size={10} color={T.dim} /> : <ChevronRight size={10} color={T.dim} />
-        )}
-        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.text, flex: 1 }}>
-          {run.name}
+      {onCompareToggle && (
+        <input
+          type="checkbox"
+          checked={compareSelected}
+          onChange={() => onCompareToggle(run.id)}
+          style={{ accentColor: T.cyan, cursor: 'pointer' }}
+        />
+      )}
+      <Icon
+        size={12}
+        color={statusDef.color}
+        style={run.status === 'running' ? { animation: 'spin 1.5s linear infinite' } : undefined}
+      />
+      <span style={{ fontFamily: F, fontSize: FS.sm, color: T.text, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {run.name}
+      </span>
+
+      {run.loss != null && (
+        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec }}>
+          {run.loss.toFixed(3)}
         </span>
+      )}
+      {run.accuracy != null && (
+        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec }}>
+          {(run.accuracy * 100).toFixed(1)}%
+        </span>
+      )}
 
-        {isRunning && run.progress != null && (
-          <div style={{ width: 60 }}>
-            <ProgressBar value={run.progress * 100} height={3} color={T.cyan} />
-          </div>
-        )}
+      {run.status === 'running' && run.progress != null && (
+        <div style={{ width: 60 }}>
+          <ProgressBar value={run.progress * 100} color={T.cyan} height={2} />
+        </div>
+      )}
 
-        {isRunning && run.eta && (
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
-            ETA {run.eta}
-          </span>
-        )}
+      {run.elapsed != null && (
+        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, minWidth: 30, textAlign: 'right' }}>
+          {formatDuration(run.elapsed)}
+        </span>
+      )}
 
-        {run.status === 'complete' && run.metrics && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            {Object.entries(run.metrics).slice(0, 3).map(([key, val]) => (
-              <span key={key} style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec }}>
-                {key}=<span style={{ color: T.cyan }}>{typeof val === 'number' ? val.toFixed(2) : val}</span>
-              </span>
-            ))}
-          </div>
-        )}
-
-        <StatusBadge status={run.status} size="sm" />
+      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+        <button
+          onClick={handleClone}
+          title="Clone"
+          style={btnStyle}
+          onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}22` }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = `${T.cyan}14` }}
+        >
+          <Copy size={9} />
+        </button>
+        <button
+          onClick={() => setView('results')}
+          title="Results"
+          style={btnStyle}
+          onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}22` }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = `${T.cyan}14` }}
+        >
+          <ExternalLink size={9} />
+        </button>
       </div>
 
-      {/* Expanded error traceback */}
-      {expanded && isFailed && run.errorMessage && (
-        <div style={{
-          padding: '8px 10px 8px 28px',
-          background: `${T.red}06`,
-          borderTop: `1px solid ${T.red}20`,
-        }}>
-          <pre style={{
-            fontFamily: F, fontSize: FS.xxs, color: T.red,
-            whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0,
-            maxHeight: 200, overflow: 'auto',
-          }}>
-            {run.errorMessage}
-          </pre>
-        </div>
+      {run.status === 'running' && (
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       )}
     </div>
   )

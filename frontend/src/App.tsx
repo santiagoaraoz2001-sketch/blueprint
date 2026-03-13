@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, lazy, Suspense } from 'react'
 import ErrorBoundary from '@/components/shared/ErrorBoundary'
 import AppShell from '@/components/Layout/AppShell'
-import CommandPalette from '@/components/Layout/CommandPalette'
+import CommandPalette from '@/components/shared/CommandPalette'
 import StartScreen from '@/components/Layout/StartScreen'
 import SplashScreen from '@/components/Layout/SplashScreen'
 import { useUIStore } from '@/stores/uiStore'
@@ -20,12 +20,12 @@ import WorkshopView from '@/views/WorkshopView'
 import InferenceView from '@/views/InferenceView'
 import DataView from '@/views/DataView'
 import VisualizationView from '@/views/VisualizationView'
+import ResearchDashboardView from '@/views/ResearchDashboardView'
+import PaperDetailView from '@/views/PaperDetailView'
+import MonitorView from '@/views/MonitorView'
 
 // Lazy-loaded views
 const HelpView = lazy(() => import('@/views/HelpView'))
-const MonitorView = lazy(() => import('@/views/MonitorView'))
-const ResearchDashboardView = lazy(() => import('@/views/ResearchDashboardView'))
-const PaperDetailView = lazy(() => import('@/views/PaperDetailView'))
 
 const viewComponents: Record<string, React.ComponentType> = {
   dashboard: DashboardView,
@@ -40,9 +40,9 @@ const viewComponents: Record<string, React.ComponentType> = {
   settings: SettingsView,
   paper: PaperView,
   help: HelpView,
-  monitor: MonitorView,
   research: ResearchDashboardView,
-  paperDetail: PaperDetailView,
+  'research-detail': PaperDetailView,
+  monitor: MonitorView,
 }
 
 function ViewTransition({ viewKey, children }: { viewKey: string; children: React.ReactNode }) {
@@ -106,7 +106,7 @@ export default function App() {
     injectThemeCSSVars(theme)
   }, [theme])
 
-  const ViewComponent = viewComponents[activeView] || DashboardView
+  const ViewComponent = viewComponents[activeView] || ResearchDashboardView
 
   return (
     <SplashScreen>
