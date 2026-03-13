@@ -22,6 +22,7 @@ import DataView from '@/views/DataView'
 import VisualizationView from '@/views/VisualizationView'
 import ResearchDashboardView from '@/views/ResearchDashboardView'
 import PaperDetailView from '@/views/PaperDetailView'
+import MonitorView from '@/views/MonitorView'
 
 // Lazy-loaded views
 const HelpView = lazy(() => import('@/views/HelpView'))
@@ -41,6 +42,7 @@ const viewComponents: Record<string, React.ComponentType> = {
   help: HelpView,
   research: ResearchDashboardView,
   'research-detail': PaperDetailView,
+  monitor: MonitorView,
 }
 
 function ViewTransition({ viewKey, children }: { viewKey: string; children: React.ReactNode }) {
