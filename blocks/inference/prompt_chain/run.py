@@ -13,6 +13,23 @@ import json
 import os
 import time
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # ── Model config: upstream model input takes priority ──────────────
@@ -40,7 +57,7 @@ def run(ctx):
         )
 
     if not model_name:
-        raise ValueError("No model specified. Connect a Model Selector block or set model_name in config.")
+        raise BlockConfigError("model_name", "No model specified. Connect a Model Selector block or set model_name in config.")
 
     steps_json = ctx.config.get("steps", '["Analyze: {input}"]')
     pass_context = ctx.config.get("pass_context", True)
@@ -64,7 +81,7 @@ def run(ctx):
         steps = [steps_json]
 
     if not steps:
-        raise ValueError("No steps defined in the chain.")
+        raise BlockConfigError("steps", "No steps defined in the chain.")
 
     # Load initial input
     initial_input = ""
@@ -95,7 +112,7 @@ def run(ctx):
             step_output, token_usage = _call_llm(provider, endpoint, api_key, model_name, prompt, system_prompt, temperature, max_tokens, frequency_penalty, presence_penalty)
         except Exception as e:
             if stop_on_error:
-                raise RuntimeError(f"Chain stopped at step {i+1}: {e}")
+                raise BlockExecutionError(f"Chain stopped at step {i+1}: {e}", details=str(e))
             step_output = f"[Error: {e}]"
             token_usage = {}
             ctx.log_message(f"Step {i+1} error (continuing): {e}")
@@ -175,7 +192,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
         try:
             from mlx_lm import load, generate
         except ImportError:
-            raise RuntimeError("mlx-lm not installed.")
+            raise BlockDependencyError("mlx-lm", install_hint="pip install mlx-lm")
         model_obj, tokenizer = load(model)
         text = generate(model_obj, tokenizer, prompt=prompt, max_tokens=max_tokens, temp=temperature)
         return text, {}
@@ -184,7 +201,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
         if not api_key:
             api_key = os.environ.get("OPENAI_API_KEY", "")
         if not api_key:
-            raise ValueError("OpenAI API key required.")
+            raise BlockConfigError("api_key", "OpenAI API key required.")
         url = endpoint.rstrip("/")
         if "/v1/" not in url:
             url = f"{url}/v1/chat/completions"
@@ -216,7 +233,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
         if not api_key:
             api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         if not api_key:
-            raise ValueError("Anthropic API key required.")
+            raise BlockConfigError("api_key", "Anthropic API key required.")
         url = endpoint.rstrip("/")
         if not url.endswith("/v1/messages"):
             url = f"{url}/v1/messages"
@@ -239,4 +256,4 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
             }
 
     else:
-        raise ValueError(f"Unknown provider: {provider}")
+        raise BlockConfigError("provider", f"Unknown provider: {provider}")

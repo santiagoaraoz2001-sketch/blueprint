@@ -3,6 +3,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     file_path = ctx.config.get("file_path", "")
@@ -15,11 +32,11 @@ def run(ctx):
         validate_schema = validate_schema.lower() in ("true", "1", "yes")
 
     if not file_path:
-        raise ValueError("No file_path configured")
+        raise BlockConfigError("file_path", "No file_path configured")
 
     file_path = os.path.expanduser(file_path)
     if not os.path.isfile(file_path):
-        raise FileNotFoundError(f"Config file not found: {file_path}")
+        raise BlockInputError(f"Config file not found: {file_path}", details="Check that the upstream block produced output", recoverable=False)
 
     ctx.log_message(f"Loading config from {os.path.basename(file_path)}")
     ctx.report_progress(0, 1)
@@ -48,7 +65,7 @@ def run(ctx):
             parsed = yaml.safe_load(raw)
             ctx.log_message("Parsed as YAML")
         except ImportError:
-            raise ImportError("PyYAML is required for YAML files: pip install pyyaml")
+            raise BlockDependencyError("pyyaml", install_hint="pip install pyyaml")
     elif fmt == "toml":
         try:
             import tomllib
@@ -58,7 +75,7 @@ def run(ctx):
                 import tomli
                 parsed = tomli.loads(raw)
             except ImportError:
-                raise ImportError("tomli is required for TOML files on Python <3.11: pip install tomli")
+                raise BlockDependencyError("tomli", install_hint="pip install tomli")
         ctx.log_message("Parsed as TOML")
     else:
         parsed = json.loads(raw)

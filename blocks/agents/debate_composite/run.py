@@ -12,6 +12,23 @@ The parent block's inputs (llm config, topic) are injected into root
 child blocks by the composite executor.
 """
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     topic = ctx.inputs.get("input", "") or ctx.config.get("topic", "")
@@ -19,7 +36,6 @@ def run(ctx):
     rounds = ctx.config.get("rounds", 3)
 
     if not topic:
-        from backend.block_sdk.exceptions import BlockInputError
         raise BlockInputError(
             "No debate topic provided",
             details="Connect a text source to the 'input' port or set 'topic' in config.",

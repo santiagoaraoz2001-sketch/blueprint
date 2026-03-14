@@ -4,6 +4,23 @@ import csv
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     file_path = ctx.config.get("file_path", "")
@@ -37,11 +54,11 @@ def run(ctx):
         has_header = has_header.lower() in ("true", "1", "yes")
 
     if not file_path:
-        raise ValueError("file_path is required")
+        raise BlockConfigError("file_path", "file_path is required")
 
     file_path = os.path.expanduser(file_path)
     if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise BlockInputError(f"File not found: {file_path}", details="Check that the upstream block produced output", recoverable=False)
 
     ctx.log_message(f"Loading file: {file_path}")
 

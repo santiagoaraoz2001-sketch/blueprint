@@ -12,6 +12,23 @@ import json
 import math
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _load_json(path):
     """Load data from a file path (JSON or numpy .npy)."""
@@ -24,9 +41,10 @@ def _load_json(path):
             arr = np.load(path)
             return {"embeddings": arr.tolist()}
         except ImportError:
-            raise ImportError(
-                f"NumPy is required to load .npy embeddings file: {path}. "
-                f"Install with: pip install numpy"
+            raise BlockDependencyError(
+                "numpy",
+                f"NumPy is required to load .npy embeddings file: {path}",
+                install_hint="pip install numpy",
             )
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -142,7 +160,7 @@ def run(ctx):
         vectors, labels, dataset_metadata = _extract_vectors_and_labels(raw_emb, embedding_column)
 
     if not vectors:
-        raise ValueError("No embeddings received. Connect 'dataset' or 'embeddings' input.")
+        raise BlockInputError("No embeddings received. Connect 'dataset' or 'embeddings' input.", recoverable=False)
 
     # Filter out empty vectors
     valid_indices = [i for i, v in enumerate(vectors) if v and len(v) > 0]

@@ -11,6 +11,23 @@ from collections import deque
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 class _TextExtractor(HTMLParser):
     """Simple HTML-to-text parser using stdlib."""
@@ -191,7 +208,7 @@ def run(ctx):
         use_llm_extraction = use_llm_extraction.lower() in ("true", "1", "yes")
 
     if not urls_str:
-        raise ValueError("urls is required — provide one or more URLs (one per line)")
+        raise BlockConfigError("urls", "urls is required — provide one or more URLs (one per line)")
 
     # Parse URLs — support both newline and comma separation for backward compat
     if "\n" in urls_str:

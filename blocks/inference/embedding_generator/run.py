@@ -13,6 +13,23 @@ import math
 import os
 import urllib.request
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 _DEFAULT_DEMO_DIM = 384
 _DEFAULT_ENDPOINT = "http://localhost:11434"
 
@@ -83,15 +100,15 @@ def run(ctx):
         with open(data_file, "r", encoding="utf-8") as f:
             rows = json.load(f)
     except FileNotFoundError:
-        raise ValueError(f"Dataset file not found: {data_file}")
+        raise BlockInputError(f"Dataset file not found: {data_file}", details="Check that the upstream block produced output", recoverable=False)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in dataset file {data_file}: {e}")
+        raise BlockDataError(f"Invalid JSON in dataset file {data_file}: {e}")
 
     # Normalize to list of rows
     if isinstance(rows, dict):
         rows = rows.get("data", rows.get("rows", rows.get("documents", [rows])))
     if not isinstance(rows, list):
-        raise ValueError(
+        raise BlockDataError(
             f"Expected a JSON array in {data_file}, got {type(rows).__name__}. "
             f"The dataset should be a JSON array of objects."
         )
@@ -188,7 +205,7 @@ def run(ctx):
     # ── OpenAI ───────────────────────────────────────────────────
     elif provider == "openai":
         if not api_key:
-            raise ValueError("OpenAI API key required. Set api_key config or OPENAI_API_KEY env var.")
+            raise BlockConfigError("api_key", "OpenAI API key required. Set api_key config or OPENAI_API_KEY env var.")
 
         # Use custom endpoint if explicitly configured, otherwise default to OpenAI API
         if endpoint and endpoint.rstrip("/") != _DEFAULT_ENDPOINT:

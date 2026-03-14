@@ -5,6 +5,23 @@ import os
 import random
 from collections import Counter, defaultdict
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 # ── Rule-based strategies (no model needed) ────────────────────────
 
@@ -283,13 +300,13 @@ def run(ctx):
     # Load dataset
     data_file = os.path.join(dataset_path, "data.json") if os.path.isdir(dataset_path) else dataset_path
     if not os.path.isfile(data_file):
-        raise FileNotFoundError(f"Dataset not found at: {dataset_path}")
+        raise BlockInputError(f"Dataset not found at: {dataset_path}", details="Check that the upstream block produced output", recoverable=False)
 
     with open(data_file, "r", encoding="utf-8") as f:
         rows = json.load(f)
 
     if not isinstance(rows, list):
-        raise ValueError("Dataset must be a JSON array")
+        raise BlockDataError("Dataset must be a JSON array", details="Expected a list of objects from upstream block")
 
     original_count = len(rows)
     # Support comma-separated multi-strategy for diversity
@@ -318,9 +335,10 @@ def run(ctx):
     has_model_strategies = any(s in _MODEL_STRATEGIES for s in strategies)
     if has_model_strategies and not model_name:
         model_strategies = [s for s in strategies if s in _MODEL_STRATEGIES]
-        raise ValueError(
+        raise BlockInputError(
             f"Strategies {model_strategies} require a model input. "
-            f"Connect a model block or use only rule-based strategies."
+            f"Connect a model block or use only rule-based strategies.",
+            recoverable=False
         )
 
     augmented = list(rows)  # keep originals

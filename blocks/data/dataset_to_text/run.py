@@ -1,6 +1,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _auto_detect_column(row, preferred="text"):
     """Auto-detect the best text column from a dataset row."""
@@ -27,13 +44,13 @@ def run(ctx):
         else dataset_path
     )
     if not os.path.isfile(data_file):
-        raise FileNotFoundError(f"Dataset not found at: {dataset_path}")
+        raise BlockInputError(f"Dataset not found at: {dataset_path}", details="Check that the upstream block produced output", recoverable=False)
 
     with open(data_file, "r", encoding="utf-8") as f:
         rows = json.load(f)
 
     if not isinstance(rows, list):
-        raise ValueError("Dataset must be a JSON array")
+        raise BlockDataError("Dataset must be a JSON array", details="Expected a list of objects from upstream block")
 
     # Handle empty dataset gracefully
     if len(rows) == 0:
@@ -62,9 +79,10 @@ def run(ctx):
     # Extract single row by index
     if row_index >= 0:
         if row_index >= len(rows):
-            raise ValueError(
+            raise BlockDataError(
                 f"Row index {row_index} out of range "
-                f"(dataset has {len(rows)} rows)"
+                f"(dataset has {len(rows)} rows)",
+                details="Received row_index beyond dataset bounds"
             )
         extracted = str(rows[row_index].get(column, ""))
         row_count = 1

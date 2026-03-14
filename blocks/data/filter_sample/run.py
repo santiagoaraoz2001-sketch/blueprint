@@ -6,6 +6,23 @@ import os
 import random
 import re
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     dataset_path = ctx.resolve_as_file_path("dataset")
@@ -38,12 +55,12 @@ def run(ctx):
     # Load data
     data_file = os.path.join(dataset_path, "data.json") if os.path.isdir(dataset_path) else dataset_path
     if not os.path.isfile(data_file):
-        raise FileNotFoundError(f"Dataset file not found: {data_file}")
+        raise BlockInputError(f"Dataset file not found: {data_file}", details="Check that the upstream block produced output", recoverable=False)
     with open(data_file, "r", encoding="utf-8") as f:
         rows = json.load(f)
 
     if not isinstance(rows, list):
-        raise ValueError("Dataset must be a JSON array")
+        raise BlockDataError("Dataset must be a JSON array", details="Expected a list of objects from upstream block")
 
     original_count = len(rows)
     ctx.log_message(f"Loaded {original_count} rows. Method: {method}")
@@ -76,11 +93,11 @@ def run(ctx):
 
     elif method == "regex":
         if not regex_pattern:
-            raise ValueError("regex_pattern is required for regex filter method")
+            raise BlockConfigError("regex_pattern", "regex_pattern is required for regex filter method")
         try:
             compiled = re.compile(regex_pattern)
         except re.error as e:
-            raise ValueError(f"Invalid regex pattern: {e}")
+            raise BlockConfigError("regex_pattern", f"Invalid regex pattern: {e}")
         for r in rows:
             text_val = str(r.get(text_column, ""))
             matches = bool(compiled.search(text_val))
@@ -122,7 +139,7 @@ def run(ctx):
 
     elif method == "value_match":
         if not match_values_str:
-            raise ValueError("match_values is required for value_match filter method")
+            raise BlockConfigError("match_values", "match_values is required for value_match filter method")
         match_set = {v.strip() for v in match_values_str.split(",") if v.strip()}
         for r in rows:
             if str(r.get(text_column, "")) in match_set:
@@ -131,7 +148,7 @@ def run(ctx):
                 rejected.append(r)
 
     else:
-        raise ValueError(f"Unknown filter method: {method}")
+        raise BlockConfigError("method", f"Unknown filter method: {method}")
 
     ctx.report_progress(2, 4)
 

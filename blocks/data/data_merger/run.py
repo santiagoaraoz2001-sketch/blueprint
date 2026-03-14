@@ -5,6 +5,23 @@ import json
 import os
 import random
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _load_dataset(path):
     """Load a dataset from a path, returning an empty list if not available."""
@@ -20,7 +37,7 @@ def _load_dataset(path):
 def _join(rows_a, rows_b, join_key, join_type, join_suffix="_b"):
     """Perform a key-based join between two row lists."""
     if not join_key:
-        raise ValueError("join_key is required for join method")
+        raise BlockConfigError("join_key", "join_key is required for join method")
 
     # Index dataset B by join key
     b_index = {}

@@ -5,6 +5,23 @@ import os
 import urllib.request
 import urllib.error
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     model_id = ctx.config.get("model_id", "").strip()
@@ -16,9 +33,7 @@ def run(ctx):
     torch_dtype = ctx.config.get("torch_dtype", "auto")
 
     if not model_id:
-        raise ValueError(
-            "model_id is required (e.g. 'meta-llama/Llama-2-7b-hf')"
-        )
+        raise BlockConfigError("model_id", "model_id is required (e.g. 'meta-llama/Llama-2-7b-hf')")
 
     ctx.log_message(f"Loading HuggingFace model: {model_id}")
     ctx.log_message(f"  Revision: {revision}")

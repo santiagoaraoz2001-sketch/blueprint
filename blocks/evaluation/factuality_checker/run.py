@@ -14,6 +14,23 @@ import re
 
 from blocks.inference._inference_utils import call_inference
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # ── Configuration ─────────────────────────────────────────────────────
@@ -238,7 +255,6 @@ def _init_embeddings(ctx, model_name="all-MiniLM-L6-v2"):
 
         return compute_similarity
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
         missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
         raise BlockDependencyError(
             missing,

@@ -5,6 +5,23 @@ import os
 import time
 from datetime import datetime, timezone
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _generate_data_summary(data):
     """Generate a human-readable summary of the data for review."""
@@ -72,7 +89,7 @@ def run(ctx):
     ctx.report_progress(1, 4)
     raw_data = ctx.resolve_as_data("data")
     if not raw_data:
-        raise ValueError("No data provided for review. Connect a 'data' input.")
+        raise BlockInputError("No data provided for review. Connect a 'data' input.", recoverable=False)
     data = raw_data
     data_summary = _generate_data_summary(data)
     ctx.log_message(f"Data loaded: type={data_summary.get('type')}")

@@ -4,6 +4,23 @@ import json
 import os
 import random
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _load_data(ctx, port_name):
     """Load and resolve input data from a port, handling file/directory paths."""
@@ -44,10 +61,11 @@ def run(ctx):
 
     # Modes that iterate over data require input
     if input_data is None and mode != "count":
-        raise ValueError(
+        raise BlockInputError(
             f"Input data required for '{mode}' mode. "
             f"Connect data to the 'Input Data' port, or use 'count' mode "
-            f"to repeat without input."
+            f"to repeat without input.",
+            recoverable=False
         )
 
     # Normalize to list

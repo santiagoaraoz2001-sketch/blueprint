@@ -6,6 +6,23 @@ import signal
 import sqlite3
 import time
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     connection_string = ctx.config.get("connection_string", "")
@@ -39,7 +56,7 @@ def run(ctx):
         parameterized = parameterized.lower() in ("true", "1", "yes")
 
     if not query:
-        raise ValueError("query is required — provide a SQL query to execute")
+        raise BlockConfigError("query", "query is required — provide a SQL query to execute")
 
     ctx.log_message(f"Database: {connection_string or '(in-memory demo)'}")
     ctx.log_message(f"Query: {query[:200]}{'...' if len(query) > 200 else ''}")
@@ -110,9 +127,7 @@ def run(ctx):
                 return
 
             except ImportError:
-                raise RuntimeError(
-                    f"SQLAlchemy required for {cs.split('://')[0]} databases: pip install sqlalchemy"
-                )
+                raise BlockDependencyError("sqlalchemy", install_hint=f"pip install sqlalchemy")
 
         # SQLite: handle sqlite:/// prefix or plain file path
         if cs.startswith("sqlite:///"):
@@ -185,7 +200,7 @@ def run(ctx):
         ctx.log_message(f"TIMEOUT: Query exceeded {timeout}s limit")
         raise
     except Exception as e:
-        raise RuntimeError(f"SQL query failed: {e}")
+        raise BlockExecutionError(f"SQL query failed: {e}", details=str(e))
     finally:
         if use_alarm:
             signal.alarm(0)

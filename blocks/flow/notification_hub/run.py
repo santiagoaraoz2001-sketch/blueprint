@@ -9,6 +9,23 @@ from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _format_message(template, data):
     """Format a message template with data fields."""
@@ -140,13 +157,13 @@ def run(ctx):
 
     valid_channels = {"telegram", "slack", "email"}
     if channel not in valid_channels:
-        raise ValueError(f"Unsupported channel '{channel}'. Supported: {', '.join(sorted(valid_channels))}")
+        raise BlockConfigError("channel", f"Unsupported channel '{channel}'. Supported: {', '.join(sorted(valid_channels))}")
 
     # ---- Step 1: Load trigger data ----
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_data("data")
     if not raw_data:
-        raise ValueError("No trigger data provided. Connect a 'data' input.")
+        raise BlockInputError("No trigger data provided. Connect a 'data' input.", recoverable=False)
     data = raw_data
     ctx.log_message("Trigger data loaded")
 
@@ -197,7 +214,8 @@ def run(ctx):
             # For Slack, api_token is used as the webhook URL
             webhook_url = api_token if api_token.startswith("http") else ""
             if not webhook_url:
-                raise ValueError(
+                raise BlockConfigError(
+                    "api_token",
                     "For Slack, set 'API Token' to your Slack incoming webhook URL "
                     "(e.g., https://hooks.slack.com/services/...)"
                 )

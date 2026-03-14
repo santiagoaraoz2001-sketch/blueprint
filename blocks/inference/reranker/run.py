@@ -11,6 +11,23 @@ Workflows:
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     dataset_input = ctx.resolve_as_file_path("dataset")
@@ -41,7 +58,7 @@ def run(ctx):
     elif isinstance(dataset_input, list):
         rows = dataset_input
     else:
-        raise ValueError("Invalid dataset input")
+        raise BlockDataError("Invalid dataset input")
 
     # Load query from input or from dataset rows
     query = ""

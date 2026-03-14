@@ -9,6 +9,23 @@ import json
 import os
 import time
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # Read upstream dataset metadata
@@ -56,7 +73,8 @@ def run(ctx):
         trust_remote_code = trust_remote_code.lower() in ("true", "1", "yes")
 
     if not model_path:
-        raise ValueError(
+        raise BlockConfigError(
+            "model_path",
             "Model path required: connect a model via the 'model' input "
             "port or set 'model_path' in config."
         )
@@ -120,7 +138,6 @@ def run(ctx):
             max_seq_length, trust_remote_code,
         )
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
         missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
         raise BlockDependencyError(
             missing,
@@ -157,7 +174,6 @@ def _analyze_torch_model(ctx, model_path, telemetry, sample_texts,
     try:
         import torch
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
         missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
         raise BlockDependencyError(
             missing,

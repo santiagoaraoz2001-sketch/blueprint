@@ -2,6 +2,23 @@
 
 import json
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     fmt = ctx.config.get("format", "json")
@@ -34,9 +51,9 @@ def run(ctx):
         try:
             metrics = json.loads(raw)
             if not isinstance(metrics, dict):
-                raise ValueError("Metrics JSON must be an object (dict), not a list or scalar")
+                raise BlockConfigError("metrics_json", "Metrics JSON must be an object (dict), not a list or scalar")
         except (json.JSONDecodeError, ValueError) as e:
-            raise ValueError(f"Invalid metrics JSON: {e}")
+            raise BlockConfigError("metrics_json", f"Invalid metrics JSON: {e}")
 
     ctx.log_message(f"Metrics input: {len(metrics)} entries")
     for key, val in metrics.items():

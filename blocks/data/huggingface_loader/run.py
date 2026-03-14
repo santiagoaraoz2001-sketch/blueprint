@@ -4,6 +4,23 @@ import json
 import os
 import time
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     dataset_name = ctx.config.get("dataset_name", "")
@@ -39,7 +56,7 @@ def run(ctx):
         pass
 
     if not dataset_name:
-        raise ValueError("dataset_name is required — provide a HuggingFace dataset identifier (e.g. 'imdb', 'squad')")
+        raise BlockConfigError("dataset_name", "dataset_name is required — provide a HuggingFace dataset identifier (e.g. 'imdb', 'squad')")
 
     # Normalize booleans from string config values
     if isinstance(streaming, str):

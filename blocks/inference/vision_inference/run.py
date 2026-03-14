@@ -15,6 +15,23 @@ import json
 import os
 import time
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # ── Model config: upstream model input takes priority ──────────────
@@ -74,7 +91,7 @@ def run(ctx):
         prompt = f"{prompt}\n\nAdditional context:\n{additional_context}"
 
     if not image_path or not os.path.isfile(image_path):
-        raise ValueError(f"Image file not found: {image_path or '(none provided)'}")
+        raise BlockInputError(f"Image file not found: {image_path or '(none provided)'}", recoverable=False)
 
     ctx.log_message(f"Vision inference via {provider}/{model_name}")
     ctx.log_message(f"Image: {os.path.basename(image_path)}")
@@ -127,7 +144,7 @@ def run(ctx):
     elif provider == "ollama":
         response_text, token_usage = _call_ollama_vision(endpoint, model_name, prompt, system_prompt, image_b64, temperature, max_tokens, ctx)
     else:
-        raise ValueError(f"Provider {provider} does not support vision.")
+        raise BlockConfigError("provider", f"Provider {provider} does not support vision.")
     latency = time.time() - start
 
     ctx.log_metric("latency_s", round(latency, 3))
@@ -161,7 +178,7 @@ def _call_openai_vision(endpoint, api_key, model, prompt, system_prompt, image_b
     if not api_key:
         api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
-        raise ValueError("OpenAI API key required for vision.")
+        raise BlockConfigError("api_key", "OpenAI API key required for vision.")
 
     url = endpoint.rstrip("/")
     if "/v1/" not in url:
@@ -210,7 +227,7 @@ def _call_anthropic_vision(endpoint, api_key, model, prompt, system_prompt, imag
     if not api_key:
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        raise ValueError("Anthropic API key required for vision.")
+        raise BlockConfigError("api_key", "Anthropic API key required for vision.")
 
     url = endpoint.rstrip("/")
     if not url.endswith("/v1/messages"):

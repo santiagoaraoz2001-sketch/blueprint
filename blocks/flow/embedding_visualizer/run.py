@@ -3,6 +3,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _load_json(path):
     """Load data from a file path (JSON or numpy .npy)."""
@@ -15,9 +32,10 @@ def _load_json(path):
             arr = np.load(path)
             return {"embeddings": arr.tolist()}
         except ImportError:
-            raise ImportError(
-                f"NumPy is required to load .npy embeddings file: {path}. "
-                f"Install with: pip install numpy"
+            raise BlockDependencyError(
+                "numpy",
+                f"NumPy is required to load .npy embeddings file: {path}.",
+                install_hint="pip install numpy"
             )
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -142,7 +160,7 @@ def run(ctx):
         vectors, embedded_labels, embedded_clusters, source_metadata = _extract_vectors_labels_clusters(raw_emb, embedding_column)
 
     if not vectors:
-        raise ValueError("No embedding vectors received. Connect 'dataset' or 'embeddings' input.")
+        raise BlockInputError("No embedding vectors received. Connect 'dataset' or 'embeddings' input.", recoverable=False)
 
     dim = len(vectors[0])
     ctx.log_message(f"Loaded {len(vectors)} embeddings (dim={dim})")
@@ -219,12 +237,11 @@ def run(ctx):
                 method = "pca_fallback"
 
         else:
-            raise ValueError(f"Unknown method: {method}")
+            raise BlockConfigError("method", f"Unknown method: {method}")
 
         reduced = coords.tolist()
 
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
         missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
         raise BlockDependencyError(
             missing,

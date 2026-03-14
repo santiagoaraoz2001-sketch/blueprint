@@ -2,6 +2,23 @@ import json
 import os
 import random
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _auto_detect_column(row, preferred="text"):
     """Auto-detect the best text column from a dataset row."""
@@ -31,13 +48,13 @@ def run(ctx):
         else dataset_path
     )
     if not os.path.isfile(data_file):
-        raise FileNotFoundError(f"Dataset not found at: {dataset_path}")
+        raise BlockInputError(f"Dataset not found at: {dataset_path}", details="Check that the upstream block produced output", recoverable=False)
 
     with open(data_file, "r", encoding="utf-8") as f:
         rows = json.load(f)
 
     if not isinstance(rows, list):
-        raise ValueError("Dataset must be a JSON array")
+        raise BlockDataError("Dataset must be a JSON array", details="Expected a list of objects from upstream block")
 
     # Handle empty dataset gracefully
     if len(rows) == 0:
@@ -65,8 +82,9 @@ def run(ctx):
         selected = rows[-count:]
     elif mode == "index":
         if index < 0 or index >= len(rows):
-            raise ValueError(
-                f"Index {index} out of range (dataset has {len(rows)} rows)"
+            raise BlockDataError(
+                f"Index {index} out of range (dataset has {len(rows)} rows)",
+                details="Received index beyond dataset bounds"
             )
         end = min(index + count, len(rows))
         selected = rows[index:end]
@@ -77,7 +95,7 @@ def run(ctx):
         ctx.log_message(f"Random sampling with seed={seed}")
     elif mode == "filter":
         if not filter_column:
-            raise ValueError("Filter column must be specified for filter mode")
+            raise BlockConfigError("filter_column", "Filter column must be specified for filter mode")
         selected = [
             row for row in rows
             if str(row.get(filter_column, "")) == filter_value
@@ -89,7 +107,7 @@ def run(ctx):
         if count > 0 and len(selected) > count:
             selected = selected[:count]
     else:
-        raise ValueError(f"Unknown selection mode: {mode}")
+        raise BlockConfigError("mode", f"Unknown selection mode: {mode}")
 
     if len(selected) == 0:
         ctx.log_message("Warning: no rows matched the selection criteria")

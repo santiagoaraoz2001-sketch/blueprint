@@ -7,6 +7,23 @@ import time
 import urllib.request
 import urllib.error
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _resolve_response_path(data, path):
     """Traverse nested dict using dot-notation path (e.g. 'data.items')."""
@@ -103,7 +120,7 @@ def run(ctx):
         pagination = pagination.lower() in ("true", "1", "yes")
 
     if not url:
-        raise ValueError("url is required — provide an API endpoint URL")
+        raise BlockConfigError("url", "URL is required — provide an API endpoint URL")
 
     # Merge with incoming config input if connected
     try:

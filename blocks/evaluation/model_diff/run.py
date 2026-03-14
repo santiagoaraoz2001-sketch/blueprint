@@ -13,6 +13,23 @@ import json
 import math
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # -- Configuration ---------------------------------------------------------
@@ -28,19 +45,21 @@ def run(ctx):
     decimal_precision = int(ctx.config.get("decimal_precision", 4))
 
     if not prompt or not prompt.strip():
-        raise ValueError("Test prompt cannot be empty")
+        raise BlockConfigError("prompt", "Test prompt cannot be empty")
 
     # -- Resolve model info ----------------------------------------------------
     model_a_info = _resolve_model(ctx, "model_a", model_a_override)
     model_b_info = _resolve_model(ctx, "model_b", model_b_override)
 
     if not model_a_info["name"]:
-        raise ValueError(
+        raise BlockConfigError(
+            "model_a_name",
             "Model A is required: connect a model to the 'model_a' input "
             "port or set 'Model A Name Override' in config"
         )
     if not model_b_info["name"]:
-        raise ValueError(
+        raise BlockConfigError(
+            "model_b_name",
             "Model B is required: connect a model to the 'model_b' input "
             "port or set 'Model B Name Override' in config"
         )
@@ -200,7 +219,6 @@ def _compare_local_models(ctx, model_a_info, model_b_info, prompt, max_tokens,
         import torch
         import torch.nn.functional as F
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
         missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
         raise BlockDependencyError(
             missing,
@@ -225,7 +243,7 @@ def _compare_local_models(ctx, model_a_info, model_b_info, prompt, max_tokens,
             )
             model_a.eval()
         except Exception as e:
-            raise RuntimeError(f"Failed to load Model A ({model_a_info['name']}): {e}")
+            raise BlockExecutionError(f"Failed to load Model A ({model_a_info['name']}): {e}", details=str(e))
 
         ctx.log_message("Loading Model B...")
         ctx.report_progress(1, 6)
@@ -239,7 +257,7 @@ def _compare_local_models(ctx, model_a_info, model_b_info, prompt, max_tokens,
             )
             model_b.eval()
         except Exception as e:
-            raise RuntimeError(f"Failed to load Model B ({model_b_info['name']}): {e}")
+            raise BlockExecutionError(f"Failed to load Model B ({model_b_info['name']}): {e}", details=str(e))
 
         same_tokenizer = (model_a_info["name"] == model_b_info["name"])
 
@@ -449,7 +467,7 @@ def _compare_via_inference(ctx, model_a_info, model_b_info, prompt, max_tokens,
             log_fn=ctx.log_message,
         )
     except Exception as e:
-        raise RuntimeError(f"Model A inference failed ({model_a_info['name']}): {e}")
+        raise BlockExecutionError(f"Model A inference failed ({model_a_info['name']}): {e}", details=str(e))
 
     ctx.report_progress(1, 4)
     ctx.log_message("Generating response from Model B...")
@@ -461,7 +479,7 @@ def _compare_via_inference(ctx, model_a_info, model_b_info, prompt, max_tokens,
             log_fn=ctx.log_message,
         )
     except Exception as e:
-        raise RuntimeError(f"Model B inference failed ({model_b_info['name']}): {e}")
+        raise BlockExecutionError(f"Model B inference failed ({model_b_info['name']}): {e}", details=str(e))
 
     ctx.report_progress(2, 4)
     ctx.log_message("Computing text-level differences...")

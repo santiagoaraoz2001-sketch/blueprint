@@ -6,6 +6,23 @@ import os
 import re
 import time
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _read_pdf(filepath):
     """Read text from PDF file."""
@@ -36,9 +53,10 @@ def _read_pdf(filepath):
     except ImportError:
         pass
 
-    raise ImportError(
-        "PDF reading requires PyPDF2 or pdfplumber. "
-        "Install with: pip install PyPDF2  or  pip install pdfplumber"
+    raise BlockDependencyError(
+        "PyPDF2",
+        "PDF reading requires PyPDF2 or pdfplumber",
+        install_hint="pip install PyPDF2  or  pip install pdfplumber"
     )
 
 
@@ -50,9 +68,10 @@ def _read_docx(filepath):
         paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
         return "\n\n".join(paragraphs), len(paragraphs)
     except ImportError:
-        raise ImportError(
-            "DOCX reading requires python-docx. "
-            "Install with: pip install python-docx"
+        raise BlockDependencyError(
+            "python-docx",
+            "DOCX reading requires python-docx",
+            install_hint="pip install python-docx"
         )
 
 
@@ -277,7 +296,7 @@ def run(ctx):
                 ctx.log_message(f"  Failed to read {filename}: {e}")
                 failed_files.append({"filename": filename, "error": str(e)})
                 if error_handling == "fail_fast":
-                    raise RuntimeError(f"Document ingestion failed on {filename}: {e}")
+                    raise BlockExecutionError(f"Document ingestion failed on {filename}: {e}", details=str(e))
 
             ctx.report_progress(i + 1, max(len(files), 1))
 

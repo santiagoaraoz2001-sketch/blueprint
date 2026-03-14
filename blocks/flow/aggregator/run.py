@@ -3,6 +3,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _load_data(raw):
     """Resolve raw input value to Python data, handling file/directory paths."""
@@ -61,9 +78,10 @@ def run(ctx):
     loaded_ports = {name for name, _ in collected}
     missing = required_ports - loaded_ports
     if missing:
-        raise ValueError(
+        raise BlockInputError(
             f"Required input(s) {', '.join(sorted(missing))} not connected "
-            f"or produced no data. The Aggregator needs at least 2 inputs."
+            f"or produced no data. The Aggregator needs at least 2 inputs.",
+            recoverable=False
         )
 
     ctx.log_message(f"Aggregating {len(collected)} inputs (strategy={strategy})")
