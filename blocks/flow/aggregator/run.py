@@ -43,6 +43,7 @@ def run(ctx):
     limit = int(ctx.config.get("limit", 0))
 
     # Collect from input ports in_1 through in_5
+    required_ports = {"in_1", "in_2"}
     input_port_ids = ["in_1", "in_2", "in_3", "in_4", "in_5"]
     collected = []  # list of (port_name, loaded_data)
 
@@ -55,6 +56,15 @@ def run(ctx):
                     collected.append((port_id, data))
         except (ValueError, Exception):
             pass
+
+    # Validate that required ports provided data
+    loaded_ports = {name for name, _ in collected}
+    missing = required_ports - loaded_ports
+    if missing:
+        raise ValueError(
+            f"Required input(s) {', '.join(sorted(missing))} not connected "
+            f"or produced no data. The Aggregator needs at least 2 inputs."
+        )
 
     ctx.log_message(f"Aggregating {len(collected)} inputs (strategy={strategy})")
 

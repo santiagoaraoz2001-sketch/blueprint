@@ -21,7 +21,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'experimental',
     inputs: [
-      { id: 'dataset', label: 'Agent Outputs', dataType: 'dataset', required: true },
+      { id: 'dataset', label: 'Agent Outputs', dataType: 'dataset', required: false },
       { id: 'references', label: 'Reference Answers', dataType: 'dataset', required: false },
     ],
     outputs: [
@@ -7060,7 +7060,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#6366f1',
     maturity: 'stable',
     inputs: [
-      { id: 'input', label: 'Input Data', dataType: 'any', required: true },
+      { id: 'input', label: 'Input Data', dataType: 'any', required: false },
     ],
     outputs: [
       { id: 'item', label: 'Current Item', dataType: 'any', required: false },
@@ -9835,7 +9835,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#34D399',
     maturity: 'stable',
     inputs: [
-      { id: 'metrics', label: 'Results', dataType: 'metrics', required: true },
+      { id: 'metrics', label: 'Results', dataType: 'metrics', required: false },
     ],
     outputs: [
       { id: 'artifact', label: 'Submission', dataType: 'artifact', required: false },

@@ -8,7 +8,8 @@ inputs:
   - id: input
     label: Input Data
     data_type: any
-    required: true
+    required: false
+    description: "Data to iterate over. Required for iterate_rows and batch modes; optional for count mode."
 
 outputs:
   - id: item

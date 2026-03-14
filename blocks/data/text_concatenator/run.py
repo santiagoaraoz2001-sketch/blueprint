@@ -79,6 +79,11 @@ def run(ctx):
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(result)
 
+    input_count = sum(1 for t in (text_a, text_b, text_c) if t)
+    ctx.log_metric("input_count", input_count)
+    ctx.log_metric("output_length", len(result))
+    ctx.log_metric("char_count", len(text_a) + len(text_b) + len(text_c))
+
     ctx.log_message(f"Combined output: {len(result)} chars")
     ctx.report_progress(1, 1)
     ctx.save_output("text", out_path)

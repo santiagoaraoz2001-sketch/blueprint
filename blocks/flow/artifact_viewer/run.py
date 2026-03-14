@@ -69,5 +69,7 @@ def run(ctx):
         json.dump(artifact_info, f, indent=2, default=str)
 
     ctx.save_output("summary", out_path)
+    ctx.log_metric("artifact_count", 1)
+    ctx.log_metric("total_size_bytes", artifact_info["size"])
     ctx.log_message(f"Artifact manifest created: {artifact_info['type']} ({artifact_info['size']:,} bytes)")
     ctx.report_progress(1, 1)

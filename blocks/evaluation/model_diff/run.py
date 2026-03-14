@@ -31,8 +31,19 @@ def run(ctx):
         raise ValueError("Test prompt cannot be empty")
 
     # -- Resolve model info ----------------------------------------------------
-    model_a_info = _resolve_model(ctx, "model_a", model_a_override, "gpt2")
-    model_b_info = _resolve_model(ctx, "model_b", model_b_override, "gpt2")
+    model_a_info = _resolve_model(ctx, "model_a", model_a_override)
+    model_b_info = _resolve_model(ctx, "model_b", model_b_override)
+
+    if not model_a_info["name"]:
+        raise ValueError(
+            "Model A is required: connect a model to the 'model_a' input "
+            "port or set 'Model A Name Override' in config"
+        )
+    if not model_b_info["name"]:
+        raise ValueError(
+            "Model B is required: connect a model to the 'model_b' input "
+            "port or set 'Model B Name Override' in config"
+        )
 
     model_a_name = model_a_info["name"]
     model_b_name = model_b_info["name"]
@@ -130,14 +141,19 @@ def run(ctx):
 # ── Model resolution ─────────────────────────────────────────────────────
 
 
-def _resolve_model(ctx, port_id, name_override, fallback):
-    """Resolve model info from input port or config override."""
-    info = {"name": fallback, "framework": "pytorch", "endpoint": "http://localhost:11434"}
+def _resolve_model(ctx, port_id, name_override):
+    """Resolve model info from input port or config override.
+
+    Returns a dict with 'name', 'framework', and 'endpoint'. The 'name'
+    field will be empty if neither the input port nor the override provided
+    a value — callers must validate before proceeding.
+    """
+    info = {"name": "", "framework": "pytorch", "endpoint": "http://localhost:11434"}
 
     try:
         model_data = ctx.load_input(port_id)
         if isinstance(model_data, dict):
-            info["name"] = model_data.get("model_name", model_data.get("model_id", fallback))
+            info["name"] = model_data.get("model_name", model_data.get("model_id", ""))
             info["endpoint"] = model_data.get("endpoint", model_data.get("base_url", info["endpoint"]))
             source = model_data.get("source", model_data.get("backend", ""))
             if source == "ollama":
@@ -155,7 +171,7 @@ def _resolve_model(ctx, port_id, name_override, fallback):
         info["name"] = name_override
 
     # Auto-detect framework for short names (no slash = likely Ollama)
-    if "/" not in info["name"] and info["name"] != "gpt2" and info["framework"] == "pytorch":
+    if info["name"] and "/" not in info["name"] and info["framework"] == "pytorch":
         try:
             import urllib.request
             req = urllib.request.Request(
