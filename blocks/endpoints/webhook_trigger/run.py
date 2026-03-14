@@ -213,7 +213,9 @@ def run(ctx):
             except Exception as e:
                 ctx.log_message(f"WARNING: Could not send failure notification: {e}")
 
+        # Branch: webhook failed
         ctx.save_output("status", status_msg)
+        # Branch: webhook failed
         ctx.save_output("summary", {"status": "failed", "error": last_error, "status_code": status_code})
         ctx.log_metric("webhook_success", 0.0)
         raise BlockExecutionError(
@@ -222,7 +224,9 @@ def run(ctx):
         )
     else:
         status_msg = f"OK ({status_code})"
+        # Branch: webhook succeeded
         ctx.save_output("status", status_msg)
+        # Branch: webhook succeeded
         ctx.save_output("summary", {
             "status": "success",
             "status_code": status_code,

@@ -245,12 +245,12 @@ def _generate_template_data(ctx, dimensions, temperature=0.7, max_tokens=200, ti
     framework = model_data.get("source", model_data.get("backend",
         ctx.config.get("provider", "ollama")))
     model_name = model_data.get("model_name", model_data.get("model_id",
-        ctx.config.get("model_name", "llama3.2")))
+        ctx.config.get("model_name", "")))
     config = {"endpoint": model_data.get("endpoint", model_data.get("base_url",
         ctx.config.get("endpoint", "http://localhost:11434")))}
 
     if not model_name:
-        ctx.log_message("No model connected — cannot generate from templates")
+        ctx.log_message("No model connected \u2014 cannot generate from templates")
         return None
 
     config["temperature"] = temperature

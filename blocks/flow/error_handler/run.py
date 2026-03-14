@@ -94,7 +94,9 @@ def run(ctx):
 
                 result = exec_globals.get("result", input_data)
                 ctx.log_message(f"Script succeeded on attempt {attempt + 1}")
+                # Branch: script succeeded
                 ctx.save_output("output", result)
+                # Branch: script succeeded
                 ctx.save_output("error", None)
                 ctx.log_metric("attempts", attempt + 1)
                 ctx.log_metric("success", 1)
@@ -128,7 +130,9 @@ def run(ctx):
         ctx.log_metric("attempts", total_attempts)
 
         if on_error == "raise":
+            # Branch: all retries failed — raise error
             ctx.save_output("output", None)
+            # Branch: all retries failed — raise error
             ctx.save_output("error", error_info)
             ctx.save_artifact("error_report", error_path)
             raise RuntimeError(f"Error Handler: all {total_attempts} retries exhausted: {last_error}")
@@ -141,18 +145,23 @@ def run(ctx):
             else:
                 fallback = None
             ctx.log_message("Using fallback value as output.")
+            # Branch: all retries failed — use fallback
             ctx.save_output("output", fallback)
         else:  # "log"
             ctx.log_message("Error logged. Passing input through as output.")
+            # Branch: all retries failed — log and continue
             ctx.save_output("output", input_data)
 
+        # Branch: all retries failed — shared by fallback and log paths (raise path already saved error above)
         ctx.save_output("error", error_info)
         ctx.save_artifact("error_report", error_path)
 
     else:
         # No script — pass-through mode
         ctx.log_message("No script provided. Passing input through as output.")
+        # Branch: no script provided — pass through
         ctx.save_output("output", input_data)
+        # Branch: no script provided — pass through
         ctx.save_output("error", None)
         ctx.log_metric("success", 1)
         ctx.log_metric("attempts", 0)

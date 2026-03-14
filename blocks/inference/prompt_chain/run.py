@@ -25,7 +25,7 @@ def run(ctx):
     provider = model_data.get("source", model_data.get("backend",
         ctx.config.get("backend", ctx.config.get("provider", "ollama"))))
     model_name = model_data.get("model_name", model_data.get("model_id",
-        ctx.config.get("model_name", "llama3.2")))
+        ctx.config.get("model_name", "")))
     endpoint = model_data.get("endpoint", model_data.get("base_url",
         ctx.config.get("endpoint", "http://localhost:11434")))
     api_key = model_data.get("api_key",
@@ -38,6 +38,9 @@ def run(ctx):
             f"but local config has model_name='{ctx.config.get('model_name')}'. "
             f"Using upstream. Clear local config to remove this warning."
         )
+
+    if not model_name:
+        raise ValueError("No model specified. Connect a Model Selector block or set model_name in config.")
 
     steps_json = ctx.config.get("steps", '["Analyze: {input}"]')
     pass_context = ctx.config.get("pass_context", True)

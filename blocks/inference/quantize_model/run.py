@@ -99,10 +99,12 @@ def run(ctx):
             tokenizer.save_pretrained(out_path)
 
             elapsed = time.time() - start_time
+            # Branch: GPTQ quantization succeeded
             ctx.save_output("model", {
                 "source": "gptq", "path": out_path,
                 "model_name": model_name, "bits": bits,
             })
+            # Branch: GPTQ quantization succeeded
             ctx.save_output("metrics", {
                 "method": "gptq", "bits": bits, "group_size": group_size,
                 "calibration_dataset": dataset_name, "elapsed_s": round(elapsed, 2),
@@ -152,10 +154,12 @@ def run(ctx):
                 pass
 
             elapsed = time.time() - start_time
+            # Branch: BitsAndBytes quantization succeeded
             ctx.save_output("model", {
                 "source": "bitsandbytes", "path": out_path,
                 "model_name": model_name, "bits": bits,
             })
+            # Branch: BitsAndBytes quantization succeeded
             ctx.save_output("metrics", {
                 "method": "bitsandbytes", "bits": bits,
                 "elapsed_s": round(elapsed, 2),
@@ -196,10 +200,12 @@ def run(ctx):
             tokenizer.save_pretrained(out_path)
 
             elapsed = time.time() - start_time
+            # Branch: AWQ quantization succeeded
             ctx.save_output("model", {
                 "source": "awq", "path": out_path,
                 "model_name": model_name, "bits": bits,
             })
+            # Branch: AWQ quantization succeeded
             ctx.save_output("metrics", {
                 "method": "awq", "bits": bits, "group_size": group_size,
                 "elapsed_s": round(elapsed, 2),
@@ -255,6 +261,7 @@ def run(ctx):
         }, f, indent=2)
 
     elapsed = time.time() - start_time
+    # Branch: estimation fallback — no real quantization
     ctx.save_output("model", {
         "source": method,
         "path": out_path,
@@ -262,6 +269,7 @@ def run(ctx):
         "bits": bits,
         "estimation_only": True,
     })
+    # Branch: estimation fallback — no real quantization
     ctx.save_output("metrics", {
         "method": method,
         "bits": bits,

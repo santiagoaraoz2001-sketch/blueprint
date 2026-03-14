@@ -13,6 +13,7 @@ Workflows:
 import base64
 import json
 import os
+import time
 
 
 def run(ctx):
@@ -118,6 +119,7 @@ def run(ctx):
     response_text = ""
     token_usage = {}
 
+    start = time.time()
     if provider == "openai":
         response_text, token_usage = _call_openai_vision(endpoint, api_key, model_name, prompt, system_prompt, image_b64, mime_type, detail, temperature, max_tokens, ctx)
     elif provider == "anthropic":
@@ -126,7 +128,11 @@ def run(ctx):
         response_text, token_usage = _call_ollama_vision(endpoint, model_name, prompt, system_prompt, image_b64, temperature, max_tokens, ctx)
     else:
         raise ValueError(f"Provider {provider} does not support vision.")
+    latency = time.time() - start
 
+    ctx.log_metric("latency_s", round(latency, 3))
+    ctx.log_metric("tokens_used", token_usage.get("total_tokens", 0))
+    ctx.log_metric("image_size_bytes", len(image_bytes))
     ctx.report_progress(2, 3)
 
     # Save response

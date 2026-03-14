@@ -111,8 +111,13 @@ def _call_anthropic(api_key, model_name, prompt, ctx, temperature=0.1, system_pr
 
 def _call_judge(provider, model_name, api_key, base_url, prompt, ctx, temperature=0.1, system_prompt=""):
     """Dispatch to the appropriate LLM provider."""
+    if not model_name:
+        raise ValueError(
+            f"No model_name specified for {provider} judge. "
+            "Set model_name in config or connect a Model Selector block."
+        )
     if provider == "ollama":
-        return _call_ollama(base_url or "http://localhost:11434", model_name or "llama3.2", prompt, ctx, temperature=temperature, system_prompt=system_prompt)
+        return _call_ollama(base_url or "http://localhost:11434", model_name, prompt, ctx, temperature=temperature, system_prompt=system_prompt)
     elif provider == "openai":
         if not api_key:
             api_key = os.environ.get("OPENAI_API_KEY", "")

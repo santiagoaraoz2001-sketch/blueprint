@@ -29,8 +29,9 @@ def run(ctx):
             ref_lookup[str(key)] = ref
 
     # ── Demo mode ───────────────────────────────────────────────────────
-    if not agent_outputs:
-        ctx.log_message("No agent outputs connected. Generating demo evaluation.")
+    is_simulated = not agent_outputs
+    if is_simulated:
+        ctx.log_message("⚠️ SIMULATION MODE: No agent outputs connected. Generating synthetic evaluation data.")
         agent_outputs = [
             {
                 "task": f"Task {i}",
@@ -121,6 +122,7 @@ def run(ctx):
         "pass_threshold": pass_threshold,
     }
     ctx.save_output("metrics", metrics)
+    ctx.log_metric("simulation_mode", 1.0 if is_simulated else 0.0)
     for k, v in metrics.items():
         if isinstance(v, (int, float)):
             ctx.log_metric(k, v)

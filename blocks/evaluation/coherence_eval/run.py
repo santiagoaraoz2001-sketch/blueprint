@@ -48,8 +48,9 @@ def run(ctx):
     except (ValueError, Exception):
         pass
 
-    if not rows:
-        ctx.log_message("No dataset connected — using demo data")
+    is_simulated = not rows
+    if is_simulated:
+        ctx.log_message("⚠️ SIMULATION MODE: No dataset connected. Using built-in demo texts.")
         rows = [
             {"text": "The quick brown fox jumps over the lazy dog. This is a well-written sentence that demonstrates proper grammar and vocabulary usage."},
             {"text": "The the the the the the the. Bad bad bad."},
@@ -135,7 +136,7 @@ def run(ctx):
     ctx.save_output("dataset", out_dir)
 
     # ── Save report output ─────────────────────────────────────────────
-    _flagged = [r for r in scored if r.get("too_short") or r.get("is_degenerate")]
+    _flagged = [r for r in results if r.get("too_short") or r.get("is_degenerate")]
     _report = {"summary": metrics, "total_flagged": len(_flagged), "flagged_texts": _flagged[:50]}
     _report_path = os.path.join(ctx.run_dir, "coherence_report.json")
     with open(_report_path, "w", encoding="utf-8") as f:
@@ -144,6 +145,7 @@ def run(ctx):
     ctx.save_output("report", _report_path)
 
     ctx.save_output("metrics", metrics)
+    ctx.log_metric("simulation_mode", 1.0 if is_simulated else 0.0)
     for k, v in metrics.items():
         if isinstance(v, (int, float)):
             ctx.log_metric(k, v)

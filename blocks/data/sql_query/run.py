@@ -82,6 +82,7 @@ def run(ctx):
                     ctx.log_message("SSL certificates configured")
                 engine = sqlalchemy.create_engine(cs, connect_args=connect_args if connect_args else {})
                 ctx.log_message(f"Connected via SQLAlchemy: {cs.split('@')[-1] if '@' in cs else cs}")
+                ctx.log_metric("simulation_mode", 0.0)
 
                 with engine.connect() as sa_conn:
                     if query_params:
@@ -123,16 +124,20 @@ def run(ctx):
         if os.path.isfile(db_path):
             conn = sqlite3.connect(db_path)
             ctx.log_message(f"Connected to SQLite: {db_path}")
+            ctx.log_metric("simulation_mode", 0.0)
         else:
             try:
                 conn = sqlite3.connect(db_path)
                 ctx.log_message(f"Created/connected to SQLite: {db_path}")
+                ctx.log_metric("simulation_mode", 0.0)
             except Exception as e:
                 ctx.log_message(f"Cannot connect to {db_path}: {e}. Using in-memory database.")
                 conn = sqlite3.connect(":memory:")
+                ctx.log_metric("simulation_mode", 0.0)
     else:
         # Demo mode with in-memory database
-        ctx.log_message("No connection_string set. Using in-memory demo database.")
+        ctx.log_message("⚠️ SIMULATION MODE: No connection string provided. Using in-memory demo database with synthetic data. Set connection_string for real database queries.")
+        ctx.log_metric("simulation_mode", 1.0)
         conn = sqlite3.connect(":memory:")
         conn.execute("""CREATE TABLE demo_data (
             id INTEGER PRIMARY KEY, name TEXT, value REAL, category TEXT
