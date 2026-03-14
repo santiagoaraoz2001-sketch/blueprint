@@ -62,7 +62,7 @@ def run(ctx):
     framework = model_data.get("source", model_data.get("backend",
         ctx.config.get("provider", "ollama")))
     model_name_resolved = model_data.get("model_name", model_data.get("model_id",
-        ctx.config.get("model_name", "llama3.2")))
+        ctx.config.get("model_name", "")))
     model_config = {"endpoint": model_data.get("endpoint", model_data.get("base_url",
         ctx.config.get("endpoint", "http://localhost:11434")))}
 

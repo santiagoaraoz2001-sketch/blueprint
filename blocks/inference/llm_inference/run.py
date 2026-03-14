@@ -39,12 +39,12 @@ def run(ctx):
     framework = model_data.get("source", model_data.get("backend", "auto")) if model_data else "auto"
     model = model_data.get("model_name", model_data.get("model_id", "")) if model_data else ""
 
-    if not model_data:
-        ctx.log_message(
-            "\u26a0 No model connected \u2014 using Ollama default (llama3.2). "
-            "Connect a Model Selector for explicit model choice."
+    if not model:
+        model = ctx.config.get("model_name", "")
+    if not model:
+        raise ValueError(
+            "No model specified. Connect a Model Selector block or set model_name in config."
         )
-        model = "llama3.2"
 
     # ── Load inputs ────────────────────────────────────────────────────
     # Prompt input port takes priority over user_input config

@@ -37,7 +37,7 @@ def run(ctx):
     provider = model_data.get("source", model_data.get("backend",
         ctx.config.get("backend", ctx.config.get("provider", "ollama"))))
     model_name = model_data.get("model_name", model_data.get("model_id",
-        ctx.config.get("model_name", "llama3.2")))
+        ctx.config.get("model_name", "")))
     endpoint = model_data.get("endpoint", model_data.get("base_url",
         ctx.config.get("endpoint", "http://localhost:11434")))
     api_key = model_data.get("api_key",

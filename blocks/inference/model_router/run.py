@@ -27,7 +27,7 @@ def run(ctx):
     primary_provider = model_data.get("source", model_data.get("backend",
         ctx.config.get("primary_provider", "ollama")))
     primary_model = model_data.get("model_name", model_data.get("model_id",
-        ctx.config.get("primary_model", "llama3.2")))
+        ctx.config.get("primary_model", "")))
     primary_endpoint = model_data.get("endpoint", model_data.get("base_url",
         ctx.config.get("primary_endpoint", "http://localhost:11434")))
     api_key = model_data.get("api_key",
@@ -41,8 +41,11 @@ def run(ctx):
             f"Using upstream. Clear local config to remove this warning."
         )
 
+    if not primary_model:
+        raise ValueError("No primary model specified. Connect a Model Selector block or set primary_model in config.")
+
     fallback_provider = ctx.config.get("fallback_provider", "openai")
-    fallback_model = ctx.config.get("fallback_model", "gpt-4o-mini")
+    fallback_model = ctx.config.get("fallback_model", "")
     fallback_endpoint = ctx.config.get("fallback_endpoint", "https://api.openai.com")
     threshold = float(ctx.config.get("threshold", 0.5))
     keyword_triggers = ctx.config.get("keyword_triggers", "code,math,analyze,complex")
@@ -94,6 +97,12 @@ def run(ctx):
     else:
         use_fallback = False
 
+    if use_fallback and not fallback_model:
+        raise ValueError(
+            "Routing selected fallback model but fallback_model is not configured. "
+            "Set fallback_model in config."
+        )
+
     selected_provider = fallback_provider if use_fallback else primary_provider
     selected_model = fallback_model if use_fallback else primary_model
     selected_endpoint = fallback_endpoint if use_fallback else primary_endpoint
@@ -119,6 +128,11 @@ def run(ctx):
 
     if last_error is not None:
         if not use_fallback:
+            if not fallback_model:
+                raise RuntimeError(
+                    f"Primary model failed after {max_retries} retries: {last_error}. "
+                    f"No fallback_model configured."
+                )
             ctx.log_message(f"Primary failed after {max_retries} retries: {last_error} — trying fallback")
             try:
                 response_text = _call_llm(fallback_provider, fallback_endpoint, api_key, fallback_model, prompt, "", temperature, max_tokens)
