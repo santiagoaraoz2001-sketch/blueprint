@@ -68,3 +68,10 @@ config:
     default: "always"
     options: ["always", "on_failure", "on_success"]
     description: "Conditionally send — checks trigger data for status/gate_passed/error fields"
+  timeout:
+    type: integer
+    label: Timeout (seconds)
+    default: 30
+    min: 10
+    max: 300
+    description: "Maximum time for webhook or desktop notification delivery"

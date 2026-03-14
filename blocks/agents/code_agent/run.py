@@ -5,10 +5,17 @@ Uses connected LLM Inference block for all model calls via shared utilities.
 
 import json
 import os
+import platform
 import subprocess
 import tempfile
 import time
 
+try:
+    import resource as _resource
+except ImportError:
+    _resource = None  # unavailable on Windows
+
+from backend.block_sdk.exceptions import BlockTimeoutError
 from blocks.inference._inference_utils import call_inference
 
 
@@ -31,7 +38,7 @@ def run(ctx):
     # ── Config ──────────────────────────────────────────────────────────
     language = ctx.config.get("language", "python")
     execute = ctx.config.get("execute", False)
-    timeout = int(ctx.config.get("timeout", 30))
+    timeout = int(ctx.config.get("timeout", 60))
     max_iterations = int(ctx.config.get("max_iterations", 1))
     system_prompt = ctx.config.get("system_prompt", "")
 
@@ -320,8 +327,23 @@ def _demo_code(task, language):
     return f"// Solution for: {task}\n// Language: {language}\n"
 
 
-def _execute_code(code, language, timeout):
-    """Execute generated code in a subprocess."""
+def _make_preexec(memory_limit_mb):
+    """Return a preexec_fn that sets memory limits on Unix systems."""
+    if _resource is None or memory_limit_mb <= 0:
+        return None
+
+    def _set_limits():
+        limit_bytes = memory_limit_mb * 1024 * 1024
+        try:
+            _resource.setrlimit(_resource.RLIMIT_AS, (limit_bytes, limit_bytes))
+        except (ValueError, OSError):
+            pass  # best-effort
+
+    return _set_limits
+
+
+def _execute_code(code, language, timeout, memory_limit_mb=512):
+    """Execute generated code in a subprocess with timeout and memory limits."""
     runner = LANG_RUNNERS.get(language)
     if not runner:
         return {"error": f"No runner for {language}", "returncode": 1}
@@ -339,6 +361,7 @@ def _execute_code(code, language, timeout):
             capture_output=True,
             text=True,
             timeout=timeout,
+            preexec_fn=_make_preexec(memory_limit_mb),
         )
         return {
             "stdout": result.stdout,
@@ -346,9 +369,11 @@ def _execute_code(code, language, timeout):
             "returncode": result.returncode,
         }
     except subprocess.TimeoutExpired:
-        return {"error": "timeout", "timeout": timeout, "returncode": 1}
+        raise BlockTimeoutError(timeout, f"Code execution timed out after {timeout}s")
     except FileNotFoundError:
         return {"error": f"Runtime not found: {runner[0]}", "returncode": 1}
+    except BlockTimeoutError:
+        raise
     except Exception as e:
         return {"error": str(e), "returncode": 1}
     finally:
