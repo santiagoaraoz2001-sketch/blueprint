@@ -8,6 +8,15 @@ export type FontSizeScale = 'compact' | 'default' | 'comfortable' | 'large'
 export type AccentColor = 'cyan' | 'orange' | 'green' | 'blue' | 'purple' | 'pink'
 export type UiMode = 'simple' | 'professional'
 
+export interface PanelLayoutEntry {
+  panelId: string
+  order: number
+  width: number   // grid units
+  height: number  // grid units
+  visible: boolean
+  config: Record<string, unknown>
+}
+
 export const FONT_SIZE_SCALES: Record<FontSizeScale, number> = {
   compact: 0.85,
   default: 1.0,
@@ -59,6 +68,9 @@ interface SettingsState {
   hardware: HardwareCapabilities | null
   hardwareLoading: boolean
 
+  // Plugin panel layouts
+  panelLayouts: Record<string, PanelLayoutEntry>
+
   // UI mode
   uiMode: UiMode
   hasSeenWelcome: boolean
@@ -79,6 +91,9 @@ interface SettingsState {
   setApiKey: (provider: string, key: string) => void
   getApiKey: (provider: string) => string
   fetchHardware: () => Promise<void>
+
+  setPanelLayout: (panelId: string, entry: Partial<PanelLayoutEntry>) => void
+  removePanelLayout: (panelId: string) => void
 
   setUiMode: (mode: UiMode) => void
   setHasSeenWelcome: (seen: boolean) => void
@@ -102,6 +117,8 @@ export const useSettingsStore = create<SettingsState>()(
       apiKeys: {} as Record<string, string>,
       hardware: null,
       hardwareLoading: false,
+
+      panelLayouts: {} as Record<string, PanelLayoutEntry>,
 
       uiMode: 'simple' as UiMode,
       hasSeenWelcome: false,
@@ -135,6 +152,17 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
 
+      setPanelLayout: (panelId, entry) => {
+        const layouts = { ...get().panelLayouts }
+        layouts[panelId] = { ...layouts[panelId], ...entry } as PanelLayoutEntry
+        set({ panelLayouts: layouts })
+      },
+      removePanelLayout: (panelId) => {
+        const layouts = { ...get().panelLayouts }
+        delete layouts[panelId]
+        set({ panelLayouts: layouts })
+      },
+
       setUiMode: (uiMode) => set({ uiMode }),
       setHasSeenWelcome: (hasSeenWelcome) => set({ hasSeenWelcome }),
 
@@ -155,6 +183,7 @@ export const useSettingsStore = create<SettingsState>()(
         demoMode: state.demoMode,
         autoSaveInterval: state.autoSaveInterval,
         apiKeys: state.apiKeys,
+        panelLayouts: state.panelLayouts,
         uiMode: state.uiMode,
         hasSeenWelcome: state.hasSeenWelcome,
         audioAlertsEnabled: state.audioAlertsEnabled,
@@ -182,6 +211,7 @@ export const useSettingsStore = create<SettingsState>()(
             demoMode: load<boolean>('demoMode', false),
             autoSaveInterval: load<number>('autoSaveInterval', 5000),
             apiKeys: load<Record<string, string>>('apiKeys', {}),
+            panelLayouts: load<Record<string, PanelLayoutEntry>>('panelLayouts', {}),
             uiMode: 'simple' as UiMode,
             hasSeenWelcome: false,
             audioAlertsEnabled: load<boolean>('audioAlertsEnabled', false),
@@ -194,6 +224,7 @@ export const useSettingsStore = create<SettingsState>()(
         if (version === 1) {
           return {
             ...(persisted as Record<string, unknown>),
+            panelLayouts: {},
             uiMode: 'simple' as UiMode,
             hasSeenWelcome: false,
           }

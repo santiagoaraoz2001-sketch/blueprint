@@ -63,6 +63,12 @@ def _persist_enabled_flag(plugin, enabled: bool):
         )
 
 
+@router.get("/panels")
+def list_panels():
+    """Return all panels registered by loaded plugins."""
+    return {"panels": plugin_registry.get_panels()}
+
+
 @router.get("/")
 def list_plugins():
     return {"plugins": plugin_registry.list_plugins()}
