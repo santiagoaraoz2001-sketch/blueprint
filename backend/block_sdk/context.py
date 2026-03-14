@@ -150,6 +150,286 @@ class BlockContext:
     def get_data_fingerprints(self) -> dict[str, dict]:
         return self._data_fingerprints
 
+    # ── resolve_* helpers ─────────────────────────────────────────────
+    # Normalize upstream outputs into the format the downstream block
+    # expects, regardless of how the upstream block saved the data.
+
+    # Well-known filenames tried (in order) when a directory is given.
+    _DIR_DATA_CANDIDATES = (
+        "data.json", "data.jsonl", "dataset.json",
+        "output.json", "results.json",
+    )
+    # Extensions considered data files when scanning a directory.
+    _DIR_SCAN_EXTENSIONS = (".json", ".jsonl", ".csv", ".txt")
+
+    def _resolve_dir_to_file(self, dir_path: str, name: str) -> str:
+        """Find the best data file inside *dir_path*.
+
+        Tries well-known names first, then falls back to the first file
+        whose extension looks like data.  Raises FileNotFoundError if
+        the directory contains nothing usable.
+        """
+        for candidate in self._DIR_DATA_CANDIDATES:
+            p = os.path.join(dir_path, candidate)
+            if os.path.isfile(p):
+                return p
+        try:
+            entries = sorted(os.listdir(dir_path))
+        except OSError as exc:
+            raise FileNotFoundError(
+                f"Input '{name}' directory ({dir_path}) is not readable: {exc}"
+            ) from exc
+        for entry in entries:
+            if entry.endswith(self._DIR_SCAN_EXTENSIONS):
+                return os.path.join(dir_path, entry)
+        raise FileNotFoundError(
+            f"Input '{name}' is a directory ({dir_path}) but contains no data files"
+        )
+
+    @staticmethod
+    def _safe_filename(name: str) -> str:
+        """Sanitize a port name for use in a temp filename."""
+        # Strip path components and restrict to safe characters
+        base = os.path.basename(name)
+        return "".join(c if (c.isalnum() or c in "_-") else "_" for c in base) or "input"
+
+    def _load_file_as_data(self, path: str) -> list:
+        """Load a single file into a list of records."""
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            if path.endswith(".jsonl"):
+                rows = []
+                for lineno, line in enumerate(f, 1):
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    try:
+                        rows.append(json.loads(stripped))
+                    except json.JSONDecodeError:
+                        # Skip malformed lines rather than crashing the
+                        # entire pipeline — log if possible.
+                        rows.append({"_raw": stripped, "_parse_error": f"line {lineno}"})
+                return rows
+            elif path.endswith(".json"):
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
+                if isinstance(data, dict):
+                    return [data]
+                return [{"value": data}]
+            elif path.endswith(".csv"):
+                import csv
+                return list(csv.DictReader(f))
+            else:
+                # Plain text — one record per non-empty line
+                lines = f.read().strip().splitlines()
+                return [{"text": line} for line in lines if line.strip()]
+
+    def resolve_as_file_path(self, name: str) -> str:
+        """Resolve an input to a file path, regardless of upstream format.
+
+        - File path string → return as-is
+        - Directory path → return path to first data file inside it
+        - Dict/list → serialize to a temp JSON file and return path
+        - Raw string → write to a temp .txt file and return path
+        """
+        value = self.load_input(name)
+
+        if value is None:
+            raise ValueError(f"Input '{name}' is None")
+
+        safe = self._safe_filename(name)
+
+        if isinstance(value, str):
+            if os.path.isfile(value):
+                return value
+            if os.path.isdir(value):
+                return self._resolve_dir_to_file(value, name)
+            # Raw string — write to temp file
+            tmp_path = os.path.join(self.run_dir, f"_resolved_{safe}.txt")
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                f.write(value)
+            return tmp_path
+
+        if isinstance(value, (dict, list)):
+            tmp_path = os.path.join(self.run_dir, f"_resolved_{safe}.json")
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(value, f, indent=2, default=str)
+            return tmp_path
+
+        # Fallback: convert to string and write
+        tmp_path = os.path.join(self.run_dir, f"_resolved_{safe}.txt")
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(str(value))
+        return tmp_path
+
+    def resolve_as_data(self, name: str) -> list[dict] | list:
+        """Resolve an input to in-memory data (list of dicts), regardless of format.
+
+        - File path to JSON/JSONL/CSV → load and return
+        - Directory → find best data file inside and load it
+        - List → return as-is
+        - Dict → return [dict]
+        - Raw string → return [{"text": string}]
+        """
+        value = self.load_input(name)
+
+        if value is None:
+            return []
+
+        if isinstance(value, list):
+            return value
+
+        if isinstance(value, dict):
+            return [value]
+
+        if isinstance(value, str):
+            # Resolve directory to its best data file
+            path = value
+            if os.path.isdir(path):
+                try:
+                    path = self._resolve_dir_to_file(path, name)
+                except FileNotFoundError:
+                    return [{"text": value}]
+
+            if os.path.isfile(path):
+                return self._load_file_as_data(path)
+
+            # Not a file path — treat as raw text
+            return [{"text": value}]
+
+        return [{"value": str(value)}]
+
+    def resolve_as_text(self, name: str) -> str:
+        """Resolve an input to a plain text string, regardless of format.
+
+        - File path → read file contents
+        - Directory → find best data file inside and read it
+        - Dict/list → JSON serialize
+        - Raw string → return as-is
+        """
+        value = self.load_input(name)
+
+        if value is None:
+            return ""
+
+        if isinstance(value, str):
+            if os.path.isfile(value):
+                with open(value, "r", encoding="utf-8", errors="replace") as f:
+                    return f.read()
+            if os.path.isdir(value):
+                try:
+                    resolved = self._resolve_dir_to_file(value, name)
+                    with open(resolved, "r", encoding="utf-8", errors="replace") as f:
+                        return f.read()
+                except FileNotFoundError:
+                    pass
+            return value
+
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, indent=2, default=str)
+
+        return str(value)
+
+    def resolve_as_dict(self, name: str) -> dict:
+        """Resolve an input to a dict, regardless of format.
+
+        - Dict → return as-is
+        - File path to JSON → load and return
+        - Directory → find best data file inside and load it
+        - String → try JSON parse, else return {"value": string}
+        - List → return {"items": list}
+        """
+        value = self.load_input(name)
+
+        if value is None:
+            return {}
+
+        if isinstance(value, dict):
+            return value
+
+        if isinstance(value, str):
+            # Resolve directory to its best data file
+            path = value
+            if os.path.isdir(path):
+                try:
+                    path = self._resolve_dir_to_file(path, name)
+                except FileNotFoundError:
+                    return {"value": value}
+            if os.path.isfile(path):
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    data = json.load(f)
+                    return data if isinstance(data, dict) else {"data": data}
+            # Not a file — try JSON parse
+            try:
+                data = json.loads(value)
+                return data if isinstance(data, dict) else {"data": data}
+            except (json.JSONDecodeError, ValueError):
+                return {"value": value}
+
+        if isinstance(value, list):
+            return {"items": value}
+
+        return {"value": str(value)}
+
+    def resolve_model_info(self, name: str = "model") -> dict:
+        """Resolve a model input to a standardized model info dict.
+
+        Returns a dict with normalized keys: model_name, model_id, source,
+        backend, and any extra keys from the upstream output.
+
+        Handles dicts, model-name strings, HuggingFace IDs, local directory
+        paths, and file paths to JSON model-info files.
+        """
+        value = self.load_input(name)
+
+        if value is None:
+            return {}
+
+        # If it's a file path pointing to a JSON model-info file, load it
+        if isinstance(value, str) and os.path.isfile(value) and value.endswith(".json"):
+            try:
+                with open(value, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    value = loaded
+                # If the JSON isn't a dict, fall through to string handling
+            except (json.JSONDecodeError, OSError):
+                pass  # Fall through to string handling
+
+        if isinstance(value, dict):
+            result = dict(value)
+            if "model_name" not in result:
+                result["model_name"] = result.get("model_id", result.get("name", ""))
+            if "model_id" not in result:
+                result["model_id"] = result.get("model_name", "")
+            if "source" not in result:
+                result["source"] = result.get("backend", result.get("provider", "auto"))
+            if "backend" not in result:
+                result["backend"] = result.get("source", "auto")
+            return result
+
+        if isinstance(value, str):
+            if os.path.isdir(value):
+                return {
+                    "model_name": os.path.basename(value.rstrip("/")),
+                    "model_id": value,
+                    "source": "local_path",
+                    "backend": "local_path",
+                    "path": value,
+                }
+            # Infer source from string format
+            source = "ollama"  # default for plain model names
+            if "/" in value and not value.startswith("/"):
+                source = "huggingface"
+            return {
+                "model_name": value,
+                "model_id": value,
+                "source": source,
+                "backend": source,
+            }
+
+        return {}
+
 
 class CompositeBlockContext(BlockContext):
     """Extended context for composite blocks with sub-pipeline support.
