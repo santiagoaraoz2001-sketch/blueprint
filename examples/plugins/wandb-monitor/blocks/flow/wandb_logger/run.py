@@ -1,12 +1,38 @@
-"""W&B Logger — initialize a Weights & Biases run and pass through pipeline data."""
+"""W&B Logger — initialize a Weights & Biases run and pass through pipeline data.
+
+This block authenticates with Weights & Biases, creates a new run, and leaves it
+active so downstream blocks (e.g. training loops) can stream metrics to it via
+the global ``wandb.log()`` API.  Trigger data is forwarded unchanged on the
+passthrough output to allow inline placement in any pipeline.
+
+Thread safety
+-------------
+wandb uses global process state for login credentials and the active run.
+A module-level lock serializes the login → init sequence so concurrent
+pipeline executions sharing the same server process cannot race.
+"""
 
 import json
 import os
+import threading
 from datetime import datetime, timezone
+
+# wandb uses global process state (active run, login credentials).
+# Serialize the login → init sequence so concurrent pipeline executions
+# sharing the same server process do not race each other.
+_wandb_lock = threading.Lock()
 
 
 def _resolve_input(raw):
-    """Resolve an input value that might be a file path or directory to a Python object."""
+    """Resolve an input value that might be a file path or directory to a Python object.
+
+    Handles four cases in order:
+    1. ``None`` → ``None``
+    2. File path → JSON-parsed contents (fallback: raw string)
+    3. Directory → ``data.json`` inside it
+    4. JSON string → parsed object
+    5. Anything else → returned as-is
+    """
     if raw is None:
         return None
     if isinstance(raw, str):
@@ -29,10 +55,11 @@ def _resolve_input(raw):
 
 
 def _extract_loggable_metrics(data):
-    """Extract numeric key-value pairs from data for W&B logging.
+    """Extract numeric key-value pairs from *data* for W&B logging.
 
-    Walks one level of nesting so that {"eval": {"loss": 0.5}} produces
-    {"eval.loss": 0.5}.
+    Walks one level of nesting so that ``{"eval": {"loss": 0.5}}`` produces
+    ``{"eval.loss": 0.5}``.  Booleans are excluded because ``bool`` is a
+    subclass of ``int`` in Python and would silently coerce to ``0``/``1``.
     """
     metrics = {}
     if not isinstance(data, dict):
@@ -77,40 +104,60 @@ def run(ctx):
 
     ctx.log_message(f"W&B Logger starting (project={project}, entity={entity or 'personal'})")
 
-    # ---- Step 2: Authenticate ----
+    # ---- Step 2: Authenticate and initialize ----
     ctx.report_progress(2, 5)
+
+    # Hold the lock for the entire login → init sequence.  wandb stores
+    # credentials and the "current run" as module-level globals, so two
+    # threads calling login()/init() concurrently can corrupt each other.
+    with _wandb_lock:
+        try:
+            wandb.login(key=api_key, relogin=True)
+        except Exception as e:
+            from backend.block_sdk.exceptions import BlockConfigError
+            raise BlockConfigError(
+                "api_key",
+                f"W&B authentication failed: {e}",
+                details="Verify your API key at https://wandb.ai/authorize",
+            )
+
+        # ---- Step 3: Initialize W&B run ----
+        ctx.report_progress(3, 5)
+        wandb_settings = wandb.Settings(
+            _disable_stats=not log_system_metrics,
+            console="off",
+        )
+
+        try:
+            wb_run = wandb.init(
+                project=project,
+                entity=entity,
+                name=run_name,
+                config={"source": "blueprint", "pipeline": ctx.project_name or "unknown"},
+                settings=wandb_settings,
+            )
+        except Exception as e:
+            from backend.block_sdk.exceptions import BlockExecutionError
+            raise BlockExecutionError(
+                f"Failed to initialize W&B run: {e}",
+                details="Check network connectivity and project permissions.",
+            )
+
+    # Validate that init actually returned a run object.  In rare edge
+    # cases (e.g. disabled mode misconfiguration) wandb.init can return None.
+    if wb_run is None:
+        from backend.block_sdk.exceptions import BlockExecutionError
+        raise BlockExecutionError(
+            "wandb.init() returned None — run creation failed silently",
+            details="This can happen in certain W&B modes. Check your wandb configuration.",
+        )
+
+    # Resolve run URL with backward compatibility for older wandb versions.
     try:
-        wandb.login(key=api_key, relogin=True)
-    except Exception as e:
-        from backend.block_sdk.exceptions import BlockConfigError
-        raise BlockConfigError(
-            "api_key",
-            f"W&B authentication failed: {e}",
-            details="Verify your API key at https://wandb.ai/authorize",
-        )
+        run_url = wb_run.get_url()
+    except AttributeError:
+        run_url = getattr(wb_run, "url", "") or ""
 
-    # ---- Step 3: Initialize W&B run ----
-    ctx.report_progress(3, 5)
-    wandb_settings = wandb.Settings(
-        _disable_stats=not log_system_metrics,
-        console="off",
-    )
-
-    try:
-        wb_run = wandb.init(
-            project=project,
-            entity=entity,
-            name=run_name,
-            config={"source": "blueprint", "pipeline": ctx.project_name or "unknown"},
-            settings=wandb_settings,
-        )
-    except Exception as e:
-        raise RuntimeError(
-            f"Failed to initialize W&B run: {e}. "
-            f"Check network connectivity and project permissions."
-        )
-
-    run_url = wb_run.url or ""
     ctx.log_message(f"W&B run initialized: {run_url}")
 
     # ---- Step 4: Load and pass through input data ----
@@ -124,18 +171,23 @@ def run(ctx):
     except (ValueError, KeyError):
         ctx.log_message("No trigger input connected — pass-through skipped")
 
-    # Log any numeric metrics found in the input data to W&B
+    # Log any numeric metrics found in the input data to W&B.
     if data is not None:
         loggable = _extract_loggable_metrics(data)
         if loggable:
-            wandb.log(loggable)
-            ctx.log_message(f"Logged {len(loggable)} initial metric(s) to W&B")
+            try:
+                wandb.log(loggable)
+                ctx.log_message(f"Logged {len(loggable)} initial metric(s) to W&B")
+            except Exception as e:
+                # Network hiccup during logging should not kill the block;
+                # the W&B run is still usable for downstream blocks.
+                ctx.log_message(f"Warning: failed to log initial metrics to W&B: {e}")
 
     # ---- Step 5: Save outputs and artifact ----
     ctx.report_progress(5, 5)
     ctx.save_output("wandb_run_url", run_url)
 
-    # Persist run status for auditability
+    # Persist run metadata for auditability
     status_record = {
         "wandb_run_url": run_url,
         "wandb_run_id": wb_run.id,
@@ -153,4 +205,4 @@ def run(ctx):
     ctx.save_artifact("wandb_run_status", status_path)
     ctx.log_metric("wandb_run_active", 1.0)
 
-    ctx.log_message("W&B Logger complete — downstream blocks will log to the active run.")
+    ctx.log_message("W&B Logger complete — downstream blocks can log to the active run.")
