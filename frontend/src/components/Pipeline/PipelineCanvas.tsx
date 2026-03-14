@@ -255,7 +255,7 @@ export default function PipelineCanvas() {
       const newDef = getBlockDefinition(newBlockType)
       if (newestNode && newDef) {
         // Find best input port match
-        const targetPort = newDef.inputs.find((i) => i.dataType === paletteParams.sourceType || i.dataType === 'data')
+        const targetPort = newDef.inputs.find((i) => i.dataType === paletteParams.sourceType || i.dataType === 'any')
         if (targetPort) {
           state.onConnect({
             source: paletteParams.sourceNodeId,

@@ -18,7 +18,7 @@ export default function DatasetView() {
   const filtered = datasets.filter(
     (d) =>
       d.name.toLowerCase().includes(search.toLowerCase()) ||
-      d.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
+      (d.tags || []).some((t) => t.toLowerCase().includes(search.toLowerCase()))
   )
 
   const selected = datasets.find((d) => d.id === selectedId)

@@ -35,7 +35,7 @@ function formatValue(v: any): string {
   return String(v)
 }
 
-export default function SweepHeatmap({ sweepId }: SweepHeatmapProps) {
+export default function SweepHeatmap({ sweepId: _sweepId }: SweepHeatmapProps) {
   const results = useSweepStore((s) => s.results)
   const configs = useSweepStore((s) => s.configs)
   const progress = useSweepStore((s) => s.progress)

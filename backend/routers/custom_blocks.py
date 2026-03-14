@@ -5,6 +5,7 @@ Manages user-created blocks stored in ~/.specific-labs/custom_blocks/{type_id}/.
 Each custom block has a block.yaml and run.py file.
 """
 
+import os
 import re
 import yaml
 import shutil
@@ -257,36 +258,49 @@ def test_custom_block(type_id: str, payload: dict | None = None):
         raise HTTPException(404, f"Custom block '{type_id}' not found or has no run.py")
 
     # Run in a subprocess with a timeout for safety
-    test_script = f"""
-import sys, json
-sys.path.insert(0, '{block_dir.parent.parent}')
+    # Pass paths and payload via environment/stdin to avoid injection
+    import json as _json
+    test_script = """\
+import sys, os, json
+sys.path.insert(0, os.environ["_BLUEPRINT_ROOT"])
 from backend.block_sdk.context import BlockContext
 import importlib.util
 
-spec = importlib.util.spec_from_file_location("test_block", "{run_py}")
+spec = importlib.util.spec_from_file_location("test_block", os.environ["_BLUEPRINT_RUN_PY"])
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 
-config = {payload.get('config', {}) if payload else {}}
-inputs = {payload.get('inputs', {}) if payload else {}}
+payload = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
+config = payload.get('config', {})
+inputs = payload.get('inputs', {})
 
 ctx = BlockContext(
     run_dir="/tmp/blueprint_test",
-    block_dir="{block_dir}",
+    block_dir=os.environ["_BLUEPRINT_BLOCK_DIR"],
     config=config,
     inputs=inputs,
 )
 mod.run(ctx)
-print(json.dumps({{"outputs": ctx.get_outputs(), "success": True}}))
+print(json.dumps({"outputs": ctx.get_outputs(), "success": True}))
 """
+    env = {
+        **os.environ,
+        "_BLUEPRINT_ROOT": str(block_dir.parent.parent),
+        "_BLUEPRINT_RUN_PY": str(run_py),
+        "_BLUEPRINT_BLOCK_DIR": str(block_dir),
+    }
+    stdin_data = _json.dumps(payload or {})
     try:
         result = subprocess.run(
             [sys.executable, "-c", test_script],
-            capture_output=True, text=True, timeout=30,
+            input=stdin_data,
+            capture_output=True, text=True, timeout=30, env=env,
         )
         if result.returncode == 0:
-            import json
-            return json.loads(result.stdout.strip().split("\n")[-1])
+            try:
+                return _json.loads(result.stdout.strip().split("\n")[-1])
+            except (ValueError, IndexError):
+                return {"success": False, "error": "Block produced invalid output"}
         else:
             return {"success": False, "error": result.stderr or "Block execution failed"}
     except subprocess.TimeoutExpired:

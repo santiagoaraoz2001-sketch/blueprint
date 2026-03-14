@@ -17,16 +17,11 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
   const runStatus = useRunStore((s) => s.status)
   const activeRunId = useRunStore((s) => s.activeRunId)
   const nodeStatuses = useRunStore((s) => s.nodeStatuses)
-  const nodeOutputs = useRunStore((s) => s.nodeOutputs)
-
   if (!visible) return null
 
   const isRunComplete = runStatus === 'complete' || runStatus === 'failed'
   const nodeRunStatus = nodeStatuses[nodeId]
   const nodeHasOutput = nodeRunStatus?.status === 'complete' || nodeRunStatus?.status === 'cached'
-  const nodeIsFailed = nodeRunStatus?.status === 'failed'
-  const nodeHasOutputData = !!nodeOutputs[nodeId] && Object.keys(nodeOutputs[nodeId]).length > 0
-
   // A node can be re-run from if:
   // 1. A run is complete (or failed)
   // 2. The node itself didn't fail (all upstream must have succeeded)

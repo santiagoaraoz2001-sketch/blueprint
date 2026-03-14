@@ -12,7 +12,7 @@ inputs:
     description: Model to evaluate (HF, Ollama, or MLX)
   - id: dataset
     label: Test Data
-    data_type: data
+    data_type: dataset
     required: true
     description: JSON dataset with input/target fields
 
@@ -28,7 +28,7 @@ outputs:
 
   - id: dataset
     label: Predictions
-    data_type: data
+    data_type: dataset
     description: "Per-sample predictions: input, target, prediction, score, correct"
 
 config:

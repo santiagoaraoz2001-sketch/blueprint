@@ -293,19 +293,23 @@ export const useRunStore = create<RunState>((set, get) => ({
         })
         break
 
-      case 'node_progress':
+      case 'node_progress': {
+        const nodeId = data.node_id || ''
+        const existing = state.nodeStatuses[nodeId]
         set({
           overallProgress: data.overall || state.overallProgress,
           eta: data.eta ?? state.eta,
           nodeStatuses: {
             ...state.nodeStatuses,
-            [data.node_id || '']: {
-              ...state.nodeStatuses[data.node_id || ''],
+            [nodeId]: {
+              nodeId,
+              status: existing?.status || 'running',
               progress: data.progress || 0,
             },
           },
         })
         break
+      }
 
       case 'node_completed':
         set({
@@ -378,6 +382,16 @@ export const useRunStore = create<RunState>((set, get) => ({
           _elapsedTimer: null,
         })
         playSound('error')
+        break
+
+      case 'run_cancelled':
+        _clearElapsedTimer(get)
+        set({
+          activeRunId: data.run_id,
+          status: 'cancelled',
+          error: 'Run cancelled',
+          _elapsedTimer: null,
+        })
         break
     }
   },

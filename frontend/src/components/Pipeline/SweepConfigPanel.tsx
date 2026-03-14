@@ -22,7 +22,7 @@ interface SweepConfigPanelProps {
 
 export default function SweepConfigPanel({ nodeId, onClose }: SweepConfigPanelProps) {
   const nodes = usePipelineStore((s) => s.nodes)
-  const pipelineId = usePipelineStore((s) => s.activePipelineId)
+  const pipelineId = usePipelineStore((s) => s.id)
   const node = nodes.find((n) => n.id === nodeId)
   const createSweep = useSweepStore((s) => s.createSweep)
   const startSweep = useSweepStore((s) => s.startSweep)
@@ -38,9 +38,9 @@ export default function SweepConfigPanel({ nodeId, onClose }: SweepConfigPanelPr
   // Get config fields from block definition
   const blockDef = node ? getBlockDefinition(node.data.type) : null
   const configFields = useMemo(() => {
-    if (!blockDef?.config) return []
-    return blockDef.config.filter(
-      (f) => f.type === 'number' || f.type === 'float' || f.type === 'select' || f.type === 'text'
+    if (!blockDef?.configFields) return []
+    return blockDef.configFields.filter(
+      (f: { type: string }) => f.type === 'integer' || f.type === 'float' || f.type === 'select' || f.type === 'string'
     )
   }, [blockDef])
 
@@ -251,7 +251,7 @@ export default function SweepConfigPanel({ nodeId, onClose }: SweepConfigPanelPr
                   style={{ ...s.input, flex: 1 }}
                 >
                   <option value="">Select param...</option>
-                  {configFields.map((f) => (
+                  {configFields.map((f: { name: string; label?: string }) => (
                     <option key={f.name} value={f.name}>
                       {f.label || f.name}
                     </option>
