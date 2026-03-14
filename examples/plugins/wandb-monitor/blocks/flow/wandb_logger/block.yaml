@@ -1,0 +1,49 @@
+name: W&B Logger
+type: wandb_logger
+category: flow
+description: Initialize a Weights & Biases run and stream pipeline metrics in real-time
+version: "1.0.0"
+maturity: stable
+tags: [monitoring, wandb, logging]
+
+inputs:
+  - id: trigger
+    label: Pipeline Data
+    data_type: any
+    required: false
+
+outputs:
+  - id: passthrough
+    label: Pass-Through
+    data_type: any
+    description: "Trigger data forwarded unchanged — enables inline pipeline usage"
+  - id: wandb_run_url
+    label: W&B Run URL
+    data_type: text
+    description: "URL of the W&B run dashboard for this pipeline execution"
+
+config:
+  api_key:
+    type: string
+    label: W&B API Key
+    description: "Your Weights & Biases API key (or use $secret:wandb_api_key)"
+  project:
+    type: string
+    label: Project Name
+    default: "blueprint"
+    description: "W&B project to log runs under"
+  entity:
+    type: string
+    label: Entity/Team
+    default: ""
+    description: "W&B team or username (leave empty for personal account)"
+  run_name:
+    type: string
+    label: Run Name
+    default: ""
+    description: "Leave empty to auto-generate from pipeline name"
+  log_system_metrics:
+    type: boolean
+    label: Log System Metrics
+    default: true
+    description: "Log CPU, memory, and GPU utilization to W&B"
