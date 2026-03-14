@@ -3,6 +3,7 @@ import ErrorBoundary from '@/components/shared/ErrorBoundary'
 import AppShell from '@/components/Layout/AppShell'
 import CommandPalette from '@/components/shared/CommandPalette'
 import StartScreen from '@/components/Layout/StartScreen'
+import WelcomeModal from '@/components/Layout/WelcomeModal'
 import SplashScreen from '@/components/Layout/SplashScreen'
 import { useUIStore } from '@/stores/uiStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -135,6 +136,7 @@ export default function App() {
       </AppShell>
       <CommandPalette />
       <StartScreen />
+      <WelcomeModal />
     </SplashScreen>
   )
 }

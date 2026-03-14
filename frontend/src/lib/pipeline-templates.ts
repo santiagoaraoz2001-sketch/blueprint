@@ -18,6 +18,22 @@ import type { Node, Edge } from '@xyflow/react'
 import type { BlockNodeData } from '@/stores/pipelineStore'
 import { LLM_DEFAULTS } from './llm-prompts'
 
+export type TemplateDifficulty = 'beginner' | 'intermediate' | 'advanced'
+
+export interface TemplateVariable {
+  id: string
+  label: string
+  description: string
+  type: 'text' | 'number' | 'select'
+  default: string | number
+  options?: string[]
+  required: boolean
+  bindings: Array<{
+    nodeId: string
+    configKey: string
+  }>
+}
+
 export interface PipelineTemplate {
   id: string
   name: string
@@ -27,6 +43,9 @@ export interface PipelineTemplate {
   blockCount: number
   nodes: Node<BlockNodeData>[]
   edges: Edge[]
+  difficulty?: TemplateDifficulty
+  estimatedTime?: string
+  variables?: TemplateVariable[]
 }
 
 // Helper to create a block node for templates
@@ -283,5 +302,345 @@ export const PIPELINE_TEMPLATES: PipelineTemplate[] = [
       ),
     ],
     edges: [],
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  //  QUICKSTART TEMPLATES — with variable binding
+  // ═══════════════════════════════════════════════════════════════
+
+  // ── QS1. Fine-Tune a LoRA ──────────────────────────────────
+  {
+    id: 'qs-finetune-lora',
+    name: 'Fine-Tune a LoRA',
+    description:
+      'Load a dataset, split it, fine-tune a model with LoRA, evaluate with LM Eval Harness, and format results.',
+    icon: 'Zap',
+    category: 'training',
+    blockCount: 6,
+    difficulty: 'beginner',
+    estimatedTime: '5 min',
+    variables: [
+      {
+        id: 'base_model',
+        label: 'Base Model',
+        description: 'HuggingFace model ID to fine-tune',
+        type: 'text',
+        default: 'meta-llama/Llama-2-7b-hf',
+        required: true,
+        bindings: [
+          { nodeId: 'qs1_3', configKey: 'model_name' },
+        ],
+      },
+      {
+        id: 'dataset_name',
+        label: 'Dataset Name',
+        description: 'HuggingFace dataset ID',
+        type: 'text',
+        default: 'tatsu-lab/alpaca',
+        required: true,
+        bindings: [
+          { nodeId: 'qs1_1', configKey: 'dataset_name' },
+        ],
+      },
+      {
+        id: 'learning_rate',
+        label: 'Learning Rate',
+        description: 'Training learning rate',
+        type: 'number',
+        default: 0.0001,
+        required: false,
+        bindings: [
+          { nodeId: 'qs1_4', configKey: 'lr' },
+        ],
+      },
+    ],
+    nodes: [
+      tNode('qs1_1', 'huggingface_loader', 'HuggingFace Loader', 'external', 'Download', TPL_ACCENT.external,
+        { x: 80, y: 200 }, { dataset_name: 'tatsu-lab/alpaca', split: 'train', max_samples: 5000 }),
+      tNode('qs1_2', 'train_val_test_split', 'Train/Val/Test Split', 'data', 'Split', TPL_ACCENT.data,
+        { x: 360, y: 200 }, { train_ratio: 0.8, val_ratio: 0.1, test_ratio: 0.1, seed: 42 }),
+      tNode('qs1_3', 'model_selector', 'Model Selector', 'model', 'Cpu', TPL_ACCENT.model,
+        { x: 640, y: 80 }, { model_name: 'meta-llama/Llama-2-7b-hf', source: 'huggingface' }),
+      tNode('qs1_4', 'lora_finetuning', 'LoRA Fine-Tuning', 'training', 'Zap', TPL_ACCENT.training,
+        { x: 640, y: 320 }, { r: 16, alpha: 32, lr: 0.0001, epochs: 3, batch_size: 4 }),
+      tNode('qs1_5', 'lm_eval_harness', 'LM Eval Harness', 'metrics', 'ClipboardCheck', TPL_ACCENT.metrics,
+        { x: 920, y: 200 }, { tasks: 'hellaswag,arc_easy', num_fewshot: 0, batch_size: 'auto' }),
+      tNode('qs1_6', 'results_formatter', 'Results Formatter', 'metrics', 'FileOutput', TPL_ACCENT.metrics,
+        { x: 1200, y: 200 }, { format: 'csv', include_config: true }),
+    ],
+    edges: [
+      tEdge('qs1_e1', 'qs1_1', 'qs1_2', 'dataset', 'dataset', '#22D3EE'),
+      tEdge('qs1_e2', 'qs1_2', 'qs1_4', 'train', 'dataset', '#22D3EE'),
+      tEdge('qs1_e3', 'qs1_3', 'qs1_4', 'model', 'model', '#A78BFA'),
+      tEdge('qs1_e4', 'qs1_4', 'qs1_5', 'model', 'model', '#A78BFA'),
+      tEdge('qs1_e5', 'qs1_5', 'qs1_6', 'metrics', 'metrics', '#34D399'),
+    ],
+  },
+
+  // ── QS2. Evaluate a Model ──────────────────────────────────
+  {
+    id: 'qs-evaluate-model',
+    name: 'Evaluate a Model',
+    description:
+      'Pick a model, run standard benchmarks, and format the results. The fastest way to evaluate any model.',
+    icon: 'ClipboardCheck',
+    category: 'metrics',
+    blockCount: 3,
+    difficulty: 'beginner',
+    estimatedTime: '2 min',
+    variables: [
+      {
+        id: 'model_name',
+        label: 'Model Name',
+        description: 'HuggingFace model ID or local path',
+        type: 'text',
+        default: '',
+        required: true,
+        bindings: [
+          { nodeId: 'qs2_1', configKey: 'model_name' },
+        ],
+      },
+      {
+        id: 'benchmark',
+        label: 'Benchmark',
+        description: 'Comma-separated eval tasks',
+        type: 'text',
+        default: 'hellaswag,arc_easy',
+        required: true,
+        bindings: [
+          { nodeId: 'qs2_2', configKey: 'tasks' },
+        ],
+      },
+    ],
+    nodes: [
+      tNode('qs2_1', 'model_selector', 'Model Selector', 'model', 'Cpu', TPL_ACCENT.model,
+        { x: 80, y: 200 }, { model_name: '', source: 'huggingface' }),
+      tNode('qs2_2', 'lm_eval_harness', 'LM Eval Harness', 'metrics', 'ClipboardCheck', TPL_ACCENT.metrics,
+        { x: 400, y: 200 }, { tasks: 'hellaswag,arc_easy', num_fewshot: 0, batch_size: 'auto' }),
+      tNode('qs2_3', 'results_formatter', 'Results Formatter', 'metrics', 'FileOutput', TPL_ACCENT.metrics,
+        { x: 720, y: 200 }, { format: 'csv', include_config: true }),
+    ],
+    edges: [
+      tEdge('qs2_e1', 'qs2_1', 'qs2_2', 'model', 'model', '#A78BFA'),
+      tEdge('qs2_e2', 'qs2_2', 'qs2_3', 'metrics', 'metrics', '#34D399'),
+    ],
+  },
+
+  // ── QS3. Build a RAG Pipeline ──────────────────────────────
+  {
+    id: 'qs-rag-pipeline',
+    name: 'Build a RAG Pipeline',
+    description:
+      'Ingest documents, chunk text, generate embeddings, build a vector store, select a chat model, and wire up retrieval-augmented generation.',
+    icon: 'Search',
+    category: 'agents',
+    blockCount: 6,
+    difficulty: 'intermediate',
+    estimatedTime: '10 min',
+    variables: [
+      {
+        id: 'document_path',
+        label: 'Document Path',
+        description: 'Local directory containing documents',
+        type: 'text',
+        default: '',
+        required: true,
+        bindings: [
+          { nodeId: 'qs3_1', configKey: 'file_path' },
+        ],
+      },
+      {
+        id: 'embedding_model',
+        label: 'Embedding Model',
+        description: 'Model for generating embeddings',
+        type: 'text',
+        default: 'sentence-transformers/all-MiniLM-L6-v2',
+        required: true,
+        bindings: [
+          { nodeId: 'qs3_3', configKey: 'model_name' },
+        ],
+      },
+      {
+        id: 'chat_model',
+        label: 'Chat Model',
+        description: 'LLM for answering queries',
+        type: 'text',
+        default: '',
+        required: true,
+        bindings: [
+          { nodeId: 'qs3_5', configKey: 'model_name' },
+        ],
+      },
+    ],
+    nodes: [
+      tNode('qs3_1', 'local_file_loader', 'Local File Loader', 'external', 'FileInput', TPL_ACCENT.external,
+        { x: 80, y: 200 }, { file_path: '', format: 'auto' }),
+      tNode('qs3_2', 'text_chunker', 'Text Chunker', 'data', 'Scissors', TPL_ACCENT.data,
+        { x: 360, y: 200 }, { chunk_size: 1000, chunk_overlap: 200, strategy: 'recursive' }),
+      tNode('qs3_3', 'embedding_generator', 'Embedding Generator', 'inference', 'Hash', TPL_ACCENT.inference,
+        { x: 640, y: 200 }, { model_name: 'sentence-transformers/all-MiniLM-L6-v2' }),
+      tNode('qs3_4', 'vector_store_build', 'Vector Store Builder', 'embedding', 'Database', TPL_ACCENT.embedding,
+        { x: 920, y: 200 }, { store_type: 'chroma', collection_name: 'blueprint_rag' }),
+      tNode('qs3_5', 'model_selector', 'Chat Model', 'model', 'Cpu', TPL_ACCENT.model,
+        { x: 920, y: 400 }, { model_name: '', source: 'ollama' }),
+      tNode('qs3_6', 'rag_pipeline', 'RAG Pipeline', 'agents', 'Search', TPL_ACCENT.agents,
+        { x: 1200, y: 300 }, { top_k: 5, max_tokens: 1024 }),
+    ],
+    edges: [
+      tEdge('qs3_e1', 'qs3_1', 'qs3_2', 'dataset', 'dataset', '#22D3EE'),
+      tEdge('qs3_e2', 'qs3_2', 'qs3_3', 'dataset', 'dataset', '#22D3EE'),
+      tEdge('qs3_e3', 'qs3_3', 'qs3_4', 'embedding', 'embedding', '#FB7185'),
+      tEdge('qs3_e4', 'qs3_4', 'qs3_6', 'config', 'config', '#F97316'),
+      tEdge('qs3_e5', 'qs3_5', 'qs3_6', 'model', 'model', '#A78BFA'),
+    ],
+  },
+
+  // ── QS4. Merge Two Models ──────────────────────────────────
+  {
+    id: 'qs-merge-models',
+    name: 'Merge Two Models',
+    description:
+      'Select two models, merge them with SLERP interpolation, evaluate the result, and format a comparison report.',
+    icon: 'GitMerge',
+    category: 'model',
+    blockCount: 5,
+    difficulty: 'intermediate',
+    estimatedTime: '15 min',
+    variables: [
+      {
+        id: 'model_a',
+        label: 'Model A',
+        description: 'First model to merge',
+        type: 'text',
+        default: '',
+        required: true,
+        bindings: [
+          { nodeId: 'qs4_1', configKey: 'model_name' },
+        ],
+      },
+      {
+        id: 'model_b',
+        label: 'Model B',
+        description: 'Second model to merge',
+        type: 'text',
+        default: '',
+        required: true,
+        bindings: [
+          { nodeId: 'qs4_2', configKey: 'model_name' },
+        ],
+      },
+      {
+        id: 'merge_ratio',
+        label: 'Merge Ratio',
+        description: 'Interpolation factor (0 = all A, 1 = all B)',
+        type: 'number',
+        default: 0.5,
+        required: false,
+        bindings: [
+          { nodeId: 'qs4_3', configKey: 't' },
+        ],
+      },
+    ],
+    nodes: [
+      tNode('qs4_1', 'model_selector', 'Model A', 'model', 'Cpu', TPL_ACCENT.model,
+        { x: 80, y: 100 }, { model_name: '', source: 'huggingface' }),
+      tNode('qs4_2', 'model_selector', 'Model B', 'model', 'Cpu', TPL_ACCENT.model,
+        { x: 80, y: 350 }, { model_name: '', source: 'huggingface' }),
+      tNode('qs4_3', 'slerp_merge', 'SLERP Merge', 'model', 'GitMerge', TPL_ACCENT.model,
+        { x: 400, y: 225 }, { t: 0.5, output_format: 'safetensors' }),
+      tNode('qs4_4', 'lm_eval_harness', 'LM Eval Harness', 'metrics', 'ClipboardCheck', TPL_ACCENT.metrics,
+        { x: 720, y: 225 }, { tasks: 'hellaswag,arc_easy', num_fewshot: 0, batch_size: 'auto' }),
+      tNode('qs4_5', 'results_formatter', 'Results Formatter', 'metrics', 'FileOutput', TPL_ACCENT.metrics,
+        { x: 1040, y: 225 }, { format: 'csv', include_config: true }),
+    ],
+    edges: [
+      tEdge('qs4_e1', 'qs4_1', 'qs4_3', 'model', 'model_a', '#A78BFA'),
+      tEdge('qs4_e2', 'qs4_2', 'qs4_3', 'model', 'model_b', '#A78BFA'),
+      tEdge('qs4_e3', 'qs4_3', 'qs4_4', 'model', 'model', '#A78BFA'),
+      tEdge('qs4_e4', 'qs4_4', 'qs4_5', 'metrics', 'metrics', '#34D399'),
+    ],
+  },
+
+  // ── QS5. Train, Evaluate & Publish ─────────────────────────
+  {
+    id: 'qs-train-eval-publish',
+    name: 'Train, Evaluate & Publish',
+    description:
+      'Full pipeline: load data, fine-tune with LoRA, evaluate, format results, and push the trained model to HuggingFace Hub.',
+    icon: 'Rocket',
+    category: 'training',
+    blockCount: 7,
+    difficulty: 'advanced',
+    estimatedTime: '30 min',
+    variables: [
+      {
+        id: 'dataset_name',
+        label: 'Dataset',
+        description: 'HuggingFace dataset ID',
+        type: 'text',
+        default: '',
+        required: true,
+        bindings: [
+          { nodeId: 'qs5_1', configKey: 'dataset_name' },
+        ],
+      },
+      {
+        id: 'base_model',
+        label: 'Base Model',
+        description: 'Model to fine-tune',
+        type: 'text',
+        default: '',
+        required: true,
+        bindings: [
+          { nodeId: 'qs5_3', configKey: 'model_name' },
+        ],
+      },
+      {
+        id: 'hf_token',
+        label: 'HF Token',
+        description: 'HuggingFace API token for pushing',
+        type: 'text',
+        default: '',
+        required: true,
+        bindings: [
+          { nodeId: 'qs5_7', configKey: 'token' },
+        ],
+      },
+      {
+        id: 'repo_id',
+        label: 'Repo ID',
+        description: 'HuggingFace repo to push to (e.g. username/model-name)',
+        type: 'text',
+        default: '',
+        required: true,
+        bindings: [
+          { nodeId: 'qs5_7', configKey: 'repo_id' },
+        ],
+      },
+    ],
+    nodes: [
+      tNode('qs5_1', 'huggingface_loader', 'HuggingFace Loader', 'external', 'Download', TPL_ACCENT.external,
+        { x: 80, y: 200 }, { dataset_name: '', split: 'train', max_samples: 10000 }),
+      tNode('qs5_2', 'train_val_test_split', 'Train/Val/Test Split', 'data', 'Split', TPL_ACCENT.data,
+        { x: 360, y: 200 }, { train_ratio: 0.8, val_ratio: 0.1, test_ratio: 0.1, seed: 42 }),
+      tNode('qs5_3', 'lora_finetuning', 'LoRA Fine-Tuning', 'training', 'Zap', TPL_ACCENT.training,
+        { x: 640, y: 200 }, { model_name: '', r: 16, alpha: 32, lr: 0.0001, epochs: 3, batch_size: 4 }),
+      tNode('qs5_4', 'lm_eval_harness', 'LM Eval Harness', 'metrics', 'ClipboardCheck', TPL_ACCENT.metrics,
+        { x: 920, y: 100 }, { tasks: 'hellaswag,arc_easy,mmlu', num_fewshot: 0, batch_size: 'auto' }),
+      tNode('qs5_5', 'results_formatter', 'Results Formatter', 'metrics', 'FileOutput', TPL_ACCENT.metrics,
+        { x: 1200, y: 100 }, { format: 'csv', include_config: true }),
+      tNode('qs5_6', 'save_model', 'Save Model', 'utilities', 'Save', TPL_ACCENT.utilities,
+        { x: 920, y: 350 }, { output_dir: './output/model' }),
+      tNode('qs5_7', 'hf_hub_push', 'Push to HF Hub', 'external', 'Upload', TPL_ACCENT.external,
+        { x: 1200, y: 350 }, { repo_id: '', token: '', private: false }),
+    ],
+    edges: [
+      tEdge('qs5_e1', 'qs5_1', 'qs5_2', 'dataset', 'dataset', '#22D3EE'),
+      tEdge('qs5_e2', 'qs5_2', 'qs5_3', 'train', 'dataset', '#22D3EE'),
+      tEdge('qs5_e3', 'qs5_3', 'qs5_4', 'model', 'model', '#A78BFA'),
+      tEdge('qs5_e4', 'qs5_4', 'qs5_5', 'metrics', 'metrics', '#34D399'),
+      tEdge('qs5_e5', 'qs5_3', 'qs5_6', 'model', 'model', '#A78BFA'),
+      tEdge('qs5_e6', 'qs5_6', 'qs5_7', 'artifact', 'artifact', '#38BDF8'),
+    ],
   },
 ]

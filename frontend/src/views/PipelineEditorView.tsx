@@ -13,8 +13,8 @@ import ValidationPanel from '@/components/Pipeline/ValidationPanel'
 import PipelineTabBar from '@/components/Pipeline/PipelineTabBar'
 import { validatePipelineClient, type DiagnosticReport } from '@/lib/pipeline-validator'
 import PipelineMonitor, { type MonitorBlock } from '@/components/Pipeline/PipelineMonitor'
-import { Save, Download, Upload, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2 } from 'lucide-react'
-import TemplateSelector from '@/components/Pipeline/TemplateSelector'
+import { Save, Download, Upload, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate } from 'lucide-react'
+import TemplateGallery from '@/components/Pipeline/TemplateGallery'
 import MissionController from '@/components/Mission/MissionController'
 import { useRunStore } from '@/stores/runStore'
 import toast from 'react-hot-toast'
@@ -336,6 +336,15 @@ export default function PipelineEditorView() {
           </button>
 
           <button
+            onClick={() => setShowTemplateSelector(true)}
+            style={btnStyle}
+            title="Pipeline Templates"
+          >
+            <LayoutTemplate size={10} />
+            TEMPLATES
+          </button>
+
+          <button
             onClick={tidyUp}
             style={btnStyle}
             title="Auto-Layout / Tidy Up Pipeline"
@@ -494,7 +503,7 @@ export default function PipelineEditorView() {
 
       {/* Template selector: show on button click */}
       {showTemplateSelector && (
-        <TemplateSelector onClose={() => setShowTemplateSelector(false)} />
+        <TemplateGallery onClose={() => setShowTemplateSelector(false)} />
       )}
 
       {/* Mission system */}

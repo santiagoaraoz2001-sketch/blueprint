@@ -9,6 +9,7 @@ import type { Node } from '@xyflow/react'
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/api/client'
 import RecommendedBlocks from './RecommendedBlocks'
+import { useIsSimpleMode } from '@/hooks/useIsSimpleMode'
 import toast from 'react-hot-toast'
 
 export default function BlockConfig() {
@@ -43,6 +44,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
   const nodes = usePipelineStore((s) => s.nodes)
   const def = getBlockDefinition(node.data.type)
   const IconComponent = getIcon(node.data.icon)
+  const isSimple = useIsSimpleMode()
 
   const handleConfigChange = (name: string, value: string | number | boolean | undefined | null) => {
     updateNodeConfig(node.id, { [name]: value })
@@ -272,7 +274,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
       )}
 
       {/* Task 5: Inheritance summary banner */}
-      {(() => {
+      {!isSimple && (() => {
         const inheritedCount = Object.keys(inheritedConfig).length
         const overriddenCount = displayFields?.filter(f => {
           const info = getFieldState(f.name, node.data.config[f.name], f.default)
@@ -340,6 +342,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
                 expectedOutputType={def?.outputs[0]?.dataType as ConnectorType | undefined}
                 fieldInfo={fieldInfo}
                 inherited={inherited}
+                hideInheritance={isSimple}
               />
             )
           })}
@@ -435,8 +438,9 @@ function ConfigFieldInput({
   onChange,
   onRevert,
   expectedOutputType,
-  fieldInfo,
-  inherited,
+  fieldInfo: rawFieldInfo,
+  inherited: rawInherited,
+  hideInheritance,
 }: {
   field: ConfigField
   value: ConfigValue
@@ -445,7 +449,14 @@ function ConfigFieldInput({
   expectedOutputType?: ConnectorType
   fieldInfo: FieldInfo
   inherited?: { value: any; sourceName: string; sourceId: string }
+  hideInheritance?: boolean
 }) {
+  // In simple mode, suppress inheritance visuals
+  const fieldInfo: FieldInfo = hideInheritance
+    ? { state: 'local', effectiveValue: rawFieldInfo.effectiveValue }
+    : rawFieldInfo
+  const inherited = hideInheritance ? undefined : rawInherited
+
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '8px 12px',
