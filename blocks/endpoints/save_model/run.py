@@ -4,25 +4,34 @@ import json
 import os
 import shutil
 
+from backend.block_sdk.exceptions import BlockInputError
+
 
 def _resolve_model_data(raw):
     """Resolve model input — could be a path, dict with path, or model object."""
     if isinstance(raw, str):
         if os.path.exists(raw):
             return {"path": raw, "type": "path"}
+        # Try parsing as JSON string
         try:
             parsed = json.loads(raw)
             if isinstance(parsed, dict):
                 return {"data": parsed, "type": "dict"}
         except (json.JSONDecodeError, ValueError):
             pass
+        # Could be a model ID or HuggingFace identifier
         return {"path": raw, "type": "path"}
     if isinstance(raw, dict):
-        if "model_path" in raw:
-            return {"path": raw["model_path"], "type": "path", "metadata": raw}
-        if "path" in raw:
-            return {"path": raw["path"], "type": "path", "metadata": raw}
+        # Check common path keys
+        for key in ["model_path", "path", "checkpoint_path", "weights_path", "output_path", "file_path"]:
+            if key in raw and isinstance(raw[key], str):
+                return {"path": raw[key], "type": "path", "metadata": raw}
         return {"data": raw, "type": "dict"}
+    if isinstance(raw, list):
+        # List of model info dicts — take the first one
+        if raw and isinstance(raw[0], dict):
+            return _resolve_model_data(raw[0])
+        return {"data": raw, "type": "unknown"}
     return {"data": raw, "type": "unknown"}
 
 
@@ -42,7 +51,10 @@ def run(ctx):
     ctx.report_progress(1, 4)
     raw_data = ctx.load_input("model")
     if raw_data is None:
-        raise ValueError("No model data provided. Connect a 'model' input.")
+        raise BlockInputError(
+            "No model data provided. Connect a 'model' input.",
+            recoverable=False,
+        )
 
     model_info = _resolve_model_data(raw_data)
     ctx.log_message(f"Model input type: {model_info['type']}")
@@ -55,7 +67,10 @@ def run(ctx):
         out_dir = os.path.join(ctx.run_dir, output_path, filename)
 
     if os.path.exists(out_dir) and not overwrite:
-        raise FileExistsError(f"Model directory already exists: {out_dir}. Enable 'Overwrite Existing'.")
+        raise BlockInputError(
+            f"Model directory already exists: {out_dir}. Enable 'Overwrite Existing'.",
+            recoverable=True,
+        )
 
     os.makedirs(out_dir, exist_ok=True)
 
@@ -95,6 +110,14 @@ def run(ctx):
             shutil.copy2(src_path, dst)
             saved_files.append(os.path.basename(src_path))
             ctx.log_message(f"Copied model file: {os.path.basename(src_path)}")
+
+    elif model_info["type"] == "path" and not os.path.exists(model_info["path"]):
+        # Path doesn't exist — log a warning and save what we know
+        ctx.log_message(f"WARNING: Model path not found: {model_info['path']}")
+        meta_path = os.path.join(out_dir, "model_info.json")
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump({"model_id": model_info["path"], "note": "Path not found on disk"}, f, indent=2)
+        saved_files.append("model_info.json")
 
     elif model_info["type"] == "dict":
         # Save model metadata/config as JSON
@@ -147,9 +170,9 @@ def run(ctx):
     # ---- Step 4: Finalize ----
     ctx.report_progress(4, 4)
     total_size = sum(
-        os.path.getsize(os.path.join(dp, f))
-        for dp, _, fns in os.walk(out_dir)
-        for f in fns
+        os.path.getsize(os.path.join(dp, fn))
+        for dp, _, fns in os.walk(out_dir, followlinks=False)
+        for fn in fns
     )
     ctx.log_message(f"Model saved to {out_dir} ({total_size:,} bytes, {len(saved_files)} files)")
 
@@ -160,7 +183,11 @@ def run(ctx):
         "format": fmt,
         "quantize": quantize,
     })
-    ctx.log_metric("total_size_bytes", float(total_size))
+    # Save artifact for the metadata file so it appears in the artifact registry
+    save_info_path = os.path.join(out_dir, "save_info.json")
+    if os.path.isfile(save_info_path):
+        ctx.save_artifact("model_save_info", save_info_path)
+    ctx.log_metric("file_size_bytes", float(total_size))
     ctx.log_metric("files_saved", float(len(saved_files)))
 
     ctx.log_message("Save Model complete.")

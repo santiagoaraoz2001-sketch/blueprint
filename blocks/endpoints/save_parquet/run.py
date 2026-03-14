@@ -1,25 +1,86 @@
 """Save Parquet — save pipeline data as a Parquet columnar file."""
 
+import csv as csv_mod
 import json
 import os
 
+from backend.block_sdk.exceptions import BlockDependencyError, BlockInputError
+
+
+def _read_jsonl(f):
+    """Read JSONL file with per-line error handling."""
+    records = []
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            records.append({"_raw_line": line, "_parse_error": True})
+    return records
+
 
 def _resolve_data(raw):
-    """Resolve raw input to a Python object."""
+    """Resolve raw input to a Python object, handling any upstream format."""
     if isinstance(raw, str):
         if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                return json.load(f)
+            ext = os.path.splitext(raw)[1].lower()
+            try:
+                if ext == ".jsonl":
+                    with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                        return _read_jsonl(f)
+                elif ext in (".json",):
+                    with open(raw, "r", encoding="utf-8") as f:
+                        return json.load(f)
+                elif ext == ".csv":
+                    with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                        return list(csv_mod.DictReader(f))
+                elif ext in (".yaml", ".yml"):
+                    try:
+                        import yaml
+                        with open(raw, "r", encoding="utf-8") as f:
+                            result = yaml.safe_load(f)
+                            return result if result is not None else []
+                    except ImportError:
+                        with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                            return [{"value": f.read()}]
+                elif ext == ".parquet":
+                    try:
+                        import pandas as pd
+                        return pd.read_parquet(raw).to_dict(orient="records")
+                    except ImportError:
+                        return [{"file_path": raw}]
+                else:
+                    with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                    try:
+                        return json.loads(content)
+                    except (json.JSONDecodeError, ValueError):
+                        return [{"value": content}]
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return [{"value": f"<unreadable file: {os.path.basename(raw)}>"}]
         if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
+            for name in ("data.json", "results.json", "output.json", "data.csv", "data.yaml"):
+                fpath = os.path.join(raw, name)
+                if os.path.isfile(fpath):
+                    return _resolve_data(fpath)
+            try:
+                files = [f for f in os.listdir(raw) if not f.startswith(".")]
+            except OSError:
+                files = []
+            return [{"directory": raw, "files": ", ".join(files)}]
         try:
             return json.loads(raw)
         except (json.JSONDecodeError, ValueError):
-            return [{"value": raw}]
-    return raw
+            raise BlockInputError(
+                "Cannot save data in Parquet format: expected tabular data, got raw string",
+                details=f"Upstream block produced: {raw[:200]}",
+                recoverable=False,
+            )
+    if isinstance(raw, (dict, list)):
+        return raw
+    return [{"value": str(raw)}]
 
 
 def _normalize_rows(data):
@@ -71,8 +132,7 @@ def _write_parquet_pandas(rows, file_path, compression):
     try:
         import pandas as pd
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
-        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        missing = getattr(e, "name", None) or "pandas"
         raise BlockDependencyError(
             missing,
             f"Required library not installed: {e}",
@@ -99,10 +159,21 @@ def run(ctx):
     ctx.report_progress(1, 3)
     raw_data = ctx.load_input("data")
     if raw_data is None:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     resolved = _resolve_data(raw_data)
     rows = _normalize_rows(resolved)
+
+    if not rows:
+        raise BlockInputError(
+            "Cannot save data in Parquet format: expected tabular data (list of dicts), got empty data",
+            details=f"Upstream block produced: {str(raw_data)[:200]}",
+            recoverable=False,
+        )
+
     headers = _collect_headers(rows)
     ctx.log_message(f"Loaded {len(rows)} rows, {len(headers)} columns")
 
@@ -127,7 +198,10 @@ def run(ctx):
     out_filepath = os.path.join(out_dir, filename)
 
     if os.path.exists(out_filepath) and not overwrite:
-        raise FileExistsError(f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.")
+        raise BlockInputError(
+            f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
+            recoverable=True,
+        )
 
     # ---- Step 3: Write Parquet ----
     written = False
@@ -147,9 +221,10 @@ def run(ctx):
             pass
 
     if not written:
-        raise ImportError(
-            "Neither pyarrow nor pandas is installed. "
-            "Install pyarrow (pip install pyarrow) for Parquet support."
+        raise BlockDependencyError(
+            "pyarrow",
+            "Neither pyarrow nor pandas is installed for Parquet support",
+            install_hint="pip install pyarrow",
         )
 
     ctx.report_progress(3, 3)
