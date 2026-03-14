@@ -34,6 +34,11 @@ outputs:
     data_type: metrics
 
 config:
+  task:
+    type: text_area
+    label: Task
+    default: ""
+    description: "Code task description (used when input port not connected)"
   system_prompt:
     type: text_area
     label: System Prompt

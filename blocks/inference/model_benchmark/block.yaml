@@ -57,6 +57,12 @@ config:
     label: Provider
     options: [ollama, mlx, openai, anthropic]
     default: ollama
+  backend:
+    type: select
+    label: Inference Backend
+    default: ""
+    options: ["", "ollama", "mlx", "openai", "anthropic"]
+    description: "Override framework auto-detection (leave empty for auto)"
   model_name:
     type: string
     label: Model Name

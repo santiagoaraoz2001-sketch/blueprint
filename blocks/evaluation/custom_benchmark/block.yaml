@@ -32,6 +32,22 @@ outputs:
     description: "Per-sample predictions: input, target, prediction, score, correct"
 
 config:
+  model_name:
+    type: string
+    label: Model Name (fallback)
+    default: "llama3.2"
+    description: "Used when model input port is not connected"
+  provider:
+    type: select
+    label: Provider (fallback)
+    default: "ollama"
+    options: ["ollama", "mlx", "openai", "anthropic"]
+    description: "Inference provider (used when model input not connected)"
+  endpoint:
+    type: string
+    label: Endpoint (fallback)
+    default: "http://localhost:11434"
+    description: "API endpoint URL (used when model input not connected)"
   metric:
     type: select
     label: Primary Metric

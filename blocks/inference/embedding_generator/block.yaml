@@ -44,6 +44,12 @@ config:
     label: Provider
     options: [sentence-transformers, ollama, openai]
     default: sentence-transformers
+  backend:
+    type: select
+    label: Inference Backend
+    default: ""
+    options: ["", "sentence-transformers", "ollama", "openai"]
+    description: "Override framework auto-detection (leave empty for auto)"
   model_name:
     type: string
     label: Model Name

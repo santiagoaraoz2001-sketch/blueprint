@@ -23,6 +23,16 @@ outputs:
     data_type: metrics
 
 config:
+  model_a_name:
+    type: string
+    label: Model A (fallback)
+    default: ""
+    description: "HuggingFace model ID for Model A (used when input port not connected)"
+  model_b_name:
+    type: string
+    label: Model B (fallback)
+    default: ""
+    description: "HuggingFace model ID for Model B (used when input port not connected)"
   layer_config:
     type: text_area
     label: "Layer Config (JSON)"
