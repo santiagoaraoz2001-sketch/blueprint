@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 import urllib.request
 import urllib.error
 
@@ -36,6 +37,15 @@ def run(ctx):
     else:
         payload = {"value": str(telemetry_data)}
 
+    # Count telemetry events
+    if isinstance(payload, list):
+        telemetry_events = len(payload)
+    elif isinstance(payload, dict):
+        telemetry_events = len(payload)
+    else:
+        telemetry_events = 1
+    ctx.log_metric("telemetry_events", telemetry_events)
+
     ctx.log_message(f"Sending telemetry to {host}:{port}")
     ctx.report_progress(1, 2)
 
@@ -50,6 +60,7 @@ def run(ctx):
         method="POST",
     )
 
+    start = time.time()
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             status = resp.status
@@ -60,6 +71,7 @@ def run(ctx):
         ctx.log_message("Data saved locally. Start Control Tower to receive telemetry.")
     except Exception as e:
         ctx.log_message(f"Failed to send telemetry: {e}")
+    ctx.log_metric("duration_s", round(time.time() - start, 3))
 
     # Always save the payload locally
     out_path = os.path.join(ctx.run_dir, "telemetry_sent.json")

@@ -172,5 +172,9 @@ def run(ctx):
             json.dump(extracted_records, f, indent=2)
         ctx.save_output("dataset", records_dir)
 
+    ctx.log_metric("parse_success", 1.0 if extracted_data else 0.0)
+    ctx.log_metric("fields_extracted", len(extracted_data))
+    ctx.log_metric("records_extracted", len(extracted_records))
+
     ctx.log_message(f"Parsed {fmt}: {len(extracted_data)} fields, {len(extracted_records)} records")
     ctx.report_progress(3, 3)
