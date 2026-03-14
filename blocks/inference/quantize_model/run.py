@@ -112,9 +112,14 @@ def run(ctx):
             ctx.report_progress(4, 4)
             return
 
-        except ImportError:
-            ctx.log_message("auto-gptq not installed. Install: pip install auto-gptq")
-            ctx.log_message("Falling back to estimation mode.")
+        except ImportError as e:
+            from backend.block_sdk.exceptions import BlockDependencyError
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install auto-gptq transformers",
+            )
 
     # ── BitsAndBytes quantization ────────────────────────────────
     elif method == "bitsandbytes":
@@ -160,9 +165,14 @@ def run(ctx):
             ctx.report_progress(4, 4)
             return
 
-        except ImportError:
-            ctx.log_message("bitsandbytes not installed. Install: pip install bitsandbytes")
-            ctx.log_message("Falling back to estimation mode.")
+        except ImportError as e:
+            from backend.block_sdk.exceptions import BlockDependencyError
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install bitsandbytes torch transformers",
+            )
 
     # ── AWQ quantization ─────────────────────────────────────────
     elif method == "awq":
@@ -199,9 +209,14 @@ def run(ctx):
             ctx.report_progress(4, 4)
             return
 
-        except ImportError:
-            ctx.log_message("autoawq not installed. Install: pip install autoawq")
-            ctx.log_message("Falling back to estimation mode.")
+        except ImportError as e:
+            from backend.block_sdk.exceptions import BlockDependencyError
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install autoawq transformers",
+            )
 
     else:
         ctx.log_message(f"Method '{method}' — running in estimation mode.")

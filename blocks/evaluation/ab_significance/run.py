@@ -4,11 +4,20 @@ import json
 import os
 import math
 
-from scipy import stats
-import numpy as np
-
 
 def run(ctx):
+    try:
+        from scipy import stats
+        import numpy as np
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"A/B significance testing requires scipy and numpy: {e}",
+            install_hint="pip install scipy numpy",
+        )
+
     metrics_a_path = ctx.load_input("metrics_a")
     metrics_b_path = ctx.load_input("metrics_b")
     metric_name = ctx.config.get("metric_name", "accuracy")
@@ -185,6 +194,7 @@ def run(ctx):
 
 def _to_numeric_array(values, label):
     """Convert a list of values to a numpy float64 array, filtering non-numeric entries."""
+    import numpy as np
     numeric = []
     skipped = 0
     for v in values:
@@ -313,6 +323,7 @@ def _bootstrap_test(a, b, n_bootstrap=10000):
 
     Uses vectorized operations for performance. Deterministic via fixed seed.
     """
+    import numpy as np
     rng = np.random.default_rng(42)
     observed_diff = abs(float(np.mean(a) - np.mean(b)))
     combined = np.concatenate([a, b])

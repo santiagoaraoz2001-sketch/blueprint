@@ -64,7 +64,7 @@ def run(ctx):
     if not isinstance(raw_data, list) or len(raw_data) == 0:
         raise ValueError("Dataset must be a non-empty JSON list")
 
-    # Import required libraries — fallback if unavailable
+    # Guard heavy imports
     try:
         import torch
         from transformers import (
@@ -77,21 +77,23 @@ def run(ctx):
         )
         from peft import LoraConfig, get_peft_model, TaskType
         from datasets import Dataset
-
-        _run_real_training(
-            ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
-            lr, epochs, batch_size, max_seq_length, text_column, training_format,
-            eval_split, save_merged, checkpoint_interval,
-            torch, AutoModelForCausalLM, AutoTokenizer, TrainingArguments,
-            Trainer, TrainerCallback, DataCollatorForLanguageModeling,
-            LoraConfig, get_peft_model, TaskType, Dataset,
-        )
     except ImportError as e:
-        ctx.log_message(f"Required libraries not available ({e}); running in config-only fallback mode")
-        _run_fallback(
-            ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
-            lr, epochs, batch_size, max_seq_length, save_merged,
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install datasets peft torch transformers",
         )
+
+    _run_real_training(
+        ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
+        lr, epochs, batch_size, max_seq_length, text_column, training_format,
+        eval_split, save_merged, checkpoint_interval,
+        torch, AutoModelForCausalLM, AutoTokenizer, TrainingArguments,
+        Trainer, TrainerCallback, DataCollatorForLanguageModeling,
+        LoraConfig, get_peft_model, TaskType, Dataset,
+    )
 
 
 def _run_real_training(

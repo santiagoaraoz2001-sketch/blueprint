@@ -84,16 +84,14 @@ def run(ctx):
         batch_scores = model.predict(pairs, batch_size=batch_size)
         scores = [float(s) for s in batch_scores]
 
-    except ImportError:
-        ctx.log_message("sentence-transformers not installed — using word-overlap scoring")
-        for q, p in zip(queries, passages):
-            if q and p:
-                q_words = set(q.lower().split())
-                p_words = set(p.lower().split())
-                overlap = len(q_words & p_words)
-                scores.append(overlap / max(len(q_words), 1))
-            else:
-                scores.append(0.0)
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install sentence-transformers",
+        )
 
     ctx.report_progress(1, 2)
 

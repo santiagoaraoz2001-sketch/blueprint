@@ -62,12 +62,22 @@ def run(ctx):
 
     ctx.log_message(f"Training data: {num_rows} samples")
 
-    # ── Try real PPO training with trl ──
+    # ── Guard heavy imports ──
     try:
         from trl import PPOTrainer, PPOConfig, AutoModelForCausalLMWithValueHead
         from transformers import AutoTokenizer
         import torch
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install torch transformers trl",
+        )
 
+    # ── Try real PPO training with trl ──
+    try:
         ctx.log_message("trl + transformers found. Running real PPO training...")
 
         output_dir = os.path.join(ctx.run_dir, "model")
@@ -206,8 +216,6 @@ def run(ctx):
         ctx.report_progress(1, 1)
         return
 
-    except ImportError as e:
-        ctx.log_message(f"Dependencies not available ({e}). Running simulation.")
     except Exception as e:
         ctx.log_message(f"PPO training error: {e}. Falling back to simulation.")
 

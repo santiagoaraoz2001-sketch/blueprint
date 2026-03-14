@@ -60,9 +60,13 @@ def run(ctx):
     ctx.report_progress(1, 4)
     try:
         from huggingface_hub import HfApi, create_repo as hf_create_repo
-    except ImportError:
-        raise ImportError(
-            "huggingface_hub is required. Install with: pip install huggingface_hub"
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install huggingface_hub",
         )
 
     api = HfApi(token=hf_token)

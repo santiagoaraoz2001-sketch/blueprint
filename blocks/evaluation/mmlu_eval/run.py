@@ -100,8 +100,14 @@ def run(ctx):
                 device = "mps"
             else:
                 device = "cpu"
-        except ImportError:
-            device = "cpu"
+        except ImportError as e:
+            from backend.block_sdk.exceptions import BlockDependencyError
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install torch",
+            )
 
     ctx.log_message(f"MMLU Evaluation: {model_name}")
     ctx.log_message(f"Subjects: {subjects_str}, Few-shot: {num_fewshot}, Seed: {seed}")

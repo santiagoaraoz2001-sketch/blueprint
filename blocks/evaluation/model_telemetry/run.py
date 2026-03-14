@@ -119,9 +119,14 @@ def run(ctx):
             capture_memory, capture_layer_stats,
             max_seq_length, trust_remote_code,
         )
-    except ImportError:
-        ctx.log_message("PyTorch not available — generating demo telemetry")
-        telemetry = _generate_demo_telemetry(ctx, telemetry, sample_size)
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install torch",
+        )
     except Exception as e:
         ctx.log_message(f"Analysis error: {e} — generating demo telemetry")
         telemetry = _generate_demo_telemetry(ctx, telemetry, sample_size)
@@ -149,7 +154,16 @@ def _analyze_torch_model(ctx, model_path, telemetry, sample_texts,
                           capture_memory, capture_layer_stats,
                           max_seq_length=128, trust_remote_code=True):
     """Real analysis using PyTorch + Transformers."""
-    import torch
+    try:
+        import torch
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install torch",
+        )
 
     ctx.log_message("Loading model with PyTorch...")
     try:

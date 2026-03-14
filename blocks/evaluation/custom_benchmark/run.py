@@ -237,8 +237,14 @@ def _try_transformers(ctx, model_id, inputs, total, max_tokens):
     try:
         import torch
         from transformers import pipeline, AutoConfig
-    except ImportError:
-        return None
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install torch transformers",
+        )
 
     try:
         ctx.log_message(f"Trying Transformers pipeline: {model_id}")

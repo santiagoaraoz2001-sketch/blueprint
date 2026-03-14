@@ -191,38 +191,14 @@ def run(ctx):
         ctx.report_progress(1, 1)
         ctx.save_output("dataset", out_path)
 
-    except ImportError:
-        # Fallback: simulate loading for demo purposes
-        ctx.log_message("'datasets' library not installed — running in demo mode")
-        ctx.log_message("Install with: pip install datasets")
-        total_steps = 10
-        for i in range(total_steps):
-            time.sleep(0.2)
-            ctx.report_progress(i + 1, total_steps)
-
-        out_path = os.path.join(ctx.run_dir, "dataset")
-        os.makedirs(out_path, exist_ok=True)
-
-        demo_data = [{"text": f"Sample {j}", "label": j % 2} for j in range(100)]
-
-        # Apply column filtering to demo data
-        if columns:
-            col_list = [c.strip() for c in columns.split(",") if c.strip()]
-            if col_list:
-                demo_data = [{k: row.get(k) for k in col_list if k in row} for row in demo_data]
-
-        if max_samples and max_samples > 0:
-            demo_data = demo_data[:max_samples]
-
-        with open(os.path.join(out_path, "data.json"), "w") as f:
-            json.dump(demo_data, f)
-
-        row_count = len(demo_data)
-        col_names = list(demo_data[0].keys()) if demo_data else []
-        col_count = len(col_names)
-        ctx.log_metric("row_count", row_count)
-        ctx.log_message(f"Demo: generated {row_count} rows")
-        ctx.save_output("dataset", out_path)
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install datasets",
+        )
 
     # Propagate dataset metadata for downstream blocks
     _text_col = "text"  # default column name

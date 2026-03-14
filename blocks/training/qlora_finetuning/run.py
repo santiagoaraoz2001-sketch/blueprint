@@ -75,10 +75,13 @@ def run(ctx):
         from datasets import Dataset
         import bitsandbytes  # noqa: F401
     except ImportError as e:
-        raise ImportError(
-            f"Required library not installed: {e}. "
-            f"Install with: pip install torch transformers peft datasets bitsandbytes"
-        ) from e
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install datasets peft torch transformers",
+        )
 
     ctx.log_message(f"QLoRA fine-tuning: {model_name}")
     ctx.log_message(f"LoRA r={r}, alpha={alpha}, bits={bits}, double_quant={double_quant}")

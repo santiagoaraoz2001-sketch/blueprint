@@ -434,12 +434,14 @@ def run(ctx):
                 model_info["downloaded"] = True
                 model_info["download_path"] = download_path
                 ctx.log_message(f"Model downloaded to: {download_path}")
-            except ImportError:
-                ctx.log_message(
-                    "WARNING: huggingface_hub not installed. "
-                    "Install with: pip install huggingface_hub"
+            except ImportError as e:
+                from backend.block_sdk.exceptions import BlockDependencyError
+                missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+                raise BlockDependencyError(
+                    missing,
+                    f"Required library not installed: {e}",
+                    install_hint="pip install huggingface_hub",
                 )
-                model_info["downloaded"] = False
             except Exception as e:
                 ctx.log_message(f"WARNING: Auto-download failed: {e}")
                 model_info["downloaded"] = False

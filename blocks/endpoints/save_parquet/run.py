@@ -68,7 +68,16 @@ def _write_parquet_pyarrow(rows, file_path, compression, row_group_size):
 
 def _write_parquet_pandas(rows, file_path, compression):
     """Fallback: write Parquet using pandas."""
-    import pandas as pd
+    try:
+        import pandas as pd
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install pandas",
+        )
 
     df = pd.DataFrame(rows)
     comp = compression if compression != "none" else None

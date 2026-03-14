@@ -125,8 +125,14 @@ def run(ctx):
             if max_rows > 0:
                 df = df.head(max_rows)
             rows = df.to_dict(orient="records")
-        except ImportError:
-            raise RuntimeError("pandas required for parquet files: pip install pandas pyarrow")
+        except ImportError as e:
+            from backend.block_sdk.exceptions import BlockDependencyError
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install pandas",
+            )
 
     elif fmt == "xlsx":
         try:
@@ -141,8 +147,14 @@ def run(ctx):
                 df = df.head(max_rows)
             rows = df.to_dict(orient="records")
             ctx.log_message(f"Excel sheet: {sheet_name or '(default)'}")
-        except ImportError:
-            raise RuntimeError("pandas + openpyxl required for Excel files: pip install pandas openpyxl")
+        except ImportError as e:
+            from backend.block_sdk.exceptions import BlockDependencyError
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install pandas",
+            )
 
     elif fmt == "txt":
         with open(file_path, "r", encoding=encoding) as f:

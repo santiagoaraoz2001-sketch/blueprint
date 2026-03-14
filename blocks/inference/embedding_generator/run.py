@@ -101,12 +101,14 @@ def run(ctx):
                 embeddings.extend(batch_embs.tolist())
                 ctx.report_progress(min(i + batch_size, len(texts)), len(texts))
 
-        except ImportError:
-            ctx.log_message("sentence-transformers not installed. Install: pip install sentence-transformers")
-            ctx.log_message("Falling back to demo embeddings.")
-            method_used = "demo"
-            embeddings = _demo_embeddings(texts, 384)
-            embedding_dim = 384
+        except ImportError as e:
+            from backend.block_sdk.exceptions import BlockDependencyError
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install sentence-transformers",
+            )
 
     # ── Ollama ───────────────────────────────────────────────────
     elif provider == "ollama":
@@ -234,16 +236,14 @@ def run(ctx):
             import numpy as np
             emb_path = os.path.join(ctx.run_dir, "embeddings.npy")
             np.save(emb_path, np.array(embeddings, dtype=np.float32))
-        except ImportError:
-            emb_path = os.path.join(ctx.run_dir, "embeddings.json")
-            emb_data = {
-                "embeddings": embeddings,
-                "labels": [str(row.get("label", row.get("text", row.get("id", i)))) if isinstance(row, dict) else str(row) for i, row in enumerate(rows)],
-                "model": model_name,
-                "dimensions": embedding_dim,
-            }
-            with open(emb_path, "w", encoding="utf-8") as f:
-                json.dump(emb_data, f)
+        except ImportError as e:
+            from backend.block_sdk.exceptions import BlockDependencyError
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install numpy",
+            )
 
     ctx.save_output("dataset", out_dir)
 

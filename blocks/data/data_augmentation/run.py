@@ -126,7 +126,16 @@ def _call_ollama(endpoint, model_name, prompt, max_tokens):
 
 def _call_transformers(model_name, prompt, max_tokens):
     """Call a local HuggingFace transformers model."""
-    from transformers import pipeline as hf_pipeline
+    try:
+        from transformers import pipeline as hf_pipeline
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install transformers",
+        )
     generator = hf_pipeline("text-generation", model=model_name, device=-1)
     out = generator(prompt, max_new_tokens=max_tokens, num_return_sequences=1, truncation=True)
     return out[0]["generated_text"].replace(prompt, "").strip()

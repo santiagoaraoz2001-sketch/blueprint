@@ -74,8 +74,17 @@ def _load_external_labels(ctx):
 
 def _auto_eps(X):
     """Estimate a reasonable eps for DBSCAN using k-nearest neighbor distances."""
-    from sklearn.neighbors import NearestNeighbors
-    import numpy as np
+    try:
+        from sklearn.neighbors import NearestNeighbors
+        import numpy as np
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install scikit-learn numpy",
+        )
 
     k = min(5, len(X) - 1)
     nn = NearestNeighbors(n_neighbors=k)
@@ -108,8 +117,14 @@ def _compute_quality_metrics(X, cluster_labels):
                 metrics["silhouette_score"] = round(float(silhouette_score(X_clean, labels_clean)), 4)
                 metrics["calinski_harabasz_score"] = round(float(calinski_harabasz_score(X_clean, labels_clean)), 2)
                 metrics["davies_bouldin_score"] = round(float(davies_bouldin_score(X_clean, labels_clean)), 4)
-    except ImportError:
-        pass
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install numpy scikit-learn",
+        )
 
     return metrics
 
@@ -233,8 +248,14 @@ def run(ctx):
         else:
             raise ValueError(f"Unknown clustering method: {method}")
 
-    except ImportError:
-        raise ImportError("scikit-learn is required. Install: pip install scikit-learn")
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install numpy scikit-learn",
+        )
 
     ctx.report_progress(2, 4)
 
