@@ -79,9 +79,9 @@ def run(ctx):
 
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 4)
-    raw_data = ctx.load_input("data")
+    raw_data = ctx.load_input("embeddings")
     if raw_data is None:
-        raise ValueError("No embedding data provided. Connect a 'data' input.")
+        raise ValueError("No embedding data provided. Connect an 'embeddings' input.")
 
     data = _resolve_data(raw_data)
     vec_info = _extract_vectors(data)

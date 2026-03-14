@@ -36,7 +36,7 @@ except ImportError:
 
 def run(ctx):
     # ── Configuration ─────────────────────────────────────────────────────
-    model_output = ctx.inputs.get('model_output')
+    model_output = ctx.inputs.get('predictions')
     reference = ctx.inputs.get('reference')
     scoring_code = ctx.config.get('scoring_function', '')
     aggregate_method = ctx.config.get('aggregate', 'mean')

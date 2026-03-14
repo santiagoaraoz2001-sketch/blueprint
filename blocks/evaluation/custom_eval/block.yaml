@@ -5,7 +5,7 @@ description: Run a custom Python scoring function on model outputs — maximum f
 version: "2.0.0"
 
 inputs:
-  - id: model_output
+  - id: predictions
     label: Model Output
     data_type: dataset
     required: true

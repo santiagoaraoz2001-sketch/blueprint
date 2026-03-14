@@ -162,7 +162,7 @@ def run(ctx):
         data_path = os.path.join(ctx.run_dir, "extracted.json")
         with open(data_path, "w", encoding="utf-8") as f:
             json.dump(extracted_data, f, indent=2)
-        ctx.save_output("data", data_path)
+        ctx.save_output("config", data_path)
 
     # Save extracted records
     if extracted_records:

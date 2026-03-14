@@ -193,7 +193,7 @@ def run(ctx):
                 f"{len(failed)} check(s) failed — {', '.join(r['metric'] for r in failed)}"
             )
 
-    ctx.save_output("report", gate_report)
+    ctx.save_output("gate_metrics", gate_report)
     ctx.save_artifact("gate_report", report_path)
     ctx.log_metric("gate_passed", 1.0 if gate_passed else 0.0)
     ctx.log_metric("checks_total", len(results))

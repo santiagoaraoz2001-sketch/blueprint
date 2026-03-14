@@ -20,7 +20,7 @@ outputs:
     data_type: dataset
   - id: report
     label: Eval Report
-    data_type: text
+    data_type: artifact
   - id: metrics
     label: Aggregate Scores
     data_type: metrics

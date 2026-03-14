@@ -30,7 +30,7 @@ outputs:
     label: Report
     data_type: artifact
     description: Generated report directory
-  - id: report
+  - id: report_file
     label: Report File
     data_type: text
     description: Path to the generated report file

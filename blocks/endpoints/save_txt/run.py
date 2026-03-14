@@ -54,9 +54,9 @@ def run(ctx):
 
     # ---- Step 1: Load and convert data ----
     ctx.report_progress(1, 3)
-    raw_data = ctx.load_input("data")
+    raw_data = ctx.load_input("text")
     if raw_data is None:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise ValueError("No input data provided. Connect a 'text' input.")
 
     content = _to_text(raw_data, separator)
     original_length = len(content)

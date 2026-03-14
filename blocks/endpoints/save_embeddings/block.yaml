@@ -5,7 +5,7 @@ description: Save vector embeddings to file in NumPy, FAISS, or HDF5 format.
 version: "1.0.0"
 
 inputs:
-  - id: data
+  - id: embeddings
     label: Embeddings
     data_type: embedding
     required: true

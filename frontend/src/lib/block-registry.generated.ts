@@ -26,7 +26,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'dataset', label: 'Evaluation Results', dataType: 'dataset', required: false },
-      { id: 'report', label: 'Eval Report', dataType: 'text', required: false },
+      { id: 'report', label: 'Eval Report', dataType: 'artifact', required: false },
       { id: 'metrics', label: 'Aggregate Scores', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -2956,7 +2956,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'status', label: 'Response Status', dataType: 'text', required: false },
       { id: 'summary', label: 'Publish Summary', dataType: 'metrics', required: false },
-      { id: 'response', label: 'Response Data', dataType: 'dataset', required: false },
+      { id: 'results', label: 'Response Data', dataType: 'dataset', required: false },
     ],
     defaultConfig: {
       url: '',
@@ -3311,7 +3311,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#84cc16',
     maturity: 'stable',
     inputs: [
-      { id: 'data', label: 'Embeddings', dataType: 'embedding', required: true },
+      { id: 'embeddings', label: 'Embeddings', dataType: 'embedding', required: true },
     ],
     outputs: [
       { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
@@ -3533,7 +3533,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#84cc16',
     maturity: 'stable',
     inputs: [
-      { id: 'data', label: 'Model Data', dataType: 'model', required: true },
+      { id: 'model', label: 'Model Data', dataType: 'model', required: true },
     ],
     outputs: [
       { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
@@ -3765,7 +3765,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#84cc16',
     maturity: 'stable',
     inputs: [
-      { id: 'data', label: 'Data', dataType: 'text', required: true },
+      { id: 'text', label: 'Data', dataType: 'text', required: true },
     ],
     outputs: [
       { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
@@ -4584,7 +4584,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#10b981',
     maturity: 'stable',
     inputs: [
-      { id: 'model_output', label: 'Model Output', dataType: 'dataset', required: true },
+      { id: 'predictions', label: 'Model Output', dataType: 'dataset', required: true },
       { id: 'reference', label: 'Reference Data', dataType: 'dataset', required: false },
     ],
     outputs: [
@@ -6233,7 +6233,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'passed', label: 'Passed', dataType: 'any', required: false },
       { id: 'rejected', label: 'Rejected', dataType: 'any', required: false },
-      { id: 'report', label: 'Gate Report', dataType: 'metrics', required: false },
+      { id: 'gate_metrics', label: 'Gate Report', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
       metric_name: 'accuracy',
@@ -7470,7 +7470,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'passed', label: 'Passed', dataType: 'any', required: false },
       { id: 'rejected', label: 'Rejected', dataType: 'any', required: false },
-      { id: 'report', label: 'Gate Report', dataType: 'metrics', required: false },
+      { id: 'gate_metrics', label: 'Gate Report', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
       metric_name: 'accuracy',
@@ -8949,7 +8949,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'text', label: 'Parsed Text', dataType: 'text', required: false },
-      { id: 'data', label: 'Extracted Fields', dataType: 'config', required: false },
+      { id: 'config', label: 'Extracted Fields', dataType: 'config', required: false },
       { id: 'dataset', label: 'Extracted Records', dataType: 'dataset', required: false },
     ],
     defaultConfig: {
@@ -9646,7 +9646,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'artifact', label: 'Report', dataType: 'artifact', required: false },
-      { id: 'report', label: 'Report File', dataType: 'text', required: false },
+      { id: 'report_file', label: 'Report File', dataType: 'text', required: false },
     ],
     defaultConfig: {
       title: 'Blueprint Report',
