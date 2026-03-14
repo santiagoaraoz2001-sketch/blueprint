@@ -14,7 +14,6 @@ def run(ctx):
     seed = int(ctx.config.get("seed", 42))
 
     random.seed(seed)
-    ctx.log_metric("simulation_mode", 1.0)
 
     # ── Load agent outputs ──────────────────────────────────────────────
     agent_outputs = _load_dataset(ctx, "dataset")
@@ -30,8 +29,9 @@ def run(ctx):
             ref_lookup[str(key)] = ref
 
     # ── Demo mode ───────────────────────────────────────────────────────
-    if not agent_outputs:
-        ctx.log_message("⚠️ SIMULATION MODE: No agent outputs connected. Generating synthetic evaluation data. Results are heuristic-based, not from a real evaluation framework.")
+    is_simulated = not agent_outputs
+    if is_simulated:
+        ctx.log_message("⚠️ SIMULATION MODE: No agent outputs connected. Generating synthetic evaluation data.")
         agent_outputs = [
             {
                 "task": f"Task {i}",
@@ -122,6 +122,7 @@ def run(ctx):
         "pass_threshold": pass_threshold,
     }
     ctx.save_output("metrics", metrics)
+    ctx.log_metric("simulation_mode", 1.0 if is_simulated else 0.0)
     for k, v in metrics.items():
         if isinstance(v, (int, float)):
             ctx.log_metric(k, v)

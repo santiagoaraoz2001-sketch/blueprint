@@ -1,9 +1,8 @@
 name: Coherence Eval
 type: coherence_eval
 category: evaluation
-description: "[DEMO] Evaluate text quality using heuristic metrics (real execution requires: transformers for perplexity scoring)"
+description: "Evaluate text quality using readability, repetition, vocabulary diversity, and length metrics"
 version: "1.0.0"
-maturity: experimental
 
 inputs:
   - id: dataset
