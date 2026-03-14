@@ -13,7 +13,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   {
     type: 'agent_evaluator',
     name: 'Agent Evaluator',
-    description: 'Evaluate agent performance on tasks using multiple scoring methods',
+    description: 'Evaluate agent performance on tasks using multiple scoring methods (task completion, accuracy, efficiency, custom criteria)',
     category: 'agents',
     tags: [],
     aliases: [],
@@ -21,7 +21,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'dataset', label: 'Agent Outputs', dataType: 'dataset', required: true },
+      { id: 'dataset', label: 'Agent Outputs', dataType: 'dataset', required: false },
       { id: 'references', label: 'Reference Answers', dataType: 'dataset', required: false },
     ],
     outputs: [
@@ -408,7 +408,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       system_prompt: '',
       language: 'python',
       execute: false,
-      timeout: 30,
+      timeout: 60,
       max_iterations: 1,
       output_format: 'raw',
     },
@@ -445,8 +445,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         name: 'timeout',
         label: 'Execution Timeout (sec)',
         type: 'integer',
-        default: 30,
-        min: 5,
+        default: 60,
+        min: 10,
         max: 300,
         depends_on: { field: 'execute', value: true },
       },
@@ -4434,7 +4434,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   {
     type: 'coherence_eval',
     name: 'Coherence Eval',
-    description: 'Evaluate text quality — coherence, fluency, readability, and repetition detection',
+    description: 'Evaluate text quality using readability, repetition, vocabulary diversity, and length metrics',
     category: 'evaluation',
     tags: [],
     aliases: [],
@@ -7060,7 +7060,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#6366f1',
     maturity: 'stable',
     inputs: [
-      { id: 'input', label: 'Input Data', dataType: 'any', required: true },
+      { id: 'input', label: 'Input Data', dataType: 'any', required: false },
     ],
     outputs: [
       { id: 'item', label: 'Current Item', dataType: 'any', required: false },
@@ -7418,6 +7418,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       webhook_headers: '',
       notification_title: '',
       send_condition: 'always',
+      timeout: 30,
     },
     configFields: [
       {
@@ -7478,6 +7479,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'always',
         options: ['always', 'on_failure', 'on_success'],
         description: 'Conditionally send — checks trigger data for status/gate_passed/error fields',
+      },
+      {
+        name: 'timeout',
+        label: 'Timeout (seconds)',
+        type: 'integer',
+        default: 30,
+        min: 10,
+        max: 300,
+        description: 'Maximum time for webhook or desktop notification delivery',
       },
     ],
   },
@@ -8065,6 +8075,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
+      { id: 'model', label: 'Model', dataType: 'config', required: false },
     ],
     outputs: [
       { id: 'dataset', label: 'Dataset with Embeddings', dataType: 'dataset', required: false },
@@ -8167,7 +8178,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'select',
         default: 'numpy',
         options: ['numpy', 'json'],
-        description: 'Format for embeddings output — numpy (.npy binary array), json (JSON object with embeddings and labels)',
+        description: 'Format for the embeddings artifact file in the run directory. The pipeline \'embeddings\' output port always uses JSON for downstream compatibility. Choose numpy for faster loading in external tools, or json for human-readable inspection.',
       },
     ],
   },
@@ -9521,6 +9532,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       layer_config: '[]',
       merge_embed: 'a',
       output_name: 'frankenmerge-model',
+      timeout: 3600,
     },
     configFields: [
       {
@@ -9558,6 +9570,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'string',
         default: 'frankenmerge-model',
         description: 'Name for the assembled model',
+      },
+      {
+        name: 'timeout',
+        label: 'Timeout (seconds)',
+        type: 'integer',
+        default: 3600,
+        min: 60,
+        max: 7200,
+        description: 'Maximum execution time for the mergekit process',
       },
     ],
   },
@@ -9814,7 +9835,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#34D399',
     maturity: 'stable',
     inputs: [
-      { id: 'metrics', label: 'Results', dataType: 'metrics', required: true },
+      { id: 'metrics', label: 'Results', dataType: 'metrics', required: false },
     ],
     outputs: [
       { id: 'artifact', label: 'Submission', dataType: 'artifact', required: false },
@@ -10677,7 +10698,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   {
     type: 'hyperparameter_sweep',
     name: 'Hyperparameter Sweep',
-    description: 'Grid or random search over hyperparameters to find optimal training config',
+    description: 'Grid or random search over hyperparameters with real training trials using HuggingFace Trainer',
     category: 'training',
     tags: [],
     aliases: [],

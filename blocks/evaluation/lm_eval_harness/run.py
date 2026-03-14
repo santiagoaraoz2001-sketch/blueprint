@@ -180,7 +180,9 @@ def run(ctx):
     with open(os.path.join(ds_dir, "data.json"), "w") as f:
         json.dump(dataset_rows, f, indent=2)
 
+    # Branch: lm_eval available — real evaluation results
     ctx.save_output("metrics", task_results)
+    # Branch: lm_eval available — real evaluation results
     ctx.save_output("results", results_path)
     ctx.save_output("dataset", ds_dir)
     ctx.log_message(f"Evaluation complete: {len(task_results) - 1} tasks, avg acc={avg_acc:.4f}")
@@ -233,7 +235,9 @@ def _run_fallback(ctx, model_name, model_backend, tasks, num_fewshot, batch_size
     with open(os.path.join(ds_dir, "data.json"), "w") as f:
         json.dump(ds_rows, f, indent=2)
 
+    # Branch: lm_eval not installed — plan-only fallback
     ctx.save_output("metrics", {"status": "plan_only", "tasks": tasks})
+    # Branch: lm_eval not installed — plan-only fallback
     ctx.save_output("results", results_path)
     ctx.save_output("dataset", ds_dir)
     ctx.report_progress(1, 1)

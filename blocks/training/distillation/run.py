@@ -225,7 +225,9 @@ def run(ctx):
                 "demo_mode": False,
             }, f, indent=2)
 
+        # Branch: real distillation succeeded
         ctx.save_output("model", output_dir)
+        # Branch: real distillation succeeded
         ctx.save_output("metrics", {
             "final_loss": final_loss,
             "total_steps": step,
@@ -284,7 +286,9 @@ def run(ctx):
             "demo_mode": True,
         }, f, indent=2)
 
+    # Branch: distillation failed — simulation fallback
     ctx.save_output("model", model_path)
+    # Branch: distillation failed — simulation fallback
     ctx.save_output("metrics", {
         "final_loss": final_loss,
         "total_steps": total_steps,

@@ -4,6 +4,8 @@ import csv
 import io
 import os
 
+from backend.block_sdk.exceptions import BlockInputError
+
 
 def _normalize_rows(data):
     """Ensure data is a list of dicts."""
@@ -57,9 +59,20 @@ def run(ctx):
     ctx.report_progress(1, 4)
     raw_data = ctx.resolve_as_data("data")
     if not raw_data:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     rows = _normalize_rows(raw_data)
+
+    if not rows:
+        raise BlockInputError(
+            "Cannot save data in CSV format: expected list of dicts, got empty data",
+            details=f"Upstream block produced: {str(raw_data)[:200]}",
+            recoverable=False,
+        )
+
     headers = _collect_headers(rows)
 
     # Filter columns if specified
@@ -67,7 +80,10 @@ def run(ctx):
         selected = [c.strip() for c in columns.split(",") if c.strip()]
         headers = [h for h in headers if h in selected]
         if not headers:
-            raise ValueError(f"None of the specified columns found. Available: {_collect_headers(rows)}")
+            raise BlockInputError(
+                f"None of the specified columns found. Available: {_collect_headers(_normalize_rows(raw_data))}",
+                recoverable=True,
+            )
 
     ctx.log_message(f"Loaded {len(rows)} rows, {len(headers)} columns")
 
@@ -104,7 +120,10 @@ def run(ctx):
     out_filepath = os.path.join(out_dir, filename)
 
     if os.path.exists(out_filepath) and not overwrite:
-        raise FileExistsError(f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.")
+        raise BlockInputError(
+            f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
+            recoverable=True,
+        )
 
     with open(out_filepath, "w", encoding=encoding, newline="") as f:
         f.write(content)

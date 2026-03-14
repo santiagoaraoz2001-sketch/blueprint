@@ -2,6 +2,8 @@
 
 import os
 
+from backend.block_sdk.exceptions import BlockDependencyError, BlockInputError
+
 
 def run(ctx):
     output_path = ctx.config.get("output_path", "./output").strip()
@@ -20,7 +22,10 @@ def run(ctx):
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_data("data")
     if not raw_data:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     data = raw_data
     ctx.log_message(f"Data type: {type(data).__name__}")
@@ -29,8 +34,13 @@ def run(ctx):
     ctx.report_progress(2, 3)
     try:
         import yaml
-    except ImportError:
-        raise ImportError("PyYAML is not installed. Install it with: pip install pyyaml")
+    except ImportError as e:
+        missing = getattr(e, "name", None) or "pyyaml"
+        raise BlockDependencyError(
+            missing,
+            "PyYAML is required for YAML output",
+            install_hint="pip install pyyaml",
+        )
 
     content = yaml.dump(
         data,
@@ -60,7 +70,10 @@ def run(ctx):
     out_filepath = os.path.join(out_dir, filename)
 
     if os.path.exists(out_filepath) and not overwrite:
-        raise FileExistsError(f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.")
+        raise BlockInputError(
+            f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
+            recoverable=True,
+        )
 
     with open(out_filepath, "w", encoding="utf-8") as f:
         if header_comment:

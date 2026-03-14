@@ -4,6 +4,8 @@ import json
 import os
 import shutil
 
+from backend.block_sdk.exceptions import BlockInputError
+
 
 def run(ctx):
     output_path = ctx.config.get("output_path", "./output").strip()
@@ -21,7 +23,10 @@ def run(ctx):
     ctx.report_progress(1, 4)
     model_info = ctx.resolve_model_info("model")
     if not model_info:
-        raise ValueError("No model data provided. Connect a 'model' input.")
+        raise BlockInputError(
+            "No model data provided. Connect a 'model' input.",
+            recoverable=False,
+        )
 
     # Determine model type from resolve_model_info output
     # resolve_model_info returns dict with: model_name, model_id, source, backend, and optionally path
@@ -37,7 +42,10 @@ def run(ctx):
         out_dir = os.path.join(ctx.run_dir, output_path, filename)
 
     if os.path.exists(out_dir) and not overwrite:
-        raise FileExistsError(f"Model directory already exists: {out_dir}. Enable 'Overwrite Existing'.")
+        raise BlockInputError(
+            f"Model directory already exists: {out_dir}. Enable 'Overwrite Existing'.",
+            recoverable=True,
+        )
 
     os.makedirs(out_dir, exist_ok=True)
 
@@ -121,9 +129,9 @@ def run(ctx):
     # ---- Step 4: Finalize ----
     ctx.report_progress(4, 4)
     total_size = sum(
-        os.path.getsize(os.path.join(dp, f))
-        for dp, _, fns in os.walk(out_dir)
-        for f in fns
+        os.path.getsize(os.path.join(dp, fn))
+        for dp, _, fns in os.walk(out_dir, followlinks=False)
+        for fn in fns
     )
     ctx.log_message(f"Model saved to {out_dir} ({total_size:,} bytes, {len(saved_files)} files)")
 
@@ -134,7 +142,11 @@ def run(ctx):
         "format": fmt,
         "quantize": quantize,
     })
-    ctx.log_metric("total_size_bytes", float(total_size))
+    # Save artifact for the metadata file so it appears in the artifact registry
+    save_info_path = os.path.join(out_dir, "save_info.json")
+    if os.path.isfile(save_info_path):
+        ctx.save_artifact("model_save_info", save_info_path)
+    ctx.log_metric("file_size_bytes", float(total_size))
     ctx.log_metric("files_saved", float(len(saved_files)))
 
     ctx.log_message("Save Model complete.")

@@ -234,11 +234,15 @@ def run(ctx):
         json.dump(review_notes, f, indent=2, default=str, ensure_ascii=False)
 
     if approved:
+        # Branch: data approved
         ctx.save_output("approved", data)
+        # Branch: data approved
         ctx.save_output("rejected", None)
         ctx.log_message(f"APPROVED: data forwarded downstream (score: {avg_score})")
     else:
+        # Branch: data rejected
         ctx.save_output("approved", None)
+        # Branch: data rejected
         ctx.save_output("rejected", data)
         ctx.log_message(f"REJECTED: data routed to rejection path (score: {avg_score})")
 

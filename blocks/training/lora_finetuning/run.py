@@ -271,7 +271,9 @@ def _run_real_training(
     ctx.log_metric("train/loss", final_loss)
     ctx.log_metric("epochs_completed", epochs)
     ctx.log_metric("trainable_params", trainable)
+    # Branch: real training succeeded
     ctx.save_output("model", output_dir)
+    # Branch: real training succeeded
     ctx.save_output("metrics", {
         "final_loss": final_loss,
         "total_steps": result.global_step,
@@ -355,7 +357,9 @@ def _run_fallback(
     ctx.log_message(f"Training plan saved to {plan_path}")
     ctx.log_message("Install torch + transformers + peft to execute actual training")
 
+    # Branch: fallback/plan-only mode (dead code — _run_fallback is never called)
     ctx.save_output("model", output_dir)
+    # Branch: fallback/plan-only mode (dead code — _run_fallback is never called)
     ctx.save_output("metrics", {
         "status": "plan_only",
         "estimated_steps": estimated_steps,

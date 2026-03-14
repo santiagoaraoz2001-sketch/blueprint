@@ -3,7 +3,11 @@
 import json
 import os
 import time
+import urllib.request
+import urllib.error
 from datetime import datetime, timezone
+
+from backend.block_sdk.exceptions import BlockExecutionError, BlockInputError
 
 
 def run(ctx):
@@ -21,7 +25,10 @@ def run(ctx):
     include_run_id = ctx.config.get("include_run_id", False)
 
     if not webhook_url:
-        raise ValueError("Webhook URL is required. Set the 'Webhook URL' config.")
+        raise BlockInputError(
+            "Webhook URL is required. Set the 'Webhook URL' config.",
+            recoverable=True,
+        )
 
     ctx.log_message(f"Webhook Trigger starting ({method} {webhook_url})")
     ctx.report_progress(0, 3)
@@ -30,7 +37,10 @@ def run(ctx):
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_data("data")
     if not raw_data:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     data = raw_data
 
@@ -60,12 +70,10 @@ def run(ctx):
         if metrics_data:
             payload["metrics"] = metrics_data
         if include_run_id:
-            payload["run_id"] = getattr(ctx, "run_id", None) or os.path.basename(ctx.run_dir)
+            payload["run_id"] = os.path.basename(ctx.run_dir)
 
     # ---- Step 2: Build request ----
     ctx.report_progress(2, 3)
-    import urllib.request
-    import urllib.error
 
     try:
         custom_headers = json.loads(headers_str) if headers_str else {}
@@ -81,15 +89,15 @@ def run(ctx):
     body = json.dumps(payload, default=str, ensure_ascii=False).encode("utf-8")
 
     # ---- Step 3: Send webhook ----
-    attempts = max_retries if retry_on_failure else 1
+    effective_attempts = max_retries if retry_on_failure else 1
+    effective_attempts = max(effective_attempts, 1)
     last_error = None
     status_code = None
     response_body = ""
 
-    for attempt in range(max(attempts, 1)):
+    for attempt in range(effective_attempts):
         try:
             if method == "GET":
-                # For GET, append data as query params (limited)
                 req = urllib.request.Request(webhook_url, headers=request_headers, method="GET")
             else:
                 req = urllib.request.Request(webhook_url, data=body, headers=request_headers, method=method)
@@ -107,16 +115,16 @@ def run(ctx):
             status_code = e.code
             if e.code < 500 and e.code != 429:
                 break  # Client error, don't retry
-            if attempt < attempts - 1:
+            if attempt < effective_attempts - 1:
                 wait = 2 ** attempt
-                ctx.log_message(f"Retry {attempt + 1}/{attempts} after {wait}s ({last_error})")
+                ctx.log_message(f"Retry {attempt + 1}/{effective_attempts} after {wait}s ({last_error})")
                 time.sleep(wait)
 
         except Exception as e:
             last_error = str(e)
-            if attempt < attempts - 1:
+            if attempt < effective_attempts - 1:
                 wait = 2 ** attempt
-                ctx.log_message(f"Retry {attempt + 1}/{attempts} after {wait}s ({last_error})")
+                ctx.log_message(f"Retry {attempt + 1}/{effective_attempts} after {wait}s ({last_error})")
                 time.sleep(wait)
 
     ctx.report_progress(3, 3)
@@ -136,18 +144,26 @@ def run(ctx):
                     "source": "blueprint",
                 }, default=str).encode("utf-8")
                 fail_req = urllib.request.Request(on_failure_url, data=fail_payload, headers={"Content-Type": "application/json"}, method="POST")
-                urllib.request.urlopen(fail_req, timeout=10)
+                with urllib.request.urlopen(fail_req, timeout=10) as _resp:
+                    _resp.read()
                 ctx.log_message(f"Failure notification sent to {on_failure_url}")
             except Exception as e:
                 ctx.log_message(f"WARNING: Could not send failure notification: {e}")
 
+        # Branch: webhook failed
         ctx.save_output("status", status_msg)
+        # Branch: webhook failed
         ctx.save_output("summary", {"status": "failed", "error": last_error, "status_code": status_code})
         ctx.log_metric("webhook_success", 0.0)
-        raise RuntimeError(f"Webhook failed after {attempts} attempts: {last_error}")
+        raise BlockExecutionError(
+            f"Webhook failed after {effective_attempts} attempt(s): {last_error}",
+            recoverable=False,
+        )
     else:
         status_msg = f"OK ({status_code})"
+        # Branch: webhook succeeded
         ctx.save_output("status", status_msg)
+        # Branch: webhook succeeded
         ctx.save_output("summary", {
             "status": "success",
             "status_code": status_code,

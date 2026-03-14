@@ -134,6 +134,9 @@ def run(ctx):
         "learning_rate": lr,
         "loss_function": loss_fn,
     }
+    ctx.log_metric("train_loss", metrics["train/loss"])
+    ctx.log_metric("epochs_completed", epochs)
+    ctx.log_metric("train_samples_per_second", metrics["train_samples_per_second"])
     ctx.log_message(f"Training complete: loss={metrics['train/loss']:.6f}")
 
     ctx.report_progress(3, 4)

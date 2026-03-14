@@ -146,6 +146,11 @@ def run(ctx):
 
     # Load main input data
     input_data = _load_data(ctx, "input")
+    if input_data is None:
+        raise ValueError(
+            "Required input 'input' not connected or produced no data. "
+            "Connect data to the 'Input Data' port."
+        )
 
     # Determine what to evaluate: main input or external condition data
     if use_condition_data:
@@ -182,11 +187,15 @@ def run(ctx):
     # Route data
     if condition_met:
         ctx.log_message("Routing to: TRUE branch")
+        # Branch: condition met — route to true
         ctx.save_output("true_branch", input_data)
+        # Branch: condition met — route to true
         ctx.save_output("false_branch", None)
     else:
         ctx.log_message("Routing to: FALSE branch")
+        # Branch: condition not met — route to false
         ctx.save_output("true_branch", None)
+        # Branch: condition not met — route to false
         ctx.save_output("false_branch", input_data)
 
     result_info = {

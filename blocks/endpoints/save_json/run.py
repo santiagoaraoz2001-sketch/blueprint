@@ -3,6 +3,8 @@
 import json
 import os
 
+from backend.block_sdk.exceptions import BlockInputError
+
 
 def run(ctx):
     output_path = ctx.config.get("output_path", "./output").strip()
@@ -23,7 +25,10 @@ def run(ctx):
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_data("data")
     if not raw_data:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     data = raw_data
 
@@ -75,13 +80,16 @@ def run(ctx):
     if timestamp_filename:
         from datetime import datetime
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        base = filename.rsplit(".", 1)[0]
-        filename = f"{base}_{ts}{ext}"
+        base, fext = os.path.splitext(filename)
+        filename = f"{base}_{ts}{fext}"
 
     out_filepath = os.path.join(out_dir, filename)
 
     if os.path.exists(out_filepath) and not overwrite:
-        raise FileExistsError(f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.")
+        raise BlockInputError(
+            f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
+            recoverable=True,
+        )
 
     with open(out_filepath, "w", encoding="utf-8") as f:
         f.write(content)

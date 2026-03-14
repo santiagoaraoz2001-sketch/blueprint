@@ -1,8 +1,8 @@
 name: Hyperparameter Sweep
 type: hyperparameter_sweep
 category: training
-description: Grid or random search over hyperparameters to find optimal training config
-version: "1.0.0"
+description: "Grid or random search over hyperparameters with real training trials using HuggingFace Trainer"
+version: "1.1.0"
 
 inputs:
   - id: dataset

@@ -294,7 +294,9 @@ def _run_real_training(
     ctx.log_metric("train/epochs_completed", float(epochs))
     ctx.log_message(f"BALLAST training complete. Final loss: {final_loss}")
 
+    # Branch: real training succeeded
     ctx.save_output("model", output_dir)
+    # Branch: real training succeeded
     ctx.save_output("metrics", {
         "final_loss": final_loss,
         "epochs": epochs,
@@ -388,7 +390,9 @@ def _run_fallback(ctx, model_name, raw_data, layer_depth, balance_factor, epochs
     ctx.log_message(f"Training plan saved to {plan_path}")
     ctx.log_message("Install torch + transformers to execute actual training")
 
+    # Branch: fallback/plan-only mode (dead code — _run_fallback is never called)
     ctx.save_output("model", output_dir)
+    # Branch: fallback/plan-only mode (dead code — _run_fallback is never called)
     ctx.save_output("metrics", {
         "status": "plan_only",
         "frozen_layers": freeze_count,

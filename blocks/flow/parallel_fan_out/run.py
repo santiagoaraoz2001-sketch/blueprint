@@ -73,6 +73,11 @@ def run(ctx):
     input_data = _load_data(ctx, "input")
     if input_data is None:
         input_data = _load_data(ctx, "dataset")
+    if input_data is None:
+        raise ValueError(
+            "Required input 'input' not connected or produced no data. "
+            "Connect data to the 'Input Data' port."
+        )
 
     # Normalize to list for splitting
     if isinstance(input_data, list):

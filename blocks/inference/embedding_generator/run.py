@@ -126,6 +126,7 @@ def run(ctx):
             st_model = SentenceTransformer(model_name)
             embedding_dim = st_model.get_sentence_embedding_dimension()
             ctx.log_message(f"Loaded. Dimension: {embedding_dim}")
+            ctx.log_metric("simulation_mode", 0.0)
 
             for i in range(0, len(texts), batch_size):
                 batch = texts[i:i + batch_size]
@@ -146,6 +147,7 @@ def run(ctx):
     elif provider == "ollama":
         ep = endpoint.rstrip("/")
         ctx.log_message(f"Using Ollama embeddings at {ep}")
+        ctx.log_metric("simulation_mode", 0.0)
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
@@ -195,6 +197,7 @@ def run(ctx):
             ep = "https://api.openai.com"
         openai_model = model_name if model_name != "all-MiniLM-L6-v2" else "text-embedding-3-small"
         ctx.log_message(f"Using OpenAI embeddings: {openai_model}")
+        ctx.log_metric("simulation_mode", 0.0)
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
@@ -226,7 +229,8 @@ def run(ctx):
 
     # ── Unknown provider ─────────────────────────────────────────
     else:
-        ctx.log_message(f"Unknown provider '{provider}'. Using demo embeddings.")
+        ctx.log_message(f"⚠️ SIMULATION MODE: Unknown provider '{provider}'. Using synthetic demo embeddings. Supported providers: sentence-transformers, ollama, openai.")
+        ctx.log_metric("simulation_mode", 1.0)
         method_used = "demo"
         embeddings = _demo_embeddings(texts, _DEFAULT_DEMO_DIM)
         embedding_dim = _DEFAULT_DEMO_DIM

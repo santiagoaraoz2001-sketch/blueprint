@@ -2,6 +2,8 @@
 
 import os
 
+from backend.block_sdk.exceptions import BlockInputError
+
 
 def run(ctx):
     output_path = ctx.config.get("output_path", "./output").strip()
@@ -26,7 +28,10 @@ def run(ctx):
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_text("text")
     if not raw_data:
-        raise ValueError("No input data provided. Connect a 'text' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'text' input.",
+            recoverable=False,
+        )
 
     content = raw_data
     original_length = len(content)
@@ -46,7 +51,7 @@ def run(ctx):
         content = content + "\n" + suffix
 
     # Apply line ending
-    if line_ending == "CRLF":
+    if line_ending.upper() == "CRLF":
         content = content.replace("\r\n", "\n").replace("\n", "\r\n")
 
     ctx.log_message(f"Text content: {len(content):,} characters")
@@ -64,11 +69,14 @@ def run(ctx):
     out_filepath = os.path.join(out_dir, filename)
 
     if not append_mode and os.path.exists(out_filepath) and not overwrite:
-        raise FileExistsError(f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.")
+        raise BlockInputError(
+            f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
+            recoverable=True,
+        )
 
     # ---- Step 3: Write file ----
     mode = "a" if append_mode else "w"
-    newline_char = "" if line_ending == "CRLF" else None
+    newline_char = "" if line_ending.upper() == "CRLF" else None
     with open(out_filepath, mode, encoding=encoding, newline=newline_char) as f:
         if append_mode:
             f.write("\n")

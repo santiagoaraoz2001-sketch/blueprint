@@ -2,6 +2,8 @@
 
 import os
 
+from backend.block_sdk.exceptions import BlockDependencyError, BlockInputError
+
 
 def _normalize_rows(data):
     """Ensure data is a list of dicts."""
@@ -52,8 +54,7 @@ def _write_parquet_pandas(rows, file_path, compression):
     try:
         import pandas as pd
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
-        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        missing = getattr(e, "name", None) or "pandas"
         raise BlockDependencyError(
             missing,
             f"Required library not installed: {e}",
@@ -80,9 +81,20 @@ def run(ctx):
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_data("data")
     if not raw_data:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     rows = _normalize_rows(raw_data)
+
+    if not rows:
+        raise BlockInputError(
+            "Cannot save data in Parquet format: expected tabular data (list of dicts), got empty data",
+            details=f"Upstream block produced: {str(raw_data)[:200]}",
+            recoverable=False,
+        )
+
     headers = _collect_headers(rows)
     ctx.log_message(f"Loaded {len(rows)} rows, {len(headers)} columns")
 
@@ -107,7 +119,10 @@ def run(ctx):
     out_filepath = os.path.join(out_dir, filename)
 
     if os.path.exists(out_filepath) and not overwrite:
-        raise FileExistsError(f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.")
+        raise BlockInputError(
+            f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
+            recoverable=True,
+        )
 
     # ---- Step 3: Write Parquet ----
     written = False
@@ -127,9 +142,10 @@ def run(ctx):
             pass
 
     if not written:
-        raise ImportError(
-            "Neither pyarrow nor pandas is installed. "
-            "Install pyarrow (pip install pyarrow) for Parquet support."
+        raise BlockDependencyError(
+            "pyarrow",
+            "Neither pyarrow nor pandas is installed for Parquet support",
+            install_hint="pip install pyarrow",
         )
 
     ctx.report_progress(3, 3)

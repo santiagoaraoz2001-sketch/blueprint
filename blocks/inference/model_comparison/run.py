@@ -30,7 +30,7 @@ def run(ctx):
         if isinstance(model_data, dict):
             ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
 
-    models_text = ctx.config.get("models", "ollama:llama3.2\nollama:mistral")
+    models_text = ctx.config.get("models", "")
     endpoint = model_data.get("endpoint", model_data.get("base_url",
         ctx.config.get("endpoint", "http://localhost:11434")))
     api_key = model_data.get("api_key",

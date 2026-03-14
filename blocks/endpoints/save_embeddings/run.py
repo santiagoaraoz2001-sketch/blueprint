@@ -3,6 +3,8 @@
 import json
 import os
 
+from backend.block_sdk.exceptions import BlockDependencyError, BlockInputError
+
 
 def _extract_vectors(data):
     """Extract numeric vectors from various data formats."""
@@ -59,7 +61,10 @@ def run(ctx):
     # that resolve_as_data cannot handle (it tries to read them as text/JSON).
     raw_data = ctx.load_input("embeddings")
     if raw_data is None:
-        raise ValueError("No embedding data provided. Connect an 'embeddings' input.")
+        raise BlockInputError(
+            "No embedding data provided. Connect an 'embeddings' input.",
+            recoverable=False,
+        )
 
     vec_info = _extract_vectors(raw_data)
     ctx.log_message(f"Embedding data type: {vec_info['type']}")
@@ -84,7 +89,10 @@ def run(ctx):
         ext = os.path.splitext(src)[1]
         out_filepath = os.path.join(out_dir, filename + ext)
         if os.path.exists(out_filepath) and not overwrite:
-            raise FileExistsError(f"File exists: {out_filepath}")
+            raise BlockInputError(
+                f"File already exists: {out_filepath}",
+                recoverable=True,
+            )
         shutil.copy2(src, out_filepath)
         ctx.log_message(f"Copied embedding file from {src}")
         file_size = os.path.getsize(out_filepath)
@@ -106,10 +114,11 @@ def run(ctx):
 
         ctx.log_message(f"Processing {num_vectors} vectors (dim={dimensions})")
 
-        if fmt == "npy" or fmt == "npz":
+        if fmt in ("npy", "npz"):
             try:
                 import numpy as np
-                np_dtype = np.float16 if precision == "float16" else np.float32
+                dtype_map = {"float16": np.float16, "float32": np.float32, "float64": np.float64}
+                np_dtype = dtype_map.get(precision, np.float32)
                 arr = np.array(vectors, dtype=np_dtype)
                 num_vectors = arr.shape[0]
                 dimensions = arr.shape[1] if arr.ndim > 1 else 0
@@ -120,23 +129,28 @@ def run(ctx):
                     arr = arr / norms
                     ctx.log_message("Applied L2 normalization")
             except ImportError as e:
-                from backend.block_sdk.exceptions import BlockDependencyError
-                missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+                missing = getattr(e, "name", None) or "numpy"
                 raise BlockDependencyError(
                     missing,
                     f"Required library not installed: {e}",
                     install_hint="pip install numpy",
                 )
+            except (ValueError, TypeError) as e:
+                raise BlockInputError(
+                    f"Cannot convert embedding data to numeric array: {e}",
+                    details=f"Got {num_vectors} items, first item type: {type(vectors[0]).__name__ if vectors else 'N/A'}",
+                    recoverable=False,
+                )
 
             if fmt == "npy":
                 out_filepath = os.path.join(out_dir, filename + ".npy")
                 if os.path.exists(out_filepath) and not overwrite:
-                    raise FileExistsError(f"File exists: {out_filepath}")
+                    raise BlockInputError(f"File already exists: {out_filepath}", recoverable=True)
                 np.save(out_filepath, arr)
             else:
                 out_filepath = os.path.join(out_dir, filename + ".npz")
                 if os.path.exists(out_filepath) and not overwrite:
-                    raise FileExistsError(f"File exists: {out_filepath}")
+                    raise BlockInputError(f"File already exists: {out_filepath}", recoverable=True)
                 np.savez_compressed(out_filepath, embeddings=arr)
 
         elif fmt == "faiss":
@@ -146,6 +160,12 @@ def run(ctx):
                 arr = np.array(vectors, dtype=np.float32)  # FAISS requires float32
                 num_vectors = arr.shape[0]
                 dimensions = arr.shape[1] if arr.ndim > 1 else 0
+                if dimensions == 0:
+                    raise BlockInputError(
+                        "Cannot create FAISS index: vectors must be 2D (each vector needs a dimension > 0)",
+                        details=f"Array shape: {arr.shape}",
+                        recoverable=False,
+                    )
                 # L2 normalize if requested
                 if normalize and arr.ndim > 1:
                     norms = np.linalg.norm(arr, axis=1, keepdims=True)
@@ -156,25 +176,28 @@ def run(ctx):
                 index.add(arr)
                 out_filepath = os.path.join(out_dir, filename + ".faiss")
                 if os.path.exists(out_filepath) and not overwrite:
-                    raise FileExistsError(f"File exists: {out_filepath}")
+                    raise BlockInputError(f"File already exists: {out_filepath}", recoverable=True)
                 faiss.write_index(index, out_filepath)
             except ImportError as e:
-                from backend.block_sdk.exceptions import BlockDependencyError
-                missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+                missing = getattr(e, "name", None) or "faiss"
                 raise BlockDependencyError(
                     missing,
                     f"Required library not installed: {e}",
-                    install_hint="pip install numpy",
+                    install_hint="pip install faiss-cpu numpy",
                 )
 
         elif fmt == "json":
             out_filepath = os.path.join(out_dir, filename + ".json")
             if os.path.exists(out_filepath) and not overwrite:
-                raise FileExistsError(f"File exists: {out_filepath}")
+                raise BlockInputError(f"File already exists: {out_filepath}", recoverable=True)
             with open(out_filepath, "w", encoding="utf-8") as f:
                 json.dump({"embeddings": vectors, "count": num_vectors, "dimensions": dimensions}, f)
         else:
-            raise ValueError(f"Unsupported format: {fmt}")
+            raise BlockInputError(
+                f"Cannot save embeddings in {fmt} format: unsupported format",
+                details="Supported formats: npy, npz, faiss, json",
+                recoverable=True,
+            )
 
         file_size = os.path.getsize(out_filepath)
 
@@ -182,7 +205,7 @@ def run(ctx):
         # Fallback: save as JSON
         out_filepath = os.path.join(out_dir, filename + ".json")
         if os.path.exists(out_filepath) and not overwrite:
-            raise FileExistsError(f"File exists: {out_filepath}")
+            raise BlockInputError(f"File already exists: {out_filepath}", recoverable=True)
         with open(out_filepath, "w", encoding="utf-8") as f:
             json.dump(vec_info.get("data", raw_data), f, indent=2, default=str)
         file_size = os.path.getsize(out_filepath)

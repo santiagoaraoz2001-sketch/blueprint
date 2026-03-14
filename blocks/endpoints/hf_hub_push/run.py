@@ -2,6 +2,9 @@
 
 import json
 import os
+import posixpath
+
+from backend.block_sdk.exceptions import BlockDependencyError, BlockInputError
 
 
 def _resolve_upload_info(data):
@@ -28,14 +31,18 @@ def run(ctx):
     path_in_repo = ctx.config.get("path_in_repo", "").strip()
 
     if not repo_id:
-        raise ValueError("Repository ID is required (e.g. 'username/model-name').")
+        raise BlockInputError(
+            "Repository ID is required (e.g. 'username/model-name').",
+            recoverable=True,
+        )
 
     if not hf_token:
         hf_token = os.environ.get("HF_TOKEN", "") or os.environ.get("HUGGING_FACE_HUB_TOKEN", "")
     if not hf_token:
-        raise ValueError(
+        raise BlockInputError(
             "HuggingFace token is required. Set it in the config, "
-            "use $secret:HF_TOKEN, or set the HF_TOKEN environment variable."
+            "use $secret:HF_TOKEN, or set the HF_TOKEN environment variable.",
+            recoverable=True,
         )
 
     ctx.log_message(f"HF Hub Push starting (repo={repo_id}, type={repo_type})")
@@ -44,10 +51,9 @@ def run(ctx):
     # ---- Step 1: Import huggingface_hub ----
     ctx.report_progress(1, 4)
     try:
-        from huggingface_hub import HfApi, create_repo as hf_create_repo
+        from huggingface_hub import HfApi
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
-        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        missing = getattr(e, "name", None) or "huggingface_hub"
         raise BlockDependencyError(
             missing,
             f"Required library not installed: {e}",
@@ -63,7 +69,10 @@ def run(ctx):
     # hiding path references that _resolve_upload_info needs to inspect.
     raw_data = ctx.load_input("data")
     if raw_data is None:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     # If upstream sent a directory path string, resolve it directly
     if isinstance(raw_data, str) and os.path.isdir(raw_data):
@@ -110,7 +119,8 @@ def run(ctx):
     elif resolved["type"] == "file":
         path = resolved["path"]
         filename = os.path.basename(path)
-        file_repo_path = os.path.join(path_in_repo, filename) if path_in_repo else filename
+        # Use posixpath for HuggingFace repo paths (always forward slashes)
+        file_repo_path = posixpath.join(path_in_repo, filename) if path_in_repo else filename
         api.upload_file(
             path_or_fileobj=path,
             path_in_repo=file_repo_path,
@@ -147,9 +157,10 @@ def run(ctx):
                         f.write(buf.getvalue())
                     filename = "data.csv"
                 except Exception:
-                    pass
+                    ctx.log_message("WARNING: Could not convert to CSV, uploading as JSON")
 
-        file_repo_path = os.path.join(path_in_repo, filename) if path_in_repo else filename
+        # Use posixpath for HuggingFace repo paths (always forward slashes)
+        file_repo_path = posixpath.join(path_in_repo, filename) if path_in_repo else filename
         api.upload_file(
             path_or_fileobj=temp_path,
             path_in_repo=file_repo_path,
@@ -162,7 +173,11 @@ def run(ctx):
         ctx.log_message(f"Uploaded data as {filename}")
 
     else:
-        raise ValueError(f"Cannot determine how to upload data of type: {resolved['type']}")
+        raise BlockInputError(
+            f"Cannot determine how to upload data of type: {resolved['type']}",
+            details=f"Upstream block produced: {str(raw_data)[:200]}",
+            recoverable=False,
+        )
 
     # ---- Finalize ----
     ctx.report_progress(4, 4)

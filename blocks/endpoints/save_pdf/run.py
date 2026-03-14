@@ -4,6 +4,8 @@ import json
 import os
 from datetime import datetime, timezone
 
+from backend.block_sdk.exceptions import BlockInputError
+
 
 def _normalize_rows(data):
     """Extract tabular data if present."""
@@ -69,10 +71,11 @@ def _build_pdf_fpdf(data, out_filepath, title, page_size, orientation, include_c
     rows = _normalize_rows(data)
     if rows:
         headers = _collect_headers(rows)
-        pdf.set_font("Helvetica", "B", 10)
-        col_width = (pdf.w - 20) / max(len(headers), 1)
+        num_cols = max(len(headers), 1)
+        col_width = (pdf.w - 20) / num_cols
         col_width = min(col_width, 60)
 
+        pdf.set_font("Helvetica", "B", 10)
         # Header row
         for h in headers:
             pdf.cell(col_width, 8, str(h)[:20], border=1, align="C")
@@ -115,14 +118,19 @@ def _build_pdf_fpdf(data, out_filepath, title, page_size, orientation, include_c
                     pdf.ln(2)
 
     elif isinstance(data, dict):
-        # Render dict as key-value pairs
-        pdf.set_font("Helvetica", "", font_size)
-        for key, value in data.items():
-            pdf.set_font("Helvetica", "B", 10)
-            pdf.cell(60, 7, str(key), border=1)
-            pdf.set_font("Helvetica", "", 10)
-            val_str = str(value)[:100]
-            pdf.cell(0, 7, val_str, border=1, ln=True)
+        # Check for text content first
+        if "text" in data and isinstance(data["text"], str):
+            pdf.set_font("Helvetica", "", font_size)
+            pdf.multi_cell(0, 6, data["text"][:5000])
+        else:
+            # Render dict as key-value pairs
+            pdf.set_font("Helvetica", "", font_size)
+            for key, value in data.items():
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.cell(60, 7, str(key), border=1)
+                pdf.set_font("Helvetica", "", 10)
+                val_str = str(value)[:100]
+                pdf.cell(0, 7, val_str, border=1, ln=True)
     elif isinstance(data, str):
         # Render text content
         pdf.set_font("Helvetica", "", font_size)
@@ -135,7 +143,7 @@ def _build_pdf_fpdf(data, out_filepath, title, page_size, orientation, include_c
 
 
 def _build_pdf_fallback(data, out_filepath, title, include_timestamp):
-    """Fallback: write a styled text file with .pdf extension note."""
+    """Fallback: write a styled text file when fpdf2 is not available."""
     lines = [f"=== {title} ===", ""]
     if include_timestamp:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -150,13 +158,17 @@ def _build_pdf_fallback(data, out_filepath, title, include_timestamp):
         for row in rows[:100]:
             lines.append(" | ".join(str(row.get(h, "")) for h in headers))
     elif isinstance(data, dict):
-        for k, v in data.items():
-            lines.append(f"{k}: {v}")
+        if "text" in data and isinstance(data["text"], str):
+            lines.append(data["text"][:5000])
+        else:
+            for k, v in data.items():
+                lines.append(f"{k}: {v}")
     else:
         lines.append(str(data)[:5000])
 
     # Write as text since fpdf2 is not available
-    txt_path = out_filepath.replace(".pdf", ".txt")
+    base, _ = os.path.splitext(out_filepath)
+    txt_path = base + ".txt"
     with open(txt_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
     return txt_path
@@ -183,7 +195,10 @@ def run(ctx):
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_data("data")
     if not raw_data:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     data = raw_data
 
@@ -193,7 +208,7 @@ def run(ctx):
         if isinstance(report_config, dict):
             title = report_config.get("title", title)
             page_size = report_config.get("page_size", page_size)
-    except Exception:
+    except (KeyError, ValueError):
         pass
 
     # ---- Step 2: Resolve path ----
@@ -209,22 +224,35 @@ def run(ctx):
     out_filepath = os.path.join(out_dir, filename)
 
     if os.path.exists(out_filepath) and not overwrite:
-        raise FileExistsError(f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.")
+        raise BlockInputError(
+            f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
+            recoverable=True,
+        )
 
     # ---- Step 3: Generate PDF ----
+    actual_format = "pdf"
+    is_simulated = False
     try:
         _build_pdf_fpdf(data, out_filepath, title, page_size, orientation, include_charts, include_timestamp, font_size, header_text, footer_text, max_rows)
         ctx.log_message("PDF generated using fpdf2")
     except ImportError:
-        ctx.log_message("WARNING: fpdf2 not installed. Install with: pip install fpdf2. Falling back to text report.")
+        ctx.log_message("⚠️ SIMULATION MODE: fpdf2 not installed. Generating text-only fallback report. Install fpdf2 for real PDF output: pip install fpdf2")
+        is_simulated = True
         out_filepath = _build_pdf_fallback(data, out_filepath, title, include_timestamp)
+        actual_format = "txt_fallback"
+
+    ctx.log_metric("simulation_mode", 1.0 if is_simulated else 0.0)
 
     ctx.report_progress(3, 3)
     file_size = os.path.getsize(out_filepath)
     ctx.log_message(f"Saved report to {out_filepath} ({file_size:,} bytes)")
 
     ctx.save_output("file_path", out_filepath)
-    ctx.save_output("summary", {"file_size_bytes": file_size, "page_size": page_size})
+    ctx.save_output("summary", {
+        "file_size_bytes": file_size,
+        "page_size": page_size,
+        "format": actual_format,
+    })
     ctx.save_artifact("pdf_report", out_filepath)
     ctx.log_metric("file_size_bytes", float(file_size))
 

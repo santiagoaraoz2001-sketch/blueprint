@@ -63,9 +63,12 @@ def run(ctx):
                 checkpoints.append(ckpt_info)
 
         ctx.log_message(f"Found {len(checkpoints)} checkpoints")
+        ctx.log_metric("simulation_mode", 0.0)
     else:
         # Demo mode: generate fake checkpoints
-        ctx.log_message("⚠ DEMO MODE: No valid checkpoint directory. Generating sample checkpoints.")
+        ctx.log_message("⚠️ SIMULATION MODE: No valid checkpoint directory found. Generating sample checkpoints with synthetic metrics. Provide a valid checkpoint_dir for real checkpoint selection.")
+        ctx.log_metric("simulation_mode", 1.0)
+        import math
         import random
         random.seed(42)
         for step in [500, 1000, 1500, 2000, 2500, 3000]:
@@ -80,7 +83,6 @@ def run(ctx):
                     "step": step,
                 },
             })
-        import math
 
     # Select best checkpoint
     best = None
@@ -104,15 +106,18 @@ def run(ctx):
 
     if best:
         ctx.log_message(f"Best checkpoint: {best['name']} ({metric_name}={best_metric_val})")
+        # Branch: best checkpoint found by metric
         ctx.save_output("model", {"path": best["path"], "source": "checkpoint", **best})
     else:
         # Fall back to latest
         if checkpoints:
             best = max(checkpoints, key=lambda c: c["step"])
             ctx.log_message(f"No metric found. Selecting latest: {best['name']}")
+            # Branch: checkpoints exist but no metric — use latest
             ctx.save_output("model", {"path": best["path"], "source": "checkpoint", **best})
         else:
             ctx.log_message("No checkpoints found.")
+            # Branch: no checkpoints found
             ctx.save_output("model", {"path": "", "source": "checkpoint", "error": "no checkpoints found"})
 
     ctx.save_output("metrics", {

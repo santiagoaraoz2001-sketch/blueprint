@@ -81,7 +81,9 @@ def run(ctx):
 
     if not outputs:
         ctx.log_message("No outputs to score.")
+        # Branch: no outputs to score — return early
         ctx.save_output('scores', {})
+        # Branch: no outputs to score — return early
         ctx.save_output('report', os.path.join(ctx.run_dir, "eval_report.json"))
         return
 
@@ -175,6 +177,7 @@ def run(ctx):
     ctx.save_output("dataset", _ds_dir)
 
     # ── Save outputs ──────────────────────────────────────────────────────
+    # Branch: normal execution — scoring complete
     ctx.save_output('scores', aggregated)
 
     report = {
@@ -187,6 +190,7 @@ def run(ctx):
     report_path = os.path.join(ctx.run_dir, "eval_report.json")
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, default=str)
+    # Branch: normal execution — scoring complete
     ctx.save_output('report', report_path)
     ctx.save_artifact("eval_report", report_path)
 

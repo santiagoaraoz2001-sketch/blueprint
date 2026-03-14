@@ -194,14 +194,18 @@ def run(ctx):
 
         if send_condition == "on_failure" and is_success:
             ctx.log_message("send_condition=on_failure but status indicates success — skipping notification")
+            # Branch: send_condition=on_failure but status is success — skip
             ctx.save_output("status", {"skipped": True, "reason": "send_condition not met", "channel": channel})
+            # Branch: send_condition=on_failure but status is success — skip
             ctx.save_output("pass_through", trigger_data)
             ctx.log_metric("notification_delivered", 0.0)
             ctx.report_progress(4, 4)
             return
         elif send_condition == "on_success" and is_failure:
             ctx.log_message("send_condition=on_success but status indicates failure — skipping notification")
+            # Branch: send_condition=on_success but status is failure — skip
             ctx.save_output("status", {"skipped": True, "reason": "send_condition not met", "channel": channel})
+            # Branch: send_condition=on_success but status is failure — skip
             ctx.save_output("pass_through", trigger_data)
             ctx.log_metric("notification_delivered", 0.0)
             ctx.report_progress(4, 4)
@@ -268,7 +272,9 @@ def run(ctx):
     with open(status_path, "w", encoding="utf-8") as f:
         json.dump(status_record, f, indent=2, default=str, ensure_ascii=False)
 
+    # Branch: notification sent
     ctx.save_output("status", status_record)
+    # Branch: notification sent
     ctx.save_output("pass_through", trigger_data)
     ctx.save_artifact("notification_status", status_path)
     ctx.log_metric("notification_delivered", 1.0 if delivery_result.get("delivered") else 0.0)

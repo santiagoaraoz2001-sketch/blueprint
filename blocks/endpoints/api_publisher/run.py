@@ -4,6 +4,10 @@ import json
 import os
 import time
 import base64
+import urllib.request
+import urllib.error
+
+from backend.block_sdk.exceptions import BlockExecutionError, BlockInputError
 
 
 def _normalize_rows(data):
@@ -36,7 +40,10 @@ def run(ctx):
     on_error = ctx.config.get("on_error", "skip").lower().strip()
 
     if not url:
-        raise ValueError("Target URL is required. Set the 'Target URL' config.")
+        raise BlockInputError(
+            "Target URL is required. Set the 'Target URL' config.",
+            recoverable=True,
+        )
 
     ctx.log_message(f"API Publisher starting ({method} {url})")
     ctx.report_progress(0, 4)
@@ -45,7 +52,10 @@ def run(ctx):
     ctx.report_progress(1, 4)
     raw_data = ctx.resolve_as_data("data")
     if not raw_data:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     rows = _normalize_rows(raw_data)
     ctx.log_message(f"Loaded {len(rows)} records to publish")
@@ -62,11 +72,6 @@ def run(ctx):
 
     # ---- Step 2: Build headers ----
     ctx.report_progress(2, 4)
-    try:
-        import urllib.request
-        import urllib.error
-    except ImportError:
-        raise ImportError("urllib is required for API requests")
 
     try:
         custom_headers = json.loads(headers_str) if headers_str else {}
@@ -98,6 +103,7 @@ def run(ctx):
     total_sent = 0
     total_failed = 0
     responses = []
+    effective_retries = max(retry_count, 1)
 
     for batch_idx, batch in enumerate(batches):
         # Build payload
@@ -114,12 +120,12 @@ def run(ctx):
 
         # Send with retry
         last_error = None
-        for attempt in range(max(retry_count, 1)):
+        for attempt in range(effective_retries):
             try:
                 req = urllib.request.Request(url, data=body, headers=request_headers, method=method)
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    resp.read()
                     status_code = resp.status
-                    resp_body = resp.read().decode("utf-8", errors="replace")
 
                 total_sent += len(batch)
                 responses.append({"batch": batch_idx, "status": status_code, "records": len(batch)})
@@ -130,18 +136,17 @@ def run(ctx):
             except urllib.error.HTTPError as e:
                 last_error = f"HTTP {e.code}: {e.reason}"
                 if e.code < 500 and e.code != 429:
-                    # Client error (not retryable except 429)
                     break
-                if attempt < retry_count - 1:
+                if attempt < effective_retries - 1:
                     wait = 2 ** attempt
-                    ctx.log_message(f"Retry {attempt + 1}/{retry_count} after {wait}s ({last_error})")
+                    ctx.log_message(f"Retry {attempt + 1}/{effective_retries} after {wait}s ({last_error})")
                     time.sleep(wait)
 
             except Exception as e:
                 last_error = str(e)
-                if attempt < retry_count - 1:
+                if attempt < effective_retries - 1:
                     wait = 2 ** attempt
-                    ctx.log_message(f"Retry {attempt + 1}/{retry_count} after {wait}s ({last_error})")
+                    ctx.log_message(f"Retry {attempt + 1}/{effective_retries} after {wait}s ({last_error})")
                     time.sleep(wait)
 
         if last_error:
@@ -149,7 +154,10 @@ def run(ctx):
             responses.append({"batch": batch_idx, "error": last_error, "records": len(batch)})
             ctx.log_message(f"Batch {batch_idx + 1} FAILED: {last_error}")
             if on_error == "fail":
-                raise RuntimeError(f"Batch {batch_idx + 1} failed: {last_error}")
+                raise BlockExecutionError(
+                    f"Batch {batch_idx + 1} failed: {last_error}",
+                    recoverable=False,
+                )
 
         # Rate limiting between batches
         if rate_limit > 0 and batch_idx < len(batches) - 1:
@@ -177,6 +185,9 @@ def run(ctx):
     ctx.log_metric("records_failed", float(total_failed))
 
     if total_failed > 0 and total_sent == 0:
-        raise RuntimeError(f"All requests failed. Last error: {last_error}")
+        raise BlockExecutionError(
+            f"All requests failed. Last error: {last_error}",
+            recoverable=False,
+        )
 
     ctx.log_message("API Publisher complete.")
