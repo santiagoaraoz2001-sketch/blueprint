@@ -67,10 +67,22 @@ interface RequestOptions extends RequestInit {
 }
 
 async function request<T>(path: string, options?: RequestOptions): Promise<T> {
-  const { retries = MAX_RETRIES, timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options || {}
+  const { retries = MAX_RETRIES, timeoutMs = DEFAULT_TIMEOUT_MS, signal: externalSignal, ...fetchOptions } = options || {}
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+  // If the caller provided an external signal (e.g. for cancel), abort our
+  // controller when that signal fires so the fetch is cancelled.
+  let onExternalAbort: (() => void) | undefined
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      clearTimeout(timeout)
+      throw new ApiError('Request was cancelled', 0)
+    }
+    onExternalAbort = () => controller.abort()
+    externalSignal.addEventListener('abort', onExternalAbort, { once: true })
+  }
 
   try {
     const res = await fetch(`${BASE_URL}${path}`, {
@@ -88,7 +100,7 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
       if (res.status >= 500 && retries > 0) {
         const delay = RETRY_BASE_DELAY_MS * (MAX_RETRIES - retries + 1)
         await new Promise((r) => setTimeout(r, delay))
-        return request<T>(path, { ...fetchOptions, retries: retries - 1, timeoutMs })
+        return request<T>(path, { ...fetchOptions, retries: retries - 1, timeoutMs, signal: externalSignal })
       }
       throw new ApiError(formatHttpError(res.status, error), res.status)
     }
@@ -97,6 +109,10 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
     return res.json()
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') {
+      // Distinguish external cancellation from timeout
+      if (externalSignal?.aborted) {
+        throw new ApiError('Request was cancelled', 0)
+      }
       throw new ApiError(
         `Request timed out after ${Math.round(timeoutMs / 1000)}s \u2014 the server may be overloaded (${path})`,
         408
@@ -110,30 +126,43 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
     throw formatNetworkError(e)
   } finally {
     clearTimeout(timeout)
+    if (onExternalAbort && externalSignal) {
+      externalSignal.removeEventListener('abort', onExternalAbort)
+    }
   }
 }
 
-export const api = {
-  get: <T>(path: string) => request<T>(path),
+/** Extra options callers can pass for individual requests */
+export interface ApiRequestOptions {
+  timeoutMs?: number
+  signal?: AbortSignal
+}
 
-  post: <T>(path: string, body?: unknown) =>
+export const api = {
+  get: <T>(path: string, opts?: ApiRequestOptions) =>
+    request<T>(path, { ...opts }),
+
+  post: <T>(path: string, body?: unknown, opts?: ApiRequestOptions) =>
     request<T>(path, {
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
+      ...opts,
     }),
 
-  put: <T>(path: string, body?: unknown) =>
+  put: <T>(path: string, body?: unknown, opts?: ApiRequestOptions) =>
     request<T>(path, {
       method: 'PUT',
       body: body ? JSON.stringify(body) : undefined,
+      ...opts,
     }),
 
-  patch: <T>(path: string, body?: unknown) =>
+  patch: <T>(path: string, body?: unknown, opts?: ApiRequestOptions) =>
     request<T>(path, {
       method: 'PATCH',
       body: body ? JSON.stringify(body) : undefined,
+      ...opts,
     }),
 
-  delete: <T>(path: string) =>
-    request<T>(path, { method: 'DELETE' }),
+  delete: <T>(path: string, opts?: ApiRequestOptions) =>
+    request<T>(path, { method: 'DELETE', ...opts }),
 }
