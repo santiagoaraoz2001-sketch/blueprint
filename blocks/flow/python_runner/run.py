@@ -183,4 +183,9 @@ def run(ctx):
     elapsed = time.time() - start_time
     ctx.log_metric("execution_time_s", round(elapsed, 3))
     ctx.log_message(f"Script completed in {elapsed:.2f}s")
+
+    # Ensure output_data is saved even if the user script didn't call save_output
+    if "output_data" not in ctx.get_outputs():
+        ctx.save_output("output_data", None)
+
     ctx.report_progress(1, 1)

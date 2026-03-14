@@ -5,6 +5,11 @@ description: Compare two or three models side-by-side on the same inputs — com
 version: "2.0.0"
 
 inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Optional judge model configuration (overrides judge_model config)"
   - id: model_a
     label: Model A
     data_type: model
