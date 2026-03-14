@@ -23,7 +23,7 @@ outputs:
 
   - id: dataset
     label: Subject Scores
-    data_type: data
+    data_type: dataset
     description: "Per-subject accuracy table: subject, category, accuracy, num_samples"
 
 config:

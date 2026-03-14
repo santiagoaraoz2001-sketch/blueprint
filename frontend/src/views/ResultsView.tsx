@@ -6,12 +6,13 @@ import ResultsTable, { type RunRow } from '@/components/Results/ResultsTable'
 import MetricChart from '@/components/Results/MetricChart'
 import RunComparison from '@/components/Results/RunComparison'
 import EmptyState from '@/components/shared/EmptyState'
-import { BarChart3, Table, LineChart, GitCompare, RefreshCw } from 'lucide-react'
+import CheckpointTimeline from '@/components/Results/CheckpointTimeline'
+import { BarChart3, Table, LineChart, GitCompare, RefreshCw, History } from 'lucide-react'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { DEMO_RUNS } from '@/lib/demo-data'
 import toast from 'react-hot-toast'
 
-type Tab = 'table' | 'chart' | 'compare'
+type Tab = 'table' | 'chart' | 'compare' | 'checkpoints'
 
 export default function ResultsView() {
   const [runs, setRuns] = useState<RunRow[]>([])
@@ -70,6 +71,7 @@ export default function ResultsView() {
     { id: 'table', label: 'TABLE', icon: Table },
     { id: 'chart', label: 'CHART', icon: LineChart },
     { id: 'compare', label: 'COMPARE', icon: GitCompare },
+    { id: 'checkpoints', label: 'CHECKPOINTS', icon: History },
   ]
 
   const selectStyle: React.CSSProperties = {
@@ -184,6 +186,20 @@ export default function ResultsView() {
                   {selectedIds.length}
                 </span>
               )}
+              {tab.id === 'checkpoints' && selectedIds.length === 1 && (
+                <span
+                  style={{
+                    background: T.cyan,
+                    color: T.bg,
+                    fontSize: FS.xxs,
+                    padding: '0 4px',
+                    marginLeft: 2,
+                    fontWeight: 700,
+                  }}
+                >
+                  1
+                </span>
+              )}
             </button>
           )
         })}
@@ -213,6 +229,15 @@ export default function ResultsView() {
             )}
             {activeTab === 'chart' && <MetricChart runs={runs} />}
             {activeTab === 'compare' && <RunComparison runs={selectedRuns} />}
+            {activeTab === 'checkpoints' && (
+              selectedIds.length === 1
+                ? <CheckpointTimeline runId={selectedIds[0]} />
+                : <EmptyState
+                    icon={History}
+                    title="Select a run"
+                    description="Select exactly one run in the table to view its checkpoints"
+                  />
+            )}
           </>
         )}
       </div>

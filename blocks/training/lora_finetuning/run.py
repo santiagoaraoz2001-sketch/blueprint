@@ -30,6 +30,7 @@ def run(ctx):
     save_merged = ctx.config.get("save_merged", False)
     if isinstance(save_merged, str):
         save_merged = save_merged.lower() in ("true", "1", "yes")
+    checkpoint_interval = int(ctx.config.get("checkpoint_interval", 0))
 
     # Parse target modules
     target_modules = [m.strip() for m in target_modules_str.split(",") if m.strip()]
@@ -80,7 +81,7 @@ def run(ctx):
         _run_real_training(
             ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
             lr, epochs, batch_size, max_seq_length, text_column, training_format,
-            eval_split, save_merged,
+            eval_split, save_merged, checkpoint_interval,
             torch, AutoModelForCausalLM, AutoTokenizer, TrainingArguments,
             Trainer, TrainerCallback, DataCollatorForLanguageModeling,
             LoraConfig, get_peft_model, TaskType, Dataset,
@@ -96,7 +97,7 @@ def run(ctx):
 def _run_real_training(
     ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
     lr, epochs, batch_size, max_seq_length, text_column, training_format,
-    eval_split, save_merged,
+    eval_split, save_merged, checkpoint_interval,
     torch, AutoModelForCausalLM, AutoTokenizer, TrainingArguments,
     Trainer, TrainerCallback, DataCollatorForLanguageModeling,
     LoraConfig, get_peft_model, TaskType, Dataset,
@@ -203,6 +204,24 @@ def _run_real_training(
                 ctx.log_message(f"  Eval loss: {logs['eval_loss']:.4f}")
             if state.max_steps > 0:
                 ctx.report_progress(state.global_step, state.max_steps)
+
+        def on_epoch_end(self, args, state, control, **kwargs):
+            current_epoch = int(state.epoch)
+            if checkpoint_interval > 0 and current_epoch % checkpoint_interval == 0:
+                ckpt_path = os.path.join(output_dir, f"checkpoint-epoch-{current_epoch}")
+                os.makedirs(ckpt_path, exist_ok=True)
+                kwargs.get("model", model).save_pretrained(ckpt_path)
+                tokenizer.save_pretrained(ckpt_path)
+                # Search backward for most recent training loss and eval loss
+                ckpt_metrics = {}
+                for entry in reversed(state.log_history):
+                    if "loss" in entry and "loss" not in ckpt_metrics:
+                        ckpt_metrics["loss"] = entry["loss"]
+                    if "eval_loss" in entry and "eval_loss" not in ckpt_metrics:
+                        ckpt_metrics["eval_loss"] = entry["eval_loss"]
+                    if "loss" in ckpt_metrics and "eval_loss" in ckpt_metrics:
+                        break
+                ctx.save_checkpoint(current_epoch, ckpt_path, ckpt_metrics)
 
     trainer = Trainer(
         model=model,

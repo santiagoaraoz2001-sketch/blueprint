@@ -120,7 +120,13 @@ def restore_snapshot(dataset_id: str, snapshot_id: str, db: Session = Depends(ge
     snapshot_dir = SNAPSHOTS_DIR / dataset_id
     original_ext = Path(dataset.source_path).suffix
     snapshot_path = snapshot_dir / f"{snapshot_id}{original_ext}"
-    
+
+    # Guard against path traversal
+    try:
+        snapshot_path.resolve().relative_to(snapshot_dir.resolve())
+    except ValueError:
+        raise HTTPException(400, "Invalid snapshot ID")
+
     if not snapshot_path.exists():
         raise HTTPException(404, "Snapshot not found")
         

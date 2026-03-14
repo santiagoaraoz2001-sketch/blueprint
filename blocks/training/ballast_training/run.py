@@ -30,6 +30,7 @@ def run(ctx):
     text_column = ctx.config.get("text_column") or _dataset_meta.get("text_column", "")
     training_format = ctx.config.get("training_format", ctx.config.get("prompt_template", ""))
     eval_split = float(ctx.config.get("eval_split", 0.0))
+    checkpoint_interval = int(ctx.config.get("checkpoint_interval", 0))
 
     # Try to get model from input port
     try:
@@ -75,7 +76,7 @@ def run(ctx):
 
         _run_real_training(
             ctx, model_name, raw_data, layer_depth, balance_factor,
-            epochs, lr, batch_size, max_seq_length,
+            epochs, lr, batch_size, max_seq_length, checkpoint_interval,
             torch, AutoModelForCausalLM, AutoTokenizer,
             TrainingArguments, Trainer, TrainerCallback,
             DataCollatorForLanguageModeling, Dataset,
@@ -91,7 +92,7 @@ def run(ctx):
 
 def _run_real_training(
     ctx, model_name, raw_data, layer_depth, balance_factor,
-    epochs, lr, batch_size, max_seq_length,
+    epochs, lr, batch_size, max_seq_length, checkpoint_interval,
     torch, AutoModelForCausalLM, AutoTokenizer,
     TrainingArguments, Trainer, TrainerCallback,
     DataCollatorForLanguageModeling, Dataset,
@@ -232,6 +233,24 @@ def _run_real_training(
                 ctx.log_message(f"  Eval loss: {logs['eval_loss']:.4f}")
             if state.max_steps > 0:
                 ctx.report_progress(state.global_step, state.max_steps)
+
+        def on_epoch_end(self, args, state, control, **kwargs):
+            current_epoch = int(state.epoch)
+            if checkpoint_interval > 0 and current_epoch % checkpoint_interval == 0:
+                ckpt_path = os.path.join(output_dir, f"checkpoint-epoch-{current_epoch}")
+                os.makedirs(ckpt_path, exist_ok=True)
+                kwargs.get("model", model).save_pretrained(ckpt_path)
+                tokenizer.save_pretrained(ckpt_path)
+                # Search backward for most recent training loss and eval loss
+                ckpt_metrics = {}
+                for entry in reversed(state.log_history):
+                    if "loss" in entry and "loss" not in ckpt_metrics:
+                        ckpt_metrics["loss"] = entry["loss"]
+                    if "eval_loss" in entry and "eval_loss" not in ckpt_metrics:
+                        ckpt_metrics["eval_loss"] = entry["eval_loss"]
+                    if "loss" in ckpt_metrics and "eval_loss" in ckpt_metrics:
+                        break
+                ctx.save_checkpoint(current_epoch, ckpt_path, ckpt_metrics)
 
     # Build custom optimizer with per-group LRs
     optimizer = torch.optim.AdamW(optimizer_groups, weight_decay=0.01)

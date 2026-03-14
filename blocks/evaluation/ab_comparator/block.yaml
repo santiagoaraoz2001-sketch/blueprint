@@ -22,7 +22,7 @@ inputs:
     description: Optional third model for tournament comparison
   - id: dataset
     label: Test Data
-    data_type: data
+    data_type: dataset
     required: false
     description: "Dataset with prompts OR pre-computed responses (columns: _response_a, _response_b)"
 
@@ -33,7 +33,7 @@ outputs:
     description: 'Aggregate: total_pairs, model_a/b_wins, ties, model_a/b_win_rate, tie_rate, method'
   - id: dataset
     label: Annotated Comparisons
-    data_type: data
+    data_type: dataset
     description: 'Per-item: index, input, response_a, response_b, score_a, score_b, winner (A/B/tie)'
 
   - id: report

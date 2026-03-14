@@ -2,7 +2,9 @@
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
+
+import yaml
 
 # Root blocks directory
 BLOCKS_DIR = Path(__file__).parent.parent.parent / "blocks"
@@ -63,3 +65,44 @@ def get_category(block_type: str) -> str:
     """Get the category of a block type."""
     info = get_block_info(block_type)
     return info["category"] if info else "unknown"
+
+
+# Cache parsed block.yaml schemas
+_yaml_cache: dict[str, dict] = {}
+
+
+def get_block_yaml(block_type: str) -> Optional[dict]:
+    """Load and cache the full block.yaml for a block type.
+
+    Returns the parsed YAML dict, or None if the block type is unknown
+    or has no block.yaml.
+    """
+    if block_type in _yaml_cache:
+        return _yaml_cache[block_type]
+
+    info = get_block_info(block_type)
+    if not info:
+        return None
+
+    yaml_path = Path(info["path"]) / "block.yaml"
+    if not yaml_path.exists():
+        return None
+
+    try:
+        with open(yaml_path, "r") as f:
+            parsed = yaml.safe_load(f) or {}
+        _yaml_cache[block_type] = parsed
+        return parsed
+    except (yaml.YAMLError, OSError):
+        return None
+
+
+def get_block_config_schema(block_type: str) -> dict[str, Any]:
+    """Return the 'config' section from a block's block.yaml.
+
+    Returns an empty dict if the block has no config schema.
+    """
+    block_yaml = get_block_yaml(block_type)
+    if not block_yaml:
+        return {}
+    return block_yaml.get("config", {})

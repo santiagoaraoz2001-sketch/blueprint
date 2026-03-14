@@ -23,7 +23,7 @@ outputs:
 
   - id: dataset
     label: Per-Task Scores
-    data_type: data
+    data_type: dataset
     description: "Per-task accuracy table: task, acc, acc_stderr, num_samples"
 
 config:

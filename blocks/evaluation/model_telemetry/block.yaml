@@ -12,7 +12,7 @@ inputs:
     description: Model to analyze (HF name, local path, or upstream block)
   - id: dataset
     label: Sample Data
-    data_type: data
+    data_type: dataset
     required: false
     description: "Optional dataset for attention capture — uses sample texts if not provided"
   - id: dataset_meta

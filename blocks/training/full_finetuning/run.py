@@ -26,6 +26,7 @@ def run(ctx):
     text_column = ctx.config.get("text_column") or _dataset_meta.get("text_column", "")
     training_format = ctx.config.get("training_format", ctx.config.get("prompt_template", ""))
     eval_split = float(ctx.config.get("eval_split", 0.0))
+    checkpoint_interval = int(ctx.config.get("checkpoint_interval", 0))
 
     if isinstance(gradient_checkpointing, str):
         gradient_checkpointing = gradient_checkpointing.lower() in ("true", "1", "yes")
@@ -166,6 +167,24 @@ def run(ctx):
                     ctx.log_metric("learning_rate", round(logs["learning_rate"], 8), state.global_step)
             if state.max_steps > 0:
                 ctx.report_progress(state.global_step, state.max_steps)
+
+        def on_epoch_end(self, args, state, control, **kwargs):
+            current_epoch = int(state.epoch)
+            if checkpoint_interval > 0 and current_epoch % checkpoint_interval == 0:
+                ckpt_path = os.path.join(output_dir, f"checkpoint-epoch-{current_epoch}")
+                os.makedirs(ckpt_path, exist_ok=True)
+                kwargs.get("model", model).save_pretrained(ckpt_path)
+                tokenizer.save_pretrained(ckpt_path)
+                # Search backward for most recent training loss (last entry may be eval)
+                ckpt_metrics = {}
+                for entry in reversed(state.log_history):
+                    if "loss" in entry and "loss" not in ckpt_metrics:
+                        ckpt_metrics["loss"] = entry["loss"]
+                    if "eval_loss" in entry and "eval_loss" not in ckpt_metrics:
+                        ckpt_metrics["eval_loss"] = entry["eval_loss"]
+                    if "loss" in ckpt_metrics and "eval_loss" in ckpt_metrics:
+                        break
+                ctx.save_checkpoint(current_epoch, ckpt_path, ckpt_metrics)
 
     trainer = Trainer(
         model=model,
