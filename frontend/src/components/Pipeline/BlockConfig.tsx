@@ -1,5 +1,5 @@
 import { T, F, FS } from '@/lib/design-tokens'
-import { usePipelineStore, type BlockNodeData } from '@/stores/pipelineStore'
+import { usePipelineStore, type BlockNodeData, INHERITABLE_KEYS, CONFIG_PROPAGATION_HANDLES } from '@/stores/pipelineStore'
 import { getBlockDefinition, getFileFormatWarning, type ConfigField, type ConnectorType } from '@/lib/block-registry'
 import { usePresetStore } from '@/stores/presetStore'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,6 +10,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/api/client'
 import RecommendedBlocks from './RecommendedBlocks'
 import toast from 'react-hot-toast'
+
+/** Teal accent for inherited config field indicators */
+const INHERITED_ACCENT = '#00BFA5'
 
 export default function BlockConfig() {
   const nodes = usePipelineStore((s) => s.nodes)
@@ -41,6 +44,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
   const selectNode = usePipelineStore((s) => s.selectNode)
   const edges = usePipelineStore((s) => s.edges)
   const nodes = usePipelineStore((s) => s.nodes)
+  const activateInheritanceOverlay = usePipelineStore((s) => s.activateInheritanceOverlay)
   const def = getBlockDefinition(node.data.type)
   const IconComponent = getIcon(node.data.icon)
 
@@ -55,7 +59,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
     const inherited: Record<string, { value: any; sourceName: string; sourceId: string }> = {}
 
     for (const edge of incomingEdges) {
-      if (edge.targetHandle !== 'model' && edge.targetHandle !== 'llm_config' && edge.targetHandle !== 'llm') {
+      if (!CONFIG_PROPAGATION_HANDLES.has(edge.targetHandle || '')) {
         continue
       }
 
@@ -65,19 +69,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
       const sourceConfig = sourceNode.data.config || {}
       const sourceName = sourceNode.data.label || sourceNode.data.type
 
-      const inheritableKeys = [
-        'model_name', 'model', 'model_id',
-        'provider', 'backend', 'source',
-        'endpoint', 'base_url',
-        'api_key',
-        'framework',
-        'temperature', 'max_tokens', 'top_p',
-        'repeat_penalty', 'stop_sequences',
-        'system_prompt',
-        'frequency_penalty', 'presence_penalty',
-      ]
-
-      for (const key of inheritableKeys) {
+      for (const key of INHERITABLE_KEYS) {
         const value = sourceConfig[key]
         if (value !== undefined && value !== null && value !== '') {
           inherited[key] = { value, sourceName, sourceId: edge.source }
@@ -283,10 +275,10 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
         return (
           <div style={{
             padding: '8px 16px',
-            background: '#00BFA510',
-            borderBottom: '1px solid #00BFA520',
+            background: `${INHERITED_ACCENT}10`,
+            borderBottom: `1px solid ${INHERITED_ACCENT}20`,
             fontSize: FS.xs,
-            color: '#00BFA5',
+            color: INHERITED_ACCENT,
             display: 'flex',
             alignItems: 'center',
             gap: 6,
@@ -330,6 +322,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
           {displayFields?.map((field) => {
             const fieldInfo = getFieldState(field.name, node.data.config[field.name], field.default)
             const inherited = inheritedConfig[field.name]
+            const isPropagatable = INHERITABLE_KEYS.includes(field.name)
             return (
               <ConfigFieldInput
                 key={field.name}
@@ -340,6 +333,11 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
                 expectedOutputType={def?.outputs[0]?.dataType as ConnectorType | undefined}
                 fieldInfo={fieldInfo}
                 inherited={inherited}
+                onShowInheritance={isPropagatable ? () => {
+                  // Origin is upstream source if inherited, otherwise this node
+                  const originId = inherited ? inherited.sourceId : node.id
+                  activateInheritanceOverlay(field.name, originId)
+                } : undefined}
               />
             )
           })}
@@ -437,6 +435,7 @@ function ConfigFieldInput({
   expectedOutputType,
   fieldInfo,
   inherited,
+  onShowInheritance,
 }: {
   field: ConfigField
   value: ConfigValue
@@ -445,12 +444,13 @@ function ConfigFieldInput({
   expectedOutputType?: ConnectorType
   fieldInfo: FieldInfo
   inherited?: { value: any; sourceName: string; sourceId: string }
+  onShowInheritance?: () => void
 }) {
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '8px 12px',
     background: T.surface3,
-    border: `1px solid ${fieldInfo.state === 'inherited' ? '#00BFA540' : T.borderHi}`,
+    border: `1px solid ${fieldInfo.state === 'inherited' ? `${INHERITED_ACCENT}40` : T.borderHi}`,
     borderRadius: 6,
     color: fieldInfo.state === 'default' ? T.dim : T.text,
     fontFamily: F,
@@ -470,10 +470,12 @@ function ConfigFieldInput({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {/* Label with state indicator */}
       <label
+        onClick={onShowInheritance}
+        title={onShowInheritance ? `Show inheritance flow for "${field.name}"` : undefined}
         style={{
           fontFamily: F,
           fontSize: FS.xs,
-          color: fieldInfo.state === 'inherited' ? '#00BFA5'
+          color: fieldInfo.state === 'inherited' ? INHERITED_ACCENT
                : fieldInfo.state === 'default' ? T.dim
                : T.sec,
           fontWeight: 600,
@@ -481,13 +483,19 @@ function ConfigFieldInput({
           display: 'flex',
           alignItems: 'center',
           gap: 6,
+          cursor: onShowInheritance ? 'pointer' : undefined,
         }}
       >
         {field.label}
+        {onShowInheritance && (
+          <span style={{ fontSize: FS.xxs, color: T.blue, opacity: 0.6 }} title="Click to visualize inheritance">
+            &#x25C9;
+          </span>
+        )}
         {fieldInfo.state === 'inherited' && (
           <span style={{
             fontSize: FS.xxs,
-            color: '#00BFA580',
+            color: `${INHERITED_ACCENT}80`,
             fontStyle: 'normal',
             fontWeight: 400,
           }}>
@@ -521,7 +529,7 @@ function ConfigFieldInput({
               fontWeight: 400,
               marginLeft: 'auto',
             }}
-            onMouseEnter={e => e.currentTarget.style.color = '#00BFA5'}
+            onMouseEnter={e => e.currentTarget.style.color = INHERITED_ACCENT}
             onMouseLeave={e => e.currentTarget.style.color = T.dim}
           >
             &#x2715; revert
@@ -535,7 +543,7 @@ function ConfigFieldInput({
           onChange={(e) => onChange(e.target.value)}
           style={{
             ...inputStyle,
-            color: isInherited ? '#00BFA5' : fieldInfo.state === 'default' ? T.dim : T.text,
+            color: isInherited ? INHERITED_ACCENT : fieldInfo.state === 'default' ? T.dim : T.text,
           }}
         >
           {isInherited && !field.options?.includes(String(fieldInfo.effectiveValue)) && (
@@ -557,14 +565,14 @@ function ConfigFieldInput({
               ...inputStyle,
               flex: 1,
               textAlign: 'left',
-              color: isInherited ? '#00BFA5' : (value ? T.cyan : T.dim),
+              color: isInherited ? INHERITED_ACCENT : (value ? T.cyan : T.dim),
               cursor: 'pointer',
             }}
           >
             {isInherited ? (fieldInfo.effectiveValue ? 'ON' : 'OFF') : (value ? 'ON' : 'OFF')}
           </button>
           {isInherited && (
-            <span style={{ fontSize: FS.xxs, color: '#00BFA580', fontFamily: F, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: FS.xxs, color: `${INHERITED_ACCENT}80`, fontFamily: F, whiteSpace: 'nowrap' }}>
               &larr; {fieldInfo.source}
             </span>
           )}
@@ -578,7 +586,7 @@ function ConfigFieldInput({
             ...inputStyle,
             minHeight: 50,
             resize: 'vertical',
-            color: isInherited ? '#00BFA5' : fieldInfo.state === 'default' ? T.dim : T.text,
+            color: isInherited ? INHERITED_ACCENT : fieldInfo.state === 'default' ? T.dim : T.text,
           }}
         />
       ) : field.type === 'integer' ? (
