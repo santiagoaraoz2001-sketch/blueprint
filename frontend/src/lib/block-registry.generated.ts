@@ -1,5 +1,5 @@
 // AUTO-GENERATED — DO NOT EDIT MANUALLY
-// Generated from 132 block.yaml files across 12 categories
+// Generated from 135 block.yaml files across 12 categories
 // Run: python scripts/generate_block_registry.py
 
 import type { BlockDefinition } from './block-registry'
@@ -5104,9 +5104,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     category: 'evaluation',
     tags: [],
     aliases: [],
-    icon: 'BarChart3',
+    icon: 'GitCompareArrows',
     accent: '#10b981',
-    maturity: 'stable',
+    maturity: 'beta',
     inputs: [
       { id: 'model_a', label: 'Model A', dataType: 'model', required: true },
       { id: 'model_b', label: 'Model B', dataType: 'model', required: true },
@@ -5929,7 +5929,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -6142,7 +6142,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -6535,7 +6535,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -6628,6 +6628,43 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: '',
         description: 'Regex pattern — only retry if the error message matches (e.g., \'ConnectionError|Timeout\'). Empty = retry on all errors.',
       },
+    ],
+  },
+  {
+    type: 'experiment_logger',
+    name: 'Experiment Logger',
+    description: 'Log experiment results with metadata, timestamps, and run tracking',
+    category: 'flow',
+    tags: ['logging', 'experiment-tracking', 'metadata'],
+    aliases: ['experiment log', 'run logger', 'experiment tracker', 'training log', 'run tracking'],
+    icon: 'ScrollText',
+    accent: '#34D399',
+    maturity: 'stable',
+    inputs: [
+      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: true },
+      { id: 'config', label: 'Run Config', dataType: 'config', required: false },
+      { id: 'model', label: 'Model Info', dataType: 'model', required: false },
+    ],
+    outputs: [
+      { id: 'experiment_log', label: 'Experiment Log', dataType: 'artifact', required: false },
+    ],
+    defaultConfig: { experiment_name: 'default_experiment', tags: '', log_to_file: true },
+    configFields: [
+      {
+        name: 'experiment_name',
+        label: 'Experiment Name',
+        type: 'string',
+        default: 'default_experiment',
+        description: 'Name for this experiment run',
+      },
+      {
+        name: 'tags',
+        label: 'Tags',
+        type: 'string',
+        default: '',
+        description: 'Comma-separated tags for filtering',
+      },
+      { name: 'log_to_file', label: 'Log to File', type: 'boolean', default: true },
     ],
   },
 
@@ -6737,7 +6774,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -7174,7 +7211,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -10513,7 +10550,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  OUTPUT (2 blocks)
+  //  OUTPUT (4 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -10550,6 +10587,61 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'boolean',
         default: true,
         description: 'Create a compressed tar.gz archive',
+      },
+    ],
+  },
+  {
+    type: 'leaderboard_publisher',
+    name: 'Leaderboard Publisher',
+    description: 'Publish results to a leaderboard or tracking system',
+    category: 'output',
+    tags: ['tracking', 'leaderboard', 'experiment-tracking'],
+    aliases: ['leaderboard', 'MLflow', 'W&B', 'Weights and Biases', 'experiment tracker', 'publish results'],
+    icon: 'Trophy',
+    accent: '#34D399',
+    maturity: 'stable',
+    inputs: [
+      { id: 'metrics', label: 'Results', dataType: 'metrics', required: true },
+    ],
+    outputs: [
+      { id: 'artifact', label: 'Submission', dataType: 'artifact', required: false },
+      { id: 'metrics', label: 'Stats', dataType: 'metrics', required: false },
+    ],
+    defaultConfig: {
+      title: 'Model Leaderboard',
+      sort_by: '',
+      sort_order: 'descending',
+      format: 'markdown',
+    },
+    configFields: [
+      {
+        name: 'title',
+        label: 'Title',
+        type: 'string',
+        default: 'Model Leaderboard',
+        description: 'Title for the leaderboard',
+      },
+      {
+        name: 'sort_by',
+        label: 'Sort By',
+        type: 'string',
+        default: '',
+        description: 'Column name to sort by (empty = auto-detect)',
+      },
+      {
+        name: 'sort_order',
+        label: 'Sort Order',
+        type: 'select',
+        default: 'descending',
+        options: ['descending', 'ascending'],
+      },
+      {
+        name: 'format',
+        label: 'Output Format',
+        type: 'select',
+        default: 'markdown',
+        options: ['markdown', 'csv', 'json'],
+        description: 'Format for the leaderboard output',
       },
     ],
   },
@@ -10660,9 +10752,65 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
     ],
   },
+  {
+    type: 'report_generator',
+    name: 'Report Generator',
+    description: 'Generate a comprehensive experiment report',
+    category: 'output',
+    tags: ['reporting', 'visualization', 'export'],
+    aliases: ['report', 'experiment report', 'HTML report', 'PDF report', 'results summary', 'generate report'],
+    icon: 'FileBarChart',
+    accent: '#34D399',
+    maturity: 'stable',
+    inputs: [
+      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: true },
+      { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: false },
+      { id: 'model', label: 'Model Info', dataType: 'model', required: false },
+    ],
+    outputs: [
+      { id: 'artifact', label: 'Report', dataType: 'artifact', required: false },
+      { id: 'report', label: 'Report File', dataType: 'text', required: false },
+    ],
+    defaultConfig: {
+      title: 'Blueprint Report',
+      include_timestamp: true,
+      include_charts: false,
+      sections: 'summary,metrics,details',
+    },
+    configFields: [
+      {
+        name: 'title',
+        label: 'Report Title',
+        type: 'string',
+        default: 'Blueprint Report',
+        description: 'Title for the report header',
+      },
+      {
+        name: 'include_timestamp',
+        label: 'Include Timestamp',
+        type: 'boolean',
+        default: true,
+        description: 'Add generation timestamp to the report',
+      },
+      {
+        name: 'include_charts',
+        label: 'Include Charts',
+        type: 'boolean',
+        default: false,
+        description: 'Include chart visualizations in the report',
+      },
+      {
+        name: 'sections',
+        label: 'Sections',
+        type: 'string',
+        default: 'summary,metrics,details',
+        description: 'Comma-separated section names to include (summary, metrics, details, config)',
+      },
+    ],
+  },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {

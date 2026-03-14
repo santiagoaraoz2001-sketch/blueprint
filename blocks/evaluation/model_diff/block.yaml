@@ -3,6 +3,8 @@ type: model_diff
 category: evaluation
 description: Compare two models side-by-side — token probabilities, attention patterns, layer activations
 version: "2.0.0"
+icon: GitCompareArrows
+maturity: beta
 
 inputs:
   - id: model_a

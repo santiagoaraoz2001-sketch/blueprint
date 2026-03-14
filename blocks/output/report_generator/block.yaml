@@ -1,0 +1,58 @@
+name: Report Generator
+type: report_generator
+category: output
+description: Generate a comprehensive experiment report
+version: "1.0.0"
+icon: FileBarChart
+accent: '#34D399'
+tags: [reporting, visualization, export]
+aliases: [report, experiment report, HTML report, PDF report, results summary, generate report]
+
+inputs:
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+    required: true
+    description: Metrics to include in the report
+  - id: dataset
+    label: Dataset
+    data_type: dataset
+    required: false
+    description: Dataset to include in report details
+  - id: model
+    label: Model Info
+    data_type: model
+    required: false
+    description: Model metadata to include in report
+
+outputs:
+  - id: artifact
+    label: Report
+    data_type: artifact
+    description: Generated report directory
+  - id: report
+    label: Report File
+    data_type: text
+    description: Path to the generated report file
+
+config:
+  title:
+    type: string
+    label: Report Title
+    default: "Blueprint Report"
+    description: Title for the report header
+  include_timestamp:
+    type: boolean
+    label: Include Timestamp
+    default: true
+    description: Add generation timestamp to the report
+  include_charts:
+    type: boolean
+    label: Include Charts
+    default: false
+    description: Include chart visualizations in the report
+  sections:
+    type: string
+    label: Sections
+    default: "summary,metrics,details"
+    description: Comma-separated section names to include (summary, metrics, details, config)
