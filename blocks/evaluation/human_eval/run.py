@@ -44,7 +44,7 @@ def run(ctx):
     framework = model_data.get("source", model_data.get("backend",
         ctx.config.get("provider", "ollama")))
     model_name = model_data.get("model_name", model_data.get("model_id",
-        ctx.config.get("model_name", "llama3.2"))) if not model_name else model_name
+        ctx.config.get("model_name", ""))) if not model_name else model_name
     config = {"endpoint": model_data.get("endpoint", model_data.get("base_url",
         ctx.config.get("endpoint", "http://localhost:11434")))}
 
@@ -64,18 +64,21 @@ def run(ctx):
         ctx.log_message("human-eval package found — running real evaluation")
         _run_real_eval(ctx, model_name, framework, config, num_problems,
                        temperature, k_values, num_samples_per, timeout,
-                       max_new_tokens, inference_timeout)
+                       max_new_tokens, inference_timeout,
+                       output_format=output_format, decimal_precision=decimal_precision)
         return
     except ImportError:
         ctx.log_message("human-eval not installed (pip install human-eval) — running simulation")
 
     # ── Simulation fallback ───────────────────────────────────────────────
-    _run_simulation(ctx, model_name, num_problems, temperature, k_values, seed)
+    _run_simulation(ctx, model_name, num_problems, temperature, k_values, seed,
+                    output_format=output_format, decimal_precision=decimal_precision)
 
 
 def _run_real_eval(ctx, model_name, framework, config, num_problems,
                    temperature, k_values, num_samples_per, timeout,
-                   max_new_tokens=256, inference_timeout=30):
+                   max_new_tokens=256, inference_timeout=30,
+                   output_format="json", decimal_precision=4):
     """Run actual HumanEval evaluation."""
     from human_eval.data import read_problems, write_jsonl
     from human_eval.evaluation import evaluate_functional_correctness
@@ -124,10 +127,12 @@ def _run_real_eval(ctx, model_name, framework, config, num_problems,
         "demo_mode": False,
     }
 
-    _save_results(ctx, metrics, pass_at_k, [])
+    _save_results(ctx, metrics, pass_at_k, [],
+                   output_format=output_format, decimal_precision=decimal_precision)
 
 
-def _run_simulation(ctx, model_name, num_problems, temperature, k_values, seed):
+def _run_simulation(ctx, model_name, num_problems, temperature, k_values, seed,
+                    output_format="json", decimal_precision=4):
     """Simulation fallback when human_eval is not installed."""
     demo_problems = [
         {"task_id": f"HumanEval/{i}", "difficulty": random.choice(["easy", "medium", "hard"])}
@@ -181,22 +186,23 @@ def _run_simulation(ctx, model_name, num_problems, temperature, k_values, seed):
         "demo_mode": True,
     }
 
-    _save_results(ctx, metrics, pass_at_k, problem_results)
+    _save_results(ctx, metrics, pass_at_k, problem_results,
+                   output_format=output_format, decimal_precision=decimal_precision)
 
 
-def _save_results(ctx, metrics, pass_at_k, problem_results):
+def _save_results(ctx, metrics, pass_at_k, problem_results,
+                   output_format="json", decimal_precision=4):
     """Save outputs and artifacts."""
     results_path = os.path.join(ctx.run_dir, "human_eval_results.json")
     with open(results_path, "w", encoding="utf-8") as f:
         json.dump({"metrics": metrics, "results": problem_results}, f, indent=2)
     ctx.save_artifact("human_eval_results", results_path)
 
-
     # ── Save dataset output ────────────────────────────────────────────
-    if results_data:
+    if problem_results:
         _ds_dir = os.path.join(ctx.run_dir, "dataset_out")
         os.makedirs(_ds_dir, exist_ok=True)
-        _rows = results_data if isinstance(results_data, list) else [results_data]
+        _rows = problem_results if isinstance(problem_results, list) else [problem_results]
         for _r in _rows:
             if isinstance(_r, dict):
                 for _k, _v in _r.items():

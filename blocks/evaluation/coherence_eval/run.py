@@ -135,7 +135,7 @@ def run(ctx):
     ctx.save_output("dataset", out_dir)
 
     # ── Save report output ─────────────────────────────────────────────
-    _flagged = [r for r in scored if r.get("too_short") or r.get("is_degenerate")]
+    _flagged = [r for r in results if r.get("too_short") or r.get("is_degenerate")]
     _report = {"summary": metrics, "total_flagged": len(_flagged), "flagged_texts": _flagged[:50]}
     _report_path = os.path.join(ctx.run_dir, "coherence_report.json")
     with open(_report_path, "w", encoding="utf-8") as f:

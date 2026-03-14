@@ -31,8 +31,15 @@ def run(ctx):
         raise ValueError("Test prompt cannot be empty")
 
     # -- Resolve model info ----------------------------------------------------
-    model_a_info = _resolve_model(ctx, "model_a", model_a_override, "gpt2")
-    model_b_info = _resolve_model(ctx, "model_b", model_b_override, "gpt2")
+    model_a_info = _resolve_model(ctx, "model_a", model_a_override, "")
+    model_b_info = _resolve_model(ctx, "model_b", model_b_override, "")
+
+    if not model_a_info["name"]:
+        model_a_info["name"] = "gpt2"  # Demo fallback
+        ctx.log_message("\u26a0\ufe0f No model_a configured. Using 'gpt2' for demonstration.")
+    if not model_b_info["name"]:
+        model_b_info["name"] = "gpt2"  # Demo fallback
+        ctx.log_message("\u26a0\ufe0f No model_b configured. Using 'gpt2' for demonstration.")
 
     model_a_name = model_a_info["name"]
     model_b_name = model_b_info["name"]
