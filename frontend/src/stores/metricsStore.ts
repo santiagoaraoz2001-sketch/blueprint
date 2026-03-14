@@ -885,6 +885,11 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
             value,
             timestamp: now,
           }
+          // Cap metric series to 10k points to prevent unbounded memory growth
+          const maxPoints = 10000
+          const updatedSeries = series.length >= maxPoints
+            ? [...series.slice(-maxPoints + 1), point]
+            : [...series, point]
           return {
             runs: {
               ...s.runs,
@@ -894,7 +899,7 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
                   ...run.blocks,
                   [nodeId]: {
                     ...block,
-                    metrics: { ...block.metrics, [name]: [...series, point] },
+                    metrics: { ...block.metrics, [name]: updatedSeries },
                     _stepCounters: { ...block._stepCounters, [name]: stepCounter },
                   },
                 },

@@ -13,8 +13,8 @@ import ValidationPanel from '@/components/Pipeline/ValidationPanel'
 import PipelineTabBar from '@/components/Pipeline/PipelineTabBar'
 import { validatePipelineClient, type DiagnosticReport } from '@/lib/pipeline-validator'
 import PipelineMonitor, { type MonitorBlock } from '@/components/Pipeline/PipelineMonitor'
-import { Save, Download, Upload, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2 } from 'lucide-react'
-import TemplateSelector from '@/components/Pipeline/TemplateSelector'
+import { Save, Download, Upload, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate } from 'lucide-react'
+import TemplateGallery from '@/components/Pipeline/TemplateGallery'
 import MissionController from '@/components/Mission/MissionController'
 import { useRunStore } from '@/stores/runStore'
 import toast from 'react-hot-toast'
@@ -68,7 +68,6 @@ export default function PipelineEditorView() {
 
   useEffect(() => {
     if (!selectedProjectId) {
-      toast.error('Please select a project first')
       setView('dashboard')
     }
   }, [selectedProjectId, setView])
@@ -179,6 +178,7 @@ export default function PipelineEditorView() {
       const { nodes, edges } = usePipelineStore.getState()
       const report = validatePipelineClient(nodes, edges)
       setValidationReport(report)
+      setShowValidation(true)
     } finally {
       setValidating(false)
     }
@@ -333,6 +333,15 @@ export default function PipelineEditorView() {
           >
             <FolderOpen size={10} />
             NEW
+          </button>
+
+          <button
+            onClick={() => setShowTemplateSelector(true)}
+            style={btnStyle}
+            title="Pipeline Templates"
+          >
+            <LayoutTemplate size={10} />
+            TEMPLATES
           </button>
 
           <button
@@ -494,7 +503,7 @@ export default function PipelineEditorView() {
 
       {/* Template selector: show on button click */}
       {showTemplateSelector && (
-        <TemplateSelector onClose={() => setShowTemplateSelector(false)} />
+        <TemplateGallery onClose={() => setShowTemplateSelector(false)} />
       )}
 
       {/* Mission system */}

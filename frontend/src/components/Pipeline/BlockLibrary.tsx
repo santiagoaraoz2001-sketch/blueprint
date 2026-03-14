@@ -6,6 +6,7 @@ import BlockTooltip from './BlockTooltip'
 import BlockDetailPanel from './BlockDetailPanel'
 import CustomModuleEditor, { loadCustomBlocks, type CustomBlock } from './CustomModuleEditor'
 import { usePipelineStore } from '@/stores/pipelineStore'
+import { useIsSimpleMode } from '@/hooks/useIsSimpleMode'
 import * as Icons from 'lucide-react'
 
 const { Search, ChevronRight, ChevronDown, Plus } = Icons
@@ -26,10 +27,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   endpoints: 'ENDPOINTS',
 }
 
+const SIMPLE_CATEGORIES = new Set(['external', 'data', 'model', 'inference', 'training', 'metrics'])
+
 export default function BlockLibrary() {
   const [search, setSearch] = useState('')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const blocksByCategory = getBlocksByCategory()
+  const isSimple = useIsSimpleMode()
 
   // Custom modules
   const [customBlocks, setCustomBlocks] = useState<CustomBlock[]>(() => loadCustomBlocks())
@@ -123,7 +127,10 @@ export default function BlockLibrary() {
   }
 
   // Order categories and filter
-  const orderedCategories = CATEGORY_ORDER
+  const effectiveCategoryOrder = isSimple
+    ? CATEGORY_ORDER.filter((cat) => SIMPLE_CATEGORIES.has(cat))
+    : CATEGORY_ORDER
+  const orderedCategories = effectiveCategoryOrder
     .filter((cat) => blocksByCategory[cat])
     .map((category) => {
       let filtered = blocksByCategory[category]
@@ -221,7 +228,7 @@ export default function BlockLibrary() {
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 4px', scrollbarWidth: 'thin' }}>
 
         {/* Custom Modules Section */}
-        {!search && (
+        {!search && !isSimple && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 4px', padding: '6px 8px' }}>
               <button
@@ -336,7 +343,7 @@ export default function BlockLibrary() {
       </div>
 
       {/* Category bar */}
-      <CategoryBar onCategoryClick={(cat) => setCategoryPopup(cat)} />
+      <CategoryBar onCategoryClick={(cat) => setCategoryPopup(cat)} categories={effectiveCategoryOrder} />
 
       {/* Category detail popup */}
       {categoryPopup && (
@@ -593,7 +600,7 @@ const CATEGORY_DESCRIPTIONS: Record<string, { summary: string; connectorNote: st
 }
 
 /* ── CategoryBar — 10 category buttons at the bottom ── */
-function CategoryBar({ onCategoryClick }: { onCategoryClick: (cat: string) => void }) {
+function CategoryBar({ onCategoryClick, categories }: { onCategoryClick: (cat: string) => void; categories: string[] }) {
   const [hovered, setHovered] = useState<string | null>(null)
   return (
     <div style={{
@@ -604,7 +611,7 @@ function CategoryBar({ onCategoryClick }: { onCategoryClick: (cat: string) => vo
       gap: 1,
       alignItems: 'center',
     }}>
-      {CATEGORY_ORDER.map((cat) => {
+      {categories.map((cat) => {
         const color = CATEGORY_COLORS[cat] || T.dim
         const isHov = hovered === cat
         return (

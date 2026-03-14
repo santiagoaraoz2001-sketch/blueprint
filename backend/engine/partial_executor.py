@@ -33,6 +33,8 @@ from .executor import (
     BLOCK_ALIASES,
     SAFE_BLOCK_TYPE,
 )
+from .composite import CompositeBlockContext
+from .schema_validator import load_block_schema
 
 
 def _get_downstream_nodes(start_id: str, nodes: list, edges: list) -> set[str]:
@@ -426,10 +428,16 @@ async def execute_partial_pipeline(
                     metrics_file.flush()
                     metrics_log_buffer.append(metric_event)
 
+                # Detect composite blocks
+                block_schema = load_block_schema(block_dir)
+                is_composite = block_schema.get("composite", False) if block_schema else False
+                context_cls = CompositeBlockContext if is_composite else None
+
                 try:
-                    node_outputs = _load_and_run_block(
+                    node_outputs, _fingerprints = _load_and_run_block(
                         block_dir, config, node_inputs, run_dir,
                         run_id, node_id, progress_cb, message_cb, metric_cb,
+                        context_cls=context_cls,
                     )
                     outputs[node_id] = node_outputs
                 except InterruptedError:

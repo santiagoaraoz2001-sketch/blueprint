@@ -267,14 +267,21 @@ export const useInferenceStore = create<InferenceState>((set, get) => ({
       await api.post(`/inference/servers/${name}/start`, {})
       // Poll for server readiness: check at 2s, 5s, 10s
       const poll = [2000, 5000, 10000]
+      let cancelled = false
+      const timers: ReturnType<typeof setTimeout>[] = []
       for (const delay of poll) {
-        setTimeout(async () => {
+        timers.push(setTimeout(async () => {
+          if (cancelled) return
           await get().fetchServers()
           await get().fetchModels()
-        }, delay)
+        }, delay))
       }
+      // Store cleanup in case store is reset
+      const cleanup = () => { cancelled = true; timers.forEach(clearTimeout) }
+      // Auto-cleanup after last poll fires
+      setTimeout(cleanup, 12000)
     } catch {
-      // Ignore
+      // Server start failed silently — fetchServers will show offline status
     }
   },
 }))

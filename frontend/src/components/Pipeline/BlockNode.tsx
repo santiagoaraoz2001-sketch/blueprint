@@ -4,9 +4,10 @@ import { T, F, FS } from '@/lib/design-tokens'
 import { getBlockDefinition, getPortColor, computeBlockWidth } from '@/lib/block-registry'
 import { getIcon } from '@/lib/icon-utils'
 import ProgressBar from '@/components/shared/ProgressBar'
-import { usePipelineStore, type BlockNodeData } from '@/stores/pipelineStore'
+import { usePipelineStore, type BlockNodeData, type NodeExecutionState } from '@/stores/pipelineStore'
 import { useRunStore } from '@/stores/runStore'
-import { AlertTriangle, Clock } from 'lucide-react'
+import { OVERLAY_COLORS } from './InheritanceOverlay'
+import { AlertTriangle, Clock, Lock } from 'lucide-react'
 import { estimatePipeline, formatTimeShort } from '@/lib/pipeline-estimator'
 
 function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; selected?: boolean }) {
@@ -36,11 +37,25 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
   const focusedErrorNodeId = usePipelineStore((s) => s.focusedErrorNodeId)
   const isErrorFocused = focusedErrorNodeId === id
 
+  // Inheritance overlay — derived selector returns primitive for O(1) lookup + minimal re-renders
+  const overlayRole = usePipelineStore(
+    (s): 'origin' | 'inheriting' | 'overriding' | 'dimmed' | null => {
+      if (!s.inheritanceOverlay) return null
+      return s.inheritanceOverlay.nodeRoles[id] ?? 'dimmed'
+    }
+  )
+
   // Subscribe to live run status directly — avoids cascading pipelineStore updates
   const nodeRunStatus = useRunStore((s) => s.nodeStatuses[id])
-  const effectiveStatus: 'idle' | 'running' | 'complete' | 'failed' | 'pending' =
+  const effectiveStatus: 'idle' | 'running' | 'complete' | 'failed' | 'pending' | 'cached' =
     nodeRunStatus?.status ?? (data.status as any) ?? 'idle'
   const effectiveProgress = nodeRunStatus?.progress ?? data.progress ?? 0
+
+  // Re-run mode visual state
+  const rerunNodeState: NodeExecutionState | null = usePipelineStore(
+    (s) => s.rerunMode?.nodeStates[id] ?? null
+  )
+  const isRerunActive = usePipelineStore((s) => s.rerunMode?.active ?? false)
 
   const def = getBlockDefinition(data.type)
   const accent = data.accent || T.cyan
@@ -52,8 +67,19 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
     running: T.amber,
     complete: T.green,
     failed: T.red,
+    cached: T.dim,
+    pending: T.dim,
   }
   const statusColor = statusColors[effectiveStatus] || T.dim
+
+  // Rerun mode visual overrides
+  const isCached = isRerunActive && rerunNodeState === 'cached'
+  const isWillRerun = isRerunActive && rerunNodeState === 'will_rerun'
+  const isWillRerunDownstream = isRerunActive && rerunNodeState === 'will_rerun_downstream'
+  // Also dim nodes during live partial run when they're cached via SSE
+  const isLiveCached = !isRerunActive && effectiveStatus === 'cached'
+  const rerunOpacity = isCached || isLiveCached ? 0.45 : 1
+  const rerunBorderColor = isWillRerun ? T.blue : isWillRerunDownstream ? `${T.blue}80` : undefined
 
   const configSummary = Object.entries(data.config || {})
     .filter(([, v]) => v !== '' && v !== 0 && v !== false && v !== null)
@@ -92,18 +118,27 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
         background: `linear-gradient(145deg, ${T.surface2} 0%, ${T.surface1} 100%)`,
         backdropFilter: 'blur(16px)',
         borderRadius: 8,
-        border: `1px solid ${isErrorFocused ? T.red : selected ? accent : isHovered ? T.borderHi : T.border}`,
-        transition: 'border-color 0.2s, box-shadow 0.2s',
-        boxShadow: isErrorFocused
-          ? `0 8px 32px ${T.red}60, 0 0 0 2px ${T.red}`
-          : selected
-            ? `0 0 0 1px ${accent}40, 0 8px 32px ${T.shadowHeavy}`
-            : isHovered
-              ? `0 8px 24px ${T.shadow}, inset 0 1px 0 rgba(255,255,255,0.05)`
-              : `0 4px 12px ${T.shadow}`,
+        border: `1px solid ${
+          rerunBorderColor
+            ? rerunBorderColor
+            : isErrorFocused ? T.red : selected ? accent : isHovered ? T.borderHi : T.border
+        }`,
+        transition: 'border-color 0.2s, box-shadow 0.2s, opacity 0.3s',
+        boxShadow: isWillRerun
+          ? `0 0 0 2px ${T.blue}, 0 8px 32px ${T.blue}30`
+          : isWillRerunDownstream
+            ? `0 0 0 1px ${T.blue}60, 0 4px 16px ${T.blue}15`
+            : isErrorFocused
+              ? `0 8px 32px ${T.red}60, 0 0 0 2px ${T.red}`
+              : selected
+                ? `0 0 0 1px ${accent}40, 0 8px 32px ${T.shadowHeavy}`
+                : isHovered
+                  ? `0 8px 24px ${T.shadow}, inset 0 1px 0 rgba(255,255,255,0.05)`
+                  : `0 4px 12px ${T.shadow}`,
         position: 'relative',
         overflow: 'visible',
         zIndex: selected || isErrorFocused ? 10 : isHovered ? 5 : 1,
+        opacity: overlayRole === 'dimmed' ? 0.2 : rerunOpacity,
       }}
     >
       {/* Top accent bar */}
@@ -121,6 +156,100 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
           borderRadius: '8px 8px 0 0',
         }}
       />
+
+      {/* Cached badge (lock icon) — shown during re-run mode */}
+      {isCached && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
+            background: `${T.surface4}dd`,
+            border: `1px solid ${T.border}`,
+            borderRadius: 4,
+            padding: '2px 6px',
+            zIndex: 20,
+          }}
+        >
+          <Lock size={7} color={T.dim} />
+          <span style={{ fontFamily: F, fontSize: 6.5, color: T.dim, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            Cached
+          </span>
+        </div>
+      )}
+
+      {/* Will re-run indicator */}
+      {isWillRerun && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
+            background: `${T.blue}20`,
+            border: `1px solid ${T.blue}60`,
+            borderRadius: 4,
+            padding: '2px 6px',
+            zIndex: 20,
+          }}
+        >
+          <span style={{ fontFamily: F, fontSize: 6.5, color: T.blue, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            Will re-run
+          </span>
+        </div>
+      )}
+
+      {/* Will re-run downstream indicator */}
+      {isWillRerunDownstream && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
+            background: `${T.blue}10`,
+            border: `1px solid ${T.blue}30`,
+            borderRadius: 4,
+            padding: '2px 6px',
+            zIndex: 20,
+          }}
+        >
+          <span style={{ fontFamily: F, fontSize: 6.5, color: `${T.blue}bb`, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            Downstream
+          </span>
+        </div>
+      )}
+
+      {/* SSE cached status badge (during live run) */}
+      {effectiveStatus === 'cached' && !isRerunActive && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
+            background: `${T.surface4}dd`,
+            border: `1px solid ${T.border}`,
+            borderRadius: 4,
+            padding: '2px 6px',
+            zIndex: 20,
+          }}
+        >
+          <Lock size={7} color={T.dim} />
+          <span style={{ fontFamily: F, fontSize: 6.5, color: T.dim, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            Cached
+          </span>
+        </div>
+      )}
 
       {/* Internal ambient glow */}
       {(isHovered || selected) && (
@@ -155,6 +284,22 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
           zIndex: 2,
         }}
       />
+
+      {/* Inheritance overlay badge */}
+      {overlayRole && overlayRole !== 'dimmed' && (
+        <div style={{
+          position: 'absolute',
+          top: -5,
+          left: -5,
+          width: 12,
+          height: 12,
+          borderRadius: '50%',
+          background: OVERLAY_COLORS[overlayRole],
+          boxShadow: `0 0 8px ${OVERLAY_COLORS[overlayRole]}80`,
+          zIndex: 20,
+          border: '2px solid rgba(0,0,0,0.6)',
+        }} />
+      )}
 
       {/* Header */}
       <div

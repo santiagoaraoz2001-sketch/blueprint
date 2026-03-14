@@ -6,6 +6,7 @@ export type ThemeMode = 'dark' | 'light'
 export type FontChoice = 'jetbrains' | 'inter' | 'fira' | 'ibm-plex'
 export type FontSizeScale = 'compact' | 'default' | 'comfortable' | 'large'
 export type AccentColor = 'cyan' | 'orange' | 'green' | 'blue' | 'purple' | 'pink'
+export type UiMode = 'simple' | 'professional'
 
 export interface PanelLayoutEntry {
   panelId: string
@@ -70,6 +71,10 @@ interface SettingsState {
   // Plugin panel layouts
   panelLayouts: Record<string, PanelLayoutEntry>
 
+  // UI mode
+  uiMode: UiMode
+  hasSeenWelcome: boolean
+
   // Audio alerts
   audioAlertsEnabled: boolean
   audioVolume: number
@@ -89,6 +94,9 @@ interface SettingsState {
 
   setPanelLayout: (panelId: string, entry: Partial<PanelLayoutEntry>) => void
   removePanelLayout: (panelId: string) => void
+
+  setUiMode: (mode: UiMode) => void
+  setHasSeenWelcome: (seen: boolean) => void
 
   setAudioAlertsEnabled: (enabled: boolean) => void
   setAudioVolume: (volume: number) => void
@@ -111,6 +119,9 @@ export const useSettingsStore = create<SettingsState>()(
       hardwareLoading: false,
 
       panelLayouts: {} as Record<string, PanelLayoutEntry>,
+
+      uiMode: 'simple' as UiMode,
+      hasSeenWelcome: false,
 
       audioAlertsEnabled: false,
       audioVolume: 0.5,
@@ -152,6 +163,9 @@ export const useSettingsStore = create<SettingsState>()(
         set({ panelLayouts: layouts })
       },
 
+      setUiMode: (uiMode) => set({ uiMode }),
+      setHasSeenWelcome: (hasSeenWelcome) => set({ hasSeenWelcome }),
+
       setAudioAlertsEnabled: (enabled) => set({ audioAlertsEnabled: enabled }),
       setAudioVolume: (volume) => set({ audioVolume: volume }),
       setAudioOnStepComplete: (enabled) => set({ audioOnStepComplete: enabled }),
@@ -160,7 +174,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'blueprint-settings',
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         theme: state.theme,
         accentColor: state.accentColor,
@@ -170,6 +184,8 @@ export const useSettingsStore = create<SettingsState>()(
         autoSaveInterval: state.autoSaveInterval,
         apiKeys: state.apiKeys,
         panelLayouts: state.panelLayouts,
+        uiMode: state.uiMode,
+        hasSeenWelcome: state.hasSeenWelcome,
         audioAlertsEnabled: state.audioAlertsEnabled,
         audioVolume: state.audioVolume,
         audioOnStepComplete: state.audioOnStepComplete,
@@ -196,11 +212,21 @@ export const useSettingsStore = create<SettingsState>()(
             autoSaveInterval: load<number>('autoSaveInterval', 5000),
             apiKeys: load<Record<string, string>>('apiKeys', {}),
             panelLayouts: load<Record<string, PanelLayoutEntry>>('panelLayouts', {}),
+            uiMode: 'simple' as UiMode,
+            hasSeenWelcome: false,
             audioAlertsEnabled: load<boolean>('audioAlertsEnabled', false),
             audioVolume: load<number>('audioVolume', 0.5),
             audioOnStepComplete: load<boolean>('audioOnStepComplete', true),
             audioOnPipelineComplete: load<boolean>('audioOnPipelineComplete', true),
             audioOnError: load<boolean>('audioOnError', true),
+          }
+        }
+        if (version === 1) {
+          return {
+            ...(persisted as Record<string, unknown>),
+            panelLayouts: {},
+            uiMode: 'simple' as UiMode,
+            hasSeenWelcome: false,
           }
         }
         return persisted as Record<string, unknown>

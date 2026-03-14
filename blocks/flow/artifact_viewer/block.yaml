@@ -7,7 +7,7 @@ version: "1.0.0"
 inputs:
   - id: artifact
     label: Artifact
-    data_type: data
+    data_type: dataset
     required: true
 
 outputs: []

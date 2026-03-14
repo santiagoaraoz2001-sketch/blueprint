@@ -43,7 +43,7 @@ function NoRunState() {
     api
       .get<any[]>('/runs?limit=10')
       .then((runs) => setRecentRuns(runs || []))
-      .catch(() => {})
+      .catch(() => setRecentRuns([]))
   }, [])
 
   return (
@@ -122,7 +122,7 @@ function NoRunState() {
 }
 
 function MonitorContent({ runId }: { runId: string }) {
-  const { isConnected, overallProgress, eta, status } = useRunMonitor(runId)
+  const { isConnected: _isConnected, overallProgress, eta, status } = useRunMonitor(runId)
   const [viewedBlockId, setViewedBlockId] = useState<string | null>(null)
   const run = useMetricsStore((s) => s.runs[runId])
   const pipelineName = run?.pipelineName || ''

@@ -13,7 +13,7 @@ inputs:
 
   - id: dataset
     label: Custom Prompts
-    data_type: data
+    data_type: dataset
     required: false
     description: "Optional custom prompts for profiling — uses text column"
 
@@ -29,7 +29,7 @@ outputs:
 
   - id: dataset
     label: Timing Data
-    data_type: data
+    data_type: dataset
     description: "Per-config timings: batch_size, input_length, avg_ms, p50_ms, p95_ms, throughput"
 
 config:

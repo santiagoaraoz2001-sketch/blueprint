@@ -56,3 +56,6 @@ pyinstaller_log.txt
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Generated block registry (build artifact from codegen)
+frontend/src/lib/block-registry.generated.ts
