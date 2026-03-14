@@ -145,7 +145,9 @@ slices:
             if result.stderr:
                 for line in result.stderr.strip().split("\n")[-5:]:
                     ctx.log_message(f"  {line}")
+            raise RuntimeError(f"mergekit exited with code {result.returncode}")
 
+        ctx.log_metric("simulation_mode", 0.0)
         total_layers = sum(
             (lc.get("layer_range", [0, 16])[1] - lc.get("layer_range", [0, 16])[0])
             for lc in layer_config
@@ -175,13 +177,14 @@ slices:
         return
 
     except ImportError:
-        ctx.log_message("'mergekit' not installed (pip install mergekit). Running simulation.")
+        ctx.log_message("⚠️ SIMULATION MODE: mergekit not installed. Layer assembly is simulated. Install mergekit for real model merging: pip install mergekit")
     except subprocess.TimeoutExpired:
         raise BlockTimeoutError(timeout, f"mergekit process timed out after {timeout}s")
     except Exception as e:
-        ctx.log_message(f"mergekit error: {e}. Falling back to simulation.")
+        ctx.log_message(f"⚠️ SIMULATION MODE: mergekit error ({e}). Falling back to simulated layer assembly.")
 
     # ── Simulation fallback ──
+    ctx.log_metric("simulation_mode", 1.0)
     total_layers = sum(
         (lc.get("layer_range", [0, 16])[1] - lc.get("layer_range", [0, 16])[0])
         for lc in layer_config

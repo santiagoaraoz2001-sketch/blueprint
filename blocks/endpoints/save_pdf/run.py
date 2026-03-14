@@ -234,12 +234,16 @@ def run(ctx):
         raise FileExistsError(f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.")
 
     # ---- Step 3: Generate PDF ----
+    is_simulated = False
     try:
         _build_pdf_fpdf(data, out_filepath, title, page_size, orientation, include_charts, include_timestamp, font_size, header_text, footer_text, max_rows)
         ctx.log_message("PDF generated using fpdf2")
     except ImportError:
-        ctx.log_message("WARNING: fpdf2 not installed. Install with: pip install fpdf2. Falling back to text report.")
+        ctx.log_message("⚠️ SIMULATION MODE: fpdf2 not installed. Generating text-only fallback report. Install fpdf2 for real PDF output: pip install fpdf2")
+        is_simulated = True
         out_filepath = _build_pdf_fallback(data, out_filepath, title, include_timestamp)
+
+    ctx.log_metric("simulation_mode", 1.0 if is_simulated else 0.0)
 
     ctx.report_progress(3, 3)
     file_size = os.path.getsize(out_filepath)

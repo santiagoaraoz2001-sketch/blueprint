@@ -24,7 +24,9 @@ def run(ctx):
     ctx.log_message(f"Instance: {instance_type} x{gpu_count}, Region: {region}{mem_str}{img_str}")
 
     if not api_key:
-        ctx.log_message(f"WARNING: No API key provided for {provider}. Running in simulation mode.")
+        ctx.log_message(f"⚠️ SIMULATION MODE: No API key provided for {provider}. Cloud provisioning is simulated. Provide an API key for real cloud compute.")
+    elif provider != "modal":
+        ctx.log_message(f"⚠️ SIMULATION MODE: Provider '{provider}' does not have SDK integration yet. Only 'modal' supports real connections. Cloud provisioning is simulated.")
 
     # Try real provider SDK if available
     real_connection = False
@@ -35,10 +37,12 @@ def run(ctx):
             ctx.log_message("Modal SDK detected — attempting real connection...")
             # Real Modal integration would go here
             real_connection = True
+            ctx.log_metric("simulation_mode", 0.0)
         except ImportError:
             ctx.log_message("Modal SDK not installed. Install with: pip install modal")
 
     if not real_connection:
+        ctx.log_metric("simulation_mode", 1.0)
         # Simulated provisioning
         ctx.report_progress(1, 5)
         time.sleep(0.3)

@@ -1,8 +1,9 @@
 name: Agent Evaluator
 type: agent_evaluator
 category: agents
-description: Evaluate agent performance on tasks using multiple scoring methods
+description: "[DEMO] Evaluate agent performance using heuristic scoring (real execution requires: an external evaluation framework)"
 version: "1.1.0"
+maturity: experimental
 
 inputs:
   - id: dataset
