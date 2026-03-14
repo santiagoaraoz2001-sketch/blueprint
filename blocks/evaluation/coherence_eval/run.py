@@ -13,8 +13,6 @@ from collections import Counter
 
 
 def run(ctx):
-    ctx.log_metric("simulation_mode", 1.0)
-
     # Read upstream dataset metadata
     _dataset_meta = {}
     try:
@@ -50,8 +48,9 @@ def run(ctx):
     except (ValueError, Exception):
         pass
 
-    if not rows:
-        ctx.log_message("⚠️ SIMULATION MODE: No dataset connected. Using built-in demo texts. Results use heuristic metrics only — perplexity scoring requires transformers.")
+    is_simulated = not rows
+    if is_simulated:
+        ctx.log_message("⚠️ SIMULATION MODE: No dataset connected. Using built-in demo texts.")
         rows = [
             {"text": "The quick brown fox jumps over the lazy dog. This is a well-written sentence that demonstrates proper grammar and vocabulary usage."},
             {"text": "The the the the the the the. Bad bad bad."},
@@ -146,6 +145,7 @@ def run(ctx):
     ctx.save_output("report", _report_path)
 
     ctx.save_output("metrics", metrics)
+    ctx.log_metric("simulation_mode", 1.0 if is_simulated else 0.0)
     for k, v in metrics.items():
         if isinstance(v, (int, float)):
             ctx.log_metric(k, v)

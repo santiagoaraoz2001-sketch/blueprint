@@ -13,13 +13,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   {
     type: 'agent_evaluator',
     name: 'Agent Evaluator',
-    description: '[DEMO] Evaluate agent performance using heuristic scoring (real execution requires: an external evaluation framework)',
+    description: 'Evaluate agent performance on tasks using multiple scoring methods (task completion, accuracy, efficiency, custom criteria)',
     category: 'agents',
     tags: [],
     aliases: [],
     icon: 'Bot',
     accent: '#06b6d4',
-    maturity: 'experimental',
+    maturity: 'stable',
     inputs: [
       { id: 'dataset', label: 'Agent Outputs', dataType: 'dataset', required: false },
       { id: 'references', label: 'Reference Answers', dataType: 'dataset', required: false },
@@ -4434,13 +4434,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   {
     type: 'coherence_eval',
     name: 'Coherence Eval',
-    description: '[DEMO] Evaluate text quality using heuristic metrics (real execution requires: transformers for perplexity scoring)',
+    description: 'Evaluate text quality using readability, repetition, vocabulary diversity, and length metrics',
     category: 'evaluation',
     tags: [],
     aliases: [],
     icon: 'BarChart3',
     accent: '#10b981',
-    maturity: 'experimental',
+    maturity: 'stable',
     inputs: [
       { id: 'dataset', label: 'Text Data', dataType: 'dataset', required: false },
       { id: 'model', label: 'Scorer Model', dataType: 'model', required: false },
@@ -10698,13 +10698,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   {
     type: 'hyperparameter_sweep',
     name: 'Hyperparameter Sweep',
-    description: '[DEMO] Simulated hyperparameter sweep with synthetic loss curves (real execution requires: torch, transformers)',
+    description: 'Grid or random search over hyperparameters with real training trials using HuggingFace Trainer',
     category: 'training',
     tags: [],
     aliases: [],
     icon: 'GraduationCap',
     accent: '#f59e0b',
-    maturity: 'experimental',
+    maturity: 'stable',
     inputs: [
       { id: 'dataset', label: 'Training Data', dataType: 'dataset', required: true },
       { id: 'model', label: 'Base Model', dataType: 'model', required: false },
