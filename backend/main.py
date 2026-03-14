@@ -15,7 +15,7 @@ from .utils.structured_logger import (
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference
+from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference, sweeps
 
 _recovery_logger = logging.getLogger("blueprint.recovery")
 
@@ -119,6 +119,11 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     try:
+        from .routers.sweeps import shutdown_sweep_executor
+        shutdown_sweep_executor()
+    except Exception:
+        pass
+    try:
         from .utils.model_watcher import stop_watcher
         stop_watcher()
     except Exception:
@@ -159,6 +164,7 @@ app.include_router(papers.router)
 app.include_router(secrets.router)
 app.include_router(custom_blocks.router)
 app.include_router(inference.router)
+app.include_router(sweeps.router)
 
 
 @app.get("/api/health")

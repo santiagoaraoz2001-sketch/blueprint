@@ -33,6 +33,7 @@ const NAMED_EVENT_TYPES = [
   'node_output', 'node_log', 'node_retry',
   'metric', 'system_metrics',
   'run_completed', 'run_failed', 'run_cancelled',
+  'sweep_run_completed', 'sweep_run_failed', 'sweep_completed',
 ]
 
 class SSEManager {

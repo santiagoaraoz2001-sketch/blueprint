@@ -56,8 +56,8 @@ def publish_event(run_id: str, event_type: str, data: dict):
         except Exception:
             pass  # Dead subscriber
 
-    # Clean up buffer when run completes or fails
-    if event_type in ("run_completed", "run_failed", "run_cancelled"):
+    # Clean up buffer when run/sweep completes or fails
+    if event_type in ("run_completed", "run_failed", "run_cancelled", "sweep_completed"):
         _cleanup_run(run_id)
 
 
