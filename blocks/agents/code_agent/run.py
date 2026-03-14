@@ -160,6 +160,7 @@ def run(ctx):
         fmt_path = os.path.join(out_dir, "response.md")
         with open(fmt_path, "w") as f:
             f.write(formatted)
+        # Branch: output_format == "markdown"
         ctx.save_output("text", fmt_path)
     elif output_format == "json":
         formatted = json.dumps({
@@ -171,8 +172,10 @@ def run(ctx):
         fmt_path = os.path.join(out_dir, "response.json")
         with open(fmt_path, "w") as f:
             f.write(formatted)
+        # Branch: output_format == "json"
         ctx.save_output("text", fmt_path)
     else:
+        # Branch: output_format == "raw" (default)
         ctx.save_output("text", code_path)
 
     result_record = {

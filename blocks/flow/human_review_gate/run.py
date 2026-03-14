@@ -229,11 +229,15 @@ def run(ctx):
         json.dump(review_notes, f, indent=2, default=str, ensure_ascii=False)
 
     if approved:
+        # Branch: data approved
         ctx.save_output("approved", data)
+        # Branch: data approved
         ctx.save_output("rejected", None)
         ctx.log_message("GATE PASSED: data approved and forwarded downstream")
     else:
+        # Branch: data rejected
         ctx.save_output("approved", None)
+        # Branch: data rejected
         ctx.save_output("rejected", data)
         ctx.log_message("GATE BLOCKED: data was rejected")
 

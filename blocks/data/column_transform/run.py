@@ -25,6 +25,7 @@ def run(ctx):
         os.makedirs(out_dir, exist_ok=True)
         with open(os.path.join(out_dir, "data.json"), "w") as f:
             json.dump([], f)
+        # Branch: empty dataset — return early
         ctx.save_output("dataset", out_dir)
         ctx.report_progress(1, 1)
         return
@@ -128,6 +129,7 @@ def run(ctx):
         "result_columns": final_cols,
     }
 
+    # Branch: normal execution — transformed dataset
     ctx.save_output("dataset", out_dir)
     ctx.save_output("stats", stats)
     ctx.log_metric("rows", len(rows))

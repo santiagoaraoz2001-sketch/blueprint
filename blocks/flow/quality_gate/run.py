@@ -231,21 +231,29 @@ def run(ctx):
 
     if gate_passed:
         ctx.log_message(f"QUALITY GATE PASSED: {report['passed_checks']}/{report['total_checks']} checks passed")
+        # Branch: gate passed
         ctx.save_output("passed", data)
+        # Branch: gate passed
         ctx.save_output("rejected", None)
     else:
         failed_names = [r["metric"] for r in results if not r["passed"]]
         ctx.log_message(f"QUALITY GATE FAILED: {', '.join(failed_names)}")
 
         if on_fail == "route_rejected":
+            # Branch: gate failed — route to rejected
             ctx.save_output("passed", None)
+            # Branch: gate failed — route to rejected
             ctx.save_output("rejected", data)
         elif on_fail == "warn_continue":
             ctx.log_message("Action: WARNING only — data passed through")
+            # Branch: gate failed — warn and continue
             ctx.save_output("passed", data)
+            # Branch: gate failed — warn and continue
             ctx.save_output("rejected", None)
         elif on_fail == "stop_pipeline":
+            # Branch: gate failed — stop pipeline
             ctx.save_output("passed", None)
+            # Branch: gate failed — stop pipeline
             ctx.save_output("rejected", data)
             raise RuntimeError(f"Quality Gate BLOCKED pipeline: failed checks — {', '.join(failed_names)}")
 

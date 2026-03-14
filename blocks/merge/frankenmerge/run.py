@@ -162,10 +162,12 @@ slices:
                 "demo_mode": False,
             }, f, indent=2)
 
+        # Branch: mergekit available — real merge
         ctx.save_output("model", {
             "source": "merge", "method": "passthrough", "path": output_dir,
             "model_name": output_name, "total_layers": total_layers, "demo_mode": False,
         })
+        # Branch: mergekit available — real merge
         ctx.save_output("metrics", {
             "merge_method": "passthrough", "total_layers": total_layers,
             "num_slices": len(layer_config), "merge_embed": merge_embed,
@@ -202,10 +204,12 @@ slices:
             "demo_mode": True,
         }, f, indent=2)
 
+    # Branch: mergekit unavailable — simulation fallback
     ctx.save_output("model", {
         "source": "merge", "method": "passthrough", "path": model_path,
         "model_name": output_name, "total_layers": total_layers, "demo_mode": True,
     })
+    # Branch: mergekit unavailable — simulation fallback
     ctx.save_output("metrics", {
         "merge_method": "passthrough", "total_layers": total_layers,
         "num_slices": len(layer_config), "merge_embed": merge_embed,

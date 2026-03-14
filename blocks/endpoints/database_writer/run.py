@@ -230,7 +230,9 @@ def run(ctx):
 
     if not rows:
         ctx.log_message("WARNING: No data to write")
+        # Branch: no data to write — return early
         ctx.save_output("status", "No data to write")
+        # Branch: no data to write — return early
         ctx.save_output("summary", {"rows_written": 0})
         ctx.report_progress(4, 4)
         return
@@ -268,7 +270,9 @@ def run(ctx):
     status_msg = f"Wrote {rows_written} rows to {table_name}"
     ctx.log_message(status_msg)
 
+    # Branch: successful write
     ctx.save_output("status", status_msg)
+    # Branch: successful write
     ctx.save_output("summary", {
         "rows_written": rows_written,
         "columns": len(headers),

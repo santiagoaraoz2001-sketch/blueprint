@@ -177,7 +177,9 @@ def run(ctx):
     severity_levels = {"info": 0, "warning": 1, "error": 2, "critical": 3}
     if severity_levels.get(severity, 0) < severity_levels.get(min_severity, 0):
         ctx.log_message(f"Severity '{severity}' is below min_severity '{min_severity}' — skipping notification")
+        # Branch: severity below threshold — skip notification
         ctx.save_output("status", {"skipped": True, "reason": f"severity below min_severity ({severity} < {min_severity})", "channel": channel})
+        # Branch: severity below threshold — skip notification
         ctx.save_output("pass_through", data)
         ctx.log_metric("delivered", 0.0)
         ctx.report_progress(3, 3)
@@ -251,7 +253,9 @@ def run(ctx):
     with open(status_path, "w", encoding="utf-8") as f:
         json.dump(status_record, f, indent=2, default=str, ensure_ascii=False)
 
+    # Branch: notification sent
     ctx.save_output("status", status_record)
+    # Branch: notification sent
     ctx.save_output("pass_through", data)
     ctx.save_artifact("notification_hub_status", status_path)
     ctx.log_metric("delivered", 1.0 if delivery_result.get("delivered") else 0.0)
