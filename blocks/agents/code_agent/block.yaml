@@ -52,8 +52,8 @@ config:
   timeout:
     type: integer
     label: Execution Timeout (sec)
-    default: 30
-    min: 5
+    default: 60
+    min: 10
     max: 300
     depends_on:
       field: execute

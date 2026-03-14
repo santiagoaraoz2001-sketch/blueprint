@@ -9,11 +9,14 @@ import os
 import subprocess
 import time
 
+from backend.block_sdk.exceptions import BlockTimeoutError
+
 
 def run(ctx):
     output_name = ctx.config.get("output_name", "frankenmerge-model")
     layer_config_str = ctx.config.get("layer_config", "")
     merge_embed = ctx.config.get("merge_embed", "a")
+    timeout = int(ctx.config.get("timeout", 3600))
 
     model_a_name = _get_model_name(ctx, "model_a", "model")
     model_b_name = _get_model_name(ctx, "model_b", None)
@@ -129,7 +132,7 @@ slices:
             cmd,
             capture_output=True,
             text=True,
-            timeout=3600,
+            timeout=timeout,
         )
 
         if result.returncode == 0:
@@ -174,7 +177,7 @@ slices:
     except ImportError:
         ctx.log_message("'mergekit' not installed (pip install mergekit). Running simulation.")
     except subprocess.TimeoutExpired:
-        ctx.log_message("Merge timed out after 1 hour.")
+        raise BlockTimeoutError(timeout, f"mergekit process timed out after {timeout}s")
     except Exception as e:
         ctx.log_message(f"mergekit error: {e}. Falling back to simulation.")
 

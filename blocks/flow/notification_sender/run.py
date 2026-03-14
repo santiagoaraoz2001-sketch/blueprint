@@ -3,10 +3,13 @@
 import json
 import os
 import platform
+import socket
 import subprocess
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
+
+from backend.block_sdk.exceptions import BlockTimeoutError
 
 
 def _resolve_input(raw):
@@ -88,7 +91,7 @@ def _parse_headers(headers_text):
     return custom
 
 
-def _send_webhook(url, payload, ctx, extra_headers=None):
+def _send_webhook(url, payload, ctx, extra_headers=None, timeout=30):
     """Send a JSON payload to a webhook URL via POST."""
     json_data = json.dumps(payload, default=str, ensure_ascii=False).encode("utf-8")
     headers = {
@@ -105,7 +108,7 @@ def _send_webhook(url, payload, ctx, extra_headers=None):
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             status_code = response.status
             body = response.read().decode("utf-8", errors="replace")[:500]
             ctx.log_message(f"Webhook response: {status_code}")
@@ -114,39 +117,43 @@ def _send_webhook(url, payload, ctx, extra_headers=None):
         ctx.log_message(f"Webhook HTTP error: {e.code} {e.reason}")
         return {"delivered": False, "error": f"HTTP {e.code}: {e.reason}", "status_code": e.code}
     except urllib.error.URLError as e:
+        if isinstance(e.reason, (socket.timeout, TimeoutError)):
+            raise BlockTimeoutError(timeout, f"Webhook request timed out after {timeout}s")
         ctx.log_message(f"Webhook URL error: {e.reason}")
         return {"delivered": False, "error": f"URL error: {e.reason}"}
+    except BlockTimeoutError:
+        raise
     except Exception as e:
         ctx.log_message(f"Webhook error: {e}")
         return {"delivered": False, "error": str(e)}
 
 
-def _send_desktop(title, message, ctx):
+def _send_desktop(title, message, ctx, timeout=10):
     """Send a desktop notification. Supports macOS (osascript) and Linux (notify-send)."""
     system = platform.system()
 
     if system == "Darwin":
         script = f'display notification "{message}" with title "{title}"'
         try:
-            subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=10)
+            subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=timeout)
             ctx.log_message("Desktop notification sent via osascript (macOS)")
             return {"delivered": True, "method": "osascript"}
         except FileNotFoundError:
             return {"delivered": False, "error": "osascript not found"}
         except subprocess.TimeoutExpired:
-            return {"delivered": False, "error": "osascript timeout"}
+            raise BlockTimeoutError(timeout, f"Desktop notification timed out after {timeout}s")
         except Exception as e:
             return {"delivered": False, "error": str(e)}
 
     elif system == "Linux":
         try:
-            subprocess.run(["notify-send", title, message], capture_output=True, text=True, timeout=10)
+            subprocess.run(["notify-send", title, message], capture_output=True, text=True, timeout=timeout)
             ctx.log_message("Desktop notification sent via notify-send (Linux)")
             return {"delivered": True, "method": "notify-send"}
         except FileNotFoundError:
             return {"delivered": False, "error": "notify-send not found (install libnotify-bin)"}
         except subprocess.TimeoutExpired:
-            return {"delivered": False, "error": "notify-send timeout"}
+            raise BlockTimeoutError(timeout, f"Desktop notification timed out after {timeout}s")
         except Exception as e:
             return {"delivered": False, "error": str(e)}
 
@@ -180,6 +187,7 @@ def run(ctx):
     webhook_headers = ctx.config.get("webhook_headers", "").strip()
     notification_title = ctx.config.get("notification_title", "").strip()
     send_condition = ctx.config.get("send_condition", "always").lower().strip()
+    timeout = int(ctx.config.get("timeout", 30))
 
     ctx.log_message(f"Notification Sender starting (channel={channel}, severity={severity})")
     ctx.report_progress(0, 4)
@@ -256,11 +264,11 @@ def run(ctx):
         }
         if include_metrics and metrics_summary:
             payload["metrics"] = metrics_summary
-        delivery_result = _send_webhook(webhook_url, payload, ctx, extra_headers=custom_headers)
+        delivery_result = _send_webhook(webhook_url, payload, ctx, extra_headers=custom_headers, timeout=timeout)
 
     elif channel == "desktop":
         title = notification_title if notification_title else f"Blueprint [{severity.upper()}]"
-        delivery_result = _send_desktop(title, message, ctx)
+        delivery_result = _send_desktop(title, message, ctx, timeout=timeout)
         _send_log(message, severity, metrics_summary, ctx.run_dir, ctx)
 
     elif channel == "log":

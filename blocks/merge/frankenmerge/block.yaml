@@ -39,3 +39,10 @@ config:
     label: Output Name
     description: Name for the assembled model
     default: "frankenmerge-model"
+  timeout:
+    type: integer
+    label: Timeout (seconds)
+    default: 3600
+    min: 60
+    max: 7200
+    description: "Maximum execution time for the mergekit process"
