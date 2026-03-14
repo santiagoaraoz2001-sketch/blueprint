@@ -94,6 +94,8 @@ def run(ctx):
         f"Debate composite: {rounds} round(s) with model={model or 'default'}, "
         f"sub-blocks={ctx.sub_block_count}"
     )
+    ctx.log_metric("rounds_completed", rounds)
+    ctx.log_metric("sub_blocks_created", ctx.sub_block_count)
     ctx.report_progress(1, 1)
 
     # Save a placeholder for consensus — the sub-pipeline's actual output

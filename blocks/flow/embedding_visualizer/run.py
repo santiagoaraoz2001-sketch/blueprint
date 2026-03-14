@@ -289,5 +289,10 @@ def run(ctx):
         json.dump(coords_dataset, f, indent=2)
     ctx.save_output("dataset", coords_path)
 
+    ctx.log_metric("point_count", len(reduced))
+    ctx.log_metric("dimensions", dim)
+    unique_clusters = len(set(c for c in clusters if c != -1)) if clusters else 0
+    ctx.log_metric("clusters_found", unique_clusters)
+
     ctx.log_message(f"Visualization: {len(reduced)} points in {dimensions}D ({method})")
     ctx.report_progress(4, 4)

@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import time
+from pathlib import Path
 
 from backend.block_sdk.exceptions import BlockTimeoutError
 
@@ -128,12 +129,14 @@ slices:
 
         ctx.log_message(f"Running: {' '.join(cmd)}")
 
+        merge_start = time.time()
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=timeout,
         )
+        merge_time = time.time() - merge_start
 
         if result.returncode == 0:
             ctx.log_message("Merge completed successfully!")
@@ -161,6 +164,11 @@ slices:
                 "output_dir": output_dir,
                 "demo_mode": False,
             }, f, indent=2)
+        ctx.log_metric("merge_time_s", round(merge_time, 2))
+        ctx.log_metric("layers_merged", total_layers)
+        if os.path.isdir(output_dir):
+            total_bytes = sum(f.stat().st_size for f in Path(output_dir).rglob("*") if f.is_file())
+            ctx.log_metric("output_size_mb", round(total_bytes / (1024 * 1024), 1))
 
         ctx.save_output("model", {
             "source": "merge", "method": "passthrough", "path": output_dir,
@@ -182,6 +190,7 @@ slices:
         ctx.log_message(f"mergekit error: {e}. Falling back to simulation.")
 
     # ── Simulation fallback ──
+    merge_start = time.time()
     total_layers = sum(
         (lc.get("layer_range", [0, 16])[1] - lc.get("layer_range", [0, 16])[0])
         for lc in layer_config
@@ -201,6 +210,13 @@ slices:
             "merge_embed": merge_embed,
             "demo_mode": True,
         }, f, indent=2)
+
+    merge_time = time.time() - merge_start
+    ctx.log_metric("merge_time_s", round(merge_time, 2))
+    ctx.log_metric("layers_merged", total_layers)
+    if os.path.isdir(model_path):
+        total_bytes = sum(f.stat().st_size for f in Path(model_path).rglob("*") if f.is_file())
+        ctx.log_metric("output_size_mb", round(total_bytes / (1024 * 1024), 1))
 
     ctx.save_output("model", {
         "source": "merge", "method": "passthrough", "path": model_path,
