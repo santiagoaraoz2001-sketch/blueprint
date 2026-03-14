@@ -110,10 +110,10 @@ def run(ctx):
     join_suffix = ctx.config.get("join_suffix", "_b")
 
     # Load datasets
-    dataset_a_path = ctx.load_input("dataset_a")
-    dataset_b_path = ctx.load_input("dataset_b")
+    dataset_a_path = ctx.resolve_as_file_path("dataset_a")
+    dataset_b_path = ctx.resolve_as_file_path("dataset_b")
     try:
-        dataset_c_path = ctx.load_input("dataset_c")
+        dataset_c_path = ctx.resolve_as_file_path("dataset_c")
     except ValueError:
         dataset_c_path = None
 

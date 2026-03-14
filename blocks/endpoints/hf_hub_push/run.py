@@ -7,33 +7,17 @@ import posixpath
 from backend.block_sdk.exceptions import BlockDependencyError, BlockInputError
 
 
-def _resolve_data(raw):
-    """Resolve raw input to determine what to upload, handling any upstream format."""
-    if isinstance(raw, str):
-        if os.path.isdir(raw):
-            return {"type": "directory", "path": raw}
-        if os.path.isfile(raw):
-            return {"type": "file", "path": raw}
-        try:
-            parsed = json.loads(raw)
-            if isinstance(parsed, dict):
-                # Check for path references in the parsed dict
-                for key in ["model_path", "path", "output_path", "file_path"]:
-                    if key in parsed and isinstance(parsed[key], str) and os.path.exists(parsed[key]):
-                        path = parsed[key]
-                        return {"type": "directory" if os.path.isdir(path) else "file", "path": path, "metadata": parsed}
-            return {"type": "data", "data": parsed}
-        except (json.JSONDecodeError, ValueError):
-            return {"type": "string", "data": raw}
-    if isinstance(raw, dict):
+def _resolve_upload_info(data):
+    """Determine upload type from resolved data."""
+    if isinstance(data, dict):
         for key in ["model_path", "path", "output_path", "file_path"]:
-            if key in raw and isinstance(raw[key], str) and os.path.exists(raw[key]):
-                path = raw[key]
-                return {"type": "directory" if os.path.isdir(path) else "file", "path": path, "metadata": raw}
-        return {"type": "data", "data": raw}
-    if isinstance(raw, list):
-        return {"type": "data", "data": raw}
-    return {"type": "unknown", "data": str(raw)}
+            if key in data and isinstance(data[key], str) and os.path.exists(data[key]):
+                path = data[key]
+                return {"type": "directory" if os.path.isdir(path) else "file", "path": path, "metadata": data}
+        return {"type": "data", "data": data}
+    if isinstance(data, list):
+        return {"type": "data", "data": data}
+    return {"type": "data", "data": data}
 
 
 def run(ctx):
@@ -80,6 +64,9 @@ def run(ctx):
 
     # ---- Step 2: Load and resolve data ----
     ctx.report_progress(2, 4)
+    # Use load_input directly — hf_hub_push needs to detect directory/file paths
+    # from upstream dicts, and resolve_as_data would wrap dicts in [dict],
+    # hiding path references that _resolve_upload_info needs to inspect.
     raw_data = ctx.load_input("data")
     if raw_data is None:
         raise BlockInputError(
@@ -87,7 +74,13 @@ def run(ctx):
             recoverable=False,
         )
 
-    resolved = _resolve_data(raw_data)
+    # If upstream sent a directory path string, resolve it directly
+    if isinstance(raw_data, str) and os.path.isdir(raw_data):
+        resolved = {"type": "directory", "path": raw_data}
+    elif isinstance(raw_data, str) and os.path.isfile(raw_data):
+        resolved = {"type": "file", "path": raw_data}
+    else:
+        resolved = _resolve_upload_info(raw_data)
     ctx.log_message(f"Upload source type: {resolved['type']}")
 
     # ---- Step 3: Create repo if needed ----

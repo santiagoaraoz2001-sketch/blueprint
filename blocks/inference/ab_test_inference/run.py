@@ -75,7 +75,7 @@ def run(ctx):
     prompts = []
 
     if ctx.inputs.get("dataset"):
-        data = ctx.load_input("dataset")
+        data = ctx.resolve_as_file_path("dataset")
         rows = _load_dataset(data)
         for row in rows:
             if isinstance(row, dict):

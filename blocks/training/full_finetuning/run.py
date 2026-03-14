@@ -44,7 +44,7 @@ def run(ctx):
     if not model_name:
         raise ValueError("model_name is required — set it in config or connect a model to the input port")
 
-    dataset_path = ctx.load_input("dataset")
+    dataset_path = ctx.resolve_as_file_path("dataset")
 
     try:
         import torch

@@ -12,29 +12,6 @@ from datetime import datetime, timezone
 from backend.block_sdk.exceptions import BlockTimeoutError
 
 
-def _resolve_input(raw):
-    """Resolve an input value that might be a file path or directory to a Python object."""
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except (json.JSONDecodeError, ValueError):
-                    return raw
-        if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return raw
-    return raw
-
-
 def _format_message(template, trigger_data, message_data, severity):
     """Format a notification message by substituting placeholders."""
     replacements = {
@@ -198,10 +175,10 @@ def run(ctx):
 
     # ---- Step 1: Load trigger data ----
     ctx.report_progress(1, 4)
-    raw_trigger = ctx.load_input("trigger")
-    if raw_trigger is None:
+    raw_trigger = ctx.resolve_as_dict("trigger")
+    if not raw_trigger:
         raise ValueError("No trigger data provided. Connect a 'trigger' input to this block.")
-    trigger_data = _resolve_input(raw_trigger)
+    trigger_data = raw_trigger
     ctx.log_message("Trigger data loaded")
 
     # Evaluate send_condition: skip sending if condition not met
@@ -238,8 +215,8 @@ def run(ctx):
     ctx.report_progress(2, 4)
     message_data = None
     if ctx.inputs.get("message_data"):
-        raw_msg = ctx.load_input("message_data")
-        message_data = _resolve_input(raw_msg)
+        raw_msg = ctx.resolve_as_dict("message_data")
+        message_data = raw_msg
         ctx.log_message("Additional message data loaded")
 
     # ---- Step 3: Build and send notification ----

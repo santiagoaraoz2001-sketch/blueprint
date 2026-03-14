@@ -8,29 +8,6 @@ import traceback
 import time
 
 
-def _resolve_input(raw):
-    """Resolve an input value that might be a file path or directory to a Python object."""
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except (json.JSONDecodeError, ValueError):
-                    return raw
-        if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return raw
-    return raw
-
-
 def run(ctx):
     max_retries = int(ctx.config.get("max_retries", 0))
     retry_delay = float(ctx.config.get("retry_delay", 1.0))
@@ -46,12 +23,11 @@ def run(ctx):
                     + (f", error_pattern='{error_pattern}'" if error_pattern else ""))
 
     # Load input
-    raw_input = None
+    input_data = None
     try:
-        raw_input = ctx.load_input("input")
+        input_data = ctx.resolve_as_data("input")
     except (ValueError, Exception):
         pass
-    input_data = _resolve_input(raw_input)
 
     # If a script is provided, execute it with retry logic
     if script:

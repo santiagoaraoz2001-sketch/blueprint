@@ -9,7 +9,7 @@ import os
 
 
 def run(ctx):
-    dataset_path = ctx.load_input("dataset")
+    dataset_path = ctx.resolve_as_file_path("dataset")
 
     # Read upstream dataset metadata
     _dataset_meta = {}

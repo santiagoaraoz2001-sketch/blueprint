@@ -7,34 +7,6 @@ import shutil
 from backend.block_sdk.exceptions import BlockInputError
 
 
-def _resolve_model_data(raw):
-    """Resolve model input — could be a path, dict with path, or model object."""
-    if isinstance(raw, str):
-        if os.path.exists(raw):
-            return {"path": raw, "type": "path"}
-        # Try parsing as JSON string
-        try:
-            parsed = json.loads(raw)
-            if isinstance(parsed, dict):
-                return {"data": parsed, "type": "dict"}
-        except (json.JSONDecodeError, ValueError):
-            pass
-        # Could be a model ID or HuggingFace identifier
-        return {"path": raw, "type": "path"}
-    if isinstance(raw, dict):
-        # Check common path keys
-        for key in ["model_path", "path", "checkpoint_path", "weights_path", "output_path", "file_path"]:
-            if key in raw and isinstance(raw[key], str):
-                return {"path": raw[key], "type": "path", "metadata": raw}
-        return {"data": raw, "type": "dict"}
-    if isinstance(raw, list):
-        # List of model info dicts — take the first one
-        if raw and isinstance(raw[0], dict):
-            return _resolve_model_data(raw[0])
-        return {"data": raw, "type": "unknown"}
-    return {"data": raw, "type": "unknown"}
-
-
 def run(ctx):
     output_path = ctx.config.get("output_path", "./output").strip()
     filename = ctx.config.get("filename", "model").strip()
@@ -49,15 +21,18 @@ def run(ctx):
 
     # ---- Step 1: Load model data ----
     ctx.report_progress(1, 4)
-    raw_data = ctx.load_input("model")
-    if raw_data is None:
+    model_info = ctx.resolve_model_info("model")
+    if not model_info:
         raise BlockInputError(
             "No model data provided. Connect a 'model' input.",
             recoverable=False,
         )
 
-    model_info = _resolve_model_data(raw_data)
-    ctx.log_message(f"Model input type: {model_info['type']}")
+    # Determine model type from resolve_model_info output
+    # resolve_model_info returns dict with: model_name, model_id, source, backend, and optionally path
+    model_path = model_info.get("path", model_info.get("model_id", ""))
+    has_local_path = isinstance(model_path, str) and os.path.exists(model_path)
+    ctx.log_message(f"Model input: {model_info.get('model_name', 'unknown')} (source={model_info.get('source', 'unknown')})")
 
     # ---- Step 2: Resolve output directory ----
     ctx.report_progress(2, 4)
@@ -78,8 +53,8 @@ def run(ctx):
     ctx.report_progress(3, 4)
     saved_files = []
 
-    if model_info["type"] == "path" and os.path.exists(model_info["path"]):
-        src_path = model_info["path"]
+    if has_local_path:
+        src_path = model_path
 
         if os.path.isdir(src_path):
             # Copy model directory contents
@@ -111,26 +86,17 @@ def run(ctx):
             saved_files.append(os.path.basename(src_path))
             ctx.log_message(f"Copied model file: {os.path.basename(src_path)}")
 
-    elif model_info["type"] == "path" and not os.path.exists(model_info["path"]):
-        # Path doesn't exist — log a warning and save what we know
-        ctx.log_message(f"WARNING: Model path not found: {model_info['path']}")
-        meta_path = os.path.join(out_dir, "model_info.json")
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump({"model_id": model_info["path"], "note": "Path not found on disk"}, f, indent=2)
-        saved_files.append("model_info.json")
-
-    elif model_info["type"] == "dict":
+    else:
         # Save model metadata/config as JSON
-        data = model_info.get("data", model_info)
         meta_path = os.path.join(out_dir, "model_info.json")
         with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, default=str)
+            json.dump(model_info, f, indent=2, default=str)
         saved_files.append("model_info.json")
         ctx.log_message("Saved model metadata as JSON")
 
         # If there's a nested path reference, try to copy
         for key in ["model_path", "path", "checkpoint_path", "weights_path"]:
-            nested_path = data.get(key, "")
+            nested_path = model_info.get(key, "")
             if isinstance(nested_path, str) and os.path.exists(nested_path):
                 if os.path.isdir(nested_path):
                     for item in os.listdir(nested_path):
@@ -144,13 +110,6 @@ def run(ctx):
                     saved_files.append(os.path.basename(nested_path))
                 ctx.log_message(f"Also copied files from {key}: {nested_path}")
                 break
-    else:
-        # Store whatever we have as JSON
-        meta_path = os.path.join(out_dir, "model_info.json")
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump({"raw": str(raw_data)[:10000]}, f, indent=2)
-        saved_files.append("model_info.json")
-        ctx.log_message("Saved raw model info as JSON (no recognizable model format)")
 
     # Save format metadata
     format_meta = {

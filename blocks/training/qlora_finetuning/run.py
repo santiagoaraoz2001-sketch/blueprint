@@ -57,7 +57,7 @@ def run(ctx):
         raise ValueError("model_name is required — set it in config or connect a model to the input port")
 
     # Load dataset
-    dataset_path = ctx.load_input("dataset")
+    dataset_path = ctx.resolve_as_file_path("dataset")
 
     # Import required libraries
     try:

@@ -13,7 +13,7 @@ import os
 
 
 def run(ctx):
-    dataset_input = ctx.load_input("dataset")
+    dataset_input = ctx.resolve_as_file_path("dataset")
 
     # Read upstream dataset metadata
     _dataset_meta = {}

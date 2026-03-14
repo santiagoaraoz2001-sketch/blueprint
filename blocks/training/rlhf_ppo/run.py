@@ -11,7 +11,7 @@ import time
 
 
 def run(ctx):
-    dataset_path = ctx.load_input("dataset")
+    dataset_path = ctx.resolve_as_file_path("dataset")
     model_name = ctx.config.get("model_name", "")
     lr = float(ctx.config.get("lr", 1e-5))
     epochs = int(ctx.config.get("epochs", 1))

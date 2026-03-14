@@ -5,13 +5,16 @@ import os
 
 
 def run(ctx):
-    # Required inputs
-    prompt_input = ctx.load_input("prompt")
-    model_ref = ctx.load_input("model")
+    # Required inputs — prompt is optional with a default fallback
+    try:
+        prompt_input = ctx.resolve_as_text("prompt")
+    except ValueError:
+        prompt_input = ""
+    model_ref = ctx.resolve_model_info("model")
 
     # Optional input
     try:
-        seed_data_path = ctx.load_input("seed_data")
+        seed_data_path = ctx.resolve_as_file_path("seed_data")
     except ValueError:
         seed_data_path = None
 
@@ -63,7 +66,12 @@ def run(ctx):
         ctx.log_message(f"System prompt: {len(system_prompt)} chars")
 
     # Resolve model
-    model_id = model_ref if isinstance(model_ref, str) else str(model_ref)
+    if isinstance(model_ref, dict):
+        model_id = model_ref.get("model_id", model_ref.get("model_name", ""))
+    else:
+        model_id = str(model_ref) if model_ref else ""
+    if not model_id:
+        raise ValueError("No model specified. Connect a model input or set model_name in config.")
     if os.path.isdir(model_id):
         # Local model path
         ctx.log_message(f"Using local model at: {model_id}")

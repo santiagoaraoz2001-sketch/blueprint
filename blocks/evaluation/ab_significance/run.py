@@ -18,8 +18,8 @@ def run(ctx):
             install_hint="pip install scipy numpy",
         )
 
-    metrics_a_path = ctx.load_input("metrics_a")
-    metrics_b_path = ctx.load_input("metrics_b")
+    metrics_a = ctx.resolve_as_dict("metrics_a")
+    metrics_b = ctx.resolve_as_dict("metrics_b")
     metric_name = ctx.config.get("metric_name", "accuracy")
     alpha = ctx.config.get("significance_level", 0.05)
     test_type = ctx.config.get("test_type", "welch_t")
@@ -28,8 +28,8 @@ def run(ctx):
     ctx.report_progress(0, 4)
 
     # ── 1. Load metric values ────────────────────────────────────────────
-    values_a = _load_metric_values(metrics_a_path, metric_name)
-    values_b = _load_metric_values(metrics_b_path, metric_name)
+    values_a = _load_metric_values(metrics_a, metric_name)
+    values_b = _load_metric_values(metrics_b, metric_name)
 
     # Convert to numpy float arrays — filter out any non-numeric values
     values_a = _to_numeric_array(values_a, "Branch A")
