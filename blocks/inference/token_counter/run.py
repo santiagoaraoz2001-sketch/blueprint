@@ -56,6 +56,7 @@ def run(ctx):
             token_count = len(tokens)
             method_used = "tiktoken"
             ctx.log_message(f"Used tiktoken ({enc.name})")
+            ctx.log_metric("simulation_mode", 0.0)
         except ImportError:
             if tokenizer_type == "tiktoken":
                 ctx.log_message("tiktoken not installed. Run: pip install tiktoken")
@@ -78,6 +79,7 @@ def run(ctx):
             token_count = len(tokens)
             method_used = "transformers"
             ctx.log_message(f"Used transformers tokenizer for {model_name}")
+            ctx.log_metric("simulation_mode", 0.0)
         except OSError:
             pass
 
@@ -85,7 +87,8 @@ def run(ctx):
     if method_used == "estimate":
         token_count = max(1, len(text) // 4)
         method_used = "char_estimate"
-        ctx.log_message("Using character-based estimation (~4 chars/token)")
+        ctx.log_message("⚠️ SIMULATION MODE: No tokenizer library available. Using character-based estimation (~4 chars/token). Install tiktoken or transformers for accurate counts.")
+        ctx.log_metric("simulation_mode", 1.0)
 
     ctx.report_progress(2, 3)
 

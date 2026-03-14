@@ -63,9 +63,12 @@ def run(ctx):
                 checkpoints.append(ckpt_info)
 
         ctx.log_message(f"Found {len(checkpoints)} checkpoints")
+        ctx.log_metric("simulation_mode", 0.0)
     else:
         # Demo mode: generate fake checkpoints
-        ctx.log_message("⚠ DEMO MODE: No valid checkpoint directory. Generating sample checkpoints.")
+        ctx.log_message("⚠️ SIMULATION MODE: No valid checkpoint directory found. Generating sample checkpoints with synthetic metrics. Provide a valid checkpoint_dir for real checkpoint selection.")
+        ctx.log_metric("simulation_mode", 1.0)
+        import math
         import random
         random.seed(42)
         for step in [500, 1000, 1500, 2000, 2500, 3000]:
@@ -80,7 +83,6 @@ def run(ctx):
                     "step": step,
                 },
             })
-        import math
 
     # Select best checkpoint
     best = None

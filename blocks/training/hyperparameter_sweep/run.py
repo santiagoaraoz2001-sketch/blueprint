@@ -28,6 +28,8 @@ def run(ctx):
     mode = ctx.config.get("mode", "min")
 
     ctx.log_message(f"Starting {search_type} sweep. Target metric: {optimize_metric} (mode={mode})")
+    ctx.log_message("⚠️ SIMULATION MODE: Training runs are simulated with synthetic loss curves. Results are NOT from real model training. Install torch and transformers for real hyperparameter optimization.")
+    ctx.log_metric("simulation_mode", 1.0)
 
     try:
         param_space = json.loads(param_space_str)

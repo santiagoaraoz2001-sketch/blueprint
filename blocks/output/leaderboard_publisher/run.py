@@ -13,6 +13,7 @@ def run(ctx):
 
     # Collect all metrics inputs
     all_entries = []
+    is_simulated = False
 
     for input_name in ["metrics", "dataset", "input", "results",
                         "metrics_1", "metrics_2", "metrics_3", "metrics_4"]:
@@ -35,7 +36,8 @@ def run(ctx):
             pass
 
     if not all_entries:
-        ctx.log_message("No data connected. Generating demo leaderboard.")
+        ctx.log_message("⚠️ SIMULATION MODE: No evaluation data connected. Displaying demo leaderboard with synthetic model scores. Connect real evaluation outputs for actual results.")
+        is_simulated = True
         all_entries = [
             {"model": "Llama-3-70B", "mmlu": 0.82, "humaneval": 0.68, "hellaswag": 0.87, "average": 0.79},
             {"model": "Mistral-7B-v0.3", "mmlu": 0.64, "humaneval": 0.45, "hellaswag": 0.81, "average": 0.63},
@@ -138,4 +140,5 @@ def run(ctx):
     })
     ctx.log_metric("num_entries", len(all_entries))
     ctx.log_message(f"Leaderboard published: {len(all_entries)} entries, {output_format} format")
+    ctx.log_metric("simulation_mode", 1.0 if is_simulated else 0.0)
     ctx.report_progress(1, 1)
