@@ -38,6 +38,13 @@ def run(ctx):
         except (ValueError, Exception):
             pass
 
+    # Validate required input
+    if "metrics" not in all_data:
+        raise ValueError(
+            "Required input 'metrics' not connected or produced no data. "
+            "Connect evaluation results to the 'Metrics' port."
+        )
+
     ctx.log_message(f"Generating report: '{title}' with sections: {sections}")
     ctx.log_message(f"Data sources: {list(all_data.keys())}")
 
