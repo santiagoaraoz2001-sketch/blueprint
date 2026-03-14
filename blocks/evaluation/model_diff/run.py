@@ -183,10 +183,13 @@ def _compare_local_models(ctx, model_a_info, model_b_info, prompt, max_tokens,
         from transformers import AutoModelForCausalLM, AutoTokenizer
         import torch
         import torch.nn.functional as F
-    except ImportError:
-        raise RuntimeError(
-            "transformers and torch required for local comparison. "
-            "Run: pip install transformers torch"
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install torch transformers",
         )
 
     model_a = None

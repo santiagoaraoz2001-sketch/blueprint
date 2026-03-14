@@ -135,7 +135,16 @@ def _build_chroma(ctx, chunks, embeddings, collection_name, distance_metric, bat
 def _build_faiss(ctx, chunks, embeddings, collection_name, distance_metric, batch_size):
     """Build a FAISS vector index."""
     import faiss
-    import numpy as np
+    try:
+        import numpy as np
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install numpy",
+        )
 
     if not embeddings:
         raise ValueError(

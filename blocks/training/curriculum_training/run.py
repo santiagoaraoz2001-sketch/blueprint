@@ -79,7 +79,7 @@ def run(ctx):
         end = min((s + 1) * stage_size, num_rows)
         stages.append(rows[start:end])
 
-    # ── Try real training with transformers ──
+    # ── Guard heavy imports ──
     try:
         from transformers import (
             AutoModelForCausalLM,
@@ -91,7 +91,17 @@ def run(ctx):
         )
         import torch
         from torch.utils.data import Dataset as TorchDataset
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install torch transformers",
+        )
 
+    # ── Try real training with transformers ──
+    try:
         ctx.log_message("transformers + torch found. Running real curriculum training...")
 
         output_dir = os.path.join(ctx.run_dir, "model")
@@ -217,8 +227,6 @@ def run(ctx):
         ctx.report_progress(1, 1)
         return
 
-    except ImportError as e:
-        ctx.log_message(f"Dependencies not available ({e}). Running simulation.")
     except Exception as e:
         ctx.log_message(f"Training error: {e}. Falling back to simulation.")
 

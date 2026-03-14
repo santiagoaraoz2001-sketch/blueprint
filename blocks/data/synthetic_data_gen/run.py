@@ -73,10 +73,13 @@ def run(ctx):
     # Load model via transformers
     try:
         from transformers import pipeline as hf_pipeline
-    except ImportError:
-        raise RuntimeError(
-            "The 'transformers' library is required for synthetic data generation. "
-            "Install it with: pip install transformers"
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install transformers",
         )
 
     ctx.log_message(f"Loading pipeline for '{model_id}'...")

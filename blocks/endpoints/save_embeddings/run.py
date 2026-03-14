@@ -142,8 +142,14 @@ def run(ctx):
                     norms[norms == 0] = 1
                     arr = arr / norms
                     ctx.log_message("Applied L2 normalization")
-            except ImportError:
-                raise ImportError("NumPy is required for npy/npz format. Install with: pip install numpy")
+            except ImportError as e:
+                from backend.block_sdk.exceptions import BlockDependencyError
+                missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+                raise BlockDependencyError(
+                    missing,
+                    f"Required library not installed: {e}",
+                    install_hint="pip install numpy",
+                )
 
             if fmt == "npy":
                 out_filepath = os.path.join(out_dir, filename + ".npy")
@@ -175,8 +181,14 @@ def run(ctx):
                 if os.path.exists(out_filepath) and not overwrite:
                     raise FileExistsError(f"File exists: {out_filepath}")
                 faiss.write_index(index, out_filepath)
-            except ImportError:
-                raise ImportError("faiss-cpu is required for FAISS format. Install with: pip install faiss-cpu")
+            except ImportError as e:
+                from backend.block_sdk.exceptions import BlockDependencyError
+                missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+                raise BlockDependencyError(
+                    missing,
+                    f"Required library not installed: {e}",
+                    install_hint="pip install numpy",
+                )
 
         elif fmt == "json":
             out_filepath = os.path.join(out_dir, filename + ".json")

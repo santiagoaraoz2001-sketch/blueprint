@@ -72,86 +72,69 @@ def run(ctx):
     metrics = {}
     output_model_path = os.path.join(ctx.run_dir, "reward_model")
 
+    # Guard heavy imports
     try:
         from transformers import AutoModelForSequenceClassification, AutoTokenizer, TrainingArguments
         from trl import RewardTrainer
         from datasets import Dataset as HFDataset
-
-        ctx.log_message("Loading model and tokenizer...")
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
-        model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1)
-
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
-
-        # Convert list to HF Dataset if needed
-        if isinstance(dataset, list):
-            train_dataset = HFDataset.from_list(dataset)
-        elif hasattr(dataset, '__len__'):
-            train_dataset = dataset
-        else:
-            raise ValueError("Dataset format not supported. Provide a JSON list of preference pairs.")
-
-        training_args = TrainingArguments(
-            output_dir=output_model_path,
-            num_train_epochs=epochs,
-            learning_rate=lr,
-            per_device_train_batch_size=batch_size,
-            max_steps=-1,
-            logging_steps=10,
-            save_strategy="epoch",
-            remove_unused_columns=False,
-        )
-
-        ctx.report_progress(2, 4)
-        ctx.log_message("Starting reward model training...")
-
-        trainer = RewardTrainer(
-            model=model,
-            args=training_args,
-            tokenizer=tokenizer,
-            train_dataset=train_dataset,
-            max_length=max_length,
-        )
-
-        train_result = trainer.train()
-        trainer.save_model(output_model_path)
-
-        metrics = {
-            "train/loss": round(train_result.training_loss, 6),
-            "train_runtime": round(train_result.metrics.get("train_runtime", 0), 2),
-            "train_samples_per_second": round(train_result.metrics.get("train_samples_per_second", 0), 2),
-            "epochs": epochs,
-            "learning_rate": lr,
-            "loss_function": loss_fn,
-        }
-        ctx.log_message(f"Training complete: loss={metrics['train/loss']:.6f}")
-
     except ImportError as e:
-        missing = str(e)
-        ctx.log_message(f"Required package not available: {missing}")
-        ctx.log_message("Running in demo mode — generating synthetic metrics")
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install datasets transformers trl",
+        )
 
-        # Demo mode: simulate training metrics
-        os.makedirs(output_model_path, exist_ok=True)
-        demo_config = {"model_type": "demo_reward_model", "base_model": model_path}
-        with open(os.path.join(output_model_path, "config.json"), "w") as f:
-            json.dump(demo_config, f, indent=2)
+    ctx.log_message("Loading model and tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1)
 
-        random.seed(42)
-        metrics = {
-            "train/loss": round(0.5 - 0.3 * (1 - 1 / (epochs + 1)) + random.gauss(0, 0.02), 6),
-            "train_runtime": round(n_samples * epochs * 0.05, 2),
-            "train_samples_per_second": round(n_samples / max(n_samples * epochs * 0.05, 0.01), 2),
-            "epochs": epochs,
-            "learning_rate": lr,
-            "loss_function": loss_fn,
-            "demo_mode": True,
-        }
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
 
-    except Exception as e:
-        ctx.log_message(f"Training error: {e}")
-        raise
+    # Convert list to HF Dataset if needed
+    if isinstance(dataset, list):
+        train_dataset = HFDataset.from_list(dataset)
+    elif hasattr(dataset, '__len__'):
+        train_dataset = dataset
+    else:
+        raise ValueError("Dataset format not supported. Provide a JSON list of preference pairs.")
+
+    training_args = TrainingArguments(
+        output_dir=output_model_path,
+        num_train_epochs=epochs,
+        learning_rate=lr,
+        per_device_train_batch_size=batch_size,
+        max_steps=-1,
+        logging_steps=10,
+        save_strategy="epoch",
+        remove_unused_columns=False,
+    )
+
+    ctx.report_progress(2, 4)
+    ctx.log_message("Starting reward model training...")
+
+    trainer = RewardTrainer(
+        model=model,
+        args=training_args,
+        tokenizer=tokenizer,
+        train_dataset=train_dataset,
+        max_length=max_length,
+    )
+
+    train_result = trainer.train()
+    trainer.save_model(output_model_path)
+
+    metrics = {
+        "train/loss": round(train_result.training_loss, 6),
+        "train_runtime": round(train_result.metrics.get("train_runtime", 0), 2),
+        "train_samples_per_second": round(train_result.metrics.get("train_samples_per_second", 0), 2),
+        "epochs": epochs,
+        "learning_rate": lr,
+        "loss_function": loss_fn,
+    }
+    ctx.log_message(f"Training complete: loss={metrics['train/loss']:.6f}")
 
     ctx.report_progress(3, 4)
 

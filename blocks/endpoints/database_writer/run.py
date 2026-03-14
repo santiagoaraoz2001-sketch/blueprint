@@ -68,7 +68,16 @@ def _infer_sql_type(values):
 
 def _write_with_pandas(rows, connection_string, table_name, if_exists, dtype_mapping, batch_size):
     """Write using pandas + sqlalchemy (supports PostgreSQL, MySQL, etc.)."""
-    import pandas as pd
+    try:
+        import pandas as pd
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install pandas",
+        )
     from sqlalchemy import create_engine
 
     engine = create_engine(connection_string)

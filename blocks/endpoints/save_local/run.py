@@ -203,8 +203,14 @@ def run(ctx):
                 import pandas as pd
                 df = pd.DataFrame(rows)
                 df.to_parquet(out_filepath, index=False)
-            except ImportError:
-                raise ImportError("Install pyarrow or pandas for Parquet support.")
+            except ImportError as e:
+                from backend.block_sdk.exceptions import BlockDependencyError
+                missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+                raise BlockDependencyError(
+                    missing,
+                    f"Required library not installed: {e}",
+                    install_hint="pip install pandas",
+                )
     else:
         raise ValueError(f"Unsupported format: {fmt}")
 

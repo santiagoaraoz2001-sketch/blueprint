@@ -237,9 +237,14 @@ def _init_embeddings(ctx, model_name="all-MiniLM-L6-v2"):
             return float(cos)
 
         return compute_similarity
-    except ImportError:
-        ctx.log_message("sentence-transformers not installed (pip install sentence-transformers)")
-        return None
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install numpy sentence-transformers",
+        )
 
 
 def _init_llm_judge(ctx, timeout=30):

@@ -74,13 +74,23 @@ def run(ctx):
 
     ctx.log_message(f"Training data: {num_rows} samples")
 
-    # ── Try real distillation with torch + transformers ──
+    # ── Guard heavy imports ──
     try:
         import torch
         import torch.nn.functional as F
         from transformers import AutoModelForCausalLM, AutoTokenizer
         from torch.utils.data import DataLoader, Dataset as TorchDataset
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install torch transformers",
+        )
 
+    # ── Try real distillation ──
+    try:
         ctx.log_message("torch + transformers found. Running real distillation...")
 
         output_dir = os.path.join(ctx.run_dir, "model")
@@ -227,8 +237,6 @@ def run(ctx):
         ctx.report_progress(1, 1)
         return
 
-    except ImportError as e:
-        ctx.log_message(f"Dependencies not available ({e}). Running simulation.")
     except Exception as e:
         ctx.log_message(f"Distillation error: {e}. Falling back to simulation.")
 

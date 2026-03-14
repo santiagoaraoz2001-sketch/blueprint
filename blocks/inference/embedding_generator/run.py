@@ -133,12 +133,14 @@ def run(ctx):
                 embeddings.extend(batch_embs.tolist())
                 ctx.report_progress(min(i + batch_size, len(texts)), len(texts))
 
-        except ImportError:
-            ctx.log_message("sentence-transformers not installed. Install: pip install sentence-transformers")
-            ctx.log_message("Falling back to demo embeddings.")
-            method_used = "demo"
-            embeddings = _demo_embeddings(texts, _DEFAULT_DEMO_DIM)
-            embedding_dim = _DEFAULT_DEMO_DIM
+        except ImportError as e:
+            from backend.block_sdk.exceptions import BlockDependencyError
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install sentence-transformers",
+            )
 
     # ── Ollama ───────────────────────────────────────────────────
     elif provider == "ollama":
@@ -258,6 +260,8 @@ def run(ctx):
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "data.json"), "w", encoding="utf-8") as f:
         json.dump(results, f)
+
+
     ctx.save_output("dataset", out_dir)
 
     # ── Save format-specific artifact (for manual download/inspection) ──
@@ -266,8 +270,14 @@ def run(ctx):
             import numpy as np
             npy_path = os.path.join(ctx.run_dir, "embeddings.npy")
             np.save(npy_path, np.array(embeddings, dtype=np.float32))
-        except ImportError:
-            pass
+        except ImportError as e:
+            from backend.block_sdk.exceptions import BlockDependencyError
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install numpy",
+            )
 
     # ── Save structured embeddings output for pipeline consumers ──
     # Always JSON for downstream block compatibility

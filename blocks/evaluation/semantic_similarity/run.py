@@ -153,33 +153,14 @@ def _init_similarity(ctx, model_name, batch_size):
 
         return compute_similarity
 
-    except ImportError:
-        ctx.log_message(
-            "sentence-transformers not installed (pip install sentence-transformers) "
-            "— using TF-IDF cosine similarity"
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install numpy sentence-transformers",
         )
-
-        def tfidf_similarity(text_a, text_b):
-            tokens_a = _tokenize(text_a)
-            tokens_b = _tokenize(text_b)
-            if not tokens_a or not tokens_b:
-                return 0.0
-
-            # Build vocabulary
-            vocab = set(tokens_a) | set(tokens_b)
-            vec_a = Counter(tokens_a)
-            vec_b = Counter(tokens_b)
-
-            # Cosine similarity
-            dot = sum(vec_a.get(w, 0) * vec_b.get(w, 0) for w in vocab)
-            norm_a = math.sqrt(sum(v ** 2 for v in vec_a.values()))
-            norm_b = math.sqrt(sum(v ** 2 for v in vec_b.values()))
-
-            if norm_a == 0 or norm_b == 0:
-                return 0.0
-            return dot / (norm_a * norm_b)
-
-        return tfidf_similarity
 
 
 def _tokenize(text):

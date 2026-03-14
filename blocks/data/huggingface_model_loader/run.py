@@ -119,8 +119,14 @@ def run(ctx):
                     bnb_4bit_compute_dtype="float16",
                 )
                 ctx.log_message("Applying 4-bit quantization via bitsandbytes")
-            except ImportError:
-                ctx.log_message("WARNING: bitsandbytes not installed, skipping quantization")
+            except ImportError as e:
+                from backend.block_sdk.exceptions import BlockDependencyError
+                missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+                raise BlockDependencyError(
+                    missing,
+                    f"Required library not installed: {e}",
+                    install_hint="pip install bitsandbytes transformers",
+                )
         elif quantization == "8bit":
             try:
                 from transformers import BitsAndBytesConfig
@@ -128,8 +134,14 @@ def run(ctx):
                     load_in_8bit=True,
                 )
                 ctx.log_message("Applying 8-bit quantization via bitsandbytes")
-            except ImportError:
-                ctx.log_message("WARNING: bitsandbytes not installed, skipping quantization")
+            except ImportError as e:
+                from backend.block_sdk.exceptions import BlockDependencyError
+                missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+                raise BlockDependencyError(
+                    missing,
+                    f"Required library not installed: {e}",
+                    install_hint="pip install bitsandbytes transformers",
+                )
 
         ctx.report_progress(2, 3)
 
@@ -150,12 +162,14 @@ def run(ctx):
         model_info["loaded"] = True
         ctx.log_message(f"Model loaded and saved to: {model_path}")
 
-    except ImportError:
-        ctx.log_message(
-            "transformers not installed. Emitting model config for downstream blocks. "
-            "Install with: pip install transformers"
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install torch transformers",
         )
-        model_info["loaded"] = False
     except Exception as e:
         ctx.log_message(f"Could not load model: {e}. Emitting model config only.")
         model_info["loaded"] = False

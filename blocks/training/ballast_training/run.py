@@ -61,7 +61,7 @@ def run(ctx):
 
     ctx.log_message(f"Dataset: {len(raw_data)} samples")
 
-    # ── Attempt real training via transformers ──────────────────────────
+    # ── Guard heavy imports ──────────────────────────────────────────────
     try:
         import torch
         from transformers import (
@@ -73,18 +73,22 @@ def run(ctx):
             DataCollatorForLanguageModeling,
         )
         from datasets import Dataset
-
-        _run_real_training(
-            ctx, model_name, raw_data, layer_depth, balance_factor,
-            epochs, lr, batch_size, max_seq_length, checkpoint_interval,
-            torch, AutoModelForCausalLM, AutoTokenizer,
-            TrainingArguments, Trainer, TrainerCallback,
-            DataCollatorForLanguageModeling, Dataset,
+    except ImportError as e:
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install datasets torch transformers",
         )
 
-    except ImportError as e:
-        ctx.log_message(f"transformers/torch not available ({e}); running in config-only fallback mode")
-        _run_fallback(ctx, model_name, raw_data, layer_depth, balance_factor, epochs, lr, batch_size)
+    _run_real_training(
+        ctx, model_name, raw_data, layer_depth, balance_factor,
+        epochs, lr, batch_size, max_seq_length, checkpoint_interval,
+        torch, AutoModelForCausalLM, AutoTokenizer,
+        TrainingArguments, Trainer, TrainerCallback,
+        DataCollatorForLanguageModeling, Dataset,
+    )
 
 
 # ── Real training path ─────────────────────────────────────────────────────

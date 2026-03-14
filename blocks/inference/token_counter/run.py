@@ -64,12 +64,21 @@ def run(ctx):
     if method_used == "estimate" and tokenizer_type in ("auto", "transformers"):
         try:
             from transformers import AutoTokenizer
+        except ImportError as e:
+            from backend.block_sdk.exceptions import BlockDependencyError
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install transformers",
+            )
+        try:
             tokenizer = AutoTokenizer.from_pretrained(model_name)
             tokens = tokenizer.encode(text)
             token_count = len(tokens)
             method_used = "transformers"
             ctx.log_message(f"Used transformers tokenizer for {model_name}")
-        except (ImportError, OSError):
+        except OSError:
             pass
 
     # Fallback: estimation

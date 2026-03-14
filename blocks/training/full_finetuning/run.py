@@ -58,10 +58,13 @@ def run(ctx):
         )
         from datasets import Dataset
     except ImportError as e:
-        raise ImportError(
-            f"Required library not installed: {e}. "
-            f"Install with: pip install torch transformers datasets"
-        ) from e
+        from backend.block_sdk.exceptions import BlockDependencyError
+        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install datasets torch transformers",
+        )
 
     ctx.log_message(f"Full fine-tuning: {model_name}")
     ctx.log_message(f"LR={lr}, epochs={epochs}, batch_size={batch_size}, max_seq={max_seq_length}")
