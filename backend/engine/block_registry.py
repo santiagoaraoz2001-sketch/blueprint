@@ -106,3 +106,11 @@ def get_block_config_schema(block_type: str) -> dict[str, Any]:
     if not block_yaml:
         return {}
     return block_yaml.get("config", {})
+
+
+def reset() -> None:
+    """Clear all cached state so the next scan_blocks() re-discovers blocks."""
+    global _registry, _scanned, _yaml_cache
+    _scanned = False
+    _registry = {}
+    _yaml_cache = {}

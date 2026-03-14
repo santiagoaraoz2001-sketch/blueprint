@@ -5,11 +5,12 @@ import { BLOCK_ALIASES, CATEGORY_ALIASES } from '@/lib/search-aliases'
 import BlockTooltip from './BlockTooltip'
 import BlockDetailPanel from './BlockDetailPanel'
 import CustomModuleEditor, { loadCustomBlocks, type CustomBlock } from './CustomModuleEditor'
+import BlockGeneratorModal from './BlockGeneratorModal'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useIsSimpleMode } from '@/hooks/useIsSimpleMode'
 import * as Icons from 'lucide-react'
 
-const { Search, ChevronRight, ChevronDown, Plus } = Icons
+const { Search, ChevronRight, ChevronDown, Plus, Sparkles } = Icons
 
 const CATEGORY_ORDER = ['external', 'data', 'model', 'inference', 'training', 'metrics', 'embedding', 'utilities', 'agents', 'interventions', 'endpoints']
 
@@ -39,6 +40,7 @@ export default function BlockLibrary() {
   const [customBlocks, setCustomBlocks] = useState<CustomBlock[]>(() => loadCustomBlocks())
   const [showCustomEditor, setShowCustomEditor] = useState(false)
   const [duplicateTarget, setDuplicateTarget] = useState<string | undefined>(undefined)
+  const [showGenerator, setShowGenerator] = useState(false)
 
   const refreshCustomBlocks = useCallback(() => {
     setCustomBlocks(loadCustomBlocks())
@@ -224,6 +226,27 @@ export default function BlockLibrary() {
         />
       </div>
 
+      {/* Generate with AI button */}
+      {!isSimple && (
+        <button
+          onClick={() => setShowGenerator(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            margin: '4px 10px 6px', padding: '7px 12px',
+            background: `${T.purple}12`, border: `1px solid ${T.purple}25`,
+            borderRadius: 6, cursor: 'pointer', width: 'calc(100% - 20px)',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = `${T.purple}22`; e.currentTarget.style.borderColor = `${T.purple}40` }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = `${T.purple}12`; e.currentTarget.style.borderColor = `${T.purple}25` }}
+        >
+          <Sparkles size={12} color={T.purple} />
+          <span style={{ fontFamily: F, fontSize: FS.xs, color: T.purple, fontWeight: 700 }}>
+            Generate with AI
+          </span>
+        </button>
+      )}
+
       {/* Block list */}
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 4px', scrollbarWidth: 'thin' }}>
 
@@ -367,6 +390,12 @@ export default function BlockLibrary() {
         onClose={() => setShowCustomEditor(false)}
         duplicateFrom={duplicateTarget}
         onSaved={refreshCustomBlocks}
+      />
+
+      {/* Block Generator Modal */}
+      <BlockGeneratorModal
+        visible={showGenerator}
+        onClose={() => setShowGenerator(false)}
       />
 
       {/* Block Detail Panel */}
