@@ -13,6 +13,10 @@ inputs:
     label: Dataset Info
     data_type: config
     required: false
+  - id: model
+    label: Model
+    data_type: config
+    required: false
 
 outputs:
   - id: dataset
@@ -96,6 +100,6 @@ config:
   output_format:
     type: select
     label: Output Format
-    description: "Format for embeddings output — numpy (.npy binary array), json (JSON object with embeddings and labels)"
+    description: "Format for the embeddings artifact file in the run directory. The pipeline 'embeddings' output port always uses JSON for downstream compatibility. Choose numpy for faster loading in external tools, or json for human-readable inspection."
     default: numpy
     options: [numpy, json]

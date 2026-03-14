@@ -111,6 +111,15 @@ def run(ctx):
         shutil.copy2(src, out_filepath)
         ctx.log_message(f"Copied embedding file from {src}")
         file_size = os.path.getsize(out_filepath)
+        # Extract metadata from numpy files for accurate reporting
+        if ext.lower() == ".npy":
+            try:
+                import numpy as np
+                arr = np.load(src)
+                num_vectors = arr.shape[0]
+                dimensions = arr.shape[1] if arr.ndim > 1 else 0
+            except Exception:
+                pass
 
     elif vec_info["type"] == "list" and "vectors" in vec_info:
         vectors = vec_info["vectors"]

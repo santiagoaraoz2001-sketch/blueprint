@@ -6,11 +6,22 @@ import time
 
 
 def _load_json(path):
-    """Load JSON from a file path."""
-    if path and os.path.isfile(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return None
+    """Load data from a file path (JSON or numpy .npy)."""
+    if not path or not os.path.isfile(path):
+        return None
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".npy":
+        try:
+            import numpy as np
+            arr = np.load(path)
+            return {"embeddings": arr.tolist()}
+        except ImportError:
+            raise ImportError(
+                f"NumPy is required to load .npy embeddings file: {path}. "
+                f"Install with: pip install numpy"
+            )
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def _extract_chunks(raw):
