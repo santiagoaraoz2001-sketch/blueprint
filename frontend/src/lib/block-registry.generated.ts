@@ -1,5 +1,5 @@
 // AUTO-GENERATED — DO NOT EDIT MANUALLY
-// Generated from 135 block.yaml files across 12 categories
+// Generated from 121 block.yaml files across 12 categories
 // Run: python scripts/generate_block_registry.py
 
 import type { BlockDefinition } from './block-registry'
@@ -684,7 +684,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  SOURCE (9 blocks)
+  //  SOURCE (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -820,7 +820,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (14 blocks)
+  //  DATA (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -912,7 +912,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  SOURCE (9 blocks)
+  //  SOURCE (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1000,7 +1000,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (14 blocks)
+  //  DATA (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1322,7 +1322,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  SOURCE (9 blocks)
+  //  SOURCE (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1436,7 +1436,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (14 blocks)
+  //  DATA (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1570,38 +1570,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { name: 'seed', label: 'Random Seed', type: 'integer', default: 42 },
     ],
   },
-  {
-    type: 'gguf_model',
-    name: 'GGUF Model',
-    description: 'Load a GGUF model using llama-cpp-python',
-    category: 'data',
-    tags: [],
-    aliases: [],
-    icon: 'Database',
-    accent: '#3b82f6',
-    maturity: 'stable',
-    inputs: [],
-    outputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
-    ],
-    defaultConfig: { model_path: '', n_ctx: 2048, n_gpu_layers: 0 },
-    configFields: [
-      {
-        name: 'model_path',
-        label: 'Model Path',
-        type: 'file_path',
-        default: '',
-        description: 'Path to .gguf model file',
-      },
-      { name: 'n_ctx', label: 'Context Length', type: 'integer', default: 2048 },
-      { name: 'n_gpu_layers', label: 'GPU Layers', type: 'integer', default: 0 },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use Model Selector block instead. It handles all model sources (Ollama, MLX, HuggingFace, local).',
-  },
 
   // ═══════════════════════════════════════════════
-  //  SOURCE (9 blocks)
+  //  SOURCE (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1747,7 +1718,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (14 blocks)
+  //  DATA (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1827,7 +1798,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  SOURCE (9 blocks)
+  //  SOURCE (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1924,16 +1895,11 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
     ],
   },
-
-  // ═══════════════════════════════════════════════
-  //  DATA (14 blocks)
-  // ═══════════════════════════════════════════════
-
   {
-    type: 'mlx_model',
-    name: 'MLX Model',
-    description: 'Load a model using Apple MLX framework',
-    category: 'data',
+    type: 'metrics_input',
+    name: 'Metrics Input',
+    description: 'Define metric key-value pairs manually for quality gates, leaderboards, and reports',
+    category: 'source',
     tags: [],
     aliases: [],
     icon: 'Database',
@@ -1941,20 +1907,44 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     maturity: 'stable',
     inputs: [],
     outputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
+      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { model_name: 'mlx-community/Llama-3.2-1B-Instruct-4bit' },
+    defaultConfig: {
+      metrics_json: '{"accuracy": 0.95, "loss": 0.05}',
+      format: 'json',
+      key_value_text: '',
+    },
     configFields: [
       {
-        name: 'model_name',
-        label: 'Model Name',
-        type: 'string',
-        default: 'mlx-community/Llama-3.2-1B-Instruct-4bit',
+        name: 'metrics_json',
+        label: 'Metrics (JSON)',
+        type: 'text_area',
+        default: '{"accuracy": 0.95, "loss": 0.05}',
+        description: 'JSON object with metric key-value pairs. Values should be numbers for numeric metrics.',
+      },
+      {
+        name: 'format',
+        label: 'Input Format',
+        type: 'select',
+        default: 'json',
+        options: ['json', 'key_value'],
+        description: 'json: JSON object. key_value: one metric per line as \'name: value\' (e.g., \'accuracy: 0.95\')',
+      },
+      {
+        name: 'key_value_text',
+        label: 'Metrics (Key-Value)',
+        type: 'text_area',
+        default: '',
+        description: 'One metric per line: \'name: value\'. Lines starting with # are ignored.',
+        depends_on: { field: 'format', value: 'key_value' },
       },
     ],
-    deprecated: true,
-    deprecatedMessage: 'Use Model Selector block instead. It handles all model sources (Ollama, MLX, HuggingFace, local).',
   },
+
+  // ═══════════════════════════════════════════════
+  //  DATA (11 blocks)
+  // ═══════════════════════════════════════════════
+
   {
     type: 'model_selector',
     name: 'Model Selector',
@@ -2030,31 +2020,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
     ],
   },
-  {
-    type: 'ollama_model',
-    name: 'Ollama Model',
-    description: 'Validate Ollama connection and return model reference',
-    category: 'data',
-    tags: [],
-    aliases: [],
-    icon: 'Database',
-    accent: '#3b82f6',
-    maturity: 'stable',
-    inputs: [],
-    outputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
-    ],
-    defaultConfig: { model_name: 'llama3.2', endpoint: 'http://localhost:11434' },
-    configFields: [
-      { name: 'model_name', label: 'Model Name', type: 'string', default: 'llama3.2' },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use Model Selector block instead. It handles all model sources (Ollama, MLX, HuggingFace, local).',
-  },
 
   // ═══════════════════════════════════════════════
-  //  SOURCE (9 blocks)
+  //  SOURCE (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -2149,7 +2117,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (14 blocks)
+  //  DATA (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -2428,7 +2396,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  SOURCE (9 blocks)
+  //  SOURCE (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -2474,7 +2442,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (14 blocks)
+  //  DATA (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -2617,7 +2585,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  SOURCE (9 blocks)
+  //  SOURCE (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -2769,7 +2737,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  ENDPOINTS (15 blocks)
+  //  ENDPOINTS (13 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -5929,7 +5897,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (11 blocks)
+  //  FLOW (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -6019,9 +5987,11 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#6366f1',
     maturity: 'stable',
     inputs: [
-      { id: 'artifact', label: 'Artifact', dataType: 'dataset', required: true },
+      { id: 'artifact', label: 'Artifact', dataType: 'artifact', required: true },
     ],
-    outputs: [],
+    outputs: [
+      { id: 'summary', label: 'Artifact Manifest', dataType: 'metrics', required: false },
+    ],
     defaultConfig: { auto_open: true, display_mode: 'preview' },
     configFields: [
       {
@@ -6142,7 +6112,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (11 blocks)
+  //  FLOW (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -6313,7 +6283,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     inputs: [
       { id: 'telemetry', label: 'Data / Telemetry', dataType: 'any', required: true },
     ],
-    outputs: [],
+    outputs: [
+      { id: 'telemetry', label: 'Telemetry Sent', dataType: 'any', required: false },
+    ],
     defaultConfig: { host: 'http://localhost', port: 4173 },
     configFields: [
       {
@@ -6331,96 +6303,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Control Tower port number',
       },
     ],
-  },
-
-  // ═══════════════════════════════════════════════
-  //  ENDPOINTS (15 blocks)
-  // ═══════════════════════════════════════════════
-
-  {
-    type: 'data_exporter',
-    name: 'Data Exporter',
-    description: 'Export pipeline data to JSON, JSONL, CSV, TSV, Markdown, or LaTeX format.',
-    category: 'endpoints',
-    tags: [],
-    aliases: [],
-    icon: 'Workflow',
-    accent: '#6366f1',
-    maturity: 'stable',
-    inputs: [
-      { id: 'data', label: 'Input Data', dataType: 'dataset', required: true },
-      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
-    ],
-    outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
-      { id: 'row_count', label: 'Row Count', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      format: 'json',
-      filename: 'output',
-      path: './exports/',
-      indent: 2,
-      include_metadata: false,
-      overwrite: true,
-      timestamp_filename: false,
-      encoding: 'utf-8',
-      columns_filter: '',
-      max_rows: 0,
-    },
-    configFields: [
-      {
-        name: 'format',
-        label: 'Format',
-        type: 'select',
-        default: 'json',
-        options: ['json', 'jsonl', 'csv', 'tsv', 'markdown', 'latex'],
-        description: 'Output file format',
-      },
-      { name: 'filename', label: 'Filename (no extension)', type: 'string', default: 'output' },
-      { name: 'path', label: 'Save Directory', type: 'string', default: './exports/' },
-      {
-        name: 'indent',
-        label: 'JSON Indent',
-        type: 'integer',
-        default: 2,
-        min: 0,
-        max: 8,
-        depends_on: { field: 'format', value: 'json' },
-      },
-      { name: 'include_metadata', label: 'Include Run Metadata', type: 'boolean', default: false },
-      { name: 'overwrite', label: 'Overwrite Existing', type: 'boolean', default: true },
-      {
-        name: 'timestamp_filename',
-        label: 'Timestamp Filename',
-        type: 'boolean',
-        default: false,
-        description: 'Append timestamp to filename for versioning',
-      },
-      {
-        name: 'encoding',
-        label: 'Encoding',
-        type: 'select',
-        default: 'utf-8',
-        options: ['utf-8', 'ascii', 'latin-1'],
-      },
-      {
-        name: 'columns_filter',
-        label: 'Columns Filter',
-        type: 'string',
-        default: '',
-        description: 'Comma-separated column names to include (empty = all)',
-      },
-      {
-        name: 'max_rows',
-        label: 'Max Rows',
-        type: 'integer',
-        default: 0,
-        min: 0,
-        description: 'Limit exported rows (0 = no limit)',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use \'Save to Local Path\' for files or \'Results Formatter\' for metrics. This block will be removed in v0.3.',
   },
 
   // ═══════════════════════════════════════════════
@@ -6535,7 +6417,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (11 blocks)
+  //  FLOW (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -6774,7 +6656,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (11 blocks)
+  //  FLOW (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -7211,7 +7093,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (11 blocks)
+  //  FLOW (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -7473,99 +7355,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
     ],
   },
-
-  // ═══════════════════════════════════════════════
-  //  ENDPOINTS (15 blocks)
-  // ═══════════════════════════════════════════════
-
-  {
-    type: 'results_exporter',
-    name: 'Results Exporter',
-    description: 'Export pipeline results to CSV, JSON, JSONL, or Parquet with format selection.',
-    category: 'endpoints',
-    tags: [],
-    aliases: [],
-    icon: 'Workflow',
-    accent: '#6366f1',
-    maturity: 'stable',
-    inputs: [
-      { id: 'data', label: 'Results Data', dataType: 'dataset', required: true },
-    ],
-    outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
-      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      format: 'csv',
-      file_name: 'results',
-      output_path: '',
-      include_metadata: true,
-      overwrite: true,
-      timestamp_filename: false,
-      columns_filter: '',
-      sort_by: '',
-    },
-    configFields: [
-      {
-        name: 'format',
-        label: 'Export Format',
-        type: 'select',
-        default: 'csv',
-        options: ['csv', 'json', 'jsonl', 'parquet'],
-        description: 'Output file format',
-      },
-      {
-        name: 'file_name',
-        label: 'File Name',
-        type: 'string',
-        default: 'results',
-        description: 'Base name (without extension)',
-      },
-      {
-        name: 'output_path',
-        label: 'Output Directory',
-        type: 'string',
-        default: '',
-        description: 'Directory to save to (empty = run directory)',
-      },
-      {
-        name: 'include_metadata',
-        label: 'Include Metadata',
-        type: 'boolean',
-        default: true,
-        description: 'Add timestamp, run ID, and config to output',
-      },
-      { name: 'overwrite', label: 'Overwrite Existing', type: 'boolean', default: true },
-      {
-        name: 'timestamp_filename',
-        label: 'Timestamp Filename',
-        type: 'boolean',
-        default: false,
-        description: 'Append timestamp to filename for versioning',
-      },
-      {
-        name: 'columns_filter',
-        label: 'Columns Filter',
-        type: 'string',
-        default: '',
-        description: 'Comma-separated column names to include (empty = all)',
-      },
-      {
-        name: 'sort_by',
-        label: 'Sort By',
-        type: 'string',
-        default: '',
-        description: 'Column name to sort by (prefix with - for descending, e.g. -score)',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use \'Save to Local Path\' for files or \'Results Formatter\' for metrics. This block will be removed in v0.3.',
-  },
-
-  // ═══════════════════════════════════════════════
-  //  INTERVENTIONS (9 blocks)
-  // ═══════════════════════════════════════════════
-
   {
     type: 'rollback_point',
     name: 'Rollback Point',
@@ -7624,7 +7413,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  INFERENCE (27 blocks)
+  //  INFERENCE (17 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -7745,274 +7534,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Output format for results — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
       },
     ],
-  },
-  {
-    type: 'batch_inference',
-    name: 'Batch Inference',
-    description: 'Run model inference on every row of a dataset',
-    category: 'inference',
-    tags: [],
-    aliases: [],
-    icon: 'Cpu',
-    accent: '#8b5cf6',
-    maturity: 'stable',
-    inputs: [
-      { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
-      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
-    ],
-    outputs: [
-      { id: 'dataset', label: 'Results Dataset', dataType: 'dataset', required: false },
-      { id: 'metrics', label: 'Batch Metrics', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      provider: 'ollama',
-      model_name: '',
-      text_column: 'text',
-      prompt_template: '{text}',
-      system_prompt: '',
-      endpoint: 'http://localhost:11434',
-      api_key: '',
-      temperature: 0.7,
-      max_tokens: 256,
-      batch_delay: 0.0,
-      response_column: '_response',
-      error_handling: 'skip',
-      max_rows: -1,
-      frequency_penalty: 0.0,
-      presence_penalty: 0.0,
-      dataset_format: 'json',
-    },
-    configFields: [
-      {
-        name: 'provider',
-        label: 'Provider',
-        type: 'select',
-        default: 'ollama',
-        options: ['ollama', 'mlx', 'openai', 'anthropic'],
-      },
-      {
-        name: 'model_name',
-        label: 'Model Name',
-        type: 'string',
-        default: '',
-        description: 'Model identifier (overridden by connected model)',
-      },
-      {
-        name: 'text_column',
-        label: 'Text Column',
-        type: 'string',
-        default: 'text',
-        description: 'Column containing input text for each row',
-      },
-      {
-        name: 'prompt_template',
-        label: 'Prompt Template',
-        type: 'text_area',
-        default: '{text}',
-        description: 'Template applied to each row. Use {column_name} for substitution',
-      },
-      {
-        name: 'system_prompt',
-        label: 'System Prompt',
-        type: 'text_area',
-        default: '',
-        description: 'Optional system message sent with each request',
-      },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
-      { name: 'api_key', label: 'API Key', type: 'string', default: '' },
-      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.7, min: 0.0, max: 2.0 },
-      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 256, min: 1, max: 32768 },
-      {
-        name: 'batch_delay',
-        label: 'Delay Between Rows (s)',
-        type: 'float',
-        default: 0.0,
-        min: 0.0,
-        max: 10.0,
-        description: 'Seconds to wait between rows (rate limiting)',
-      },
-      {
-        name: 'response_column',
-        label: 'Response Column',
-        type: 'string',
-        default: '_response',
-        description: 'Column name for the model\'s response in output dataset',
-      },
-      {
-        name: 'error_handling',
-        label: 'Error Handling',
-        type: 'select',
-        default: 'skip',
-        options: ['skip', 'stop'],
-        description: 'skip = log error and continue, stop = abort batch on first error',
-      },
-      {
-        name: 'max_rows',
-        label: 'Max Rows',
-        type: 'integer',
-        default: -1,
-        min: -1,
-        description: 'Process only first N rows (-1 = all). For testing prompts before full batch',
-      },
-      {
-        name: 'frequency_penalty',
-        label: 'Frequency Penalty',
-        type: 'float',
-        default: 0.0,
-        min: -2.0,
-        max: 2.0,
-        description: 'Penalize repeated tokens (positive = less repetition)',
-      },
-      {
-        name: 'presence_penalty',
-        label: 'Presence Penalty',
-        type: 'float',
-        default: 0.0,
-        min: -2.0,
-        max: 2.0,
-        description: 'Penalize tokens already present (positive = more diverse topics)',
-      },
-      {
-        name: 'dataset_format',
-        label: 'Dataset Format',
-        type: 'select',
-        default: 'json',
-        options: ['json', 'jsonl', 'csv'],
-        description: 'Output format for the dataset — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use LLM Inference block with a dataset input instead.',
-  },
-  {
-    type: 'chat_completion',
-    name: 'Chat Completion',
-    description: 'Multi-turn chat with system/user/assistant messages via any LLM provider',
-    category: 'inference',
-    tags: [],
-    aliases: [],
-    icon: 'Cpu',
-    accent: '#8b5cf6',
-    maturity: 'stable',
-    inputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
-      { id: 'messages', label: 'Messages / History', dataType: 'text', required: false },
-      { id: 'text', label: 'User Message', dataType: 'text', required: false },
-    ],
-    outputs: [
-      { id: 'response', label: 'Response', dataType: 'text', required: false },
-      { id: 'messages', label: 'Full Conversation', dataType: 'text', required: false },
-      { id: 'metrics', label: 'Token Usage', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      provider: 'ollama',
-      model_name: 'llama3.2',
-      system_prompt: 'You are a helpful assistant.',
-      user_message: '',
-      endpoint: 'http://localhost:11434',
-      api_key: '',
-      temperature: 0.7,
-      max_tokens: 1024,
-      top_p: 1.0,
-      max_history_turns: -1,
-      frequency_penalty: 0.0,
-      presence_penalty: 0.0,
-      output_format: 'text',
-    },
-    configFields: [
-      {
-        name: 'provider',
-        label: 'Provider',
-        type: 'select',
-        default: 'ollama',
-        options: ['ollama', 'mlx', 'openai', 'anthropic'],
-        description: 'Auto-filled from connected Model Selector. Override only if needed.',
-      },
-      {
-        name: 'model_name',
-        label: 'Model Name',
-        type: 'string',
-        default: 'llama3.2',
-        description: 'Auto-filled from connected Model Selector. Override only if needed.',
-      },
-      {
-        name: 'system_prompt',
-        label: 'System Prompt',
-        type: 'text_area',
-        default: 'You are a helpful assistant.',
-        description: 'System message that sets the assistant\'s behavior',
-      },
-      {
-        name: 'user_message',
-        label: 'User Message',
-        type: 'text_area',
-        default: '',
-        description: 'Direct user message (overridden by connected text input)',
-      },
-      {
-        name: 'endpoint',
-        label: 'Endpoint URL',
-        type: 'string',
-        default: 'http://localhost:11434',
-        description: 'Auto-filled from connected Model Selector. Override only if needed.',
-      },
-      {
-        name: 'api_key',
-        label: 'API Key',
-        type: 'string',
-        default: '',
-        description: 'Auto-filled from connected Model Selector. Supports $secret:OPENAI_API_KEY syntax.',
-      },
-      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.7, min: 0.0, max: 2.0 },
-      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 1024, min: 1, max: 32768 },
-      {
-        name: 'top_p',
-        label: 'Top P',
-        type: 'float',
-        default: 1.0,
-        min: 0.0,
-        max: 1.0,
-        description: 'Nucleus sampling for diversity control',
-      },
-      {
-        name: 'max_history_turns',
-        label: 'Max History Turns',
-        type: 'integer',
-        default: -1,
-        min: -1,
-        max: 100,
-        description: 'Limit conversation history to N most recent turns (-1 = unlimited). Prevents context overflow',
-      },
-      {
-        name: 'frequency_penalty',
-        label: 'Frequency Penalty',
-        type: 'float',
-        default: 0.0,
-        min: -2.0,
-        max: 2.0,
-        description: 'Penalize repeated tokens (positive = less repetition)',
-      },
-      {
-        name: 'presence_penalty',
-        label: 'Presence Penalty',
-        type: 'float',
-        default: 0.0,
-        min: -2.0,
-        max: 2.0,
-        description: 'Penalize tokens already present (positive = more diverse topics)',
-      },
-      {
-        name: 'output_format',
-        label: 'Output Format',
-        type: 'select',
-        default: 'text',
-        options: ['text', 'json'],
-        description: 'Format for the response output — text returns raw LLM response, json wraps it with metadata (model, provider, tokens, timestamp)',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use LLM Inference block with system_prompt and prompt inputs.',
   },
   {
     type: 'embedding_clustering',
@@ -8155,6 +7676,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'dataset', label: 'Dataset with Embeddings', dataType: 'dataset', required: false },
+      { id: 'embeddings', label: 'Embeddings', dataType: 'embedding', required: false },
       { id: 'metrics', label: 'Embedding Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8359,267 +7881,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Output format for the dataset — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
       },
     ],
-  },
-  {
-    type: 'few_shot_prompting',
-    name: 'Few-Shot Prompting',
-    description: 'In-context learning with example-based prompting for any LLM',
-    category: 'inference',
-    tags: [],
-    aliases: [],
-    icon: 'Cpu',
-    accent: '#8b5cf6',
-    maturity: 'stable',
-    inputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
-      { id: 'dataset', label: 'Examples Dataset', dataType: 'dataset', required: false },
-      { id: 'text', label: 'Query / Input', dataType: 'text', required: false },
-    ],
-    outputs: [
-      { id: 'response', label: 'Response', dataType: 'text', required: false },
-      { id: 'prompt', label: 'Assembled Prompt', dataType: 'text', required: false },
-      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      provider: 'ollama',
-      model_name: 'llama3.2',
-      num_examples: 3,
-      input_column: 'input',
-      output_column: 'output',
-      selection_strategy: 'sequential',
-      prompt_prefix: 'Here are some examples:\n\n',
-      prompt_suffix: '\n\nNow respond to the following:\n',
-      example_format: 'Input: {input}\nOutput: {output}',
-      query: '',
-      endpoint: 'http://localhost:11434',
-      api_key: '',
-      temperature: 0.5,
-      max_tokens: 512,
-      system_prompt: '',
-      example_separator: '\\n\\n',
-      frequency_penalty: 0.0,
-      presence_penalty: 0.0,
-      output_format: 'text',
-    },
-    configFields: [
-      {
-        name: 'provider',
-        label: 'Provider',
-        type: 'select',
-        default: 'ollama',
-        options: ['ollama', 'mlx', 'openai', 'anthropic'],
-      },
-      { name: 'model_name', label: 'Model Name', type: 'string', default: 'llama3.2' },
-      {
-        name: 'num_examples',
-        label: 'Number of Examples',
-        type: 'integer',
-        default: 3,
-        min: 1,
-        max: 50,
-        description: 'How many examples to include in the prompt',
-      },
-      {
-        name: 'input_column',
-        label: 'Input Column',
-        type: 'string',
-        default: 'input',
-        description: 'Column name for example inputs',
-      },
-      {
-        name: 'output_column',
-        label: 'Output Column',
-        type: 'string',
-        default: 'output',
-        description: 'Column name for example outputs',
-      },
-      {
-        name: 'selection_strategy',
-        label: 'Selection Strategy',
-        type: 'select',
-        default: 'sequential',
-        options: ['sequential', 'random'],
-        description: 'How to select examples from the dataset',
-      },
-      {
-        name: 'prompt_prefix',
-        label: 'Prompt Prefix',
-        type: 'text_area',
-        default: 'Here are some examples:\n\n',
-        description: 'Text before the examples',
-      },
-      {
-        name: 'prompt_suffix',
-        label: 'Prompt Suffix',
-        type: 'text_area',
-        default: '\n\nNow respond to the following:\n',
-        description: 'Text between examples and the query',
-      },
-      {
-        name: 'example_format',
-        label: 'Example Format',
-        type: 'string',
-        default: 'Input: {input}\nOutput: {output}',
-        description: 'Template for each example. Use {input} and {output}',
-      },
-      {
-        name: 'query',
-        label: 'Query',
-        type: 'text_area',
-        default: '',
-        description: 'Direct query text (overridden by connected text input)',
-      },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
-      { name: 'api_key', label: 'API Key', type: 'string', default: '' },
-      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.5, min: 0.0, max: 2.0 },
-      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 512, min: 1, max: 32768 },
-      {
-        name: 'system_prompt',
-        label: 'System Prompt',
-        type: 'text_area',
-        default: '',
-        description: 'System instruction for the LLM (e.g. \'You are a sentiment classifier\')',
-      },
-      {
-        name: 'example_separator',
-        label: 'Example Separator',
-        type: 'string',
-        default: '\\n\\n',
-        description: 'String between examples in the assembled prompt',
-      },
-      {
-        name: 'frequency_penalty',
-        label: 'Frequency Penalty',
-        type: 'float',
-        default: 0.0,
-        min: -2.0,
-        max: 2.0,
-        description: 'Penalize repeated tokens (positive = less repetition)',
-      },
-      {
-        name: 'presence_penalty',
-        label: 'Presence Penalty',
-        type: 'float',
-        default: 0.0,
-        min: -2.0,
-        max: 2.0,
-        description: 'Penalize tokens already present (positive = more diverse topics)',
-      },
-      {
-        name: 'output_format',
-        label: 'Output Format',
-        type: 'select',
-        default: 'text',
-        options: ['text', 'json'],
-        description: 'Format for the response output — text returns raw LLM response, json wraps it with metadata (model, provider, tokens, timestamp)',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use LLM Inference block with examples in the prompt template.',
-  },
-  {
-    type: 'function_calling',
-    name: 'Function Calling',
-    description: 'LLM with tool/function definitions for structured actions',
-    category: 'inference',
-    tags: [],
-    aliases: [],
-    icon: 'Cpu',
-    accent: '#8b5cf6',
-    maturity: 'stable',
-    inputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
-      { id: 'text', label: 'User Message', dataType: 'text', required: false },
-      { id: 'tools', label: 'Tool Definitions', dataType: 'config', required: false },
-    ],
-    outputs: [
-      { id: 'response', label: 'Response Text', dataType: 'text', required: false },
-      { id: 'tool_calls', label: 'Tool Calls', dataType: 'config', required: false },
-      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      provider: 'openai',
-      model_name: 'gpt-4o',
-      tools: '[]',
-      tool_choice: 'auto',
-      user_message: '',
-      system_prompt: 'You are a helpful assistant with access to tools.',
-      endpoint: 'https://api.openai.com',
-      api_key: '',
-      temperature: 0.3,
-      max_tokens: 1024,
-      top_p: 1.0,
-      max_retries: 1,
-    },
-    configFields: [
-      {
-        name: 'provider',
-        label: 'Provider',
-        type: 'select',
-        default: 'openai',
-        options: ['ollama', 'openai', 'anthropic'],
-        description: 'Provider must support function calling (OpenAI, Anthropic, Ollama)',
-      },
-      { name: 'model_name', label: 'Model Name', type: 'string', default: 'gpt-4o' },
-      {
-        name: 'tools',
-        label: 'Tool Definitions (JSON)',
-        type: 'text_area',
-        default: '[]',
-        description: 'JSON array of OpenAI-format tool definitions',
-      },
-      {
-        name: 'tool_choice',
-        label: 'Tool Choice',
-        type: 'select',
-        default: 'auto',
-        options: ['auto', 'required', 'none'],
-        description: 'auto=model decides, required=must call a tool, none=no tools',
-      },
-      {
-        name: 'user_message',
-        label: 'User Message',
-        type: 'text_area',
-        default: '',
-        description: 'Direct user message (overridden by connected text input)',
-      },
-      {
-        name: 'system_prompt',
-        label: 'System Prompt',
-        type: 'text_area',
-        default: 'You are a helpful assistant with access to tools.',
-      },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'https://api.openai.com' },
-      {
-        name: 'api_key',
-        label: 'API Key',
-        type: 'string',
-        default: '',
-        description: 'API key for the provider. Supports $secret:OPENAI_API_KEY syntax',
-      },
-      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.3, min: 0.0, max: 2.0 },
-      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 1024, min: 1, max: 32768 },
-      {
-        name: 'top_p',
-        label: 'Top P',
-        type: 'float',
-        default: 1.0,
-        min: 0.0,
-        max: 1.0,
-        description: 'Nucleus sampling threshold (1.0 = disabled)',
-      },
-      {
-        name: 'max_retries',
-        label: 'Max Retries',
-        type: 'integer',
-        default: 1,
-        min: 1,
-        max: 5,
-        description: 'Retry failed API calls up to this many times',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use Agent Orchestrator with Tool Registry for function calling.',
   },
   {
     type: 'guardrails',
@@ -8960,69 +8221,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Output format for results — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
       },
     ],
-  },
-  {
-    type: 'model_loader',
-    name: 'Model Loader',
-    description: 'Load and configure a model reference for downstream inference blocks',
-    category: 'inference',
-    tags: [],
-    aliases: [],
-    icon: 'Cpu',
-    accent: '#8b5cf6',
-    maturity: 'stable',
-    inputs: [],
-    outputs: [
-      { id: 'model', label: 'Model Config', dataType: 'model', required: false },
-      { id: 'metrics', label: 'Load Info', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      model_name: 'llama3.2',
-      backend: 'ollama',
-      base_url: 'http://localhost:11434',
-      api_key: '',
-      validate: true,
-    },
-    configFields: [
-      {
-        name: 'model_name',
-        label: 'Model Name',
-        type: 'string',
-        default: 'llama3.2',
-        description: 'Model identifier (e.g. \'llama3.2\', \'gpt-4o\', \'claude-sonnet-4-20250514\')',
-      },
-      {
-        name: 'backend',
-        label: 'Backend',
-        type: 'select',
-        default: 'ollama',
-        options: ['ollama', 'mlx', 'openai', 'anthropic'],
-        description: 'Inference provider — ollama/mlx for local, openai/anthropic for cloud',
-      },
-      {
-        name: 'base_url',
-        label: 'Base URL',
-        type: 'string',
-        default: 'http://localhost:11434',
-        description: 'API endpoint URL (Ollama: http://localhost:11434, OpenAI: https://api.openai.com)',
-      },
-      {
-        name: 'api_key',
-        label: 'API Key',
-        type: 'string',
-        default: '',
-        description: 'API key for cloud providers (OpenAI, Anthropic)',
-      },
-      {
-        name: 'validate',
-        label: 'Validate Connection',
-        type: 'boolean',
-        default: true,
-        description: 'Check if model is reachable before passing downstream',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use Model Selector block instead. It handles all model sources (Ollama, MLX, HuggingFace, local).',
   },
   {
     type: 'model_router',
@@ -9606,530 +8804,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
   },
   {
-    type: 'streaming_server',
-    name: 'Streaming Server',
-    description: 'Generate an OpenAI-compatible HTTP inference server configuration',
-    category: 'inference',
-    tags: [],
-    aliases: [],
-    icon: 'Cpu',
-    accent: '#8b5cf6',
-    maturity: 'stable',
-    inputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
-    ],
-    outputs: [
-      { id: 'config', label: 'Server Config', dataType: 'config', required: false },
-      { id: 'artifact', label: 'Server Script', dataType: 'artifact', required: false },
-      { id: 'metrics', label: 'Server Info', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      host: '0.0.0.0',
-      port: 8080,
-      model_name: '',
-      provider: 'ollama',
-      endpoint: 'http://localhost:11434',
-      max_concurrent: 4,
-      cors_enabled: true,
-      api_key_required: false,
-    },
-    configFields: [
-      { name: 'host', label: 'Host', type: 'string', default: '0.0.0.0' },
-      { name: 'port', label: 'Port', type: 'integer', default: 8080, min: 1024, max: 65535 },
-      {
-        name: 'model_name',
-        label: 'Model Name',
-        type: 'string',
-        default: '',
-        description: 'Model to serve (overridden by connected model input)',
-      },
-      {
-        name: 'provider',
-        label: 'Backend Provider',
-        type: 'select',
-        default: 'ollama',
-        options: ['ollama', 'mlx', 'openai', 'anthropic'],
-      },
-      { name: 'endpoint', label: 'Backend Endpoint', type: 'string', default: 'http://localhost:11434' },
-      {
-        name: 'max_concurrent',
-        label: 'Max Concurrent Requests',
-        type: 'integer',
-        default: 4,
-        min: 1,
-        max: 64,
-      },
-      { name: 'cors_enabled', label: 'Enable CORS', type: 'boolean', default: true },
-      {
-        name: 'api_key_required',
-        label: 'Require API Key',
-        type: 'boolean',
-        default: false,
-        description: 'Require X-API-Key header for requests',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use LLM Inference block — streaming support built in.',
-  },
-  {
-    type: 'structured_output',
-    name: 'Structured Output',
-    description: 'Generate JSON/structured data from LLM using a schema',
-    category: 'inference',
-    tags: [],
-    aliases: [],
-    icon: 'Cpu',
-    accent: '#8b5cf6',
-    maturity: 'stable',
-    inputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
-      { id: 'text', label: 'User Prompt', dataType: 'text', required: false },
-      { id: 'schema', label: 'Output Schema', dataType: 'config', required: false },
-    ],
-    outputs: [
-      { id: 'data', label: 'Structured Data', dataType: 'config', required: false },
-      { id: 'text', label: 'Raw JSON Text', dataType: 'text', required: false },
-      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      provider: 'ollama',
-      model_name: 'llama3.2',
-      output_schema: '{"name": "string", "age": "integer", "summary": "string"}',
-      user_prompt: '',
-      system_prompt: '',
-      strict_mode: true,
-      endpoint: 'http://localhost:11434',
-      api_key: '',
-      temperature: 0.3,
-      max_tokens: 1024,
-      max_retries: 2,
-    },
-    configFields: [
-      {
-        name: 'provider',
-        label: 'Provider',
-        type: 'select',
-        default: 'ollama',
-        options: ['ollama', 'openai', 'anthropic'],
-      },
-      { name: 'model_name', label: 'Model Name', type: 'string', default: 'llama3.2' },
-      {
-        name: 'output_schema',
-        label: 'Output Schema (JSON)',
-        type: 'text_area',
-        default: '{"name": "string", "age": "integer", "summary": "string"}',
-        description: 'JSON schema the LLM must conform to',
-      },
-      {
-        name: 'user_prompt',
-        label: 'User Prompt',
-        type: 'text_area',
-        default: '',
-        description: 'The user prompt (overridden by connected text input)',
-      },
-      {
-        name: 'system_prompt',
-        label: 'System Prompt',
-        type: 'text_area',
-        default: '',
-        description: 'Optional system message',
-      },
-      {
-        name: 'strict_mode',
-        label: 'Strict Mode',
-        type: 'boolean',
-        default: true,
-        description: 'Fail if output is not valid JSON',
-      },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
-      { name: 'api_key', label: 'API Key', type: 'string', default: '' },
-      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.3, min: 0.0, max: 2.0 },
-      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 1024, min: 1, max: 32768 },
-      {
-        name: 'max_retries',
-        label: 'Max Retries',
-        type: 'integer',
-        default: 2,
-        min: 0,
-        max: 5,
-        description: 'Retry LLM call if JSON parsing fails. Each retry re-prompts with stricter instructions',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use LLM Inference block with output_format set to json.',
-  },
-  {
-    type: 'text_classifier',
-    name: 'Text Classifier',
-    description: 'Classify text into categories using LLM, zero-shot transformers, or keyword rules',
-    category: 'inference',
-    tags: [],
-    aliases: [],
-    icon: 'Cpu',
-    accent: '#8b5cf6',
-    maturity: 'stable',
-    inputs: [
-      { id: 'model', label: 'Classifier Model', dataType: 'model', required: false },
-      { id: 'text', label: 'Input Text', dataType: 'text', required: true },
-      { id: 'dataset', label: 'Examples', dataType: 'dataset', required: false },
-    ],
-    outputs: [
-      { id: 'text', label: 'Classification', dataType: 'text', required: false },
-      { id: 'metrics', label: 'Confidence', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      method: 'llm',
-      categories: 'positive,negative,neutral',
-      provider: 'ollama',
-      model_name: 'llama3.2',
-      endpoint: 'http://localhost:11434',
-      api_key: '',
-      input_column: 'text',
-      label_column: 'label',
-      num_examples: 5,
-      multi_label: false,
-      confidence_threshold: 0.0,
-      classification_instructions: '',
-      output_format: 'text',
-    },
-    configFields: [
-      {
-        name: 'method',
-        label: 'Method',
-        type: 'select',
-        default: 'llm',
-        options: ['llm', 'zero_shot', 'few_shot', 'keyword'],
-        description: 'Classification method: llm, zero_shot (transformers), few_shot (LLM with examples), keyword',
-      },
-      {
-        name: 'categories',
-        label: 'Categories',
-        type: 'string',
-        default: 'positive,negative,neutral',
-        description: 'Comma-separated classification labels',
-      },
-      {
-        name: 'provider',
-        label: 'Provider',
-        type: 'select',
-        default: 'ollama',
-        options: ['ollama', 'mlx', 'openai', 'anthropic'],
-        description: 'LLM provider (used for llm/few_shot methods)',
-      },
-      {
-        name: 'model_name',
-        label: 'Model Name',
-        type: 'string',
-        default: 'llama3.2',
-        description: 'Model for LLM classification or HF model path',
-      },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
-      {
-        name: 'api_key',
-        label: 'API Key',
-        type: 'string',
-        default: '',
-        description: 'API key for OpenAI/Anthropic',
-      },
-      {
-        name: 'input_column',
-        label: 'Example Input Column',
-        type: 'string',
-        default: 'text',
-        description: 'Column with example texts (for few_shot method)',
-      },
-      {
-        name: 'label_column',
-        label: 'Example Label Column',
-        type: 'string',
-        default: 'label',
-        description: 'Column with example labels (for few_shot method)',
-      },
-      {
-        name: 'num_examples',
-        label: 'Num Examples',
-        type: 'integer',
-        default: 5,
-        min: 1,
-        max: 20,
-        description: 'Number of few-shot examples to include',
-      },
-      {
-        name: 'multi_label',
-        label: 'Multi-Label',
-        type: 'boolean',
-        default: false,
-        description: 'Allow assigning multiple categories (e.g. content can be both \'spam\' and \'offensive\')',
-      },
-      {
-        name: 'confidence_threshold',
-        label: 'Confidence Threshold',
-        type: 'float',
-        default: 0.0,
-        min: 0.0,
-        max: 1.0,
-        description: 'Minimum confidence to assign a label. Labels below this are excluded from multi-label results',
-      },
-      {
-        name: 'classification_instructions',
-        label: 'Classification Instructions',
-        type: 'text_area',
-        default: '',
-        description: 'Additional instructions for the LLM classifier (e.g. \'Focus on sentiment, ignore sarcasm\')',
-      },
-      {
-        name: 'output_format',
-        label: 'Output Format',
-        type: 'select',
-        default: 'text',
-        options: ['text', 'json'],
-        description: 'Format for text output — text returns raw result, json wraps with metadata',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use LLM Inference block with a classification prompt.',
-  },
-  {
-    type: 'text_summarizer',
-    name: 'Text Summarizer',
-    description: 'Summarize long text using LLM, transformers pipeline, or extractive methods',
-    category: 'inference',
-    tags: [],
-    aliases: [],
-    icon: 'Cpu',
-    accent: '#8b5cf6',
-    maturity: 'stable',
-    inputs: [
-      { id: 'model', label: 'Model', dataType: 'model', required: false },
-      { id: 'text', label: 'Input Text', dataType: 'text', required: true },
-    ],
-    outputs: [
-      { id: 'text', label: 'Summary', dataType: 'text', required: false },
-      { id: 'metrics', label: 'Stats', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      method: 'llm',
-      provider: 'ollama',
-      model_name: 'llama3.2',
-      endpoint: 'http://localhost:11434',
-      api_key: '',
-      max_length: 256,
-      style: 'concise',
-      system_prompt: '',
-      temperature: 0.5,
-      max_input_chars: 12000,
-      output_format: 'text',
-    },
-    configFields: [
-      {
-        name: 'method',
-        label: 'Method',
-        type: 'select',
-        default: 'llm',
-        options: ['llm', 'transformers', 'extractive'],
-        description: 'llm uses cloud/local LLM, transformers uses HF pipeline, extractive uses sentence scoring',
-      },
-      {
-        name: 'provider',
-        label: 'Provider',
-        type: 'select',
-        default: 'ollama',
-        options: ['ollama', 'mlx', 'openai', 'anthropic'],
-        description: 'LLM provider (used when method=llm)',
-      },
-      {
-        name: 'model_name',
-        label: 'Model Name',
-        type: 'string',
-        default: 'llama3.2',
-        description: 'Model for LLM summarization or HF model path',
-      },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
-      {
-        name: 'api_key',
-        label: 'API Key',
-        type: 'string',
-        default: '',
-        description: 'API key for OpenAI/Anthropic',
-      },
-      {
-        name: 'max_length',
-        label: 'Max Length (tokens)',
-        type: 'integer',
-        default: 256,
-        min: 32,
-        max: 4096,
-        description: 'Maximum summary length in tokens',
-      },
-      {
-        name: 'style',
-        label: 'Style',
-        type: 'select',
-        default: 'concise',
-        options: ['concise', 'detailed', 'bullet_points', 'abstract'],
-        description: 'Summarization style',
-      },
-      {
-        name: 'system_prompt',
-        label: 'System Prompt',
-        type: 'text_area',
-        default: '',
-        description: 'Custom system prompt for LLM summarization (optional)',
-      },
-      {
-        name: 'temperature',
-        label: 'Temperature',
-        type: 'float',
-        default: 0.5,
-        min: 0.0,
-        max: 2.0,
-        description: 'LLM sampling temperature (lower = more focused summaries)',
-      },
-      {
-        name: 'max_input_chars',
-        label: 'Max Input Characters',
-        type: 'integer',
-        default: 12000,
-        min: 500,
-        max: 100000,
-        description: 'Truncate input text beyond this length before sending to LLM',
-      },
-      {
-        name: 'output_format',
-        label: 'Output Format',
-        type: 'select',
-        default: 'text',
-        options: ['text', 'json'],
-        description: 'Format for the response output — text returns raw LLM response, json wraps it with metadata (model, provider, tokens, timestamp)',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use LLM Inference block with a summarization prompt.',
-  },
-  {
-    type: 'text_translator',
-    name: 'Text Translator',
-    description: 'Translate text between languages using LLM or transformers models',
-    category: 'inference',
-    tags: [],
-    aliases: [],
-    icon: 'Cpu',
-    accent: '#8b5cf6',
-    maturity: 'stable',
-    inputs: [
-      { id: 'model', label: 'Translation Model', dataType: 'model', required: false },
-      { id: 'text', label: 'Source Text', dataType: 'text', required: true },
-    ],
-    outputs: [
-      { id: 'text', label: 'Translated', dataType: 'text', required: false },
-      { id: 'metrics', label: 'Translation Stats', dataType: 'metrics', required: false },
-    ],
-    defaultConfig: {
-      method: 'llm',
-      provider: 'ollama',
-      model_name: 'llama3.2',
-      endpoint: 'http://localhost:11434',
-      api_key: '',
-      source_lang: 'auto',
-      target_lang: 'en',
-      formality: 'default',
-      preserve_formatting: true,
-      glossary: '',
-      max_input_chars: 12000,
-      output_format: 'text',
-    },
-    configFields: [
-      {
-        name: 'method',
-        label: 'Method',
-        type: 'select',
-        default: 'llm',
-        options: ['llm', 'transformers'],
-        description: 'llm uses cloud/local LLM, transformers uses Helsinki-NLP MarianMT',
-      },
-      {
-        name: 'provider',
-        label: 'Provider',
-        type: 'select',
-        default: 'ollama',
-        options: ['ollama', 'mlx', 'openai', 'anthropic'],
-        description: 'LLM provider (used when method=llm)',
-      },
-      {
-        name: 'model_name',
-        label: 'Model Name',
-        type: 'string',
-        default: 'llama3.2',
-        description: 'Model for LLM translation or HF model path',
-      },
-      { name: 'endpoint', label: 'Endpoint URL', type: 'string', default: 'http://localhost:11434' },
-      {
-        name: 'api_key',
-        label: 'API Key',
-        type: 'string',
-        default: '',
-        description: 'API key for OpenAI/Anthropic',
-      },
-      {
-        name: 'source_lang',
-        label: 'Source Language',
-        type: 'select',
-        default: 'auto',
-        options: ['auto', 'en', 'es', 'fr', 'de', 'zh', 'ja', 'ko', 'pt', 'ar', 'hi'],
-        description: 'Source language (auto-detect or specify)',
-      },
-      {
-        name: 'target_lang',
-        label: 'Target Language',
-        type: 'select',
-        default: 'en',
-        options: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'ko', 'pt', 'ar', 'hi'],
-        description: 'Target language',
-      },
-      {
-        name: 'formality',
-        label: 'Formality',
-        type: 'select',
-        default: 'default',
-        options: ['default', 'formal', 'informal'],
-        description: 'Tone control: formal for legal/business, informal for casual/marketing (LLM method only)',
-      },
-      {
-        name: 'preserve_formatting',
-        label: 'Preserve Formatting',
-        type: 'boolean',
-        default: true,
-        description: 'Keep markdown, HTML tags, and line breaks intact during translation',
-      },
-      {
-        name: 'glossary',
-        label: 'Glossary',
-        type: 'text_area',
-        default: '',
-        description: 'Term mappings for consistent translation (e.g. \'API=API, cloud computing=computacion en la nube\')',
-      },
-      {
-        name: 'max_input_chars',
-        label: 'Max Input Characters',
-        type: 'integer',
-        default: 12000,
-        min: 500,
-        max: 100000,
-        description: 'Truncate input text beyond this length before sending to LLM',
-      },
-      {
-        name: 'output_format',
-        label: 'Output Format',
-        type: 'select',
-        default: 'text',
-        options: ['text', 'json'],
-        description: 'Format for the response output — text returns raw LLM response, json wraps it with metadata (model, provider, tokens, timestamp)',
-      },
-    ],
-    deprecated: true,
-    deprecatedMessage: 'Use LLM Inference block with a translation prompt.',
-  },
-  {
     type: 'token_counter',
     name: 'Token Counter',
     description: 'Count and estimate tokens for text using tiktoken or heuristics',
@@ -10550,7 +9224,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  OUTPUT (4 blocks)
+  //  OUTPUT (5 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -10808,16 +9482,11 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
     ],
   },
-
-  // ═══════════════════════════════════════════════
-  //  FLOW (11 blocks)
-  // ═══════════════════════════════════════════════
-
   {
     type: 'results_formatter',
     name: 'Results Formatter',
     description: 'Format and export results as CSV/JSON',
-    category: 'flow',
+    category: 'output',
     tags: [],
     aliases: [],
     icon: 'FileOutput',
@@ -10827,7 +9496,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
     ],
     outputs: [
-      { id: 'artifact', label: 'Report', dataType: 'dataset', required: false },
+      { id: 'artifact', label: 'Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: { format: 'csv', include_config: true },
     configFields: [

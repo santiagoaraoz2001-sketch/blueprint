@@ -10,7 +10,11 @@ inputs:
     data_type: any
     required: true
 
-outputs: []
+outputs:
+  - id: telemetry
+    label: Telemetry Sent
+    data_type: any
+    description: "Copy of the telemetry payload sent to Control Tower (saved locally)"
 
 config:
   host:

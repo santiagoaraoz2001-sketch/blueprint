@@ -26,9 +26,6 @@ export const BLOCK_DEPENDENCIES: Record<string, string[]> = {
   data_merger: ["pandas"],
   text_chunker: ["langchain-text-splitters"],
   text_concatenator: [],
-  text_classifier: ["transformers", "torch"],
-  text_summarizer: ["transformers", "torch"],
-  text_translator: ["transformers", "torch"],
   prompt_template: ["jinja2"],
 
   // ─── Training ────────────────────────────────────────────────────────
@@ -65,7 +62,6 @@ export const BLOCK_DEPENDENCIES: Record<string, string[]> = {
 
   // ─── Model / Inference ───────────────────────────────────────────────
   llm_inference: ["transformers", "torch"],
-  batch_inference: ["transformers", "torch"],
   quantize_model: ["auto-gptq", "transformers", "torch"],
   reranker: ["sentence-transformers", "torch"],
   slerp_merge: ["mergekit"],

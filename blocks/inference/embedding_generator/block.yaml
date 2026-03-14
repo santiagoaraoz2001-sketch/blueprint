@@ -22,6 +22,13 @@ outputs:
       JSON array of row objects. Each row: {...original_row_fields, <embedding_column>: [float, ...]}.
       The embedding vector is stored under the column name configured by embedding_column (default: "_embedding").
       Each embedding is an array of floats with length equal to the model's output dimension.
+  - id: embeddings
+    label: Embeddings
+    data_type: embedding
+    description: >
+      {embeddings: [[float, ...], ...], labels: [string, ...], model: string, dimensions: int}.
+      embeddings: list of raw embedding vectors. labels: text labels for each vector.
+      Connect to Vector Store Builder, Embedding Clustering, Similarity Search, or Embedding Visualizer.
   - id: metrics
     label: Embedding Metrics
     data_type: metrics

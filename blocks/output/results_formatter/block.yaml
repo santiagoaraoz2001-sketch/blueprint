@@ -1,6 +1,6 @@
 name: Results Formatter
 type: results_formatter
-category: flow
+category: output
 description: Format and export results as CSV/JSON
 version: "1.0.0"
 
@@ -12,7 +12,7 @@ inputs:
 outputs:
   - id: artifact
     label: Report
-    data_type: dataset
+    data_type: artifact
 
 config:
   format:
