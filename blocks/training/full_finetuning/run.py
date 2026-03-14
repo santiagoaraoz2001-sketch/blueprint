@@ -3,6 +3,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # Read upstream dataset metadata
@@ -42,7 +59,7 @@ def run(ctx):
         pass
 
     if not model_name:
-        raise ValueError("model_name is required — set it in config or connect a model to the input port")
+        raise BlockConfigError("model_name", "Model name is required — set it in config or connect a model to the input port")
 
     dataset_path = ctx.resolve_as_file_path("dataset")
 
@@ -95,7 +112,7 @@ def run(ctx):
         with open(data_file, "r") as f:
             raw_data = json.load(f)
     else:
-        raise FileNotFoundError(f"Dataset not found: {data_file}")
+        raise BlockInputError(f"Dataset not found: {data_file}", details="Check that the upstream block produced output", recoverable=False)
 
     if isinstance(raw_data, list) and len(raw_data) > 0:
         if isinstance(raw_data[0], dict):
@@ -105,9 +122,10 @@ def run(ctx):
                     try:
                         texts.append(training_format.format(**row))
                     except KeyError as e:
-                        raise ValueError(
+                        raise BlockDataError(
                             f"training_format references missing column {e}. "
-                            f"Available columns: {list(row.keys())}"
+                            f"Available columns: {list(row.keys())}",
+                            details=f"Column {e} not found in dataset row"
                         )
             else:
                 text_key = text_column if text_column and text_column in raw_data[0] else (
@@ -117,7 +135,7 @@ def run(ctx):
         else:
             texts = [str(item) for item in raw_data]
     else:
-        raise ValueError("Dataset must be a non-empty JSON list")
+        raise BlockDataError("Dataset must be a non-empty JSON list", details="Received empty or invalid dataset from upstream block")
 
     def tokenize_fn(examples):
         return tokenizer(examples["text"], truncation=True, max_length=max_seq_length, padding="max_length")

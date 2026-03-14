@@ -3,6 +3,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # Config
@@ -29,7 +46,7 @@ def run(ctx):
         pass
 
     if not model_name:
-        raise ValueError("model_name is required")
+        raise BlockConfigError("model_name", "Model name is required")
 
     # Load dataset
     dataset_path = ctx.resolve_as_file_path("dataset")
@@ -73,20 +90,21 @@ def run(ctx):
         with open(data_file, "r") as f:
             raw_data = json.load(f)
     else:
-        raise FileNotFoundError(f"Dataset not found: {data_file}")
+        raise BlockInputError(f"Dataset not found: {data_file}", details="Check that the upstream block produced output", recoverable=False)
 
     if not isinstance(raw_data, list) or len(raw_data) == 0:
-        raise ValueError("Dataset must be a non-empty JSON list")
+        raise BlockDataError("Dataset must be a non-empty JSON list", details="Received empty or invalid dataset from upstream block")
 
     # Validate DPO data format (expects chosen/rejected pairs)
     sample = raw_data[0]
     if not isinstance(sample, dict):
-        raise ValueError("DPO dataset entries must be dicts with 'chosen' and 'rejected' keys")
+        raise BlockDataError("DPO dataset entries must be dicts with 'chosen' and 'rejected' keys", details="Each entry must be a dict containing preference pairs")
 
     if chosen_column not in sample or rejected_column not in sample:
-        raise ValueError(
+        raise BlockDataError(
             f"DPO dataset must have '{chosen_column}' and '{rejected_column}' columns. "
-            f"Set chosen_column/rejected_column config if your columns have different names."
+            f"Set chosen_column/rejected_column config if your columns have different names.",
+            details=f"Missing required columns: '{chosen_column}' and/or '{rejected_column}'"
         )
 
     # Build dataset dict — map user column names to DPO-expected keys

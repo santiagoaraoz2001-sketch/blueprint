@@ -4,13 +4,29 @@ import json
 import os
 import math
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     try:
         from scipy import stats
         import numpy as np
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
         missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
         raise BlockDependencyError(
             missing,
@@ -39,9 +55,10 @@ def run(ctx):
 
     # Hard minimum: need at least 2 samples per group for std calculation
     if n_a < 2 or n_b < 2:
-        raise ValueError(
+        raise BlockDataError(
             f"Need at least 2 numeric samples per group. "
-            f"Got A={n_a}, B={n_b} for metric '{metric_name}'."
+            f"Got A={n_a}, B={n_b} for metric '{metric_name}'.",
+            details=f"A={n_a}, B={n_b}",
         )
 
     ctx.report_progress(1, 4)
@@ -206,9 +223,10 @@ def _to_numeric_array(values, label):
         # Log but don't fail — partial data is still usable
         pass
     if not numeric:
-        raise ValueError(
+        raise BlockDataError(
             f"{label}: No valid numeric values found. "
-            f"Got {len(values)} entries but none were numeric."
+            f"Got {len(values)} entries but none were numeric.",
+            details=f"{len(values)} entries received",
         )
     return np.array(numeric, dtype=np.float64)
 
@@ -233,7 +251,7 @@ def _load_metric_values(source, metric_name):
     if isinstance(source, str):
         return _load_from_path(source, metric_name)
 
-    raise ValueError(
+    raise BlockDataError(
         f"Unsupported input type: {type(source).__name__}. "
         f"Expected list, dict, or file path string."
     )
@@ -269,12 +287,18 @@ def _load_from_path(path, metric_name):
             if json_files:
                 path = os.path.join(path, json_files[0])
             else:
-                raise FileNotFoundError(
-                    f"No JSON files found in directory: {path}"
+                raise BlockInputError(
+                    f"No JSON files found in directory: {path}",
+                    details="Check that the upstream block produced output",
+                    recoverable=False,
                 )
 
     if not os.path.isfile(path):
-        raise FileNotFoundError(f"Metrics file not found: {path}")
+        raise BlockInputError(
+            f"Metrics file not found: {path}",
+            details="Check that the upstream block produced output",
+            recoverable=False,
+        )
 
     # Try JSONL first (one JSON object per line)
     if path.endswith(".jsonl"):

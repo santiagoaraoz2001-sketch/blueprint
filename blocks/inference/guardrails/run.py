@@ -13,6 +13,23 @@ import json
 import os
 import re
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 # PII detection patterns
 PII_PATTERNS = {
@@ -64,7 +81,7 @@ def run(ctx):
                 text = data
 
     if not text:
-        raise ValueError("No input text to filter")
+        raise BlockInputError("No input text to filter", recoverable=False)
 
     ctx.log_message(f"Guardrails: checking {len(categories)} categories, action={action}")
     ctx.report_progress(1, 3)
@@ -149,7 +166,7 @@ def run(ctx):
     # Raise error if fail_on_flag is enabled and content was flagged
     flagged_categories = list(flagged.keys())
     if fail_on_flag and flagged_categories:
-        raise RuntimeError(f"Content flagged: {', '.join(flagged_categories)}")
+        raise BlockExecutionError(f"Content flagged: {', '.join(flagged_categories)}")
 
     # Save filtered text
     if output_format == "json":

@@ -5,6 +5,23 @@ import os
 import time
 import random
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _load_data(ctx, input_name):
     data = ctx.load_input(input_name)
@@ -32,12 +49,12 @@ def run(ctx):
     # Load preference data
     dataset = _load_data(ctx, "dataset")
     if dataset is None:
-        raise ValueError("No preference dataset provided")
+        raise BlockInputError("No preference dataset provided", recoverable=False)
 
     # Load base model
     model_data = _load_data(ctx, "model")
     if model_data is None:
-        raise ValueError("No base model provided")
+        raise BlockInputError("No base model provided", recoverable=False)
 
     model_path = model_data if isinstance(model_data, str) else str(model_data)
     ctx.log_message(f"Base model: {model_path}")
@@ -99,7 +116,7 @@ def run(ctx):
     elif hasattr(dataset, '__len__'):
         train_dataset = dataset
     else:
-        raise ValueError("Dataset format not supported. Provide a JSON list of preference pairs.")
+        raise BlockDataError("Dataset format not supported. Provide a JSON list of preference pairs.", details="Expected a list of preference pair dicts")
 
     training_args = TrainingArguments(
         output_dir=output_model_path,

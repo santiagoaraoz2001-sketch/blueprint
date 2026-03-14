@@ -12,6 +12,23 @@ import json
 import os
 import time
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # Read upstream dataset metadata
@@ -62,7 +79,7 @@ def run(ctx):
             model_configs.append({"provider": "ollama", "model": line})
 
     if len(model_configs) < 2:
-        raise ValueError("At least 2 models required for comparison. Format: provider:model_name per line.")
+        raise BlockConfigError("models", "At least 2 models required for comparison. Format: provider:model_name per line.")
 
     # Build prompt list
     prompts = []
@@ -79,7 +96,7 @@ def run(ctx):
         prompts = [p.strip() for p in prompts_text.strip().split("\n") if p.strip()]
 
     if not prompts:
-        raise ValueError("No prompts provided. Connect a dataset or set prompts in config.")
+        raise BlockInputError("No prompts provided. Connect a dataset or set prompts in config.", recoverable=False)
 
     num_models = len(model_configs)
     ctx.log_message(f"Comparing {num_models} models on {len(prompts)} prompts")
@@ -233,7 +250,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, temperature, max_token
         try:
             from mlx_lm import load, generate
         except ImportError:
-            raise RuntimeError("mlx-lm not installed.")
+            raise BlockDependencyError("mlx-lm", install_hint="pip install mlx-lm")
         model_obj, tokenizer = load(model)
         return generate(model_obj, tokenizer, prompt=prompt, max_tokens=max_tokens, temp=temperature)
 
@@ -241,7 +258,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, temperature, max_token
         if not api_key:
             api_key = os.environ.get("OPENAI_API_KEY", "")
         if not api_key:
-            raise ValueError("OpenAI API key required.")
+            raise BlockConfigError("api_key", "OpenAI API key required.")
         url = endpoint.rstrip("/")
         if "/v1/" not in url:
             url = f"{url}/v1/chat/completions"
@@ -258,7 +275,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, temperature, max_token
         if not api_key:
             api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         if not api_key:
-            raise ValueError("Anthropic API key required.")
+            raise BlockConfigError("api_key", "Anthropic API key required.")
         url = endpoint.rstrip("/")
         if not url.endswith("/v1/messages"):
             url = f"{url}/v1/messages"
@@ -271,4 +288,4 @@ def _call_llm(provider, endpoint, api_key, model, prompt, temperature, max_token
             return json.loads(resp.read().decode())["content"][0]["text"]
 
     else:
-        raise ValueError(f"Unknown provider: {provider}")
+        raise BlockConfigError("provider", f"Unknown provider: {provider}")

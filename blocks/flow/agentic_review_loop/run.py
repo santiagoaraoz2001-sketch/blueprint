@@ -7,6 +7,23 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timezone
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _call_ollama(base_url, model_name, prompt, ctx, temperature=0.1, system_prompt=""):
     """Call Ollama API for judging."""
@@ -89,7 +106,8 @@ def _call_anthropic(api_key, model_name, prompt, ctx, temperature=0.1, system_pr
 def _call_judge(provider, model_name, api_key, base_url, prompt, ctx, temperature=0.1, system_prompt=""):
     """Dispatch to the appropriate LLM provider."""
     if not model_name:
-        raise ValueError(
+        raise BlockConfigError(
+            "model_name",
             f"No model_name specified for {provider} judge. "
             "Set model_name in config or connect a Model Selector block."
         )
@@ -197,7 +215,7 @@ def run(ctx):
     # ---- Load input data ----
     raw_data = ctx.resolve_as_data("data")
     if not raw_data:
-        raise ValueError("No data provided. Connect a 'data' input.")
+        raise BlockInputError("No data provided. Connect a 'data' input.", recoverable=False)
     current_output = raw_data
 
     # Convert to string for LLM processing

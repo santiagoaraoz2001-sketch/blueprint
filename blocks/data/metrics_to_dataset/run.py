@@ -1,6 +1,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _load_metrics(ctx, input_id):
     """Load metrics from an input, handling both dict and file path formats."""
@@ -12,11 +29,11 @@ def _load_metrics(ctx, input_id):
             data = json.load(f)
             if isinstance(data, dict):
                 return data
-            raise ValueError(
+            raise BlockDataError(
                 f"Metrics file for '{input_id}' must contain a JSON object, "
                 f"got {type(data).__name__}"
             )
-    raise ValueError(f"Cannot parse metrics from input '{input_id}'")
+    raise BlockInputError(f"Cannot parse metrics from input '{input_id}'", recoverable=False)
 
 
 def _flatten_dict(d, parent_key="", sep="/"):

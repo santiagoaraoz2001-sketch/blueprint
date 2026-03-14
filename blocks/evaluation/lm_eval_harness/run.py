@@ -10,6 +10,23 @@ Supports HuggingFace, vLLM, and local-completions backends.
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # ── Read configuration ────────────────────────────────────────────────
@@ -56,14 +73,15 @@ def run(ctx):
         trust_remote = trust_remote.lower() in ("true", "1", "yes")
 
     if not model_name:
-        raise ValueError(
+        raise BlockConfigError(
+            "model_name",
             "Model required: connect a model via the 'model' input port "
             "or set 'model_name' in config."
         )
 
     tasks = [t.strip() for t in tasks_str.split(",") if t.strip()]
     if not tasks:
-        raise ValueError("No tasks specified. Provide comma-separated task names.")
+        raise BlockConfigError("tasks", "No tasks specified. Provide comma-separated task names.")
 
     # ── Resolve device ────────────────────────────────────────────────────
     if device == "auto":
@@ -252,7 +270,6 @@ def _detect_device():
         if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             return "mps"
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
         missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
         raise BlockDependencyError(
             missing,

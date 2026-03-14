@@ -10,6 +10,23 @@ import math
 import os
 import statistics
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 # Safe builtins for sandboxed execution
 SAFE_BUILTINS = {
@@ -49,7 +66,8 @@ def run(ctx):
     decimal_precision = int(ctx.config.get("decimal_precision", 4))
 
     if not scoring_code.strip():
-        raise ValueError(
+        raise BlockConfigError(
+            "scoring_function",
             "scoring_function is required. Define a function like:\n"
             "def score(output, reference, idx):\n"
             "    return {'accuracy': 1.0 if output == reference else 0.0}"
@@ -65,7 +83,10 @@ def run(ctx):
 
     score_fn = local_ns.get('score')
     if not callable(score_fn):
-        raise ValueError("Scoring code must define a callable 'score(output, reference, idx)'")
+        raise BlockConfigError(
+            "scoring_function",
+            "Scoring code must define a callable 'score(output, reference, idx)'"
+        )
 
     # ── Load and normalize inputs ─────────────────────────────────────────
     outputs = _load_data(model_output)

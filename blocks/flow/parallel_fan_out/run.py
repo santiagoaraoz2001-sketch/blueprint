@@ -5,6 +5,23 @@ import math
 import os
 import random
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _load_data(ctx, port_name):
     """Load and resolve input data from a port, handling file/directory paths."""
@@ -74,9 +91,10 @@ def run(ctx):
     if input_data is None:
         input_data = _load_data(ctx, "dataset")
     if input_data is None:
-        raise ValueError(
+        raise BlockInputError(
             "Required input 'input' not connected or produced no data. "
-            "Connect data to the 'Input Data' port."
+            "Connect data to the 'Input Data' port.",
+            recoverable=False
         )
 
     # Normalize to list for splitting

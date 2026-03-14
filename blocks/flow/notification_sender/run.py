@@ -11,6 +11,23 @@ from datetime import datetime, timezone
 
 from backend.block_sdk.exceptions import BlockTimeoutError
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _format_message(template, trigger_data, message_data, severity):
     """Format a notification message by substituting placeholders."""
@@ -171,13 +188,13 @@ def run(ctx):
 
     valid_channels = {"webhook", "desktop", "log"}
     if channel not in valid_channels:
-        raise ValueError(f"Unsupported channel '{channel}'. Supported: {', '.join(sorted(valid_channels))}")
+        raise BlockConfigError("channel", f"Unsupported channel '{channel}'. Supported: {', '.join(sorted(valid_channels))}")
 
     # ---- Step 1: Load trigger data ----
     ctx.report_progress(1, 4)
     raw_trigger = ctx.resolve_as_dict("trigger")
     if not raw_trigger:
-        raise ValueError("No trigger data provided. Connect a 'trigger' input to this block.")
+        raise BlockInputError("No trigger data provided. Connect a 'trigger' input to this block.", recoverable=False)
     trigger_data = raw_trigger
     ctx.log_message("Trigger data loaded")
 
@@ -236,7 +253,7 @@ def run(ctx):
 
     if channel == "webhook":
         if not webhook_url:
-            raise ValueError("webhook_url is required when channel is 'webhook'")
+            raise BlockConfigError("webhook_url", "webhook_url is required when channel is 'webhook'")
         payload = {
             "message": message,
             "severity": severity,

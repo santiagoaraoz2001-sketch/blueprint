@@ -3,6 +3,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     try:
@@ -10,9 +27,10 @@ def run(ctx):
         from mergekit.config import MergeConfiguration
         from mergekit.merge import MergeOptions, run_merge
     except ImportError as e:
-        raise ImportError(
-            f"Required library not installed: {e}. "
-            f"Install with: pip install mergekit pyyaml"
+        raise BlockDependencyError(
+            "mergekit",
+            f"Required library not installed: {e}",
+            install_hint="pip install mergekit pyyaml",
         ) from e
 
     method = ctx.config.get("method", "slerp")
@@ -33,7 +51,7 @@ def run(ctx):
     base_model = _resolve_model(ctx, "base", "")
 
     if not model_a or not model_b:
-        raise ValueError("Both model_a and model_b are required")
+        raise BlockInputError("Both model_a and model_b are required", recoverable=False)
 
     ctx.log_message(f"Merging models with method={method}")
     ctx.log_message(f"  Model A: {model_a}")

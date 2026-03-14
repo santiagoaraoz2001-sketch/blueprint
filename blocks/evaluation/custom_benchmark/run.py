@@ -13,6 +13,23 @@ from collections import Counter
 
 from blocks.inference._inference_utils import call_inference
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # ── Load inputs ───────────────────────────────────────────────────────
@@ -39,13 +56,17 @@ def run(ctx):
     data_file = (os.path.join(dataset_path, "data.json")
                  if os.path.isdir(dataset_path) else dataset_path)
     if not os.path.isfile(data_file):
-        raise FileNotFoundError(f"Dataset not found: {data_file}")
+        raise BlockInputError(
+            f"Dataset not found: {data_file}",
+            details="Check that the upstream block produced output",
+            recoverable=False,
+        )
 
     with open(data_file, "r", encoding="utf-8") as f:
         rows = json.load(f)
 
     if not isinstance(rows, list) or len(rows) == 0:
-        raise ValueError("Dataset must be a non-empty JSON list")
+        raise BlockDataError("Dataset must be a non-empty JSON list")
 
     if max_samples > 0:
         rows = rows[:max_samples]
@@ -238,7 +259,6 @@ def _try_transformers(ctx, model_id, inputs, total, max_tokens):
         import torch
         from transformers import pipeline, AutoConfig
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
         missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
         raise BlockDependencyError(
             missing,

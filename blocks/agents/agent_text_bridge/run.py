@@ -3,6 +3,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # ── Config ──────────────────────────────────────────────────────────
@@ -20,7 +37,7 @@ def run(ctx):
     # ── Load agent output ───────────────────────────────────────────────
     agent_data = _load_data(ctx, "agent")
     if agent_data is None:
-        raise ValueError("No agent output received on 'agent' input port.")
+        raise BlockInputError("No agent output received on 'agent' input port.", recoverable=False)
 
     ctx.log_message(f"Agent data type: {type(agent_data).__name__}")
     ctx.report_progress(1, 3)

@@ -7,6 +7,23 @@ the unfrozen layers with per-group learning-rate scaling (balance_factor).
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     dataset_path = ctx.resolve_as_file_path("dataset")
@@ -43,7 +60,7 @@ def run(ctx):
         pass
 
     if not model_name:
-        raise ValueError("model_name is required (via config or model input port)")
+        raise BlockConfigError("model_name", "Model name is required (via config or model input port)")
 
     ctx.log_message(f"BALLAST training: {model_name}")
     ctx.log_message(f"layer_depth={layer_depth}, balance_factor={balance_factor}, epochs={epochs}")
@@ -51,13 +68,13 @@ def run(ctx):
     # ── Load dataset ────────────────────────────────────────────────────
     data_file = os.path.join(dataset_path, "data.json") if os.path.isdir(dataset_path) else dataset_path
     if not os.path.isfile(data_file):
-        raise FileNotFoundError(f"Dataset not found: {data_file}")
+        raise BlockInputError(f"Dataset not found: {data_file}", details="Check that the upstream block produced output", recoverable=False)
 
     with open(data_file, "r") as f:
         raw_data = json.load(f)
 
     if not isinstance(raw_data, list) or len(raw_data) == 0:
-        raise ValueError("Dataset must be a non-empty JSON list")
+        raise BlockDataError("Dataset must be a non-empty JSON list", details="Received empty or invalid dataset from upstream block")
 
     ctx.log_message(f"Dataset: {len(raw_data)} samples")
 
@@ -175,9 +192,10 @@ def _run_real_training(
                 try:
                     texts.append(training_format.format(**row))
                 except KeyError as e:
-                    raise ValueError(
+                    raise BlockDataError(
                         f"training_format references missing column {e}. "
-                        f"Available columns: {list(row.keys())}"
+                        f"Available columns: {list(row.keys())}",
+                        details=f"Column {e} not found in dataset row"
                     )
         else:
             text_key = text_column if text_column and text_column in raw_data[0] else (

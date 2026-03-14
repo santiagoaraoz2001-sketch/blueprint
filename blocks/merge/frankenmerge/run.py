@@ -12,6 +12,23 @@ from pathlib import Path
 
 from backend.block_sdk.exceptions import BlockTimeoutError
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     output_name = ctx.config.get("output_name", "frankenmerge-model")
@@ -42,31 +59,35 @@ def run(ctx):
                 f'[{{"model":"org/model-a","layer_range":[0,16]}},'
                 f'{{"model":"org/model-b","layer_range":[16,32]}}]'
             )
-            raise ValueError(f"layer_config is not valid JSON: {e}") from e
+            raise BlockConfigError("layer_config", f"layer_config is not valid JSON: {e}") from e
 
         # Validate structure
         if not isinstance(layer_config, list):
-            raise ValueError(
+            raise BlockConfigError(
+                "layer_config",
                 f"layer_config must be a JSON array, got {type(layer_config).__name__}. "
-                f'Expected: [{{"model":"...","layer_range":[start,end]}}]'
+                f'Expected: [{{"model":"...","layer_range":[start,end]}}]',
             )
         for i, entry in enumerate(layer_config):
             if not isinstance(entry, dict):
-                raise ValueError(f"layer_config[{i}] must be an object, got {type(entry).__name__}")
+                raise BlockConfigError("layer_config", f"layer_config[{i}] must be an object, got {type(entry).__name__}")
             if "model" not in entry:
-                raise ValueError(
+                raise BlockConfigError(
+                    "layer_config",
                     f'layer_config[{i}] missing required "model" key. '
-                    f'Each slice needs {{"model":"org/model","layer_range":[start,end]}}'
+                    f'Each slice needs {{"model":"org/model","layer_range":[start,end]}}',
                 )
             lr = entry.get("layer_range")
             if lr is not None:
                 if not isinstance(lr, list) or len(lr) != 2:
-                    raise ValueError(
-                        f"layer_config[{i}].layer_range must be [start, end], got {lr}"
+                    raise BlockConfigError(
+                        "layer_config",
+                        f"layer_config[{i}].layer_range must be [start, end], got {lr}",
                     )
                 if lr[0] >= lr[1]:
-                    raise ValueError(
-                        f"layer_config[{i}].layer_range start ({lr[0]}) must be < end ({lr[1]})"
+                    raise BlockConfigError(
+                        "layer_config",
+                        f"layer_config[{i}].layer_range start ({lr[0]}) must be < end ({lr[1]})",
                     )
 
     if not layer_config:
@@ -148,7 +169,7 @@ slices:
             if result.stderr:
                 for line in result.stderr.strip().split("\n")[-5:]:
                     ctx.log_message(f"  {line}")
-            raise RuntimeError(f"mergekit exited with code {result.returncode}")
+            raise BlockExecutionError(f"mergekit exited with code {result.returncode}", details=result.stderr)
 
         ctx.log_metric("simulation_mode", 0.0)
         total_layers = sum(

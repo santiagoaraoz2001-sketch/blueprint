@@ -13,6 +13,23 @@ import json
 import os
 import time
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     routing_strategy = ctx.config.get("routing_strategy", "complexity")
@@ -42,7 +59,7 @@ def run(ctx):
         )
 
     if not primary_model:
-        raise ValueError("No primary model specified. Connect a Model Selector block or set primary_model in config.")
+        raise BlockConfigError("primary_model", "No primary model specified. Connect a Model Selector block or set primary_model in config.")
 
     fallback_provider = ctx.config.get("fallback_provider", "openai")
     fallback_model = ctx.config.get("fallback_model", "")
@@ -67,7 +84,7 @@ def run(ctx):
                 prompt = text_data
 
     if not prompt:
-        raise ValueError("No prompt provided.")
+        raise BlockInputError("No prompt provided.", recoverable=False)
 
     # Compute routing decision
     word_count = len(prompt.split())
@@ -98,8 +115,8 @@ def run(ctx):
         use_fallback = False
 
     if use_fallback and not fallback_model:
-        raise ValueError(
-            "Routing selected fallback model but fallback_model is not configured. "
+        raise BlockConfigError(
+            "fallback_model", "Routing selected fallback model but fallback_model is not configured. "
             "Set fallback_model in config."
         )
 
@@ -129,9 +146,10 @@ def run(ctx):
     if last_error is not None:
         if not use_fallback:
             if not fallback_model:
-                raise RuntimeError(
+                raise BlockExecutionError(
                     f"Primary model failed after {max_retries} retries: {last_error}. "
-                    f"No fallback_model configured."
+                    f"No fallback_model configured.",
+                    details=str(last_error),
                 )
             ctx.log_message(f"Primary failed after {max_retries} retries: {last_error} — trying fallback")
             try:
@@ -140,7 +158,7 @@ def run(ctx):
                 selected_model = fallback_model
                 use_fallback = True
             except Exception as e2:
-                raise RuntimeError(f"Both models failed. Primary: {last_error}, Fallback: {e2}")
+                raise BlockExecutionError(f"Both models failed. Primary: {last_error}, Fallback: {e2}", details=str(e2))
         else:
             raise last_error
 
@@ -190,7 +208,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
         try:
             from mlx_lm import load, generate
         except ImportError:
-            raise RuntimeError("mlx-lm not installed.")
+            raise BlockDependencyError("mlx-lm", install_hint="pip install mlx-lm")
         model_obj, tokenizer = load(model)
         return generate(model_obj, tokenizer, prompt=prompt, max_tokens=max_tokens, temp=temperature)
 
@@ -198,7 +216,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
         if not api_key:
             api_key = os.environ.get("OPENAI_API_KEY", "")
         if not api_key:
-            raise ValueError("OpenAI API key required.")
+            raise BlockConfigError("api_key", "OpenAI API key required.")
         url = endpoint.rstrip("/")
         if "/v1/" not in url:
             url = f"{url}/v1/chat/completions"
@@ -216,7 +234,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
         if not api_key:
             api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         if not api_key:
-            raise ValueError("Anthropic API key required.")
+            raise BlockConfigError("api_key", "Anthropic API key required.")
         url = endpoint.rstrip("/")
         if not url.endswith("/v1/messages"):
             url = f"{url}/v1/messages"
@@ -231,4 +249,4 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
             return json.loads(resp.read().decode())["content"][0]["text"]
 
     else:
-        raise ValueError(f"Unknown provider: {provider}")
+        raise BlockConfigError("provider", f"Unknown provider: {provider}")

@@ -13,6 +13,23 @@ import os
 import time
 import math
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # Read upstream dataset metadata
@@ -56,16 +73,16 @@ def run(ctx):
     system_prompt = ctx.config.get("system_prompt", "")
 
     if not model_name:
-        raise ValueError("model_name is required — set it in config or connect a model input.")
+        raise BlockConfigError("model_name", "model_name is required — set it in config or connect a model input.")
 
     if not query:
-        raise ValueError("query is required — set it in the config.")
+        raise BlockConfigError("query", "query is required — set it in the config.")
 
     # Load knowledge base
     kb_data = ctx.resolve_as_file_path("dataset")
     rows = _load_dataset(kb_data)
     if not rows:
-        raise ValueError("Knowledge base is empty or could not be loaded.")
+        raise BlockDataError("Knowledge base is empty or could not be loaded.")
 
     ctx.log_message(f"RAG Pipeline: {len(rows)} chunks, query: {query[:100]}...")
     ctx.log_message(f"Model: {model_name} ({provider}), top_k={top_k}")
@@ -254,7 +271,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
         try:
             from mlx_lm import load, generate
         except ImportError:
-            raise RuntimeError("mlx-lm not installed. Run: pip install mlx-lm")
+            raise BlockDependencyError("mlx-lm", install_hint="pip install mlx-lm")
         model_obj, tokenizer = load(model)
         return generate(model_obj, tokenizer, prompt=prompt, max_tokens=max_tokens, temp=temperature)
 
@@ -262,7 +279,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
         if not api_key:
             api_key = os.environ.get("OPENAI_API_KEY", "")
         if not api_key:
-            raise ValueError("OpenAI API key required.")
+            raise BlockConfigError("api_key", "OpenAI API key required.")
         url = endpoint.rstrip("/")
         if "/v1/" not in url:
             url = f"{url}/v1/chat/completions"
@@ -282,7 +299,7 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
         if not api_key:
             api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         if not api_key:
-            raise ValueError("Anthropic API key required.")
+            raise BlockConfigError("api_key", "Anthropic API key required.")
         url = endpoint.rstrip("/")
         if not url.endswith("/v1/messages"):
             url = f"{url}/v1/messages"
@@ -297,4 +314,4 @@ def _call_llm(provider, endpoint, api_key, model, prompt, system_prompt, tempera
             return json.loads(resp.read().decode())["content"][0]["text"]
 
     else:
-        raise ValueError(f"Unknown provider: {provider}")
+        raise BlockConfigError("provider", f"Unknown provider: {provider}")

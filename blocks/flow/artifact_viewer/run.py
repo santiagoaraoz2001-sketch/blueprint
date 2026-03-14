@@ -3,6 +3,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     display_mode = ctx.config.get("display_mode", "preview")
@@ -12,7 +29,7 @@ def run(ctx):
 
     artifact_data = ctx.load_input("artifact")
     if artifact_data is None:
-        raise ValueError("No artifact input received")
+        raise BlockInputError("No artifact input received", recoverable=False)
 
     # Determine artifact type and info
     artifact_info = {

@@ -3,6 +3,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     # Required inputs — prompt is optional with a default fallback
@@ -31,7 +48,7 @@ def run(ctx):
     output_column = ctx.config.get("output_column", "generated_text")
 
     if num_samples <= 0:
-        raise ValueError("num_samples must be greater than 0")
+        raise BlockConfigError("num_samples", "num_samples must be greater than 0")
 
     # Load prompt template text
     if isinstance(prompt_input, str) and os.path.isfile(prompt_input):
@@ -71,7 +88,7 @@ def run(ctx):
     else:
         model_id = str(model_ref) if model_ref else ""
     if not model_id:
-        raise ValueError("No model specified. Connect a model input or set model_name in config.")
+        raise BlockInputError("No model specified. Connect a model input or set model_name in config.", recoverable=False)
     if os.path.isdir(model_id):
         # Local model path
         ctx.log_message(f"Using local model at: {model_id}")

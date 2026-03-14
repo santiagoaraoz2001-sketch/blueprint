@@ -6,6 +6,23 @@ import os
 import urllib.request
 import urllib.error
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _default_endpoint(source):
     """Return the default API endpoint for a given model source."""
@@ -83,9 +100,7 @@ def _scan_local_models(source, ctx):
 def _validate_huggingface(model_id, revision, ctx):
     """Validate that a HuggingFace model_id is provided and optionally check the API."""
     if not model_id:
-        raise ValueError(
-            "model_id is required for HuggingFace source (e.g. 'meta-llama/Llama-3-8B')"
-        )
+        raise BlockConfigError("model_id", "model_id is required for HuggingFace source (e.g. 'meta-llama/Llama-3-8B')")
 
     model_info = {
         "source": "huggingface",
@@ -145,9 +160,7 @@ def _validate_huggingface(model_id, revision, ctx):
 def _validate_ollama(model_id, ctx):
     """Validate that an Ollama model exists by querying the local Ollama API."""
     if not model_id:
-        raise ValueError(
-            "model_id is required for Ollama source (e.g. 'llama3', 'mistral')"
-        )
+        raise BlockConfigError("model_id", "model_id is required for Ollama source (e.g. 'llama3', 'mistral')")
 
     model_info = {
         "source": "ollama",
@@ -208,9 +221,7 @@ def _validate_ollama(model_id, ctx):
 def _validate_mlx(model_id, ctx):
     """Validate an MLX model reference."""
     if not model_id:
-        raise ValueError(
-            "model_id is required for MLX source (e.g. 'mlx-community/Llama-3-8B-4bit')"
-        )
+        raise BlockConfigError("model_id", "model_id is required for MLX source (e.g. 'mlx-community/Llama-3-8B-4bit')")
 
     model_info = {
         "source": "mlx",
@@ -260,10 +271,7 @@ def _validate_mlx(model_id, ctx):
 def _validate_local_path(local_path, ctx):
     """Validate that a local model path exists and contains model files."""
     if not local_path:
-        raise ValueError(
-            "local_path config is required when source is 'local_path'. "
-            "Set it to the directory containing the model files."
-        )
+        raise BlockConfigError("local_path", "local_path config is required when source is 'local_path'. Set it to the directory containing the model files.")
 
     model_info = {
         "source": "local_path",
@@ -374,16 +382,11 @@ def run(ctx):
 
     valid_sources = {"huggingface", "ollama", "mlx", "local_path"}
     if source not in valid_sources:
-        raise ValueError(
-            f"Unsupported source '{source}'. Supported: {', '.join(sorted(valid_sources))}"
-        )
+        raise BlockConfigError("source", f"Unsupported source '{source}'. Supported: {', '.join(sorted(valid_sources))}")
 
     valid_quantizations = {"none", "4bit", "8bit"}
     if quantization not in valid_quantizations:
-        raise ValueError(
-            f"Unsupported quantization '{quantization}'. "
-            f"Supported: {', '.join(sorted(valid_quantizations))}"
-        )
+        raise BlockConfigError("quantization", f"Unsupported quantization '{quantization}'. Supported: {', '.join(sorted(valid_quantizations))}")
 
     # ---- Step 0: Auto-detect locally available models ----
     ctx.report_progress(1, 5)

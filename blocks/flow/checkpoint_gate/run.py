@@ -3,6 +3,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 _OPERATORS = {
     ">=": lambda a, b: a >= b,
@@ -174,7 +191,7 @@ def run(ctx):
             ctx.save_output("passed", None)
             # Branch: gate failed — stop pipeline
             ctx.save_output("rejected", data if data is not None else metrics)
-            raise RuntimeError(
+            raise BlockExecutionError(
                 f"Checkpoint Gate [{label}] BLOCKED pipeline: "
                 f"{len(failed)} check(s) failed — {', '.join(r['metric'] for r in failed)}"
             )

@@ -3,6 +3,23 @@
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 RECURSIVE_SEPARATORS = ["\n\n", "\n", ". ", " ", ""]
 
 
@@ -94,7 +111,7 @@ def run(ctx):
     include_chunk_id = ctx.config.get("include_chunk_id", True)
 
     if overlap >= chunk_size:
-        raise ValueError(f"chunk_overlap ({overlap}) must be less than chunk_size ({chunk_size})")
+        raise BlockConfigError("chunk_overlap", f"chunk_overlap ({overlap}) must be less than chunk_size ({chunk_size})")
 
     # Load data — try data.json first, fall back to docs.json for backward compat
     if os.path.isdir(dataset_path):
@@ -107,13 +124,13 @@ def run(ctx):
         data_file = dataset_path
 
     if not os.path.isfile(data_file):
-        raise FileNotFoundError(f"Dataset not found at: {dataset_path}")
+        raise BlockInputError(f"Dataset not found at: {dataset_path}", details="Check that the upstream block produced output", recoverable=False)
 
     with open(data_file, "r", encoding="utf-8") as f:
         docs = json.load(f)
 
     if not isinstance(docs, list):
-        raise ValueError("Dataset must be a JSON array")
+        raise BlockDataError("Dataset must be a JSON array")
 
     ctx.log_message(f"Chunking {len(docs)} documents: strategy={strategy}, size={chunk_size}, overlap={overlap}")
 

@@ -13,6 +13,23 @@ import json
 import os
 import re
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     fmt = ctx.config.get("format", "json")
@@ -40,7 +57,7 @@ def run(ctx):
             text = json.dumps(data)
 
     if not text:
-        raise ValueError("No input text to parse")
+        raise BlockInputError("No input text to parse", recoverable=False)
 
     ctx.log_message(f"Parsing response: format={fmt}, {len(text)} chars")
     ctx.report_progress(1, 3)
@@ -85,7 +102,7 @@ def run(ctx):
                         extracted_records = [parsed]
                     except json.JSONDecodeError:
                         if strict:
-                            raise ValueError("Failed to parse JSON from response")
+                            raise BlockDataError("Failed to parse JSON from response")
 
     elif fmt == "regex" and extraction_pattern:
         matches = re.findall(extraction_pattern, text)
@@ -94,7 +111,7 @@ def run(ctx):
             parsed_text = "\n".join(str(m) for m in matches)
             extracted_records = [{"match": m, "index": i} for i, m in enumerate(matches)]
         elif strict:
-            raise ValueError(f"Pattern not found: {extraction_pattern}")
+            raise BlockDataError(f"Pattern not found: {extraction_pattern}")
 
     elif fmt == "key_value":
         for line in text.split("\n"):

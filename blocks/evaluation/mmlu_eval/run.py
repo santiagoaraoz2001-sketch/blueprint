@@ -8,6 +8,23 @@ EleutherAI lm-evaluation-harness for standardized, reproducible results.
 import json
 import os
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 # Subject-to-category mapping
 CATEGORY_SUBJECTS = {
@@ -79,7 +96,8 @@ def run(ctx):
         trust_remote = trust_remote.lower() in ("true", "1", "yes")
 
     if not model_name:
-        raise ValueError(
+        raise BlockConfigError(
+            "model_name",
             "Model required: connect via 'model' input port or set 'model_name' in config."
         )
 
@@ -101,7 +119,6 @@ def run(ctx):
             else:
                 device = "cpu"
         except ImportError as e:
-            from backend.block_sdk.exceptions import BlockDependencyError
             missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
             raise BlockDependencyError(
                 missing,
@@ -118,7 +135,7 @@ def run(ctx):
     try:
         import lm_eval
     except ImportError:
-        raise ImportError("lm-eval not installed. Install with: pip install lm-eval")
+        raise BlockDependencyError("lm_eval", install_hint="pip install lm-eval")
 
     ctx.report_progress(0, 1)
 

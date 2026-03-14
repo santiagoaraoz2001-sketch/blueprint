@@ -7,6 +7,23 @@ import signal
 import traceback
 import time
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     max_retries = int(ctx.config.get("max_retries", 0))
@@ -111,7 +128,7 @@ def run(ctx):
             # Branch: all retries failed — raise error
             ctx.save_output("error", error_info)
             ctx.save_artifact("error_report", error_path)
-            raise RuntimeError(f"Error Handler: all {total_attempts} retries exhausted: {last_error}")
+            raise BlockExecutionError(f"Error Handler: all {total_attempts} retries exhausted: {last_error}", details=str(last_error))
         elif on_error == "fallback":
             if fallback_value:
                 try:

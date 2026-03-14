@@ -7,6 +7,23 @@ import sys
 import time
 from datetime import datetime, timezone
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _flatten_metrics(metrics):
     """Flatten a nested dict of metrics into dot-separated keys with numeric values."""
@@ -83,7 +100,7 @@ def run(ctx):
     ctx.report_progress(1, 5)
     raw_metrics = ctx.resolve_as_dict("metrics")
     if not raw_metrics:
-        raise ValueError("No metrics provided. Connect a 'metrics' input to this block.")
+        raise BlockInputError("No metrics provided. Connect a 'metrics' input to this block.", recoverable=False)
     metrics = raw_metrics
     if not isinstance(metrics, dict):
         metrics = {"value": metrics}

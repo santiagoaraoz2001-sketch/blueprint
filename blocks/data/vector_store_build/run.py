@@ -4,6 +4,23 @@ import json
 import os
 import time
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _load_json(path):
     """Load data from a file path (JSON or numpy .npy)."""
@@ -16,10 +33,7 @@ def _load_json(path):
             arr = np.load(path)
             return {"embeddings": arr.tolist()}
         except ImportError:
-            raise ImportError(
-                f"NumPy is required to load .npy embeddings file: {path}. "
-                f"Install with: pip install numpy"
-            )
+            raise BlockDependencyError("numpy", install_hint="pip install numpy")
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -147,10 +161,11 @@ def _build_faiss(ctx, chunks, embeddings, collection_name, distance_metric, batc
         )
 
     if not embeddings:
-        raise ValueError(
+        raise BlockInputError(
             "FAISS requires pre-computed embeddings. Connect an Embedding Generator "
             "to the 'Pre-computed Embeddings' input port, or switch to ChromaDB "
-            "(which can embed internally)."
+            "(which can embed internally).",
+            recoverable=False
         )
 
     dim = len(embeddings[0])
@@ -209,9 +224,10 @@ def run(ctx):
     chunks = _extract_chunks(raw_chunks)
 
     if not chunks:
-        raise ValueError(
+        raise BlockInputError(
             "No text chunks received on the 'chunks' input port. "
-            "Connect a Text Chunker or dataset upstream."
+            "Connect a Text Chunker or dataset upstream.",
+            recoverable=False
         )
 
     ctx.log_message(f"Received {len(chunks)} chunks")
@@ -239,10 +255,7 @@ def run(ctx):
                 ctx, chunks, embeddings, collection_name, distance_metric, batch_size
             )
         except ImportError:
-            raise ImportError(
-                "FAISS is not installed. Install it with: pip install faiss-cpu\n"
-                "Or switch to ChromaDB in the block config."
-            )
+            raise BlockDependencyError("faiss-cpu", install_hint="pip install faiss-cpu")
     else:
         # Default: ChromaDB
         try:
@@ -250,10 +263,7 @@ def run(ctx):
                 ctx, chunks, embeddings, collection_name, distance_metric, batch_size, overwrite
             )
         except ImportError:
-            raise ImportError(
-                "ChromaDB is not installed. Install it with: pip install chromadb\n"
-                "Or switch to FAISS in the block config."
-            )
+            raise BlockDependencyError("chromadb", install_hint="pip install chromadb")
 
     # ── Save store config output ─────────────────────────────────
     config_path = os.path.join(ctx.run_dir, "store_config.json")

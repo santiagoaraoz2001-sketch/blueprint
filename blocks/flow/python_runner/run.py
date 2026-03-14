@@ -14,6 +14,23 @@ import math
 import traceback
 from pathlib import Path
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _make_restricted_import(allowed_modules: str):
     """Create a restricted import function for sandboxed mode."""
@@ -30,7 +47,7 @@ def _make_restricted_import(allowed_modules: str):
         top_level = name.split(".")[0]
         if top_level in allowlist:
             return _real_import(name, *args, **kwargs)
-        raise RuntimeError(
+        raise BlockExecutionError(
             f"import '{name}' is not allowed in sandbox. Allowed modules: {', '.join(sorted(allowlist))}"
         )
     return _restricted_import
@@ -141,7 +158,7 @@ def run(ctx):
         else:
             ctx.log_message(f"WARNING: script_path not found: {script_path}")
     if not script.strip():
-        raise ValueError("No script provided — set either 'script' or 'script_path'")
+        raise BlockConfigError("script", "No script provided — set either 'script' or 'script_path'")
 
     ctx.log_message(f"\u26a0 Executing user-provided Python code ({len(script)} chars) [trust: {trust_level}]")
 
@@ -174,7 +191,7 @@ def run(ctx):
     except Exception as e:
         tb = traceback.format_exc()
         ctx.log_message(f"Script error:\n{tb}")
-        raise RuntimeError(f"Python script failed: {e}")
+        raise BlockExecutionError(f"Python script failed: {e}", details=str(e))
     finally:
         if use_alarm:
             signal.alarm(0)

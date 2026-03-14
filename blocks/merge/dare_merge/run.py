@@ -5,6 +5,23 @@ import os
 import time
 from pathlib import Path
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def run(ctx):
     try:
@@ -12,9 +29,10 @@ def run(ctx):
         from mergekit.config import MergeConfiguration
         from mergekit.merge import MergeOptions, run_merge
     except ImportError as e:
-        raise ImportError(
-            f"Required library not installed: {e}. "
-            f"Install with: pip install mergekit pyyaml"
+        raise BlockDependencyError(
+            "mergekit",
+            f"Required library not installed: {e}",
+            install_hint="pip install mergekit pyyaml",
         ) from e
 
     weight = float(ctx.config.get("weight", 0.5))
@@ -36,7 +54,7 @@ def run(ctx):
     model_b_name = model_b_name or ctx.config.get("model_b_name", "")
 
     if not model_a_name or not model_b_name:
-        raise ValueError("Both model_a and model_b are required")
+        raise BlockInputError("Both model_a and model_b are required", recoverable=False)
 
     # Fall back to model_a as base if base port not connected
     if not base_name:

@@ -5,6 +5,23 @@ import os
 import random
 import hashlib
 
+try:
+    from backend.block_sdk.exceptions import (
+        BlockConfigError, BlockInputError, BlockDataError,
+        BlockDependencyError, BlockExecutionError,
+    )
+except ImportError:
+    class BlockConfigError(ValueError):
+        def __init__(self, field, message, **kw): super().__init__(message)
+    class BlockInputError(ValueError):
+        def __init__(self, message, **kw): super().__init__(message)
+    class BlockDataError(ValueError):
+        pass
+    class BlockDependencyError(ImportError):
+        def __init__(self, dep, message="", **kw): super().__init__(message or dep)
+    class BlockExecutionError(RuntimeError):
+        def __init__(self, message, **kw): super().__init__(message)
+
 
 def _deterministic_bucket(item, index, split_ratio, seed):
     """Assign an item to bucket A or B using a deterministic hash.
@@ -33,7 +50,7 @@ def run(ctx):
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_data("data")
     if not raw_data:
-        raise ValueError("No data provided. Connect a 'data' input.")
+        raise BlockInputError("No data provided. Connect a 'data' input.", recoverable=False)
     data = raw_data
 
     # ---- Step 2: Split data ----
