@@ -12,6 +12,7 @@ Every block's run.py receives a BlockContext instance:
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any, Optional
 
@@ -81,6 +82,47 @@ class BlockContext:
     def save_output(self, name: str, data_or_path: Any):
         """Save a block output for downstream blocks."""
         self._outputs[name] = data_or_path
+
+    def save_checkpoint(self, epoch: int, path: str, metrics: dict = None):
+        """Save a training checkpoint with associated metrics.
+
+        The manifest is written to the run-level directory (parent of run_dir)
+        so that the /runs/{run_id}/checkpoints API can find it regardless of
+        which node produced the checkpoint.
+        """
+        # run_dir is artifacts/{run_id}/{node_id} — write manifest one level up
+        run_level_dir = os.path.dirname(self.run_dir)
+        checkpoint_dir = os.path.join(run_level_dir, "checkpoints")
+        os.makedirs(checkpoint_dir, exist_ok=True)
+
+        checkpoint_meta = {
+            "epoch": epoch,
+            "path": path,
+            "metrics": metrics or {},
+            "timestamp": time.time(),
+        }
+
+        # Append to checkpoint manifest
+        manifest_path = os.path.join(checkpoint_dir, "manifest.json")
+        manifest = []
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path) as f:
+                    manifest = json.load(f)
+                if not isinstance(manifest, list):
+                    manifest = []
+            except (json.JSONDecodeError, OSError):
+                manifest = []
+        # Replace existing entry for the same epoch (idempotent)
+        manifest = [c for c in manifest if c.get("epoch") != epoch]
+        manifest.append(checkpoint_meta)
+        with open(manifest_path, "w") as f:
+            json.dump(manifest, f, indent=2)
+
+        if self._metric_callback:
+            self._metric_callback(f"checkpoint_epoch_{epoch}", metrics.get("loss", 0) if metrics else 0, epoch)
+
+        self.log_message(f"Checkpoint saved: epoch {epoch}")
 
     def save_artifact(self, name: str, file_path: str):
         """Save a file as a run artifact."""
