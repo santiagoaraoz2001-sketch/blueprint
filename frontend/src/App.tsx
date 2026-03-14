@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, lazy, Suspense } from 'react'
+import { useRef, useEffect, useState, useMemo, lazy, Suspense } from 'react'
 import ErrorBoundary from '@/components/shared/ErrorBoundary'
 import AppShell from '@/components/Layout/AppShell'
 import CommandPalette from '@/components/shared/CommandPalette'
@@ -14,7 +14,7 @@ import DashboardView from '@/views/DashboardView'
 import PipelineEditorView from '@/views/PipelineEditorView'
 import ResultsView from '@/views/ResultsView'
 import DatasetView from '@/views/DatasetView'
-import MarketplaceView from '@/views/MarketplaceView'
+const MarketplaceView = lazy(() => import('@/views/MarketplaceView'))
 import SettingsView from '@/views/SettingsView'
 import PaperView from '@/views/PaperView'
 import WorkshopView from '@/views/WorkshopView'
@@ -28,14 +28,13 @@ import MonitorView from '@/views/MonitorView'
 // Lazy-loaded views
 const HelpView = lazy(() => import('@/views/HelpView'))
 
-const viewComponents: Record<string, React.ComponentType> = {
+const baseViewComponents: Record<string, React.ComponentType> = {
   dashboard: DashboardView,
   editor: PipelineEditorView,
   results: ResultsView,
   datasets: DatasetView,
   data: DataView,
   visualization: VisualizationView,
-  marketplace: MarketplaceView,
   inference: InferenceView,
   workshop: WorkshopView,
   settings: SettingsView,
@@ -76,8 +75,23 @@ export default function App() {
   const theme = useSettingsStore((s) => s.theme)
   useSettingsStore((s) => s.font)
   useSettingsStore((s) => s.fontSize)
+  const features = useSettingsStore((s) => s.features)
   useKeyboardShortcuts()
   useAutoSave()
+
+  // Fetch feature flags on startup
+  useEffect(() => {
+    useSettingsStore.getState().fetchFeatures()
+  }, [])
+
+  // Build view map based on enabled features
+  const viewComponents = useMemo(() => {
+    const views = { ...baseViewComponents }
+    if (features?.marketplace) {
+      views.marketplace = MarketplaceView
+    }
+    return views
+  }, [features?.marketplace])
 
   // One-time migration: update custom blocks in localStorage from old taxonomy
   useEffect(() => {

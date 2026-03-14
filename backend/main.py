@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db, SessionLocal
-from .config import ensure_dirs
+from .config import ensure_dirs, ENABLE_MARKETPLACE
 from .models.run import Run, LiveRun
 from .utils.structured_logger import (
     init_structured_logging, log_recovery, log_event,
@@ -106,12 +106,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logging.getLogger("blueprint.plugins").error("Plugin system init failed: %s", e)
 
-    # Seed marketplace registry with built-in items
-    try:
-        from .services.marketplace_service import seed_registry
-        seed_registry()
-    except Exception as e:
-        logging.getLogger("blueprint.marketplace").error("Marketplace seed failed: %s", e)
+    # Seed marketplace registry with built-in items (if enabled)
+    if ENABLE_MARKETPLACE:
+        try:
+            from .services.marketplace_service import seed_registry
+            seed_registry()
+        except Exception as e:
+            logging.getLogger("blueprint.marketplace").error("Marketplace seed failed: %s", e)
 
     # Start background model directory watcher
     try:
@@ -182,7 +183,8 @@ app.include_router(plugins.router)
 app.include_router(sweeps.router)
 app.include_router(connectors.router)
 app.include_router(block_generator.router)
-app.include_router(marketplace.router)
+if ENABLE_MARKETPLACE:
+    app.include_router(marketplace.router)
 
 
 @app.get("/api/health")

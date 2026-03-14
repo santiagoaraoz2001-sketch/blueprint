@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useUIStore } from '@/stores/uiStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useRunStore } from '@/stores/runStore'
 import { useGuideStore } from '@/stores/guideStore'
@@ -104,7 +105,9 @@ export function useKeyboardShortcuts() {
       // Cmd+1-7 — Switch views
       if (meta && !e.shiftKey && e.key >= '1' && e.key <= '7') {
         e.preventDefault()
-        const views = ['dashboard', 'editor', 'results', 'datasets', 'marketplace', 'paper', 'settings'] as const
+        const allViews = ['dashboard', 'editor', 'results', 'datasets', 'marketplace', 'paper', 'settings'] as const
+        const features = useSettingsStore.getState().features
+        const views = allViews.filter(v => v !== 'marketplace' || features?.marketplace)
         const idx = parseInt(e.key) - 1
         if (idx < views.length) setView(views[idx])
         return
