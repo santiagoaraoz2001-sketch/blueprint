@@ -21,11 +21,6 @@ outputs:
     label: Consensus
     data_type: text
     description: "Final judge synthesis after all debate rounds"
-  - id: response
-    label: Final Response
-    data_type: text
-    description: "Raw response from the final judge (last child block output)"
-
 config:
   model_name:
     type: string

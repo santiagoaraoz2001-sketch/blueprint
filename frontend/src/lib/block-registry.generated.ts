@@ -462,7 +462,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'consensus', label: 'Consensus', dataType: 'text', required: false },
-      { id: 'response', label: 'Final Response', dataType: 'text', required: false },
     ],
     defaultConfig: { model_name: '', rounds: 3 },
     configFields: [
@@ -4023,6 +4022,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#10b981',
     maturity: 'stable',
     inputs: [
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'model_a', label: 'Model A', dataType: 'model', required: false },
       { id: 'model_b', label: 'Model B', dataType: 'model', required: false },
       { id: 'model_c', label: 'Model C', dataType: 'model', required: false },
@@ -7627,6 +7627,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#8b5cf6',
     maturity: 'stable',
     inputs: [
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'text', label: 'Prompt / Input', dataType: 'text', required: false },
       { id: 'dataset', label: 'Test Dataset', dataType: 'dataset', required: false },
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
@@ -7871,6 +7872,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#8b5cf6',
     maturity: 'stable',
     inputs: [
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
@@ -8357,6 +8359,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#8b5cf6',
     maturity: 'stable',
     inputs: [
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'dataset', label: 'Prompt Dataset', dataType: 'dataset', required: false },
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],

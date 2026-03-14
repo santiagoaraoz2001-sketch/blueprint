@@ -5,6 +5,11 @@ description: Generate vector embeddings for text data using sentence-transformer
 version: "1.0.0"
 
 inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Optional model configuration (overrides provider/model_name config)"
   - id: dataset
     label: Dataset
     data_type: dataset

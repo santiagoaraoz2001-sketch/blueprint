@@ -5,6 +5,11 @@ description: Compare outputs from two model configurations side-by-side
 version: "1.0.0"
 
 inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Optional model configuration (overrides provider/model config for Model A)"
   - id: text
     label: Prompt / Input
     data_type: text
