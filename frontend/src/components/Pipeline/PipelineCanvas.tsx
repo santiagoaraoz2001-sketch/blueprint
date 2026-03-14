@@ -19,6 +19,7 @@ import StickyNote from './StickyNote'
 import GroupNode from './GroupNode'
 import QuickPalette from './QuickPalette'
 import EdgePreviewPanel from './EdgePreviewPanel'
+import InheritanceOverlay, { OVERLAY_COLORS } from './InheritanceOverlay'
 import NodeContextMenu from './NodeContextMenu'
 import RerunOverlay from './RerunOverlay'
 
@@ -38,6 +39,8 @@ export default function PipelineCanvas() {
     onConnect,
     addNode,
     selectNode,
+    inheritanceOverlay,
+    deactivateInheritanceOverlay,
   } = usePipelineStore(useShallow((s) => ({
     nodes: s.nodes,
     edges: s.edges,
@@ -46,6 +49,8 @@ export default function PipelineCanvas() {
     onConnect: s.onConnect,
     addNode: s.addNode,
     selectNode: s.selectNode,
+    inheritanceOverlay: s.inheritanceOverlay,
+    deactivateInheritanceOverlay: s.deactivateInheritanceOverlay,
   })))
 
   // Drop zone visual feedback
@@ -147,16 +152,19 @@ export default function PipelineCanvas() {
 
   const onNodeClick = useCallback(
     (_: any, node: any) => {
+      // Dismiss inheritance overlay on any click (spec: "click anywhere to exit")
+      deactivateInheritanceOverlay()
       selectNode(node.id)
     },
-    [selectNode]
+    [selectNode, deactivateInheritanceOverlay]
   )
 
   const onPaneClick = useCallback(() => {
     selectNode(null)
     setPaletteParams((p: any) => ({ ...p, visible: false }))
     setContextMenu((p) => ({ ...p, visible: false }))
-  }, [selectNode])
+    deactivateInheritanceOverlay()
+  }, [selectNode, deactivateInheritanceOverlay])
 
   // Node right-click context menu
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: any) => {
@@ -303,6 +311,12 @@ export default function PipelineCanvas() {
         e.preventDefault()
         usePipelineStore.getState().redo()
       } else if (e.key === 'Escape') {
+        // Dismiss inheritance overlay first, then deselect
+        const overlay = usePipelineStore.getState().inheritanceOverlay
+        if (overlay) {
+          usePipelineStore.getState().deactivateInheritanceOverlay()
+          return
+        }
         // Exit rerun mode if active
         const { rerunMode, exitRerunMode } = usePipelineStore.getState()
         if (rerunMode?.active) {
@@ -345,21 +359,43 @@ export default function PipelineCanvas() {
   }, [contextMenu.visible])
 
   // Recompute edge colors for loaded pipelines (onConnect already sets them for new edges).
-  // Depends only on [edges] — reads nodes non-reactively to avoid re-computing on
-  // node dimension/position changes (node TYPE never changes after creation).
+  // Also applies inheritance overlay styling when active.
   const coloredEdges = useMemo(() => {
     const currentNodes = usePipelineStore.getState().nodes
+    // Pre-build a Set for O(1) participating-edge lookup
+    const participatingSet = inheritanceOverlay
+      ? new Set(inheritanceOverlay.participatingEdges)
+      : null
+
     return edges.map((edge) => {
-      if (edge.style?.stroke && edge.style.stroke !== T.borderHi) return edge
-      const sourceNode = currentNodes.find((n) => n.id === edge.source)
-      if (!sourceNode) return { ...edge, style: { strokeWidth: 1.5, stroke: T.borderHi, ...edge.style } }
-      const def = getBlockDefinition((sourceNode.data as any)?.type)
-      if (!def) return { ...edge, style: { strokeWidth: 1.5, stroke: T.borderHi, ...edge.style } }
-      const port = def.outputs.find((o) => o.id === edge.sourceHandle)
-      if (!port) return { ...edge, style: { strokeWidth: 1.5, stroke: T.borderHi, ...edge.style } }
-      return { ...edge, style: { ...edge.style, stroke: getPortColor(port.dataType), strokeWidth: 1.5 } }
+      // Base color computation
+      let baseStroke = edge.style?.stroke
+      if (!baseStroke || baseStroke === T.borderHi) {
+        const sourceNode = currentNodes.find((n) => n.id === edge.source)
+        const def = sourceNode ? getBlockDefinition((sourceNode.data as any)?.type) : undefined
+        const port = def?.outputs.find((o) => o.id === edge.sourceHandle)
+        baseStroke = port ? getPortColor(port.dataType) : T.borderHi
+      }
+
+      // Inheritance overlay styling
+      if (participatingSet) {
+        const isParticipating = participatingSet.has(edge.id)
+        return {
+          ...edge,
+          style: {
+            ...edge.style,
+            stroke: isParticipating ? OVERLAY_COLORS.inheriting : baseStroke,
+            strokeWidth: isParticipating ? 3 : 1.5,
+            opacity: isParticipating ? 1 : 0.15,
+          },
+          className: isParticipating ? 'inheritance-edge' : '',
+          animated: isParticipating,
+        }
+      }
+
+      return { ...edge, style: { ...edge.style, stroke: baseStroke, strokeWidth: 1.5 } }
     })
-  }, [edges])
+  }, [edges, inheritanceOverlay])
 
   return (
     <div
@@ -390,6 +426,8 @@ export default function PipelineCanvas() {
         y={hoveredEdgeParams.y}
         dataType={hoveredEdgeParams.dataType}
       />
+
+      <InheritanceOverlay />
 
       {/* 3D perspective grid underlay */}
       <div

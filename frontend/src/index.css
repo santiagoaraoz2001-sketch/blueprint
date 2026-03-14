@@ -477,6 +477,18 @@
   }
 }
 
+/* ── Inheritance overlay: flowing-dot edge animation ── */
+
+@keyframes inheritance-flow {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+.react-flow__edge.inheritance-edge path.react-flow__edge-path {
+  stroke-dasharray: 6 4;
+  animation: inheritance-flow 0.8s linear infinite;
+}
+
 /* Reduced motion — respect user preferences */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

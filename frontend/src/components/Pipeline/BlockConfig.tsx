@@ -1,5 +1,5 @@
 import { T, F, FS } from '@/lib/design-tokens'
-import { usePipelineStore, type BlockNodeData } from '@/stores/pipelineStore'
+import { usePipelineStore, type BlockNodeData, INHERITABLE_KEYS, CONFIG_PROPAGATION_HANDLES } from '@/stores/pipelineStore'
 import { getBlockDefinition, getFileFormatWarning, type ConfigField, type ConnectorType } from '@/lib/block-registry'
 import { usePresetStore } from '@/stores/presetStore'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -43,6 +43,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
   const selectNode = usePipelineStore((s) => s.selectNode)
   const edges = usePipelineStore((s) => s.edges)
   const nodes = usePipelineStore((s) => s.nodes)
+  const activateInheritanceOverlay = usePipelineStore((s) => s.activateInheritanceOverlay)
   const resolvedConfigs = usePipelineStore((s) => s.resolvedConfigs)
   const propagationKeys = usePipelineStore((s) => s.propagationKeys)
   const def = getBlockDefinition(node.data.type)
@@ -61,7 +62,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
 
     // 1. Edge-based inheritance (model/llm connections)
     for (const edge of incomingEdges) {
-      if (edge.targetHandle !== 'model' && edge.targetHandle !== 'llm_config' && edge.targetHandle !== 'llm') {
+      if (!CONFIG_PROPAGATION_HANDLES.has(edge.targetHandle || '')) {
         continue
       }
 
@@ -71,19 +72,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
       const sourceConfig = sourceNode.data.config || {}
       const sourceName = sourceNode.data.label || sourceNode.data.type
 
-      const inheritableKeys = [
-        'model_name', 'model', 'model_id',
-        'provider', 'backend', 'source',
-        'endpoint', 'base_url',
-        'api_key',
-        'framework',
-        'temperature', 'max_tokens', 'top_p',
-        'repeat_penalty', 'stop_sequences',
-        'system_prompt',
-        'frequency_penalty', 'presence_penalty',
-      ]
-
-      for (const key of inheritableKeys) {
+      for (const key of INHERITABLE_KEYS) {
         const value = sourceConfig[key]
         if (value !== undefined && value !== null && value !== '') {
           inherited[key] = { value, sourceName, sourceId: edge.source }
@@ -492,6 +481,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
           {displayFields?.map((field) => {
             const fieldInfo = getFieldState(field.name, node.data.config[field.name], field.default)
             const inherited = inheritedConfig[field.name]
+            const isPropagatable = INHERITABLE_KEYS.includes(field.name)
             return (
               <ConfigFieldInput
                 key={field.name}
@@ -506,6 +496,11 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
                 expectedOutputType={def?.outputs[0]?.dataType as ConnectorType | undefined}
                 fieldInfo={fieldInfo}
                 inherited={inherited}
+                onShowInheritance={isPropagatable ? () => {
+                  // Origin is upstream source if inherited, otherwise this node
+                  const originId = inherited ? inherited.sourceId : node.id
+                  activateInheritanceOverlay(field.name, originId)
+                } : undefined}
               />
             )
           })}
@@ -604,6 +599,7 @@ function ConfigFieldInput({
   expectedOutputType,
   fieldInfo,
   inherited,
+  onShowInheritance,
 }: {
   field: ConfigField
   value: ConfigValue
@@ -613,6 +609,7 @@ function ConfigFieldInput({
   expectedOutputType?: ConnectorType
   fieldInfo: FieldInfo
   inherited?: { value: any; sourceName: string; sourceId: string }
+  onShowInheritance?: () => void
 }) {
   const isInherited = fieldInfo.state === 'inherited'
   const isOverriddenInherited = fieldInfo.state === 'local' && !!inherited
@@ -650,6 +647,8 @@ function ConfigFieldInput({
     }}>
       {/* Label with state indicator + InheritedFieldBadge */}
       <label
+        onClick={onShowInheritance}
+        title={onShowInheritance ? `Show inheritance flow for "${field.name}"` : undefined}
         style={{
           fontFamily: F,
           fontSize: FS.xs,
@@ -661,9 +660,15 @@ function ConfigFieldInput({
           display: 'flex',
           alignItems: 'center',
           gap: 6,
+          cursor: onShowInheritance ? 'pointer' : undefined,
         }}
       >
         {field.label}
+        {onShowInheritance && (
+          <span style={{ fontSize: FS.xxs, color: T.blue, opacity: 0.6 }} title="Click to visualize inheritance">
+            &#x25C9;
+          </span>
+        )}
         {fieldInfo.state === 'default' && (
           <span style={{
             fontSize: FS.xxs,

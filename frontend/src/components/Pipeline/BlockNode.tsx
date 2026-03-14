@@ -6,6 +6,7 @@ import { getIcon } from '@/lib/icon-utils'
 import ProgressBar from '@/components/shared/ProgressBar'
 import { usePipelineStore, type BlockNodeData, type NodeExecutionState } from '@/stores/pipelineStore'
 import { useRunStore } from '@/stores/runStore'
+import { OVERLAY_COLORS } from './InheritanceOverlay'
 import { AlertTriangle, Clock, Lock } from 'lucide-react'
 import { estimatePipeline, formatTimeShort } from '@/lib/pipeline-estimator'
 
@@ -35,6 +36,14 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
 
   const focusedErrorNodeId = usePipelineStore((s) => s.focusedErrorNodeId)
   const isErrorFocused = focusedErrorNodeId === id
+
+  // Inheritance overlay — derived selector returns primitive for O(1) lookup + minimal re-renders
+  const overlayRole = usePipelineStore(
+    (s): 'origin' | 'inheriting' | 'overriding' | 'dimmed' | null => {
+      if (!s.inheritanceOverlay) return null
+      return s.inheritanceOverlay.nodeRoles[id] ?? 'dimmed'
+    }
+  )
 
   // Subscribe to live run status directly — avoids cascading pipelineStore updates
   const nodeRunStatus = useRunStore((s) => s.nodeStatuses[id])
@@ -126,10 +135,10 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
                 : isHovered
                   ? `0 8px 24px ${T.shadow}, inset 0 1px 0 rgba(255,255,255,0.05)`
                   : `0 4px 12px ${T.shadow}`,
-        opacity: rerunOpacity,
         position: 'relative',
         overflow: 'visible',
         zIndex: selected || isErrorFocused ? 10 : isHovered ? 5 : 1,
+        opacity: overlayRole === 'dimmed' ? 0.2 : rerunOpacity,
       }}
     >
       {/* Top accent bar */}
@@ -275,6 +284,22 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
           zIndex: 2,
         }}
       />
+
+      {/* Inheritance overlay badge */}
+      {overlayRole && overlayRole !== 'dimmed' && (
+        <div style={{
+          position: 'absolute',
+          top: -5,
+          left: -5,
+          width: 12,
+          height: 12,
+          borderRadius: '50%',
+          background: OVERLAY_COLORS[overlayRole],
+          boxShadow: `0 0 8px ${OVERLAY_COLORS[overlayRole]}80`,
+          zIndex: 20,
+          border: '2px solid rgba(0,0,0,0.6)',
+        }} />
+      )}
 
       {/* Header */}
       <div

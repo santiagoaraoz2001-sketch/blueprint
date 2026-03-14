@@ -59,6 +59,29 @@ export interface PipelineSnapshot {
   edges: any[]
 }
 
+export interface InheritanceOverlay {
+  key: string               // e.g., "seed"
+  originNode: string        // node ID that owns the value
+  nodeRoles: Record<string, 'origin' | 'inheriting' | 'overriding'>
+  participatingEdges: string[] // edge IDs on the propagation path
+}
+
+/** Config keys that propagate through model/config edges */
+export const INHERITABLE_KEYS = [
+  'model_name', 'model', 'model_id',
+  'provider', 'backend', 'source',
+  'endpoint', 'base_url', 'api_key',
+  'framework',
+  'temperature', 'max_tokens', 'top_p',
+  'repeat_penalty', 'stop_sequences',
+  'system_prompt',
+  'frequency_penalty', 'presence_penalty',
+  'seed', 'random_seed',
+]
+
+/** Edge target handles that carry config propagation */
+export const CONFIG_PROPAGATION_HANDLES = new Set(['model', 'llm_config', 'llm', 'config'])
+
 export type NodeExecutionState =
   | 'idle'
   | 'cached'
@@ -170,6 +193,11 @@ interface PipelineState {
   // Agentic workflow
   applyGeneratedWorkflow: (nodes: Node<BlockNodeData>[], edges: Edge[]) => void
 
+  // Inheritance overlay
+  inheritanceOverlay: InheritanceOverlay | null
+  activateInheritanceOverlay: (key: string, originNodeId: string) => void
+  deactivateInheritanceOverlay: () => void
+
   // Re-run mode
   rerunMode: RerunMode | null
   enterRerunMode: (startNodeId: string, sourceRunId: string) => void
@@ -240,6 +268,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   versions: [],
   past: [],
   future: [],
+  inheritanceOverlay: null,
 
   pushHistory: () => {
     const { nodes, edges, past } = get()
@@ -652,6 +681,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         edges: def.edges as any[],
         isDirty: false,
         selectedNodeId: null,
+        inheritanceOverlay: null,
       })
       return
     }
@@ -665,6 +695,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         edges: def.edges || [],
         isDirty: false,
         selectedNodeId: null,
+        inheritanceOverlay: null,
         resolvedConfigs: {},
         propagationKeys: null,
       })
@@ -729,6 +760,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       edges: [],
       selectedNodeId: null,
       isDirty: false,
+      inheritanceOverlay: null,
       resolvedConfigs: {},
       propagationKeys: null,
       tabs: s.tabs.map((t) =>
@@ -854,6 +886,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         edges: data.edges || [],
         isDirty: true,
         selectedNodeId: null,
+        inheritanceOverlay: null,
       })
       toast.success('Pipeline imported')
     } catch {
@@ -1125,6 +1158,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       selectedNodeId: null,
       past: target.past || [],
       future: target.future || [],
+      inheritanceOverlay: null, // Clear stale overlay on tab switch
     })
   },
 
@@ -1177,5 +1211,88 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     set((s) => ({
       tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, runStatus: status } : t)),
     }))
+  },
+
+  // ── Inheritance Overlay ──
+
+  activateInheritanceOverlay: (key: string, originNodeId: string) => {
+    const { nodes, edges } = get()
+    const originNode = nodes.find(n => n.id === originNodeId)
+    if (!originNode) return
+
+    // Pre-index outgoing edges by source for O(1) lookup
+    const outEdgesBySource = new Map<string, typeof edges>()
+    for (const edge of edges) {
+      if (!CONFIG_PROPAGATION_HANDLES.has(edge.targetHandle || '')) continue
+      const list = outEdgesBySource.get(edge.source) || []
+      list.push(edge)
+      outEdgesBySource.set(edge.source, list)
+    }
+
+    // Pre-index nodes by ID for O(1) lookup
+    const nodeMap = new Map(nodes.map(n => [n.id, n]))
+
+    // Resolve the default value for this key from the block definition
+    // so we can distinguish "explicitly set to default" vs "not set"
+    const getDefaultForNode = (nodeId: string): any => {
+      const n = nodeMap.get(nodeId)
+      if (!n) return undefined
+      const def = getBlockDefinition(n.data.type)
+      return def?.defaultConfig?.[key]
+    }
+
+    // BFS downstream from origin through config-propagation edges
+    const nodeRoles: Record<string, 'origin' | 'inheriting' | 'overriding'> = {
+      [originNodeId]: 'origin',
+    }
+    const participatingEdges: string[] = []
+    const visited = new Set<string>([originNodeId])
+    const queue = [originNodeId]
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!
+      const outEdges = outEdgesBySource.get(currentId)
+      if (!outEdges) continue
+
+      for (const edge of outEdges) {
+        if (visited.has(edge.target)) continue
+
+        const targetNode = nodeMap.get(edge.target)
+        if (!targetNode) continue
+
+        visited.add(edge.target)
+        participatingEdges.push(edge.id)
+
+        // Check if the target has a locally-set value that differs from default
+        const targetConfig = targetNode.data.config || {}
+        const currentValue = targetConfig[key]
+        const defaultValue = getDefaultForNode(edge.target)
+        const hasLocalValue = currentValue !== undefined
+          && currentValue !== null
+          && currentValue !== ''
+          && String(currentValue) !== String(defaultValue ?? '')
+
+        if (hasLocalValue) {
+          nodeRoles[edge.target] = 'overriding'
+          // Stop propagation past overriding nodes — they become new origins
+        } else {
+          nodeRoles[edge.target] = 'inheriting'
+          queue.push(edge.target) // Continue propagation downstream
+        }
+      }
+    }
+
+    set({
+      inheritanceOverlay: {
+        key,
+        originNode: originNodeId,
+        nodeRoles,
+        participatingEdges,
+      },
+    })
+  },
+
+  deactivateInheritanceOverlay: () => {
+    set({ inheritanceOverlay: null })
   },
 }))
