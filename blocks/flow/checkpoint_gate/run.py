@@ -171,7 +171,9 @@ def run(ctx):
 
     if gate_passed:
         ctx.log_message(f"GATE PASSED [{label}]: all {len(results)} check(s) passed")
+        # Branch: gate passed
         ctx.save_output("passed", data if data is not None else metrics)
+        # Branch: gate passed
         ctx.save_output("rejected", None)
     else:
         failed = [r for r in results if not r["passed"]]
@@ -179,14 +181,20 @@ def run(ctx):
             f"GATE FAILED [{label}]: {len(failed)}/{len(results)} check(s) failed"
         )
         if on_fail == "route_fail":
+            # Branch: gate failed — route to fail path
             ctx.save_output("passed", None)
+            # Branch: gate failed — route to fail path
             ctx.save_output("rejected", data if data is not None else metrics)
         elif on_fail == "warn_continue":
             ctx.log_message("Action: WARNING only — passing data through 'passed' port anyway")
+            # Branch: gate failed — warn and continue
             ctx.save_output("passed", data if data is not None else metrics)
+            # Branch: gate failed — warn and continue
             ctx.save_output("rejected", None)
         elif on_fail == "stop_pipeline":
+            # Branch: gate failed — stop pipeline
             ctx.save_output("passed", None)
+            # Branch: gate failed — stop pipeline
             ctx.save_output("rejected", data if data is not None else metrics)
             raise RuntimeError(
                 f"Checkpoint Gate [{label}] BLOCKED pipeline: "

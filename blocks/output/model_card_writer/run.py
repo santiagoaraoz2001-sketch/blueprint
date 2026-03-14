@@ -258,7 +258,9 @@ def run(ctx):
         card_path = os.path.join(out_dir, "README.md")
         with open(card_path, "w") as f:
             f.write(model_card_md)
+        # Branch: output_format == "html"
         ctx.save_output("artifact", out_dir)
+        # Branch: output_format == "html"
         ctx.save_output("text", html_path)
     else:
         out_dir = os.path.join(ctx.run_dir, "model_card")
@@ -266,7 +268,9 @@ def run(ctx):
         card_path = os.path.join(out_dir, "README.md")
         with open(card_path, "w") as f:
             f.write(model_card_md)
+        # Branch: output_format == "markdown"
         ctx.save_output("artifact", out_dir)
+        # Branch: output_format == "markdown"
         ctx.save_output("text", card_path)
 
     ctx.log_metric("card_length", len(model_card_md))

@@ -187,11 +187,15 @@ def run(ctx):
     # Route data
     if condition_met:
         ctx.log_message("Routing to: TRUE branch")
+        # Branch: condition met — route to true
         ctx.save_output("true_branch", input_data)
+        # Branch: condition met — route to true
         ctx.save_output("false_branch", None)
     else:
         ctx.log_message("Routing to: FALSE branch")
+        # Branch: condition not met — route to false
         ctx.save_output("true_branch", None)
+        # Branch: condition not met — route to false
         ctx.save_output("false_branch", input_data)
 
     result_info = {

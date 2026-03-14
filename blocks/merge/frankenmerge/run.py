@@ -172,10 +172,12 @@ slices:
             total_bytes = sum(f.stat().st_size for f in Path(output_dir).rglob("*") if f.is_file())
             ctx.log_metric("output_size_mb", round(total_bytes / (1024 * 1024), 1))
 
+        # Branch: mergekit available — real merge
         ctx.save_output("model", {
             "source": "merge", "method": "passthrough", "path": output_dir,
             "model_name": output_name, "total_layers": total_layers, "demo_mode": False,
         })
+        # Branch: mergekit available — real merge
         ctx.save_output("metrics", {
             "merge_method": "passthrough", "total_layers": total_layers,
             "num_slices": len(layer_config), "merge_embed": merge_embed,
@@ -221,10 +223,12 @@ slices:
         total_bytes = sum(f.stat().st_size for f in Path(model_path).rglob("*") if f.is_file())
         ctx.log_metric("output_size_mb", round(total_bytes / (1024 * 1024), 1))
 
+    # Branch: mergekit unavailable — simulation fallback
     ctx.save_output("model", {
         "source": "merge", "method": "passthrough", "path": model_path,
         "model_name": output_name, "total_layers": total_layers, "demo_mode": True,
     })
+    # Branch: mergekit unavailable — simulation fallback
     ctx.save_output("metrics", {
         "merge_method": "passthrough", "total_layers": total_layers,
         "num_slices": len(layer_config), "merge_embed": merge_embed,

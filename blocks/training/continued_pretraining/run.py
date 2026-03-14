@@ -239,7 +239,9 @@ def run(ctx):
                 "demo_mode": False,
             }, f, indent=2)
 
+        # Branch: real training succeeded
         ctx.save_output("model", output_dir)
+        # Branch: real training succeeded
         ctx.save_output("metrics", {
             "final_loss": final_loss,
             "final_perplexity": final_ppl,
@@ -305,7 +307,9 @@ def run(ctx):
             "demo_mode": True,
         }, f, indent=2)
 
+    # Branch: training failed — simulation fallback
     ctx.save_output("model", model_path)
+    # Branch: training failed — simulation fallback
     ctx.save_output("metrics", {
         "final_loss": final_loss,
         "final_perplexity": final_ppl,
