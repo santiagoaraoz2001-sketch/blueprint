@@ -1,5 +1,5 @@
 // AUTO-GENERATED — DO NOT EDIT MANUALLY
-// Generated from 131 block.yaml files across 12 categories
+// Generated from 132 block.yaml files across 12 categories
 // Run: python scripts/generate_block_registry.py
 
 import type { BlockDefinition } from './block-registry'
@@ -3841,7 +3841,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  EVALUATION (16 blocks)
+  //  EVALUATION (17 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -3993,6 +3993,66 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 6,
         description: 'Decimal places for all computed scores',
+      },
+    ],
+  },
+  {
+    type: 'ab_significance',
+    name: 'A/B Significance Test',
+    description: 'Compare two model variants with proper statistical significance testing',
+    category: 'evaluation',
+    tags: ['significance', 'statistics', 'ab-test', 'hypothesis-testing', 'p-value', 'cohens-d'],
+    aliases: ['significance_test', 'statistical_test', 'ab_test_significance'],
+    icon: 'BarChart3',
+    accent: '#10b981',
+    maturity: 'stable',
+    inputs: [
+      { id: 'metrics_a', label: 'Branch A Metrics', dataType: 'metrics', required: true },
+      { id: 'metrics_b', label: 'Branch B Metrics', dataType: 'metrics', required: true },
+    ],
+    outputs: [
+      { id: 'report', label: 'Significance Report', dataType: 'artifact', required: false },
+      { id: 'verdict', label: 'Verdict', dataType: 'text', required: false },
+    ],
+    defaultConfig: {
+      metric_name: 'accuracy',
+      significance_level: 0.05,
+      test_type: 'welch_t',
+      min_samples: 30,
+    },
+    configFields: [
+      {
+        name: 'metric_name',
+        label: 'Metric to Compare',
+        type: 'string',
+        default: 'accuracy',
+        description: 'Which metric to test significance on (e.g., accuracy, loss, f1)',
+      },
+      {
+        name: 'significance_level',
+        label: 'Significance Level (alpha)',
+        type: 'float',
+        default: 0.05,
+        min: 0.001,
+        max: 0.1,
+        description: 'Type I error rate threshold for rejecting the null hypothesis',
+      },
+      {
+        name: 'test_type',
+        label: 'Statistical Test',
+        type: 'select',
+        default: 'welch_t',
+        options: ['welch_t', 'mann_whitney', 'bootstrap'],
+        description: 'welch_t: parametric t-test. mann_whitney: non-parametric rank test. bootstrap: permutation test.',
+      },
+      {
+        name: 'min_samples',
+        label: 'Minimum Samples',
+        type: 'integer',
+        default: 30,
+        min: 5,
+        max: 10000,
+        description: 'Minimum samples per group for reliable results',
       },
     ],
   },

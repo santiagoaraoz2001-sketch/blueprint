@@ -1,0 +1,56 @@
+name: A/B Significance Test
+type: ab_significance
+category: evaluation
+description: Compare two model variants with proper statistical significance testing
+version: "1.0.0"
+tags: [significance, statistics, ab-test, hypothesis-testing, p-value, cohens-d]
+aliases: [significance_test, statistical_test, ab_test_significance]
+
+inputs:
+  - id: metrics_a
+    label: Branch A Metrics
+    data_type: metrics
+    required: true
+    description: Metric values from pipeline branch A
+  - id: metrics_b
+    label: Branch B Metrics
+    data_type: metrics
+    required: true
+    description: Metric values from pipeline branch B
+
+outputs:
+  - id: report
+    label: Significance Report
+    data_type: artifact
+    description: "Full statistical report: p-value, Cohen's d, confidence intervals, verdict"
+  - id: verdict
+    label: Verdict
+    data_type: text
+    description: Human-readable significance verdict
+
+config:
+  metric_name:
+    type: string
+    label: Metric to Compare
+    default: "accuracy"
+    description: "Which metric to test significance on (e.g., accuracy, loss, f1)"
+  significance_level:
+    type: float
+    label: Significance Level (alpha)
+    default: 0.05
+    min: 0.001
+    max: 0.1
+    description: "Type I error rate threshold for rejecting the null hypothesis"
+  test_type:
+    type: select
+    label: Statistical Test
+    default: "welch_t"
+    options: ["welch_t", "mann_whitney", "bootstrap"]
+    description: "welch_t: parametric t-test. mann_whitney: non-parametric rank test. bootstrap: permutation test."
+  min_samples:
+    type: integer
+    label: Minimum Samples
+    default: 30
+    min: 5
+    max: 10000
+    description: "Minimum samples per group for reliable results"
