@@ -15,7 +15,7 @@ from .utils.structured_logger import (
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference
+from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference, connectors
 
 _recovery_logger = logging.getLogger("blueprint.recovery")
 
@@ -159,6 +159,7 @@ app.include_router(papers.router)
 app.include_router(secrets.router)
 app.include_router(custom_blocks.router)
 app.include_router(inference.router)
+app.include_router(connectors.router)
 
 
 @app.get("/api/health")
