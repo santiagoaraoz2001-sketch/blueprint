@@ -1,5 +1,5 @@
 // AUTO-GENERATED — DO NOT EDIT MANUALLY
-// Generated from 121 block.yaml files across 12 categories
+// Generated from 125 block.yaml files across 12 categories
 // Run: python scripts/generate_block_registry.py
 
 import type { BlockDefinition } from './block-registry'
@@ -820,7 +820,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (11 blocks)
+  //  DATA (15 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1000,7 +1000,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (11 blocks)
+  //  DATA (15 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1320,6 +1320,131 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
     ],
   },
+  {
+    type: 'dataset_row_selector',
+    name: 'Dataset Row Selector',
+    description: 'Extract specific rows from a dataset by index, column value, or random sampling',
+    category: 'data',
+    tags: ['adapter', 'selection', 'dataset'],
+    aliases: [],
+    icon: 'Database',
+    accent: '#3b82f6',
+    maturity: 'stable',
+    inputs: [
+      { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
+    ],
+    outputs: [
+      { id: 'dataset', label: 'Selected Rows', dataType: 'dataset', required: false },
+      { id: 'text', label: 'First Row as Text', dataType: 'text', required: false },
+      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
+    ],
+    defaultConfig: {
+      mode: 'first',
+      index: 0,
+      count: 1,
+      filter_column: '',
+      filter_value: '',
+      seed: 42,
+      text_column: 'text',
+    },
+    configFields: [
+      {
+        name: 'mode',
+        label: 'Selection Mode',
+        type: 'select',
+        default: 'first',
+        options: ['first', 'last', 'index', 'random', 'filter'],
+      },
+      {
+        name: 'index',
+        label: 'Row Index',
+        type: 'integer',
+        default: 0,
+        depends_on: { field: 'mode', value: 'index' },
+      },
+      { name: 'count', label: 'Number of Rows', type: 'integer', default: 1, min: 1 },
+      {
+        name: 'filter_column',
+        label: 'Filter Column',
+        type: 'string',
+        default: '',
+        depends_on: { field: 'mode', value: 'filter' },
+      },
+      {
+        name: 'filter_value',
+        label: 'Filter Value',
+        type: 'string',
+        default: '',
+        depends_on: { field: 'mode', value: 'filter' },
+      },
+      {
+        name: 'seed',
+        label: 'Random Seed',
+        type: 'integer',
+        default: 42,
+        description: 'Seed for reproducible random sampling',
+        depends_on: { field: 'mode', value: 'random' },
+      },
+      {
+        name: 'text_column',
+        label: 'Text Column for Text Output',
+        type: 'string',
+        default: 'text',
+        description: 'Which column to output as text (auto-detects if not found)',
+      },
+    ],
+  },
+  {
+    type: 'dataset_to_text',
+    name: 'Dataset to Text',
+    description: 'Extract a text column from a dataset, joining all rows into a single text output',
+    category: 'data',
+    tags: ['adapter', 'conversion', 'text', 'dataset'],
+    aliases: [],
+    icon: 'Database',
+    accent: '#3b82f6',
+    maturity: 'stable',
+    inputs: [
+      { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
+    ],
+    outputs: [
+      { id: 'text', label: 'Extracted Text', dataType: 'text', required: false },
+      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
+    ],
+    defaultConfig: { column: 'text', join_with: '\n', max_rows: 0, row_index: -1 },
+    configFields: [
+      {
+        name: 'column',
+        label: 'Column Name',
+        type: 'string',
+        default: 'text',
+        description: 'Which column to extract (leave empty to auto-detect)',
+      },
+      {
+        name: 'join_with',
+        label: 'Join Separator',
+        type: 'string',
+        default: '\n',
+        description: 'Separator between rows',
+      },
+      {
+        name: 'max_rows',
+        label: 'Max Rows',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        description: 'Limit rows (0 = all)',
+      },
+      {
+        name: 'row_index',
+        label: 'Single Row Index',
+        type: 'integer',
+        default: -1,
+        min: -1,
+        description: 'Extract a single row by index (-1 = all rows)',
+      },
+    ],
+  },
 
   // ═══════════════════════════════════════════════
   //  SOURCE (10 blocks)
@@ -1436,7 +1561,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (11 blocks)
+  //  DATA (15 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1718,7 +1843,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (11 blocks)
+  //  DATA (15 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1942,9 +2067,46 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (11 blocks)
+  //  DATA (15 blocks)
   // ═══════════════════════════════════════════════
 
+  {
+    type: 'metrics_to_dataset',
+    name: 'Metrics to Dataset',
+    description: 'Convert metrics from an evaluation or training run into a dataset for saving or further analysis',
+    category: 'data',
+    tags: ['adapter', 'conversion', 'metrics', 'dataset'],
+    aliases: [],
+    icon: 'Database',
+    accent: '#3b82f6',
+    maturity: 'stable',
+    inputs: [
+      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: true },
+      { id: 'metrics_b', label: 'Second Metrics (optional)', dataType: 'metrics', required: false },
+    ],
+    outputs: [
+      { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: false },
+      { id: 'metrics', label: 'Conversion Stats', dataType: 'metrics', required: false },
+    ],
+    defaultConfig: { format: 'rows', label: '' },
+    configFields: [
+      {
+        name: 'format',
+        label: 'Output Format',
+        type: 'select',
+        default: 'rows',
+        options: ['rows', 'columns'],
+        description: 'rows = one row per metric, columns = one column per metric',
+      },
+      {
+        name: 'label',
+        label: 'Run Label',
+        type: 'string',
+        default: '',
+        description: 'Label to identify this metrics set (useful when merging)',
+      },
+    ],
+  },
   {
     type: 'model_selector',
     name: 'Model Selector',
@@ -2117,7 +2279,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (11 blocks)
+  //  DATA (15 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -2442,9 +2604,47 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (11 blocks)
+  //  DATA (15 blocks)
   // ═══════════════════════════════════════════════
 
+  {
+    type: 'text_to_dataset',
+    name: 'Text to Dataset',
+    description: 'Convert a text input into a dataset with a single row, useful for feeding text outputs into dataset-expecting blocks',
+    category: 'data',
+    tags: ['adapter', 'conversion', 'text', 'dataset'],
+    aliases: [],
+    icon: 'Database',
+    accent: '#3b82f6',
+    maturity: 'stable',
+    inputs: [
+      { id: 'text', label: 'Text Input', dataType: 'text', required: true },
+      { id: 'text_b', label: 'Second Text (optional)', dataType: 'text', required: false },
+      { id: 'text_c', label: 'Third Text (optional)', dataType: 'text', required: false },
+    ],
+    outputs: [
+      { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: false },
+      { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
+    ],
+    defaultConfig: { column_name: 'text', split_by: 'none' },
+    configFields: [
+      {
+        name: 'column_name',
+        label: 'Column Name',
+        type: 'string',
+        default: 'text',
+        description: 'Name of the column to store the text in',
+      },
+      {
+        name: 'split_by',
+        label: 'Split Strategy',
+        type: 'select',
+        default: 'none',
+        options: ['none', 'newline', 'paragraph', 'sentence'],
+        description: 'How to split the text into multiple rows',
+      },
+    ],
+  },
   {
     type: 'train_val_test_split',
     name: 'Train/Val/Test Split',
