@@ -3,9 +3,12 @@
 import json
 import os
 import shutil
+import time
+from pathlib import Path
 
 
 def run(ctx):
+    package_start = time.time()
     model_input = ctx.load_input("model")
     include_readme = ctx.config.get("include_readme", True)
     compress = ctx.config.get("compress", True)
@@ -111,6 +114,14 @@ def run(ctx):
             final_output = archive_path
         except Exception as e:
             ctx.log_message(f"WARNING: Compression failed ({e}), using uncompressed output")
+
+    package_time = time.time() - package_start
+    artifact_files = list(Path(output_dir).rglob("*"))
+    artifact_count = sum(1 for f in artifact_files if f.is_file())
+    total_size = sum(f.stat().st_size for f in artifact_files if f.is_file())
+    ctx.log_metric("artifact_count", artifact_count)
+    ctx.log_metric("total_size_bytes", total_size)
+    ctx.log_metric("package_time_s", round(package_time, 3))
 
     ctx.log_message("Package complete")
     ctx.report_progress(4, 4)

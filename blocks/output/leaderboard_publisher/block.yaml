@@ -12,8 +12,8 @@ inputs:
   - id: metrics
     label: Results
     data_type: metrics
-    required: true
-    description: Metrics or evaluation results to publish
+    required: false
+    description: "Metrics or evaluation results to publish. Generates demo leaderboard when not connected."
 
 outputs:
   - id: artifact

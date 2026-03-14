@@ -8,7 +8,8 @@ inputs:
   - id: dataset
     label: Agent Outputs
     data_type: dataset
-    required: true
+    required: false
+    description: "Agent outputs to evaluate. Generates demo data when not connected."
   - id: references
     label: Reference Answers
     data_type: dataset

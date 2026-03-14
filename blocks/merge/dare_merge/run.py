@@ -2,6 +2,8 @@
 
 import json
 import os
+import time
+from pathlib import Path
 
 
 def run(ctx):
@@ -75,10 +77,18 @@ def run(ctx):
     ctx.log_message("Running DARE merge...")
     ctx.report_progress(2, 3)
 
+    merge_start = time.time()
     run_merge(merge_config, out_path=model_path, options=MergeOptions(
         allow_crimes=False,
         lazy_unpickle=True,
     ))
+    merge_time = time.time() - merge_start
+
+    ctx.log_metric("merge_time_s", round(merge_time, 2))
+    ctx.log_metric("density", density)
+    if os.path.isdir(model_path):
+        total = sum(f.stat().st_size for f in Path(model_path).rglob("*") if f.is_file())
+        ctx.log_metric("output_size_mb", round(total / (1024 * 1024), 1))
 
     ctx.save_output("model", {
         "source": "merge",
