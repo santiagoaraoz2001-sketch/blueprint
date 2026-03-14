@@ -10,6 +10,7 @@ import DashboardSelector from '@/components/Monitor/DashboardSelector'
 import SystemPanel from '@/components/Monitor/SystemPanel'
 import LogStream from '@/components/Monitor/LogStream'
 import ComparisonView from '@/components/Monitor/ComparisonView'
+import PluginPanelContainer from '@/components/Monitor/PluginPanelContainer'
 import { runMetricsToTable } from '@/services/metricsBridge'
 import { Activity, ExternalLink, Wifi, WifiOff, Radio, Archive, TableProperties, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -306,10 +307,13 @@ function MonitorContent({ runId }: { runId: string }) {
           />
         </div>
 
-        {/* Center: Dashboard */}
+        {/* Center: Dashboard + Plugin panels */}
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1, overflow: 'hidden' }}>
             <DashboardSelector runId={runId} viewedBlockId={effectiveBlockId} />
+          </div>
+          <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '40%', borderTop: `1px solid ${T.border}` }}>
+            <PluginPanelContainer runId={runId} />
           </div>
         </div>
 

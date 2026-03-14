@@ -7,6 +7,15 @@ export type FontChoice = 'jetbrains' | 'inter' | 'fira' | 'ibm-plex'
 export type FontSizeScale = 'compact' | 'default' | 'comfortable' | 'large'
 export type AccentColor = 'cyan' | 'orange' | 'green' | 'blue' | 'purple' | 'pink'
 
+export interface PanelLayoutEntry {
+  panelId: string
+  order: number
+  width: number   // grid units
+  height: number  // grid units
+  visible: boolean
+  config: Record<string, unknown>
+}
+
 export const FONT_SIZE_SCALES: Record<FontSizeScale, number> = {
   compact: 0.85,
   default: 1.0,
@@ -58,6 +67,9 @@ interface SettingsState {
   hardware: HardwareCapabilities | null
   hardwareLoading: boolean
 
+  // Plugin panel layouts
+  panelLayouts: Record<string, PanelLayoutEntry>
+
   // Audio alerts
   audioAlertsEnabled: boolean
   audioVolume: number
@@ -74,6 +86,9 @@ interface SettingsState {
   setApiKey: (provider: string, key: string) => void
   getApiKey: (provider: string) => string
   fetchHardware: () => Promise<void>
+
+  setPanelLayout: (panelId: string, entry: Partial<PanelLayoutEntry>) => void
+  removePanelLayout: (panelId: string) => void
 
   setAudioAlertsEnabled: (enabled: boolean) => void
   setAudioVolume: (volume: number) => void
@@ -94,6 +109,8 @@ export const useSettingsStore = create<SettingsState>()(
       apiKeys: {} as Record<string, string>,
       hardware: null,
       hardwareLoading: false,
+
+      panelLayouts: {} as Record<string, PanelLayoutEntry>,
 
       audioAlertsEnabled: false,
       audioVolume: 0.5,
@@ -124,6 +141,17 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
 
+      setPanelLayout: (panelId, entry) => {
+        const layouts = { ...get().panelLayouts }
+        layouts[panelId] = { ...layouts[panelId], ...entry } as PanelLayoutEntry
+        set({ panelLayouts: layouts })
+      },
+      removePanelLayout: (panelId) => {
+        const layouts = { ...get().panelLayouts }
+        delete layouts[panelId]
+        set({ panelLayouts: layouts })
+      },
+
       setAudioAlertsEnabled: (enabled) => set({ audioAlertsEnabled: enabled }),
       setAudioVolume: (volume) => set({ audioVolume: volume }),
       setAudioOnStepComplete: (enabled) => set({ audioOnStepComplete: enabled }),
@@ -141,6 +169,7 @@ export const useSettingsStore = create<SettingsState>()(
         demoMode: state.demoMode,
         autoSaveInterval: state.autoSaveInterval,
         apiKeys: state.apiKeys,
+        panelLayouts: state.panelLayouts,
         audioAlertsEnabled: state.audioAlertsEnabled,
         audioVolume: state.audioVolume,
         audioOnStepComplete: state.audioOnStepComplete,
@@ -166,6 +195,7 @@ export const useSettingsStore = create<SettingsState>()(
             demoMode: load<boolean>('demoMode', false),
             autoSaveInterval: load<number>('autoSaveInterval', 5000),
             apiKeys: load<Record<string, string>>('apiKeys', {}),
+            panelLayouts: load<Record<string, PanelLayoutEntry>>('panelLayouts', {}),
             audioAlertsEnabled: load<boolean>('audioAlertsEnabled', false),
             audioVolume: load<number>('audioVolume', 0.5),
             audioOnStepComplete: load<boolean>('audioOnStepComplete', true),
