@@ -15,7 +15,7 @@ from .utils.structured_logger import (
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference, plugins, sweeps, connectors, block_generator
+from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference, plugins, sweeps, connectors, block_generator, marketplace
 
 _recovery_logger = logging.getLogger("blueprint.recovery")
 
@@ -106,6 +106,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logging.getLogger("blueprint.plugins").error("Plugin system init failed: %s", e)
 
+    # Seed marketplace registry with built-in items
+    try:
+        from .services.marketplace_service import seed_registry
+        seed_registry()
+    except Exception as e:
+        logging.getLogger("blueprint.marketplace").error("Marketplace seed failed: %s", e)
+
     # Start background model directory watcher
     try:
         from .utils.model_watcher import start_watcher
@@ -175,6 +182,7 @@ app.include_router(plugins.router)
 app.include_router(sweeps.router)
 app.include_router(connectors.router)
 app.include_router(block_generator.router)
+app.include_router(marketplace.router)
 
 
 @app.get("/api/health")
