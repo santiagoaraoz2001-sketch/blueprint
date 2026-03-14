@@ -50,6 +50,7 @@ def _persist_enabled_flag(plugin, enabled: bool):
                 yaml.safe_dump(raw, f, default_flow_style=False)
             os.rename(tmp_path, str(manifest_path))
         except BaseException:
+            # Clean up temp file on any failure
             try:
                 os.unlink(tmp_path)
             except OSError:

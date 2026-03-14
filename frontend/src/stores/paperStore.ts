@@ -203,7 +203,10 @@ export const usePaperStore = create<PaperState>((set, get) => ({
   deletePaper: async (paperId: string) => {
     try {
       const baseUrl = import.meta.env.VITE_API_URL || '/api'
-      await fetch(`${baseUrl}/papers/${paperId}`, { method: 'DELETE' })
+      const res = await fetch(`${baseUrl}/papers/${paperId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        throw new Error(`Delete failed: ${res.status}`)
+      }
       const state = get()
       if (state.id === paperId) {
         state.resetPaper()

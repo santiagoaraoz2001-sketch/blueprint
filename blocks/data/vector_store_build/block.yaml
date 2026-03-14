@@ -7,7 +7,7 @@ version: "2.0.0"
 inputs:
   - id: chunks
     label: Text Chunks
-    data_type: data
+    data_type: dataset
     required: true
   - id: embeddings
     label: Pre-computed Embeddings

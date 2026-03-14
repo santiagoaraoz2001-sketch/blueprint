@@ -389,7 +389,11 @@ class PluginRegistry:
         ]
 
     def find_block(self, block_type: str) -> Optional[Path]:
-        """Find a specific block type across all loaded plugins."""
+        """Find a specific block type across all loaded plugins.
+
+        Uses direct path lookups (category/block_type/run.py) matching the
+        same structure as built-in blocks, avoiding a full directory scan.
+        """
         with self._lock:
             plugins = [p for p in self._plugins.values() if p.is_loaded]
 

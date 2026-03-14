@@ -15,7 +15,7 @@ from .utils.structured_logger import (
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference
+from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference, plugins, sweeps, connectors
 
 _recovery_logger = logging.getLogger("blueprint.recovery")
 
@@ -99,6 +99,13 @@ async def lifespan(app: FastAPI):
     recovery_thread = threading.Thread(target=_periodic_recovery_loop, daemon=True)
     recovery_thread.start()
 
+    # Load plugins (non-critical — individual plugin errors are isolated)
+    from .plugins.registry import plugin_registry
+    try:
+        plugin_registry.load_all()
+    except Exception as e:
+        logging.getLogger("blueprint.plugins").error("Plugin system init failed: %s", e)
+
     # Start background model directory watcher
     try:
         from .utils.model_watcher import start_watcher
@@ -116,6 +123,11 @@ async def lifespan(app: FastAPI):
     try:
         from .routers.execution import shutdown_executor
         shutdown_executor()
+    except Exception:
+        pass
+    try:
+        from .routers.sweeps import shutdown_sweep_executor
+        shutdown_sweep_executor()
     except Exception:
         pass
     try:
@@ -159,6 +171,9 @@ app.include_router(papers.router)
 app.include_router(secrets.router)
 app.include_router(custom_blocks.router)
 app.include_router(inference.router)
+app.include_router(plugins.router)
+app.include_router(sweeps.router)
+app.include_router(connectors.router)
 
 
 @app.get("/api/health")

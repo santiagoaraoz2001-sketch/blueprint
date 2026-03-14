@@ -15,7 +15,7 @@ inputs:
     required: false
   - id: labels
     label: Labels / Clusters
-    data_type: data
+    data_type: dataset
     required: false
 
 outputs:
@@ -28,7 +28,7 @@ outputs:
       Full visualization payload for chart rendering.
   - id: dataset
     label: Coordinates
-    data_type: data
+    data_type: dataset
     description: >
       Array of rows: [{index, label, x, y, [z], [cluster], ...metadata_fields}].
       Enable include_metadata to carry through original source fields (text, title, etc.).
