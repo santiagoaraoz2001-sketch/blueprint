@@ -59,6 +59,64 @@ export interface PipelineSnapshot {
   edges: any[]
 }
 
+export interface InheritanceOverlay {
+  key: string               // e.g., "seed"
+  originNode: string        // node ID that owns the value
+  nodeRoles: Record<string, 'origin' | 'inheriting' | 'overriding'>
+  participatingEdges: string[] // edge IDs on the propagation path
+}
+
+/** Config keys that propagate through model/config edges */
+export const INHERITABLE_KEYS = [
+  'model_name', 'model', 'model_id',
+  'provider', 'backend', 'source',
+  'endpoint', 'base_url', 'api_key',
+  'framework',
+  'temperature', 'max_tokens', 'top_p',
+  'repeat_penalty', 'stop_sequences',
+  'system_prompt',
+  'frequency_penalty', 'presence_penalty',
+  'seed', 'random_seed',
+]
+
+/** Edge target handles that carry config propagation */
+export const CONFIG_PROPAGATION_HANDLES = new Set(['model', 'llm_config', 'llm', 'config'])
+
+export type NodeExecutionState =
+  | 'idle'
+  | 'cached'
+  | 'will_rerun'
+  | 'will_rerun_downstream'
+  | 'running'
+  | 'complete'
+  | 'failed'
+
+export interface RerunMode {
+  active: boolean
+  sourceRunId: string
+  startNodeId: string
+  nodeStates: Record<string, NodeExecutionState>
+  configOverrides: Record<string, Record<string, any>>
+  originalConfigs: Record<string, Record<string, any>>
+  downstreamNodes: string[]
+  cachedNodes: string[]
+}
+
+export interface ResolvedInheritedEntry {
+  from_node: string
+  value: any
+}
+
+export interface ResolvedNodeConfig {
+  [key: string]: any
+  _inherited?: Record<string, ResolvedInheritedEntry>
+}
+
+export interface PropagationKeys {
+  global: string[]
+  by_category: Record<string, string[]>
+}
+
 interface PipelineState {
   id: string | null
   name: string
@@ -67,6 +125,11 @@ interface PipelineState {
   selectedNodeId: string | null
   focusedErrorNodeId: string | null
   isDirty: boolean
+
+  // Config inheritance from resolve-config API
+  resolvedConfigs: Record<string, ResolvedNodeConfig>
+  propagationKeys: PropagationKeys | null
+  resolveConfigs: (pipelineId: string) => Promise<void>
 
   // Multi-pipeline management
   pipelines: PipelineSummary[]
@@ -132,6 +195,19 @@ interface PipelineState {
 
   // Template instantiation
   instantiateTemplate: (template: import('@/lib/pipeline-templates').PipelineTemplate, variableValues: Record<string, any>) => void
+
+  // Inheritance overlay
+  inheritanceOverlay: InheritanceOverlay | null
+  activateInheritanceOverlay: (key: string, originNodeId: string) => void
+  deactivateInheritanceOverlay: () => void
+
+  // Re-run mode
+  rerunMode: RerunMode | null
+  enterRerunMode: (startNodeId: string, sourceRunId: string) => void
+  exitRerunMode: (restoreConfigs?: boolean) => void
+  updateRerunConfigOverride: (nodeId: string, config: Record<string, any>) => void
+  getDownstreamNodes: (startNodeId: string) => string[]
+  getUpstreamNodes: (startNodeId: string) => string[]
 }
 
 let nodeIdCounter = 0
@@ -190,9 +266,12 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   pipelinesLoading: false,
   tabs: [{ id: DEFAULT_TAB_ID, name: 'Pipeline 1', nodes: [], edges: [], pipelineId: null, isDirty: false, runStatus: 'idle', past: [], future: [] }],
   activeTabId: DEFAULT_TAB_ID,
+  resolvedConfigs: {},
+  propagationKeys: null,
   versions: [],
   past: [],
   future: [],
+  inheritanceOverlay: null,
 
   pushHistory: () => {
     const { nodes, edges, past } = get()
@@ -605,6 +684,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         edges: def.edges as any[],
         isDirty: false,
         selectedNodeId: null,
+        inheritanceOverlay: null,
       })
       return
     }
@@ -618,9 +698,26 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         edges: def.edges || [],
         isDirty: false,
         selectedNodeId: null,
+        inheritanceOverlay: null,
+        resolvedConfigs: {},
+        propagationKeys: null,
       })
+      // Resolve config inheritance after loading pipeline
+      get().resolveConfigs(id)
     } catch {
       toast.error('Failed to load pipeline')
+    }
+  },
+
+  resolveConfigs: async (pipelineId: string) => {
+    try {
+      const res = await api.post<{ resolved: Record<string, ResolvedNodeConfig>; propagation_keys: PropagationKeys }>(
+        `/pipelines/${pipelineId}/resolve-config`
+      )
+      set({ resolvedConfigs: res.resolved || {}, propagationKeys: res.propagation_keys || null })
+    } catch {
+      // Silently fail — inheritance display is best-effort
+      set({ resolvedConfigs: {}, propagationKeys: null })
     }
   },
 
@@ -649,6 +746,11 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       set({ id: created.id })
     }
     set({ isDirty: false })
+    // Re-resolve config inheritance with persisted data
+    const pipelineId = get().id
+    if (pipelineId) {
+      get().resolveConfigs(pipelineId)
+    }
   },
 
   newPipeline: () => {
@@ -661,6 +763,9 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       edges: [],
       selectedNodeId: null,
       isDirty: false,
+      inheritanceOverlay: null,
+      resolvedConfigs: {},
+      propagationKeys: null,
       tabs: s.tabs.map((t) =>
         t.id === activeTabId
           ? { ...t, nodes: [], edges: [], pipelineId: null, isDirty: false, name: 'Untitled Pipeline' }
@@ -784,6 +889,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         edges: data.edges || [],
         isDirty: true,
         selectedNodeId: null,
+        inheritanceOverlay: null,
       })
       toast.success('Pipeline imported')
     } catch {
@@ -877,6 +983,127 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     })
 
     toast.success(`Created pipeline from template: ${template.name}`)
+  },
+
+  // ── Re-run Mode ──
+  rerunMode: null,
+
+  getDownstreamNodes: (startNodeId: string) => {
+    const { edges } = get()
+    const downstream = new Set<string>()
+    const queue = [startNodeId]
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      const outEdges = edges.filter(e => e.source === current)
+      for (const edge of outEdges) {
+        if (!downstream.has(edge.target) && edge.target !== startNodeId) {
+          downstream.add(edge.target)
+          queue.push(edge.target)
+        }
+      }
+    }
+    return Array.from(downstream)
+  },
+
+  getUpstreamNodes: (startNodeId: string) => {
+    const { edges } = get()
+    const upstream = new Set<string>()
+    const queue = [startNodeId]
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      const inEdges = edges.filter(e => e.target === current)
+      for (const edge of inEdges) {
+        if (!upstream.has(edge.source) && edge.source !== startNodeId) {
+          upstream.add(edge.source)
+          queue.push(edge.source)
+        }
+      }
+    }
+    return Array.from(upstream)
+  },
+
+  enterRerunMode: (startNodeId: string, sourceRunId: string) => {
+    const { nodes } = get()
+    const store = get()
+
+    // Validate that the start node exists
+    const startNode = nodes.find((n) => n.id === startNodeId)
+    if (!startNode || startNode.type !== 'blockNode') {
+      toast.error('Cannot re-run from this node')
+      return
+    }
+
+    const downstream = store.getDownstreamNodes(startNodeId)
+    const upstream = store.getUpstreamNodes(startNodeId)
+
+    const nodeStates: Record<string, NodeExecutionState> = {}
+    const originalConfigs: Record<string, Record<string, any>> = {}
+
+    for (const node of nodes) {
+      if (node.type !== 'blockNode') continue
+      if (upstream.includes(node.id)) {
+        nodeStates[node.id] = 'cached'
+      } else if (node.id === startNodeId) {
+        nodeStates[node.id] = 'will_rerun'
+        // Deep copy original config so edits don't mutate the snapshot
+        originalConfigs[node.id] = JSON.parse(JSON.stringify(node.data.config || {}))
+      } else if (downstream.includes(node.id)) {
+        nodeStates[node.id] = 'will_rerun_downstream'
+      } else {
+        // Nodes not on the execution path (disconnected branches) are also cached
+        nodeStates[node.id] = 'cached'
+      }
+    }
+
+    set({
+      rerunMode: {
+        active: true,
+        sourceRunId,
+        startNodeId,
+        nodeStates,
+        configOverrides: {},
+        originalConfigs,
+        downstreamNodes: downstream,
+        cachedNodes: upstream,
+      },
+      selectedNodeId: startNodeId,
+    })
+  },
+
+  exitRerunMode: (restoreConfigs = true) => {
+    const { rerunMode, nodes } = get()
+    if (!rerunMode) {
+      set({ rerunMode: null })
+      return
+    }
+
+    if (restoreConfigs && Object.keys(rerunMode.originalConfigs).length > 0) {
+      // Restore original configs for nodes that were edited during rerun mode
+      const restoredNodes = nodes.map((n) => {
+        const original = rerunMode.originalConfigs[n.id]
+        if (original) {
+          return { ...n, data: { ...n.data, config: JSON.parse(JSON.stringify(original)) } }
+        }
+        return n
+      })
+      set({ rerunMode: null, nodes: restoredNodes as Node<BlockNodeData>[] })
+    } else {
+      set({ rerunMode: null })
+    }
+  },
+
+  updateRerunConfigOverride: (nodeId: string, config: Record<string, any>) => {
+    const { rerunMode } = get()
+    if (!rerunMode) return
+    set({
+      rerunMode: {
+        ...rerunMode,
+        configOverrides: {
+          ...rerunMode.configOverrides,
+          [nodeId]: { ...(rerunMode.configOverrides[nodeId] || {}), ...config },
+        },
+      },
+    })
   },
 
   saveAsTemplate: (name: string, description: string, category: string) => {
@@ -981,6 +1208,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       selectedNodeId: null,
       past: target.past || [],
       future: target.future || [],
+      inheritanceOverlay: null, // Clear stale overlay on tab switch
     })
   },
 
@@ -1033,5 +1261,88 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     set((s) => ({
       tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, runStatus: status } : t)),
     }))
+  },
+
+  // ── Inheritance Overlay ──
+
+  activateInheritanceOverlay: (key: string, originNodeId: string) => {
+    const { nodes, edges } = get()
+    const originNode = nodes.find(n => n.id === originNodeId)
+    if (!originNode) return
+
+    // Pre-index outgoing edges by source for O(1) lookup
+    const outEdgesBySource = new Map<string, typeof edges>()
+    for (const edge of edges) {
+      if (!CONFIG_PROPAGATION_HANDLES.has(edge.targetHandle || '')) continue
+      const list = outEdgesBySource.get(edge.source) || []
+      list.push(edge)
+      outEdgesBySource.set(edge.source, list)
+    }
+
+    // Pre-index nodes by ID for O(1) lookup
+    const nodeMap = new Map(nodes.map(n => [n.id, n]))
+
+    // Resolve the default value for this key from the block definition
+    // so we can distinguish "explicitly set to default" vs "not set"
+    const getDefaultForNode = (nodeId: string): any => {
+      const n = nodeMap.get(nodeId)
+      if (!n) return undefined
+      const def = getBlockDefinition(n.data.type)
+      return def?.defaultConfig?.[key]
+    }
+
+    // BFS downstream from origin through config-propagation edges
+    const nodeRoles: Record<string, 'origin' | 'inheriting' | 'overriding'> = {
+      [originNodeId]: 'origin',
+    }
+    const participatingEdges: string[] = []
+    const visited = new Set<string>([originNodeId])
+    const queue = [originNodeId]
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!
+      const outEdges = outEdgesBySource.get(currentId)
+      if (!outEdges) continue
+
+      for (const edge of outEdges) {
+        if (visited.has(edge.target)) continue
+
+        const targetNode = nodeMap.get(edge.target)
+        if (!targetNode) continue
+
+        visited.add(edge.target)
+        participatingEdges.push(edge.id)
+
+        // Check if the target has a locally-set value that differs from default
+        const targetConfig = targetNode.data.config || {}
+        const currentValue = targetConfig[key]
+        const defaultValue = getDefaultForNode(edge.target)
+        const hasLocalValue = currentValue !== undefined
+          && currentValue !== null
+          && currentValue !== ''
+          && String(currentValue) !== String(defaultValue ?? '')
+
+        if (hasLocalValue) {
+          nodeRoles[edge.target] = 'overriding'
+          // Stop propagation past overriding nodes — they become new origins
+        } else {
+          nodeRoles[edge.target] = 'inheriting'
+          queue.push(edge.target) // Continue propagation downstream
+        }
+      }
+    }
+
+    set({
+      inheritanceOverlay: {
+        key,
+        originNode: originNodeId,
+        nodeRoles,
+        participatingEdges,
+      },
+    })
+  },
+
+  deactivateInheritanceOverlay: () => {
+    set({ inheritanceOverlay: null })
   },
 }))

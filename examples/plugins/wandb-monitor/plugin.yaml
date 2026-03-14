@@ -1,0 +1,12 @@
+name: wandb-monitor
+version: 1.0.0
+author: Specific Labs
+description: Stream metrics to Weights & Biases in real-time during training runs
+type: blocks
+permissions:
+  - network
+  - secrets
+dependencies:
+  - wandb>=0.16.0
+entry_point: __init__
+enabled: true

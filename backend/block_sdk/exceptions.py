@@ -3,6 +3,17 @@
 Blocks raise these exceptions to communicate specific failure types.
 The executor catches them and surfaces clean, actionable error messages
 to the frontend via SSE events.
+
+Hierarchy:
+    BlockError
+    ├── BlockConfigError      — invalid or missing configuration
+    ├── BlockInputError       — missing or malformed input data
+    ├── BlockOutputError      — failure to produce expected outputs
+    ├── BlockExecutionError   — runtime failure during block execution
+    ├── BlockDependencyError  — missing library or external dependency
+    ├── BlockTimeoutError     — block exceeded time limit
+    ├── BlockMemoryError      — out of memory
+    └── BlockDataError        — structurally valid but bad content
 """
 
 
@@ -42,6 +53,20 @@ class BlockConfigError(BlockError):
         d = super().to_dict()
         d["field"] = self.field
         return d
+
+
+class BlockOutputError(BlockError):
+    """Raised when a block fails to produce its expected outputs."""
+
+    def __init__(self, message: str, *, details: str = "", recoverable: bool = True):
+        super().__init__(message, details=details, recoverable=recoverable)
+
+
+class BlockExecutionError(BlockError):
+    """Raised when a block fails during execution (runtime error)."""
+
+    def __init__(self, message: str, *, details: str = "", recoverable: bool = False):
+        super().__init__(message, details=details, recoverable=recoverable)
 
 
 class BlockTimeoutError(BlockError):

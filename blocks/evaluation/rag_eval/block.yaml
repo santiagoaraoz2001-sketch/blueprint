@@ -7,7 +7,7 @@ version: "1.0.0"
 inputs:
   - id: dataset
     label: RAG Results
-    data_type: data
+    data_type: dataset
     required: true
     description: "Dataset with question, context, answer, and optional reference columns"
   - id: model
@@ -23,7 +23,7 @@ outputs:
     description: 'Aggregate: total_samples, method, avg_faithfulness, avg_answer_relevance, avg_context_relevance, avg_answer_correctness'
   - id: dataset
     label: Annotated Results
-    data_type: data
+    data_type: dataset
     description: 'Per-sample: question, answer_preview, faithfulness, answer_relevance, context_relevance, answer_correctness scores'
   - id: report
     label: RAG Report

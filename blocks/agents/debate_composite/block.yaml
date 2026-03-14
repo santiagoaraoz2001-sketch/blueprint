@@ -1,0 +1,40 @@
+name: Debate Composite
+type: debate_composite
+category: agents
+description: Multi-agent debate using composable sub-blocks (pessimist + optimist → judge)
+version: "1.0.0"
+composite: true
+
+inputs:
+  - id: llm
+    label: LLM
+    data_type: config
+    required: false
+    description: "Connected LLM Inference block for model config. If not connected, uses model_name config."
+  - id: input
+    label: Debate Topic
+    data_type: text
+    required: true
+
+outputs:
+  - id: consensus
+    label: Consensus
+    data_type: text
+    description: "Final judge synthesis after all debate rounds"
+  - id: response
+    label: Final Response
+    data_type: text
+    description: "Raw response from the final judge (last child block output)"
+
+config:
+  model_name:
+    type: string
+    label: Model
+    default: ""
+    description: "Model name for all debate agents. Overridden by connected LLM block."
+  rounds:
+    type: integer
+    label: Debate Rounds
+    default: 3
+    min: 1
+    max: 10

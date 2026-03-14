@@ -7,12 +7,12 @@ version: "2.0.0"
 inputs:
   - id: model_output
     label: Model Output
-    data_type: data
+    data_type: dataset
     required: true
     description: Model outputs to score (JSON list, file path, or single value)
   - id: reference
     label: Reference Data
-    data_type: data
+    data_type: dataset
     required: false
     description: Optional reference/ground truth data for comparison
 
@@ -28,7 +28,7 @@ outputs:
 
   - id: dataset
     label: Scored Samples
-    data_type: data
+    data_type: dataset
     description: "Per-sample scores: index, output_preview, reference_preview, {user_defined_score_keys}"
 
 config:

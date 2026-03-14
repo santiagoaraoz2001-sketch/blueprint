@@ -10,7 +10,7 @@ import {
   BackgroundVariant,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { T, F, FS } from '@/lib/design-tokens'
+import { T } from '@/lib/design-tokens'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useShallow } from 'zustand/react/shallow'
 import { getBlockDefinition, getPortColor, isPortCompatible } from '@/lib/block-registry'
@@ -19,7 +19,9 @@ import StickyNote from './StickyNote'
 import GroupNode from './GroupNode'
 import QuickPalette from './QuickPalette'
 import EdgePreviewPanel from './EdgePreviewPanel'
-import { Copy, Trash2, Settings, Maximize } from 'lucide-react'
+import InheritanceOverlay, { OVERLAY_COLORS } from './InheritanceOverlay'
+import NodeContextMenu from './NodeContextMenu'
+import RerunOverlay from './RerunOverlay'
 
 const nodeTypes: NodeTypes = {
   blockNode: BlockNode as any,
@@ -37,6 +39,8 @@ export default function PipelineCanvas() {
     onConnect,
     addNode,
     selectNode,
+    inheritanceOverlay,
+    deactivateInheritanceOverlay,
   } = usePipelineStore(useShallow((s) => ({
     nodes: s.nodes,
     edges: s.edges,
@@ -45,6 +49,8 @@ export default function PipelineCanvas() {
     onConnect: s.onConnect,
     addNode: s.addNode,
     selectNode: s.selectNode,
+    inheritanceOverlay: s.inheritanceOverlay,
+    deactivateInheritanceOverlay: s.deactivateInheritanceOverlay,
   })))
 
   // Drop zone visual feedback
@@ -146,16 +152,19 @@ export default function PipelineCanvas() {
 
   const onNodeClick = useCallback(
     (_: any, node: any) => {
+      // Dismiss inheritance overlay on any click (spec: "click anywhere to exit")
+      deactivateInheritanceOverlay()
       selectNode(node.id)
     },
-    [selectNode]
+    [selectNode, deactivateInheritanceOverlay]
   )
 
   const onPaneClick = useCallback(() => {
     selectNode(null)
     setPaletteParams((p: any) => ({ ...p, visible: false }))
     setContextMenu((p) => ({ ...p, visible: false }))
-  }, [selectNode])
+    deactivateInheritanceOverlay()
+  }, [selectNode, deactivateInheritanceOverlay])
 
   // Node right-click context menu
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: any) => {
@@ -254,7 +263,7 @@ export default function PipelineCanvas() {
       const newDef = getBlockDefinition(newBlockType)
       if (newestNode && newDef) {
         // Find best input port match
-        const targetPort = newDef.inputs.find((i) => i.dataType === paletteParams.sourceType || i.dataType === 'data')
+        const targetPort = newDef.inputs.find((i) => i.dataType === paletteParams.sourceType || i.dataType === 'any')
         if (targetPort) {
           state.onConnect({
             source: paletteParams.sourceNodeId,
@@ -302,6 +311,18 @@ export default function PipelineCanvas() {
         e.preventDefault()
         usePipelineStore.getState().redo()
       } else if (e.key === 'Escape') {
+        // Dismiss inheritance overlay first, then deselect
+        const overlay = usePipelineStore.getState().inheritanceOverlay
+        if (overlay) {
+          usePipelineStore.getState().deactivateInheritanceOverlay()
+          return
+        }
+        // Exit rerun mode if active
+        const { rerunMode, exitRerunMode } = usePipelineStore.getState()
+        if (rerunMode?.active) {
+          exitRerunMode()
+          return
+        }
         // Deselect all
         const changes = nodes
           .filter((n) => n.selected)
@@ -338,21 +359,43 @@ export default function PipelineCanvas() {
   }, [contextMenu.visible])
 
   // Recompute edge colors for loaded pipelines (onConnect already sets them for new edges).
-  // Depends only on [edges] — reads nodes non-reactively to avoid re-computing on
-  // node dimension/position changes (node TYPE never changes after creation).
+  // Also applies inheritance overlay styling when active.
   const coloredEdges = useMemo(() => {
     const currentNodes = usePipelineStore.getState().nodes
+    // Pre-build a Set for O(1) participating-edge lookup
+    const participatingSet = inheritanceOverlay
+      ? new Set(inheritanceOverlay.participatingEdges)
+      : null
+
     return edges.map((edge) => {
-      if (edge.style?.stroke && edge.style.stroke !== T.borderHi) return edge
-      const sourceNode = currentNodes.find((n) => n.id === edge.source)
-      if (!sourceNode) return { ...edge, style: { strokeWidth: 1.5, stroke: T.borderHi, ...edge.style } }
-      const def = getBlockDefinition((sourceNode.data as any)?.type)
-      if (!def) return { ...edge, style: { strokeWidth: 1.5, stroke: T.borderHi, ...edge.style } }
-      const port = def.outputs.find((o) => o.id === edge.sourceHandle)
-      if (!port) return { ...edge, style: { strokeWidth: 1.5, stroke: T.borderHi, ...edge.style } }
-      return { ...edge, style: { ...edge.style, stroke: getPortColor(port.dataType), strokeWidth: 1.5 } }
+      // Base color computation
+      let baseStroke = edge.style?.stroke
+      if (!baseStroke || baseStroke === T.borderHi) {
+        const sourceNode = currentNodes.find((n) => n.id === edge.source)
+        const def = sourceNode ? getBlockDefinition((sourceNode.data as any)?.type) : undefined
+        const port = def?.outputs.find((o) => o.id === edge.sourceHandle)
+        baseStroke = port ? getPortColor(port.dataType) : T.borderHi
+      }
+
+      // Inheritance overlay styling
+      if (participatingSet) {
+        const isParticipating = participatingSet.has(edge.id)
+        return {
+          ...edge,
+          style: {
+            ...edge.style,
+            stroke: isParticipating ? OVERLAY_COLORS.inheriting : baseStroke,
+            strokeWidth: isParticipating ? 3 : 1.5,
+            opacity: isParticipating ? 1 : 0.15,
+          },
+          className: isParticipating ? 'inheritance-edge' : '',
+          animated: isParticipating,
+        }
+      }
+
+      return { ...edge, style: { ...edge.style, stroke: baseStroke, strokeWidth: 1.5 } }
     })
-  }, [edges])
+  }, [edges, inheritanceOverlay])
 
   return (
     <div
@@ -383,6 +426,8 @@ export default function PipelineCanvas() {
         y={hoveredEdgeParams.y}
         dataType={hoveredEdgeParams.dataType}
       />
+
+      <InheritanceOverlay />
 
       {/* 3D perspective grid underlay */}
       <div
@@ -469,98 +514,16 @@ export default function PipelineCanvas() {
       </ReactFlow>
 
       {/* Node context menu */}
-      {contextMenu.visible && (
-        <div
-          style={{
-            position: 'fixed',
-            left: contextMenu.x,
-            top: contextMenu.y,
-            background: T.surface2,
-            border: `1px solid ${T.borderHi}`,
-            boxShadow: `0 4px 16px ${T.shadowHeavy}`,
-            zIndex: 999,
-            minWidth: 160,
-            borderRadius: 4,
-            overflow: 'hidden',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <ContextMenuBtn
-            icon={<Settings size={10} />}
-            label="Edit Config"
-            shortcut=""
-            onClick={() => {
-              selectNode(contextMenu.nodeId)
-              setContextMenu((p) => ({ ...p, visible: false }))
-            }}
-          />
-          <ContextMenuBtn
-            icon={<Copy size={10} />}
-            label="Duplicate"
-            shortcut="⌘C → ⌘V"
-            onClick={() => {
-              usePipelineStore.getState().duplicateNodes([contextMenu.nodeId])
-              setContextMenu((p) => ({ ...p, visible: false }))
-            }}
-          />
-          <ContextMenuBtn
-            icon={<Maximize size={10} />}
-            label="Focus"
-            shortcut="F"
-            onClick={() => {
-              fitView({ nodes: [{ id: contextMenu.nodeId }], duration: 400, padding: 0.5 })
-              setContextMenu((p) => ({ ...p, visible: false }))
-            }}
-          />
-          <div style={{ height: 1, background: T.border, margin: '2px 0' }} />
-          <ContextMenuBtn
-            icon={<Trash2 size={10} />}
-            label="Delete"
-            shortcut="⌫"
-            color={T.red}
-            onClick={() => {
-              usePipelineStore.getState().removeNode(contextMenu.nodeId)
-              setContextMenu((p) => ({ ...p, visible: false }))
-            }}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
+      <NodeContextMenu
+        visible={contextMenu.visible}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        nodeId={contextMenu.nodeId}
+        onClose={() => setContextMenu((p) => ({ ...p, visible: false }))}
+      />
 
-function ContextMenuBtn({ icon, label, shortcut, onClick, color }: {
-  icon: React.ReactNode
-  label: string
-  shortcut: string
-  onClick: () => void
-  color?: string
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        width: '100%',
-        padding: '6px 12px',
-        background: 'none',
-        border: 'none',
-        color: color || T.sec,
-        fontFamily: F,
-        fontSize: FS.xs,
-        cursor: 'pointer',
-        textAlign: 'left',
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = T.surface4 }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
-    >
-      {icon}
-      <span style={{ flex: 1 }}>{label}</span>
-      {shortcut && (
-        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>{shortcut}</span>
-      )}
-    </button>
+      {/* Re-run mode overlay */}
+      <RerunOverlay />
+    </div>
   )
 }

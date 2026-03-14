@@ -68,7 +68,6 @@ export default function PipelineEditorView() {
 
   useEffect(() => {
     if (!selectedProjectId) {
-      toast.error('Please select a project first')
       setView('dashboard')
     }
   }, [selectedProjectId, setView])
@@ -179,6 +178,7 @@ export default function PipelineEditorView() {
       const { nodes, edges } = usePipelineStore.getState()
       const report = validatePipelineClient(nodes, edges)
       setValidationReport(report)
+      setShowValidation(true)
     } finally {
       setValidating(false)
     }
