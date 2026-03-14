@@ -23,7 +23,7 @@ outputs:
     label: Rejected
     data_type: any
     description: "Input data routed here when gate fails (None when passed)"
-  - id: report
+  - id: gate_metrics
     label: Gate Report
     data_type: metrics
     description: "JSON: {gate_passed, total_checks, passed/failed counts, checks[{metric, value, operator, threshold, passed}], all_metrics}"

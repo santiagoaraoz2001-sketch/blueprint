@@ -5,7 +5,7 @@ description: Save data as a plain text file with encoding and append mode option
 version: "1.0.0"
 
 inputs:
-  - id: data
+  - id: text
     label: Data
     data_type: text
     required: true

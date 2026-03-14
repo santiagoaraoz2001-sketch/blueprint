@@ -40,9 +40,9 @@ def run(ctx):
 
     # ---- Step 1: Load model data ----
     ctx.report_progress(1, 4)
-    raw_data = ctx.load_input("data")
+    raw_data = ctx.load_input("model")
     if raw_data is None:
-        raise ValueError("No model data provided. Connect a 'data' input.")
+        raise ValueError("No model data provided. Connect a 'model' input.")
 
     model_info = _resolve_model_data(raw_data)
     ctx.log_message(f"Model input type: {model_info['type']}")

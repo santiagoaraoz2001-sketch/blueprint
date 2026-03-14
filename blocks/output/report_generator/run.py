@@ -118,7 +118,7 @@ def run(ctx):
         f.write(report_md)
 
     ctx.save_output("artifact", out_dir)
-    ctx.save_output("report", report_path)
+    ctx.save_output("report_file", report_path)
     ctx.log_metric("report_length", len(report_md))
     ctx.log_metric("num_sections", len(sections))
     ctx.log_message(f"Report generated: {len(report_md)} chars, {len(lines)} lines")

@@ -191,7 +191,7 @@ def run(ctx):
         "url": url,
         "method": method,
     })
-    ctx.save_output("response", responses)
+    ctx.save_output("results", responses)
     ctx.log_metric("records_sent", float(total_sent))
     ctx.log_metric("records_failed", float(total_failed))
 

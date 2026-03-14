@@ -14,7 +14,7 @@ outputs:
   - id: text
     label: Parsed Text
     data_type: text
-  - id: data
+  - id: config
     label: Extracted Fields
     data_type: config
   - id: dataset
