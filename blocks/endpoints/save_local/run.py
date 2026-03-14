@@ -8,20 +8,6 @@ import shutil
 from datetime import datetime, timezone
 
 
-def _resolve_data(raw):
-    """Resolve raw input to a Python object."""
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            return raw  # Keep as file path for copying
-        if os.path.isdir(raw):
-            return raw  # Keep as directory path for copying
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return raw  # Plain string
-    return raw
-
-
 def _detect_format(data):
     """Auto-detect the best format for the given data."""
     if isinstance(data, str):
@@ -87,11 +73,13 @@ def run(ctx):
 
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 4)
+    # Use load_input directly — save_local needs to handle file/dir copy mode,
+    # which requires preserving the original file path string.
     raw_data = ctx.load_input("data")
     if raw_data is None:
         raise ValueError("No input data provided. Connect a 'data' input.")
 
-    data = _resolve_data(raw_data)
+    data = raw_data
 
     # ---- Step 2: Resolve format ----
     ctx.report_progress(2, 4)

@@ -5,28 +5,6 @@ import os
 from datetime import datetime, timezone
 
 
-def _resolve_data(raw):
-    """Resolve raw input to a Python object."""
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except json.JSONDecodeError:
-                    f.seek(0)
-                    return {"text": f.read()}
-        if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return {"text": raw}
-    return raw
-
-
 def _normalize_rows(data):
     """Extract tabular data if present."""
     if isinstance(data, list) and all(isinstance(r, dict) for r in data):
@@ -203,15 +181,15 @@ def run(ctx):
 
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 3)
-    raw_data = ctx.load_input("data")
-    if raw_data is None:
+    raw_data = ctx.resolve_as_data("data")
+    if not raw_data:
         raise ValueError("No input data provided. Connect a 'data' input.")
 
-    data = _resolve_data(raw_data)
+    data = raw_data
 
     # Load optional report config
     try:
-        report_config = ctx.load_input("config")
+        report_config = ctx.resolve_as_dict("config")
         if isinstance(report_config, dict):
             title = report_config.get("title", title)
             page_size = report_config.get("page_size", page_size)

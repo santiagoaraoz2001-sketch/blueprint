@@ -8,29 +8,6 @@ import urllib.error
 from datetime import datetime, timezone
 
 
-def _resolve_input(raw):
-    """Resolve an input value that might be a file path or directory to a Python object."""
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except (json.JSONDecodeError, ValueError):
-                    return raw
-        if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return raw
-    return raw
-
-
 def _call_ollama(base_url, model_name, prompt, ctx, temperature=0.1, system_prompt=""):
     """Call Ollama API for judging."""
     url = f"{base_url}/api/generate"
@@ -190,9 +167,9 @@ def run(ctx):
 
     # ---- Load optional model input (overrides config if connected) ----
     try:
-        model_input = ctx.load_input("model")
-        if model_input is not None:
-            model_info = _resolve_input(model_input)
+        model_input = ctx.resolve_model_info("model")
+        if model_input:
+            model_info = model_input
             if isinstance(model_info, dict):
                 if model_info.get("provider") and not model_provider:
                     model_provider = model_info["provider"]
@@ -213,10 +190,10 @@ def run(ctx):
     ctx.report_progress(0, max_iterations + 1)
 
     # ---- Load input data ----
-    raw_data = ctx.load_input("data")
-    if raw_data is None:
+    raw_data = ctx.resolve_as_data("data")
+    if not raw_data:
         raise ValueError("No data provided. Connect a 'data' input.")
-    current_output = _resolve_input(raw_data)
+    current_output = raw_data
 
     # Convert to string for LLM processing
     if not isinstance(current_output, str):

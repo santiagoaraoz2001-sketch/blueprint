@@ -2,31 +2,7 @@
 
 import json
 import os
-import shutil
 from datetime import datetime, timezone
-
-
-def _resolve_input(raw):
-    """Resolve an input value that might be a file path or directory to a Python object."""
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except (json.JSONDecodeError, ValueError):
-                    return raw
-        if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return raw
-    return raw
 
 
 def run(ctx):
@@ -40,10 +16,10 @@ def run(ctx):
 
     # ---- Step 1: Load input data ----
     ctx.report_progress(1, 3)
-    raw_data = ctx.load_input("data")
-    if raw_data is None:
+    raw_data = ctx.resolve_as_data("data")
+    if not raw_data:
         raise ValueError("No data provided. Connect a 'data' input.")
-    data = _resolve_input(raw_data)
+    data = raw_data
 
     # ---- Step 2: Create snapshot ----
     ctx.report_progress(2, 3)
@@ -59,12 +35,8 @@ def run(ctx):
     with open(snapshot_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, default=str, ensure_ascii=False)
 
-    # If input is a file path, also save a copy of the original file
-    if isinstance(raw_data, str) and os.path.isfile(raw_data):
-        ext = os.path.splitext(raw_data)[1]
-        file_copy_path = os.path.join(snapshots_dir, f"{snapshot_id}_file{ext}")
-        shutil.copy2(raw_data, file_copy_path)
-        ctx.log_message(f"File snapshot saved: {file_copy_path}")
+    # Note: resolve_as_data already loads file contents into memory,
+    # so raw_data is always a list/dict — the file copy is captured in the JSON snapshot above.
 
     # Manage snapshot count — remove oldest if over limit
     existing_snapshots = sorted([

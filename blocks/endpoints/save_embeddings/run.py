@@ -4,30 +4,6 @@ import json
 import os
 
 
-def _resolve_data(raw):
-    """Resolve raw input to embedding data."""
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            # Could be a .npy, .json, or directory
-            ext = os.path.splitext(raw)[1].lower()
-            if ext == ".json":
-                with open(raw, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            return raw  # Return path for binary files
-        if os.path.isdir(raw):
-            # Check for known embedding files
-            for name in ["embeddings.npy", "embeddings.json", "index.faiss", "data.json"]:
-                fpath = os.path.join(raw, name)
-                if os.path.isfile(fpath):
-                    return fpath
-            return raw
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return raw
-    return raw
-
-
 def _extract_vectors(data):
     """Extract numeric vectors from various data formats."""
     # If it's already a numpy array path or FAISS index path, return as-is
@@ -79,12 +55,13 @@ def run(ctx):
 
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 4)
+    # Use load_input directly — embeddings may be binary file paths (.npy, .faiss)
+    # that resolve_as_data cannot handle (it tries to read them as text/JSON).
     raw_data = ctx.load_input("embeddings")
     if raw_data is None:
         raise ValueError("No embedding data provided. Connect an 'embeddings' input.")
 
-    data = _resolve_data(raw_data)
-    vec_info = _extract_vectors(data)
+    vec_info = _extract_vectors(raw_data)
     ctx.log_message(f"Embedding data type: {vec_info['type']}")
 
     # ---- Step 2: Resolve output path ----
@@ -207,7 +184,7 @@ def run(ctx):
         if os.path.exists(out_filepath) and not overwrite:
             raise FileExistsError(f"File exists: {out_filepath}")
         with open(out_filepath, "w", encoding="utf-8") as f:
-            json.dump(vec_info.get("data", data), f, indent=2, default=str)
+            json.dump(vec_info.get("data", raw_data), f, indent=2, default=str)
         file_size = os.path.getsize(out_filepath)
         ctx.log_message("Saved embedding data as JSON (could not extract vector array)")
 

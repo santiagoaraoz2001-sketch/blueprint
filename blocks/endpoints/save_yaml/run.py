@@ -1,25 +1,6 @@
 """Save YAML — save pipeline configuration or data as YAML file."""
 
-import json
 import os
-
-
-def _resolve_data(raw):
-    """Resolve raw input to a Python object."""
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                return json.load(f)
-        if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return {"value": raw}
-    return raw
 
 
 def run(ctx):
@@ -37,11 +18,11 @@ def run(ctx):
 
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 3)
-    raw_data = ctx.load_input("data")
-    if raw_data is None:
+    raw_data = ctx.resolve_as_data("data")
+    if not raw_data:
         raise ValueError("No input data provided. Connect a 'data' input.")
 
-    data = _resolve_data(raw_data)
+    data = raw_data
     ctx.log_message(f"Data type: {type(data).__name__}")
 
     # ---- Step 2: Serialize to YAML ----

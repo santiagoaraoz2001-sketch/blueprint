@@ -10,29 +10,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 
-def _resolve_input(raw):
-    """Resolve an input value that might be a file path or directory to a Python object."""
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except (json.JSONDecodeError, ValueError):
-                    return raw
-        if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return raw
-    return raw
-
-
 def _format_message(template, data):
     """Format a message template with data fields."""
     replacements = {
@@ -167,10 +144,10 @@ def run(ctx):
 
     # ---- Step 1: Load trigger data ----
     ctx.report_progress(1, 3)
-    raw_data = ctx.load_input("data")
-    if raw_data is None:
+    raw_data = ctx.resolve_as_data("data")
+    if not raw_data:
         raise ValueError("No trigger data provided. Connect a 'data' input.")
-    data = _resolve_input(raw_data)
+    data = raw_data
     ctx.log_message("Trigger data loaded")
 
     # Check min_severity gate

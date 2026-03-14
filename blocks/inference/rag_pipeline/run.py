@@ -62,7 +62,7 @@ def run(ctx):
         raise ValueError("query is required — set it in the config.")
 
     # Load knowledge base
-    kb_data = ctx.load_input("dataset")
+    kb_data = ctx.resolve_as_file_path("dataset")
     rows = _load_dataset(kb_data)
     if not rows:
         raise ValueError("Knowledge base is empty or could not be loaded.")

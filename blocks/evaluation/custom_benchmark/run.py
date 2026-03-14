@@ -16,8 +16,8 @@ from blocks.inference._inference_utils import call_inference
 
 def run(ctx):
     # ── Load inputs ───────────────────────────────────────────────────────
-    model_info = ctx.load_input("model")
-    dataset_path = ctx.load_input("dataset")
+    model_info = ctx.resolve_model_info("model")
+    dataset_path = ctx.resolve_as_file_path("dataset")
 
     metric_name = ctx.config.get("metric", "accuracy")
     threshold = float(ctx.config.get("threshold", 0.0))

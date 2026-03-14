@@ -107,16 +107,9 @@ def run(ctx):
 
     # Merge with incoming config input if connected
     try:
-        config_input = ctx.load_input("config")
+        config_input = ctx.resolve_as_dict("config")
         if config_input:
-            config_path = config_input
-            if isinstance(config_path, str) and os.path.isfile(config_path):
-                with open(config_path, "r") as f:
-                    extra_config = json.load(f)
-            elif isinstance(config_path, dict):
-                extra_config = config_path
-            else:
-                extra_config = {}
+            extra_config = config_input if isinstance(config_input, dict) else {}
 
             if isinstance(extra_config, dict):
                 # Merge extra headers

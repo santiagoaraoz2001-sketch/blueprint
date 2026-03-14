@@ -202,7 +202,7 @@ def run(ctx):
     # Check for LLM extraction model
     if use_llm_extraction:
         try:
-            model_input = ctx.load_input("model")
+            model_input = ctx.resolve_model_info("model")
             ctx.log_message("LLM extraction model connected — feature available in future release")
         except (ValueError, KeyError):
             ctx.log_message("WARNING: LLM extraction enabled but no model connected. Falling back to CSS extraction.")

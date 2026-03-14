@@ -199,7 +199,7 @@ def _augment_with_model(text, strategy, model_name, provider, endpoint,
 # ── Main ───────────────────────────────────────────────────────────
 
 def run(ctx):
-    dataset_path = ctx.load_input("dataset")
+    dataset_path = ctx.resolve_as_file_path("dataset")
 
     # Read upstream dataset metadata
     _dataset_meta = {}
@@ -224,7 +224,7 @@ def run(ctx):
 
     # Optional model input
     try:
-        model_ref = ctx.load_input("model")
+        model_ref = ctx.resolve_model_info("model")
     except ValueError:
         model_ref = None
 

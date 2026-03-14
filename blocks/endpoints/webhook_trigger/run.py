@@ -6,23 +6,6 @@ import time
 from datetime import datetime, timezone
 
 
-def _resolve_data(raw):
-    """Resolve raw input to a serializable object."""
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except json.JSONDecodeError:
-                    f.seek(0)
-                    return {"text": f.read()}
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return {"text": raw}
-    return raw
-
-
 def run(ctx):
     webhook_url = ctx.config.get("webhook_url", "").strip()
     method = ctx.config.get("method", "POST").upper()
@@ -45,16 +28,16 @@ def run(ctx):
 
     # ---- Step 1: Build payload ----
     ctx.report_progress(1, 3)
-    raw_data = ctx.load_input("data")
-    if raw_data is None:
+    raw_data = ctx.resolve_as_data("data")
+    if not raw_data:
         raise ValueError("No input data provided. Connect a 'data' input.")
 
-    data = _resolve_data(raw_data)
+    data = raw_data
 
     metrics_data = None
     if include_metrics:
         try:
-            metrics_data = ctx.load_input("metrics")
+            metrics_data = ctx.resolve_as_dict("metrics")
         except Exception:
             pass
 

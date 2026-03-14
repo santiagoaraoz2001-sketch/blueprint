@@ -6,29 +6,6 @@ import time
 from datetime import datetime, timezone
 
 
-def _resolve_input(raw):
-    """Resolve an input value that might be a file path or directory to a Python object."""
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except (json.JSONDecodeError, ValueError):
-                    return raw
-        if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return raw
-    return raw
-
-
 def _generate_data_summary(data):
     """Generate a human-readable summary of the data for review."""
     summary = {}
@@ -70,11 +47,11 @@ def run(ctx):
 
     # ---- Step 1: Load data to review ----
     ctx.report_progress(1, 4)
-    raw_data = ctx.load_input("data")
-    if raw_data is None:
+    raw_data = ctx.resolve_as_data("data")
+    if not raw_data:
         raise ValueError("No data provided for review. Connect a 'data' input to this block.")
 
-    data = _resolve_input(raw_data)
+    data = raw_data
 
     # Filter data summary to display_fields if configured
     if display_fields and isinstance(data, list) and data and isinstance(data[0], dict):

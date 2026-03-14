@@ -32,7 +32,7 @@ def run(ctx):
         raise ValueError("model_name is required")
 
     # Load dataset
-    dataset_path = ctx.load_input("dataset")
+    dataset_path = ctx.resolve_as_file_path("dataset")
 
     # Import required libraries — raise on failure
     try:

@@ -4,29 +4,6 @@ import json
 import os
 
 
-def _resolve_input(raw):
-    """Resolve an input value that might be a file path or directory to a Python object."""
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except (json.JSONDecodeError, ValueError):
-                    return raw
-        if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return raw
-    return raw
-
-
 _OPERATORS = {
     ">=": lambda a, b: a >= b,
     ">": lambda a, b: a > b,
@@ -96,18 +73,17 @@ def run(ctx):
 
     # ---- Step 1: Load inputs ----
     ctx.report_progress(1, 3)
-    raw_data = ctx.load_input("data")
-    if raw_data is None:
+    raw_data = ctx.resolve_as_data("data")
+    if not raw_data:
         raise ValueError("No data provided. Connect a 'data' input.")
-    data = _resolve_input(raw_data)
+    data = raw_data
 
     # Load optional metrics input
-    raw_metrics = None
+    metrics = None
     try:
-        raw_metrics = ctx.load_input("metrics")
+        metrics = ctx.resolve_as_dict("metrics")
     except (ValueError, Exception):
         pass
-    metrics = _resolve_input(raw_metrics)
     if not isinstance(metrics, dict):
         metrics = {}
 
@@ -120,9 +96,15 @@ def run(ctx):
             if k not in metrics:
                 metrics[k] = v
 
-    # If data is a dict, merge its numeric fields as available metrics
+    # If data is a dict (or a single-element list wrapping a dict from resolve_as_data),
+    # merge its numeric fields as available metrics
+    data_as_dict = None
     if isinstance(data, dict):
-        for k, v in data.items():
+        data_as_dict = data
+    elif isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
+        data_as_dict = data[0]
+    if data_as_dict is not None:
+        for k, v in data_as_dict.items():
             if isinstance(v, (int, float)) and k not in metrics:
                 metrics[k] = v
 

@@ -8,7 +8,7 @@ import random
 
 
 def run(ctx):
-    dataset_path = ctx.load_input("dataset")
+    dataset_path = ctx.resolve_as_file_path("dataset")
 
     # model input is optional
     model_path = "base_model"

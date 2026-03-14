@@ -1,36 +1,6 @@
 """Save Text — save pipeline data as a plain text file."""
 
-import json
 import os
-
-
-def _to_text(data, separator):
-    """Convert any input data to a text string."""
-    if isinstance(data, str):
-        # If it's a file path, read its contents
-        if os.path.isfile(data):
-            with open(data, "r", encoding="utf-8") as f:
-                return f.read()
-        return data
-    if isinstance(data, list):
-        parts = []
-        for item in data:
-            if isinstance(item, dict):
-                # For dicts, use a readable key: value format
-                lines = [f"{k}: {v}" for k, v in item.items()]
-                parts.append("\n".join(lines))
-            else:
-                parts.append(str(item))
-        return separator.join(parts)
-    if isinstance(data, dict):
-        if "text" in data:
-            return str(data["text"])
-        if "value" in data:
-            return str(data["value"])
-        if "data" in data:
-            return _to_text(data["data"], separator)
-        return json.dumps(data, indent=2, default=str, ensure_ascii=False)
-    return str(data)
 
 
 def run(ctx):
@@ -54,11 +24,11 @@ def run(ctx):
 
     # ---- Step 1: Load and convert data ----
     ctx.report_progress(1, 3)
-    raw_data = ctx.load_input("text")
-    if raw_data is None:
+    raw_data = ctx.resolve_as_text("text")
+    if not raw_data:
         raise ValueError("No input data provided. Connect a 'text' input.")
 
-    content = _to_text(raw_data, separator)
+    content = raw_data
     original_length = len(content)
 
     # Trim whitespace from each line if requested

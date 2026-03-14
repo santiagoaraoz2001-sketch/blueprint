@@ -5,24 +5,6 @@ import os
 import sqlite3
 
 
-def _resolve_data(raw):
-    """Resolve raw input to a Python object."""
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                return json.load(f)
-        if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return [{"value": raw}]
-    return raw
-
-
 def _normalize_rows(data):
     """Ensure data is a list of dicts."""
     if data is None:
@@ -210,12 +192,11 @@ def run(ctx):
 
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 4)
-    raw_data = ctx.load_input("data")
-    if raw_data is None:
+    raw_data = ctx.resolve_as_data("data")
+    if not raw_data:
         raise ValueError("No input data provided. Connect a 'data' input.")
 
-    resolved = _resolve_data(raw_data)
-    rows = _normalize_rows(resolved)
+    rows = _normalize_rows(raw_data)
 
     # Auto-add timestamp column if configured
     if timestamp_column and rows:

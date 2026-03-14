@@ -73,7 +73,7 @@ def _chunk_token(text, chunk_size, overlap, chars_per_token=4):
 
 
 def run(ctx):
-    dataset_path = ctx.load_input("dataset")
+    dataset_path = ctx.resolve_as_file_path("dataset")
 
     # Read upstream dataset metadata
     _dataset_meta = {}

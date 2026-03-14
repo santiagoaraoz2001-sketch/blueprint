@@ -8,29 +8,6 @@ import time
 from datetime import datetime, timezone
 
 
-def _resolve_input(raw):
-    """Resolve an input value that might be a file path or directory to a Python object."""
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except (json.JSONDecodeError, ValueError):
-                    return raw
-        if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return raw
-    return raw
-
-
 def _flatten_metrics(metrics):
     """Flatten a nested dict of metrics into dot-separated keys with numeric values."""
     flat = {}
@@ -104,10 +81,10 @@ def run(ctx):
 
     # ---- Step 1: Load metrics (required) ----
     ctx.report_progress(1, 5)
-    raw_metrics = ctx.load_input("metrics")
-    if raw_metrics is None:
+    raw_metrics = ctx.resolve_as_dict("metrics")
+    if not raw_metrics:
         raise ValueError("No metrics provided. Connect a 'metrics' input to this block.")
-    metrics = _resolve_input(raw_metrics)
+    metrics = raw_metrics
     if not isinstance(metrics, dict):
         metrics = {"value": metrics}
     ctx.log_message(f"Loaded metrics with {len(metrics)} keys")
@@ -116,8 +93,8 @@ def run(ctx):
     ctx.report_progress(2, 5)
     run_config = None
     if ctx.inputs.get("config"):
-        raw_config = ctx.load_input("config")
-        run_config = _resolve_input(raw_config)
+        raw_config = ctx.resolve_as_dict("config")
+        run_config = raw_config
         if run_config is not None:
             ctx.log_message(f"Loaded experiment config input")
     if run_config is None:
@@ -127,8 +104,8 @@ def run(ctx):
     ctx.report_progress(3, 5)
     model_info = None
     if ctx.inputs.get("model"):
-        raw_model = ctx.load_input("model")
-        model_info = _resolve_input(raw_model)
+        raw_model = ctx.resolve_model_info("model")
+        model_info = raw_model
         if model_info is not None:
             ctx.log_message(f"Loaded model info input")
     if model_info is None:
