@@ -66,6 +66,21 @@ export function useKeyboardShortcuts() {
         return
       }
 
+      // Shift+R — Re-run from selected node (no meta key, not in inputs)
+      if (!meta && e.shiftKey && (e.key === 'r' || e.key === 'R') && !isInput) {
+        const view = useUIStore.getState().activeView
+        if (view === 'editor') {
+          e.preventDefault()
+          const { selectedNodeId, enterRerunMode } = usePipelineStore.getState()
+          const { activeRunId, status } = useRunStore.getState()
+          const isComplete = status === 'complete' || status === 'failed'
+          if (selectedNodeId && activeRunId && isComplete) {
+            enterRerunMode(selectedNodeId, activeRunId)
+          }
+          return
+        }
+      }
+
       // Cmd+Z — Undo (global, works in editor view)
       if (meta && !e.shiftKey && e.key === 'z' && !isInput) {
         const view = useUIStore.getState().activeView

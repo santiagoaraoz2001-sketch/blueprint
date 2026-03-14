@@ -6,9 +6,16 @@ import { sseManager } from '@/services/sseManager'
 
 export interface NodeStatus {
   nodeId: string
-  status: 'pending' | 'running' | 'complete' | 'failed'
+  status: 'pending' | 'running' | 'complete' | 'failed' | 'cached'
   progress: number
   error?: string
+}
+
+export interface PartialRunMeta {
+  sourceRunId: string
+  startNodeId: string
+  reusedNodes: string[]
+  configOverrides: Record<string, Record<string, any>>
 }
 
 /** Typed SSE event data from the pipeline executor */
@@ -34,12 +41,14 @@ interface RunState {
   error: string | null
   logs: string[]
   sseStatus: 'connected' | 'reconnecting' | 'stale' | 'disconnected'
+  partialRunMeta: PartialRunMeta | null
   _demoTimer: number | null
   _elapsedTimer: number | null
   _sseUnsubscribe: (() => void) | null
 
   // Actions
   startRun: (pipelineId: string) => Promise<void>
+  startPartialRun: (pipelineId: string, sourceRunId: string, startNodeId: string, configOverrides: Record<string, Record<string, any>>, reusedNodes: string[]) => Promise<void>
   stopRun: () => Promise<void>
   connectSSE: (runId: string) => void
   disconnectSSE: () => void
@@ -74,6 +83,7 @@ export const useRunStore = create<RunState>((set, get) => ({
   error: null,
   logs: [],
   sseStatus: 'disconnected' as const,
+  partialRunMeta: null,
   _demoTimer: null,
   _elapsedTimer: null,
   _sseUnsubscribe: null,
@@ -134,6 +144,74 @@ export const useRunStore = create<RunState>((set, get) => ({
     }
   },
 
+  startPartialRun: async (pipelineId: string, sourceRunId: string, startNodeId: string, configOverrides: Record<string, Record<string, any>>, reusedNodes: string[]) => {
+    if (isDemoMode()) {
+      // Simulate partial run in demo mode
+      const meta: PartialRunMeta = { sourceRunId, startNodeId, reusedNodes, configOverrides }
+      const cachedStatuses: Record<string, NodeStatus> = {}
+      for (const nid of reusedNodes) {
+        cachedStatuses[nid] = { nodeId: nid, status: 'cached', progress: 1 }
+      }
+      set({
+        activeRunId: `demo-partial-${Date.now()}`,
+        pipelineId,
+        status: 'running',
+        nodeStatuses: cachedStatuses,
+        overallProgress: 0,
+        eta: 15,
+        elapsed: 0,
+        error: null,
+        partialRunMeta: meta,
+      })
+      let progress = 0
+      const timer = window.setInterval(() => {
+        progress += 0.08
+        if (progress >= 1) {
+          window.clearInterval(timer)
+          set({ status: 'complete', overallProgress: 1, eta: 0 })
+          return
+        }
+        set((s) => ({
+          overallProgress: progress,
+          elapsed: s.elapsed + 0.5,
+          eta: Math.max(0, (1 - progress) * 15),
+        }))
+      }, 500)
+      set({ _demoTimer: timer })
+      return
+    }
+    try {
+      _clearElapsedTimer(get)
+      const meta: PartialRunMeta = { sourceRunId, startNodeId, reusedNodes, configOverrides }
+      const cachedStatuses: Record<string, NodeStatus> = {}
+      for (const nid of reusedNodes) {
+        cachedStatuses[nid] = { nodeId: nid, status: 'cached', progress: 1 }
+      }
+      const res = await api.post<{ status: string; pipeline_id: string; run_id: string }>(
+        `/pipelines/${pipelineId}/execute-from`,
+        { source_run_id: sourceRunId, start_node_id: startNodeId, config_overrides: configOverrides }
+      )
+      const elapsedTimer = _startElapsedTimer(set)
+      set({
+        activeRunId: res?.run_id ?? null,
+        pipelineId,
+        status: 'running',
+        nodeStatuses: cachedStatuses,
+        nodeOutputs: {},
+        overallProgress: 0,
+        eta: null,
+        elapsed: 0,
+        error: null,
+        logs: [],
+        partialRunMeta: meta,
+        _elapsedTimer: elapsedTimer,
+      })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to start partial run'
+      set({ status: 'failed', error: msg })
+    }
+  },
+
   stopRun: async () => {
     const { activeRunId, _demoTimer } = get()
     if (!activeRunId) return
@@ -188,6 +266,19 @@ export const useRunStore = create<RunState>((set, get) => ({
     const state = get()
 
     switch (event) {
+      case 'node_cached':
+        set({
+          nodeStatuses: {
+            ...state.nodeStatuses,
+            [data.node_id || '']: {
+              nodeId: data.node_id || '',
+              status: 'cached',
+              progress: 1,
+            },
+          },
+        })
+        break
+
       case 'node_started':
         set({
           activeRunId: data.run_id || state.activeRunId,
@@ -309,6 +400,7 @@ export const useRunStore = create<RunState>((set, get) => ({
       error: null,
       logs: [],
       sseStatus: 'disconnected',
+      partialRunMeta: null,
       _demoTimer: null,
       _elapsedTimer: null,
       _sseUnsubscribe: null,
