@@ -22,6 +22,11 @@ outputs:
     data_type: text
     description: "Final judge synthesis after all debate rounds"
 config:
+  topic:
+    type: text_area
+    label: Debate Topic
+    default: ""
+    description: "Topic for debate (used when input port not connected)"
   model_name:
     type: string
     label: Model

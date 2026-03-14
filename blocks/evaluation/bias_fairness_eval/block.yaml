@@ -35,6 +35,22 @@ outputs:
     description: 'bias_report.json: metrics summary + flagged_examples with text, scores, dimension breakdown'
 
 config:
+  model_name:
+    type: string
+    label: Model Name (fallback)
+    default: "llama3.2"
+    description: "Used when model input port is not connected"
+  provider:
+    type: select
+    label: Provider (fallback)
+    default: "ollama"
+    options: ["ollama", "mlx", "openai", "anthropic"]
+    description: "Inference provider (used when model input not connected)"
+  endpoint:
+    type: string
+    label: Endpoint (fallback)
+    default: "http://localhost:11434"
+    description: "API endpoint URL (used when model input not connected)"
   text_column:
     type: string
     label: Text Column

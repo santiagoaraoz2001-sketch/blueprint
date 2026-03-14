@@ -47,6 +47,12 @@ outputs:
     description: "Detailed comparison: win rates summary, per-sample winner/scores, method config"
 
 config:
+  provider:
+    type: select
+    label: Provider (fallback)
+    default: "ollama"
+    options: ["ollama", "mlx", "openai", "anthropic"]
+    description: "Inference provider for model generation (used when model input not connected)"
   comparison_method:
     type: select
     label: Comparison Method

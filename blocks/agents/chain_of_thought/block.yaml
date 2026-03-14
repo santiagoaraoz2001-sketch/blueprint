@@ -27,6 +27,11 @@ outputs:
     data_type: metrics
 
 config:
+  input_text:
+    type: text_area
+    label: Input Text
+    default: ""
+    description: "Question or prompt for reasoning (used when input port not connected)"
   num_steps:
     type: integer
     label: Reasoning Steps

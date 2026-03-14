@@ -33,6 +33,12 @@ config:
     options: [openai, anthropic, ollama]
     default: openai
     description: "Provider must support vision (GPT-4o, Claude, LLaVA via Ollama)"
+  backend:
+    type: select
+    label: Inference Backend
+    default: ""
+    options: ["", "openai", "anthropic", "ollama"]
+    description: "Override framework auto-detection (leave empty for auto)"
   model_name:
     type: string
     label: Model Name

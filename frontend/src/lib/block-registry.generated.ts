@@ -166,6 +166,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'metrics', label: 'Run Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
+      task: '',
       system_prompt: 'You are a helpful assistant that breaks down tasks into steps and uses tools when needed. Think step by step.',
       max_steps: 10,
       strategy: 'sequential',
@@ -175,6 +176,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       output_format: 'plain',
     },
     configFields: [
+      {
+        name: 'task',
+        label: 'Task',
+        type: 'text_area',
+        default: '',
+        description: 'Task description for the agent (used when input port not connected)',
+      },
       {
         name: 'system_prompt',
         label: 'System Prompt',
@@ -312,6 +320,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'metrics', label: 'Reasoning Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
+      input_text: '',
       num_steps: 3,
       temperature: 0.3,
       max_tokens: 512,
@@ -321,6 +330,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       output_format: 'markdown',
     },
     configFields: [
+      {
+        name: 'input_text',
+        label: 'Input Text',
+        type: 'text_area',
+        default: '',
+        description: 'Question or prompt for reasoning (used when input port not connected)',
+      },
       {
         name: 'num_steps',
         label: 'Reasoning Steps',
@@ -388,6 +404,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'metrics', label: 'Code Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
+      task: '',
       system_prompt: '',
       language: 'python',
       execute: false,
@@ -396,6 +413,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       output_format: 'raw',
     },
     configFields: [
+      {
+        name: 'task',
+        label: 'Task',
+        type: 'text_area',
+        default: '',
+        description: 'Code task description (used when input port not connected)',
+      },
       {
         name: 'system_prompt',
         label: 'System Prompt',
@@ -463,8 +487,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'consensus', label: 'Consensus', dataType: 'text', required: false },
     ],
-    defaultConfig: { model_name: '', rounds: 3 },
+    defaultConfig: { topic: '', model_name: '', rounds: 3 },
     configFields: [
+      {
+        name: 'topic',
+        label: 'Debate Topic',
+        type: 'text_area',
+        default: '',
+        description: 'Topic for debate (used when input port not connected)',
+      },
       {
         name: 'model_name',
         label: 'Model',
@@ -495,6 +526,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'metrics', label: 'Consensus Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
+      topic: '',
       num_agents: 3,
       num_rounds: 3,
       temperature: 0.7,
@@ -506,6 +538,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       seed: 42,
     },
     configFields: [
+      {
+        name: 'topic',
+        label: 'Debate Topic',
+        type: 'text_area',
+        default: '',
+        description: 'Topic for debate (used when input port not connected)',
+      },
       { name: 'num_agents', label: 'Number of Agents', type: 'integer', default: 3, min: 2, max: 10 },
       { name: 'num_rounds', label: 'Debate Rounds', type: 'integer', default: 3, min: 1, max: 10 },
       { name: 'temperature', label: 'Temperature', type: 'float', default: 0.7, min: 0.0, max: 2.0 },
@@ -4034,6 +4073,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'report', label: 'Comparison Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
+      provider: 'ollama',
       comparison_method: 'heuristic',
       judge_model: '',
       judge_endpoint: 'http://localhost:11434',
@@ -4050,6 +4090,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       decimal_precision: 4,
     },
     configFields: [
+      {
+        name: 'provider',
+        label: 'Provider (fallback)',
+        type: 'select',
+        default: 'ollama',
+        options: ['ollama', 'mlx', 'openai', 'anthropic'],
+        description: 'Inference provider for model generation (used when model input not connected)',
+      },
       {
         name: 'comparison_method',
         label: 'Comparison Method',
@@ -4245,6 +4293,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'report', label: 'Bias Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
+      model_name: 'llama3.2',
+      provider: 'ollama',
+      endpoint: 'http://localhost:11434',
       text_column: 'text',
       bias_dimensions: 'gender,race,age,religion',
       group_column: '',
@@ -4259,6 +4310,28 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       decimal_precision: 4,
     },
     configFields: [
+      {
+        name: 'model_name',
+        label: 'Model Name (fallback)',
+        type: 'string',
+        default: 'llama3.2',
+        description: 'Used when model input port is not connected',
+      },
+      {
+        name: 'provider',
+        label: 'Provider (fallback)',
+        type: 'select',
+        default: 'ollama',
+        options: ['ollama', 'mlx', 'openai', 'anthropic'],
+        description: 'Inference provider (used when model input not connected)',
+      },
+      {
+        name: 'endpoint',
+        label: 'Endpoint (fallback)',
+        type: 'string',
+        default: 'http://localhost:11434',
+        description: 'API endpoint URL (used when model input not connected)',
+      },
       {
         name: 'text_column',
         label: 'Text Column',
@@ -4476,6 +4549,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Predictions', dataType: 'dataset', required: false },
     ],
     defaultConfig: {
+      model_name: 'llama3.2',
+      provider: 'ollama',
+      endpoint: 'http://localhost:11434',
       metric: 'accuracy',
       threshold: 0.0,
       input_field: '',
@@ -4488,6 +4564,28 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       decimal_precision: 4,
     },
     configFields: [
+      {
+        name: 'model_name',
+        label: 'Model Name (fallback)',
+        type: 'string',
+        default: 'llama3.2',
+        description: 'Used when model input port is not connected',
+      },
+      {
+        name: 'provider',
+        label: 'Provider (fallback)',
+        type: 'select',
+        default: 'ollama',
+        options: ['ollama', 'mlx', 'openai', 'anthropic'],
+        description: 'Inference provider (used when model input not connected)',
+      },
+      {
+        name: 'endpoint',
+        label: 'Endpoint (fallback)',
+        type: 'string',
+        default: 'http://localhost:11434',
+        description: 'API endpoint URL (used when model input not connected)',
+      },
       {
         name: 'metric',
         label: 'Primary Metric',
@@ -4679,6 +4777,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'report', label: 'Error Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
+      model_name: '',
+      provider: 'ollama',
+      endpoint: 'http://localhost:11434',
       method: 'exact_match',
       output_column: '_response',
       reference_column: 'reference',
@@ -4692,6 +4793,28 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       decimal_precision: 4,
     },
     configFields: [
+      {
+        name: 'model_name',
+        label: 'Model Name (fallback)',
+        type: 'string',
+        default: '',
+        description: 'Used when model input port is not connected',
+      },
+      {
+        name: 'provider',
+        label: 'Provider (fallback)',
+        type: 'select',
+        default: 'ollama',
+        options: ['ollama', 'mlx', 'openai', 'anthropic'],
+        description: 'Inference provider (used when model input not connected)',
+      },
+      {
+        name: 'endpoint',
+        label: 'Endpoint (fallback)',
+        type: 'string',
+        default: 'http://localhost:11434',
+        description: 'API endpoint URL (used when model input not connected)',
+      },
       {
         name: 'method',
         label: 'Comparison Method',
@@ -4802,6 +4925,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     defaultConfig: {
       model_name: '',
+      provider: 'ollama',
+      endpoint: 'http://localhost:11434',
       k_values: '1,10,100',
       temperature: 0.8,
       num_problems: 164,
@@ -4820,6 +4945,21 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'string',
         default: '',
         description: 'Model identifier (overridden by connected model input)',
+      },
+      {
+        name: 'provider',
+        label: 'Provider (fallback)',
+        type: 'select',
+        default: 'ollama',
+        options: ['ollama', 'mlx', 'openai', 'anthropic'],
+        description: 'Inference provider (used when model input not connected)',
+      },
+      {
+        name: 'endpoint',
+        label: 'Endpoint (fallback)',
+        type: 'string',
+        default: 'http://localhost:11434',
+        description: 'API endpoint URL (used when model input not connected)',
       },
       {
         name: 'k_values',
@@ -5487,6 +5627,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'report', label: 'RAG Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
+      model_name: 'llama3.2',
+      provider: 'ollama',
+      endpoint: 'http://localhost:11434',
       question_column: 'question',
       context_column: 'context',
       answer_column: 'answer',
@@ -5499,6 +5642,28 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       decimal_precision: 4,
     },
     configFields: [
+      {
+        name: 'model_name',
+        label: 'Model Name (fallback)',
+        type: 'string',
+        default: 'llama3.2',
+        description: 'Used when model input port is not connected',
+      },
+      {
+        name: 'provider',
+        label: 'Provider (fallback)',
+        type: 'select',
+        default: 'ollama',
+        options: ['ollama', 'mlx', 'openai', 'anthropic'],
+        description: 'Inference provider (used when model input not connected)',
+      },
+      {
+        name: 'endpoint',
+        label: 'Endpoint (fallback)',
+        type: 'string',
+        default: 'http://localhost:11434',
+        description: 'API endpoint URL (used when model input not connected)',
+      },
       { name: 'question_column', label: 'Question Column', type: 'string', default: 'question' },
       {
         name: 'context_column',
@@ -5766,6 +5931,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'report', label: 'Toxicity Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
+      model_name: 'llama3.2',
+      provider: 'ollama',
+      endpoint: 'http://localhost:11434',
       text_column: 'text',
       threshold: 0.5,
       categories: 'toxicity,severe_toxicity,obscene,threat,insult,identity_attack',
@@ -5779,6 +5947,28 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       decimal_precision: 4,
     },
     configFields: [
+      {
+        name: 'model_name',
+        label: 'Model Name (fallback)',
+        type: 'string',
+        default: 'llama3.2',
+        description: 'Used when model input port is not connected',
+      },
+      {
+        name: 'provider',
+        label: 'Provider (fallback)',
+        type: 'select',
+        default: 'ollama',
+        options: ['ollama', 'mlx', 'openai', 'anthropic'],
+        description: 'Inference provider (used when model input not connected)',
+      },
+      {
+        name: 'endpoint',
+        label: 'Endpoint (fallback)',
+        type: 'string',
+        default: 'http://localhost:11434',
+        description: 'API endpoint URL (used when model input not connected)',
+      },
       {
         name: 'text_column',
         label: 'Text Column',
@@ -7883,6 +8073,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     defaultConfig: {
       provider: 'sentence-transformers',
+      backend: '',
       model_name: 'all-MiniLM-L6-v2',
       text_column: 'text',
       batch_size: 32,
@@ -7901,6 +8092,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'select',
         default: 'sentence-transformers',
         options: ['sentence-transformers', 'ollama', 'openai'],
+      },
+      {
+        name: 'backend',
+        label: 'Inference Backend',
+        type: 'select',
+        default: '',
+        options: ['', 'sentence-transformers', 'ollama', 'openai'],
+        description: 'Override framework auto-detection (leave empty for auto)',
       },
       {
         name: 'model_name',
@@ -8286,6 +8485,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     defaultConfig: {
       provider: 'ollama',
+      backend: '',
       model_name: '',
       endpoint: 'http://localhost:11434',
       api_key: '',
@@ -8303,6 +8503,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'select',
         default: 'ollama',
         options: ['ollama', 'mlx', 'openai', 'anthropic'],
+      },
+      {
+        name: 'backend',
+        label: 'Inference Backend',
+        type: 'select',
+        default: '',
+        options: ['', 'ollama', 'mlx', 'openai', 'anthropic'],
+        description: 'Override framework auto-detection (leave empty for auto)',
       },
       {
         name: 'model_name',
@@ -8561,6 +8769,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     defaultConfig: {
       provider: 'ollama',
+      backend: '',
       model_name: 'llama3.2',
       steps: '["Analyze the following text:\\n{input}", "Based on the analysis:\\n{previous}\\n\\nSummarize the key points."]',
       pass_context: true,
@@ -8580,6 +8789,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'select',
         default: 'ollama',
         options: ['ollama', 'mlx', 'openai', 'anthropic'],
+      },
+      {
+        name: 'backend',
+        label: 'Inference Backend',
+        type: 'select',
+        default: '',
+        options: ['', 'ollama', 'mlx', 'openai', 'anthropic'],
+        description: 'Override framework auto-detection (leave empty for auto)',
       },
       { name: 'model_name', label: 'Model Name', type: 'string', default: 'llama3.2' },
       {
@@ -8763,6 +8980,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       text_column: 'text',
       top_k: 5,
       provider: 'ollama',
+      backend: '',
       model_name: '',
       endpoint: 'http://localhost:11434',
       api_key: '',
@@ -8802,6 +9020,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'select',
         default: 'ollama',
         options: ['ollama', 'mlx', 'openai', 'anthropic'],
+      },
+      {
+        name: 'backend',
+        label: 'Inference Backend',
+        type: 'select',
+        default: '',
+        options: ['', 'ollama', 'mlx', 'openai', 'anthropic'],
+        description: 'Override framework auto-detection (leave empty for auto)',
       },
       {
         name: 'model_name',
@@ -9104,6 +9330,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     defaultConfig: {
       provider: 'openai',
+      backend: '',
       model_name: 'gpt-4o',
       prompt: 'Describe this image in detail.',
       image_path: '',
@@ -9123,6 +9350,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'openai',
         options: ['openai', 'anthropic', 'ollama'],
         description: 'Provider must support vision (GPT-4o, Claude, LLaVA via Ollama)',
+      },
+      {
+        name: 'backend',
+        label: 'Inference Backend',
+        type: 'select',
+        default: '',
+        options: ['', 'openai', 'anthropic', 'ollama'],
+        description: 'Override framework auto-detection (leave empty for auto)',
       },
       {
         name: 'model_name',
@@ -9205,8 +9440,29 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'DARE Model', dataType: 'model', required: false },
       { id: 'metrics', label: 'Merge Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { weight: 0.5, density: 0.5, rescale: true, output_name: 'dare-merged-model' },
+    defaultConfig: {
+      model_a_name: '',
+      model_b_name: '',
+      weight: 0.5,
+      density: 0.5,
+      rescale: true,
+      output_name: 'dare-merged-model',
+    },
     configFields: [
+      {
+        name: 'model_a_name',
+        label: 'Model A (fallback)',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace model ID for Model A (used when input port not connected)',
+      },
+      {
+        name: 'model_b_name',
+        label: 'Model B (fallback)',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace model ID for Model B (used when input port not connected)',
+      },
       {
         name: 'weight',
         label: 'Weight (Model B)',
@@ -9259,8 +9515,28 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'FrankenModel', dataType: 'model', required: false },
       { id: 'metrics', label: 'Merge Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { layer_config: '[]', merge_embed: 'a', output_name: 'frankenmerge-model' },
+    defaultConfig: {
+      model_a_name: '',
+      model_b_name: '',
+      layer_config: '[]',
+      merge_embed: 'a',
+      output_name: 'frankenmerge-model',
+    },
     configFields: [
+      {
+        name: 'model_a_name',
+        label: 'Model A (fallback)',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace model ID for Model A (used when input port not connected)',
+      },
+      {
+        name: 'model_b_name',
+        label: 'Model B (fallback)',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace model ID for Model B (used when input port not connected)',
+      },
       {
         name: 'layer_config',
         label: 'Layer Config (JSON)',
@@ -9304,8 +9580,29 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Merged Model', dataType: 'model', required: false },
       { id: 'metrics', label: 'Merge Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { method: 'slerp', weight: 0.5, density: 0.5, output_name: 'merged-model' },
+    defaultConfig: {
+      model_a_name: '',
+      model_b_name: '',
+      method: 'slerp',
+      weight: 0.5,
+      density: 0.5,
+      output_name: 'merged-model',
+    },
     configFields: [
+      {
+        name: 'model_a_name',
+        label: 'Model A (fallback)',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace model ID for Model A (used when input port not connected)',
+      },
+      {
+        name: 'model_b_name',
+        label: 'Model B (fallback)',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace model ID for Model B (used when input port not connected)',
+      },
       {
         name: 'method',
         label: 'Merge Method',
@@ -9358,8 +9655,27 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'SLERP Model', dataType: 'model', required: false },
       { id: 'metrics', label: 'Merge Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { weight: 0.5, output_name: 'slerp-merged-model' },
+    defaultConfig: {
+      model_a_name: '',
+      model_b_name: '',
+      weight: 0.5,
+      output_name: 'slerp-merged-model',
+    },
     configFields: [
+      {
+        name: 'model_a_name',
+        label: 'Model A (fallback)',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace model ID for Model A (used when input port not connected)',
+      },
+      {
+        name: 'model_b_name',
+        label: 'Model B (fallback)',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace model ID for Model B (used when input port not connected)',
+      },
       {
         name: 'weight',
         label: 'Interpolation Weight (t)',
@@ -9397,8 +9713,28 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'TIES Model', dataType: 'model', required: false },
       { id: 'metrics', label: 'Merge Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { density: 0.5, weight: 1.0, output_name: 'ties-merged-model' },
+    defaultConfig: {
+      model_a_name: '',
+      model_b_name: '',
+      density: 0.5,
+      weight: 1.0,
+      output_name: 'ties-merged-model',
+    },
     configFields: [
+      {
+        name: 'model_a_name',
+        label: 'Model A (fallback)',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace model ID for Model A (used when input port not connected)',
+      },
+      {
+        name: 'model_b_name',
+        label: 'Model B (fallback)',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace model ID for Model B (used when input port not connected)',
+      },
       {
         name: 'density',
         label: 'Density',
