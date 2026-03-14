@@ -1,38 +1,107 @@
-"""
-Structured run export — generates a portable dict from a completed Run.
+"""Generate a structured export schema for a completed run."""
 
-Used by export connectors to push run data to external services.
-"""
-
+import hashlib
 import json
-import logging
+import sys
+import platform as plat
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..models.run import Run
+from ..config import ARTIFACTS_DIR
 
-_logger = logging.getLogger("blueprint.run_export")
+EXPORT_SCHEMA_VERSION = "1.0.0"
+
+# Files managed by the engine that are not user-facing artifacts
+_INTERNAL_FILES = {"metrics.jsonl", "run-export.json", "error.log"}
 
 
-def generate_run_export(run: Run, artifacts_dir: Path) -> dict[str, Any]:
-    """Build a structured export dict from a Run record.
+def _collect_artifacts(run_dir: Path) -> list[dict]:
+    """Collect artifact metadata from the run directory.
 
-    Args:
-        run: The SQLAlchemy Run object.
-        artifacts_dir: Root artifacts directory (e.g. ``~/.specific-labs/artifacts``).
-
-    Returns:
-        A portable dict containing run metadata, config, metrics, outputs,
-        and artifact manifest.
+    Excludes internal engine files (metrics.jsonl, run-export.json, error.log).
+    Handles files that may be deleted between enumeration and stat().
     """
-    run_artifact_dir = artifacts_dir / run.id
+    artifacts = []
+    if not run_dir.exists():
+        return artifacts
 
-    artifacts = _collect_artifact_manifest(run_artifact_dir)
-    metrics_log = _collect_metrics_log(run, run_artifact_dir)
+    for f in sorted(run_dir.rglob("*")):
+        if not f.is_file():
+            continue
+        if f.name in _INTERNAL_FILES and f.parent == run_dir:
+            continue
+        try:
+            size = f.stat().st_size
+        except OSError:
+            # File may have been deleted between rglob and stat
+            continue
+        artifacts.append({
+            "name": str(f.relative_to(run_dir)),
+            "path": str(f),
+            "size_bytes": size,
+        })
+
+    return artifacts
+
+
+def _extract_pipeline_metadata(config_snapshot: dict | None) -> dict:
+    """Extract pipeline-level metadata from the config snapshot."""
+    definition = config_snapshot or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+
+    # Compute a deterministic hash of the pipeline definition
+    definition_hash = None
+    if definition:
+        canonical = json.dumps(definition, sort_keys=True, separators=(",", ":"))
+        definition_hash = hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
     return {
-        "format": "blueprint-run-export",
-        "version": "1.0",
+        "definition_hash": definition_hash,
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+    }
+
+
+def _collect_environment() -> dict[str, Any]:
+    """Collect runtime environment information."""
+    env: dict[str, Any] = {
+        "python_version": sys.version.split()[0],
+        "platform": plat.platform(),
+        "blueprint_version": "0.1.0",
+    }
+    try:
+        import torch
+        env["torch_version"] = torch.__version__
+        env["gpu_available"] = torch.cuda.is_available()
+    except ImportError:
+        env["gpu_available"] = False
+    return env
+
+
+def generate_run_export(run, artifacts_dir: Path | None = None) -> dict:
+    """
+    Generate the universal run export schema.
+
+    This is the "lingua franca" JSON that downstream tools, export connectors,
+    and external scripts can parse without custom Blueprint knowledge.
+
+    Args:
+        run: A Run ORM instance with metrics, config_snapshot, etc.
+        artifacts_dir: Override for the artifacts root directory.
+
+    Returns:
+        Dict conforming to the run export schema (version 1.0.0).
+    """
+    if artifacts_dir is None:
+        artifacts_dir = ARTIFACTS_DIR
+
+    run_dir = artifacts_dir / run.id
+
+    return {
+        "schema_version": EXPORT_SCHEMA_VERSION,
+        "export_timestamp": datetime.now(timezone.utc).isoformat(),
         "run": {
             "id": run.id,
             "pipeline_id": run.pipeline_id,
@@ -40,72 +109,14 @@ def generate_run_export(run: Run, artifacts_dir: Path) -> dict[str, Any]:
             "started_at": run.started_at.isoformat() if run.started_at else None,
             "finished_at": run.finished_at.isoformat() if run.finished_at else None,
             "duration_seconds": run.duration_seconds,
-            "error_message": run.error_message,
         },
+        "pipeline": _extract_pipeline_metadata(run.config_snapshot),
         "config": run.config_snapshot or {},
-        "metrics": run.metrics or {},
-        "metrics_log": metrics_log,
-        "outputs": run.outputs_snapshot or {},
-        "data_fingerprints": run.data_fingerprints or {},
-        "artifacts": artifacts,
+        "metrics": {
+            "summary": run.metrics or {},
+            "timeseries": run.metrics_log or [],
+        },
+        "artifacts": _collect_artifacts(run_dir),
+        "data_provenance": getattr(run, "data_fingerprints", None) or {},
+        "environment": _collect_environment(),
     }
-
-
-def _collect_artifact_manifest(run_artifact_dir: Path) -> list[dict[str, Any]]:
-    """Walk the run's artifact directory and return a file manifest.
-
-    Gracefully handles missing directories and permission errors on
-    individual files (logs a warning and skips).
-    """
-    artifacts: list[dict[str, Any]] = []
-    if not run_artifact_dir.is_dir():
-        return artifacts
-
-    try:
-        entries = sorted(run_artifact_dir.rglob("*"))
-    except OSError as exc:
-        _logger.warning("Could not list artifacts in %s: %s", run_artifact_dir, exc)
-        return artifacts
-
-    for f in entries:
-        if not f.is_file():
-            continue
-        try:
-            stat = f.stat()
-            artifacts.append({
-                "path": str(f.relative_to(run_artifact_dir)),
-                "size": stat.st_size,
-                "modified": stat.st_mtime,
-            })
-        except OSError as exc:
-            _logger.warning("Could not stat artifact %s: %s", f, exc)
-            continue
-
-    return artifacts
-
-
-def _collect_metrics_log(run: Run, run_artifact_dir: Path) -> list[dict]:
-    """Return the metrics event log, preferring Layer 2 (SQLite column) and
-    falling back to Layer 1 (JSONL file on disk).
-    """
-    if run.metrics_log:
-        return run.metrics_log
-
-    jsonl_path = run_artifact_dir / "metrics.jsonl"
-    if not jsonl_path.is_file():
-        return []
-
-    events: list[dict] = []
-    try:
-        for line in jsonl_path.read_text().splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-    except OSError as exc:
-        _logger.warning("Could not read metrics log %s: %s", jsonl_path, exc)
-
-    return events

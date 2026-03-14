@@ -1,13 +1,13 @@
 // AUTO-GENERATED — DO NOT EDIT MANUALLY
-// Generated from 129 block.yaml files across 12 categories
+// Generated from 131 block.yaml files across 12 categories
 // Run: python scripts/generate_block_registry.py
 
-import type { BlockDefinition } from './block-registry-types'
+import type { BlockDefinition } from './block-registry'
 
 export const BLOCK_REGISTRY: BlockDefinition[] = [
 
   // ═══════════════════════════════════════════════
-  //  AGENTS (9 blocks)
+  //  AGENTS (10 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -444,6 +444,36 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         options: ['raw', 'markdown', 'json'],
         description: 'raw: code only, markdown: fenced code block, json: structured object',
       },
+    ],
+  },
+  {
+    type: 'debate_composite',
+    name: 'Debate Composite',
+    description: 'Multi-agent debate using composable sub-blocks (pessimist + optimist → judge)',
+    category: 'agents',
+    tags: [],
+    aliases: [],
+    icon: 'Bot',
+    accent: '#06b6d4',
+    maturity: 'stable',
+    inputs: [
+      { id: 'llm', label: 'LLM', dataType: 'config', required: false },
+      { id: 'input', label: 'Debate Topic', dataType: 'text', required: true },
+    ],
+    outputs: [
+      { id: 'consensus', label: 'Consensus', dataType: 'text', required: false },
+      { id: 'response', label: 'Final Response', dataType: 'text', required: false },
+    ],
+    defaultConfig: { model_name: '', rounds: 3 },
+    configFields: [
+      {
+        name: 'model_name',
+        label: 'Model',
+        type: 'string',
+        default: '',
+        description: 'Model name for all debate agents. Overridden by connected LLM block.',
+      },
+      { name: 'rounds', label: 'Debate Rounds', type: 'integer', default: 3, min: 1, max: 10 },
     ],
   },
   {
@@ -2529,7 +2559,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#3b82f6',
     maturity: 'stable',
     inputs: [
-      { id: 'chunks', label: 'Text Chunks', dataType: 'data', required: true },
+      { id: 'chunks', label: 'Text Chunks', dataType: 'dataset', required: true },
       { id: 'embeddings', label: 'Pre-computed Embeddings', dataType: 'embedding', required: false },
     ],
     outputs: [
@@ -3057,7 +3087,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Directory to save to (relative to run directory or absolute)',
       },
       { name: 'filename', label: 'Filename', type: 'string', default: 'data.csv' },
-      { name: 'delimiter', label: 'Delimiter', type: 'select', default: ',', options: [',', ';', '\t', '|'] },
+      {
+        name: 'delimiter',
+        label: 'Delimiter',
+        type: 'select',
+        default: ',',
+        options: [',', ';', '\\t', '|'],
+      },
       { name: 'include_header', label: 'Include Header', type: 'boolean', default: true },
       {
         name: 'encoding',
@@ -3805,7 +3841,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  EVALUATION (15 blocks)
+  //  EVALUATION (16 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -3822,11 +3858,11 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model_a', label: 'Model A', dataType: 'model', required: false },
       { id: 'model_b', label: 'Model B', dataType: 'model', required: false },
       { id: 'model_c', label: 'Model C', dataType: 'model', required: false },
-      { id: 'dataset', label: 'Test Data', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Test Data', dataType: 'dataset', required: false },
     ],
     outputs: [
       { id: 'metrics', label: 'Comparison Results', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Comparisons', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Annotated Comparisons', dataType: 'dataset', required: false },
       { id: 'report', label: 'Comparison Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -3961,98 +3997,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
   },
   {
-    type: 'model_diff',
-    name: 'Model Diff',
-    description: 'Compare two models side-by-side — token probabilities, attention patterns, layer activations',
-    category: 'evaluation',
-    tags: [],
-    aliases: [],
-    icon: 'GitCompareArrows',
-    accent: '#10b981',
-    maturity: 'beta',
-    inputs: [
-      { id: 'model_a', label: 'Model A', dataType: 'model', required: true },
-      { id: 'model_b', label: 'Model B', dataType: 'model', required: true },
-    ],
-    outputs: [
-      { id: 'diff_report', label: 'Diff Report', dataType: 'artifact', required: false },
-      { id: 'metrics', label: 'Diff Metrics', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Token Comparisons', dataType: 'data', required: false },
-    ],
-    defaultConfig: {
-      prompt: 'The capital of France is',
-      max_tokens: 50,
-      top_k: 5,
-      compare_layers: false,
-      model_a_name: '',
-      model_b_name: '',
-      output_format: 'json',
-      decimal_precision: 4,
-    },
-    configFields: [
-      {
-        name: 'prompt',
-        label: 'Test Prompt',
-        type: 'text_area',
-        default: 'The capital of France is',
-        description: 'Prompt to run through both models',
-      },
-      {
-        name: 'max_tokens',
-        label: 'Max Tokens',
-        type: 'integer',
-        default: 50,
-        min: 1,
-        max: 512,
-      },
-      {
-        name: 'top_k',
-        label: 'Top-K Probabilities',
-        type: 'integer',
-        default: 5,
-        min: 1,
-        max: 20,
-        description: 'Number of top token probabilities to compare per position',
-      },
-      {
-        name: 'compare_layers',
-        label: 'Compare Layer Activations',
-        type: 'boolean',
-        default: false,
-        description: 'Slower but shows per-layer cosine similarity between hidden states',
-      },
-      {
-        name: 'model_a_name',
-        label: 'Model A Name Override',
-        type: 'string',
-        default: '',
-      },
-      {
-        name: 'model_b_name',
-        label: 'Model B Name Override',
-        type: 'string',
-        default: '',
-      },
-      {
-        name: 'output_format',
-        label: 'Output Format',
-        type: 'select',
-        default: 'json',
-        options: ['json', 'csv'],
-        description: 'Format for dataset and report outputs',
-      },
-      {
-        name: 'decimal_precision',
-        label: 'Decimal Precision',
-        type: 'integer',
-        default: 4,
-        min: 1,
-        max: 6,
-        description: 'Decimal places for computed scores',
-      },
-    ],
-  },
-  {
     type: 'bias_fairness_eval',
     name: 'Bias & Fairness Eval',
     description: 'Evaluate model outputs for demographic biases and fairness across protected groups',
@@ -4063,13 +4007,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#10b981',
     maturity: 'stable',
     inputs: [
-      { id: 'dataset', label: 'Test Data', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Test Data', dataType: 'dataset', required: false },
       { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
       { id: 'metrics', label: 'Fairness Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Results', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Annotated Results', dataType: 'dataset', required: false },
       { id: 'report', label: 'Bias Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -4197,13 +4141,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#10b981',
     maturity: 'stable',
     inputs: [
-      { id: 'dataset', label: 'Text Data', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Text Data', dataType: 'dataset', required: false },
       { id: 'model', label: 'Scorer Model', dataType: 'model', required: false },
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
       { id: 'metrics', label: 'Quality Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Data', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Annotated Data', dataType: 'dataset', required: false },
       { id: 'report', label: 'Quality Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -4296,12 +4240,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     maturity: 'stable',
     inputs: [
       { id: 'model', label: 'Model', dataType: 'model', required: true },
-      { id: 'dataset', label: 'Test Data', dataType: 'data', required: true },
+      { id: 'dataset', label: 'Test Data', dataType: 'dataset', required: true },
     ],
     outputs: [
       { id: 'metrics', label: 'Scores', dataType: 'metrics', required: false },
       { id: 'report', label: 'Detailed Report', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Predictions', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Predictions', dataType: 'dataset', required: false },
     ],
     defaultConfig: {
       metric: 'accuracy',
@@ -4412,13 +4356,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#10b981',
     maturity: 'stable',
     inputs: [
-      { id: 'model_output', label: 'Model Output', dataType: 'data', required: true },
-      { id: 'reference', label: 'Reference Data', dataType: 'data', required: false },
+      { id: 'model_output', label: 'Model Output', dataType: 'dataset', required: true },
+      { id: 'reference', label: 'Reference Data', dataType: 'dataset', required: false },
     ],
     outputs: [
       { id: 'scores', label: 'Scores', dataType: 'metrics', required: false },
       { id: 'report', label: 'Detailed Report', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Scored Samples', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Scored Samples', dataType: 'dataset', required: false },
     ],
     defaultConfig: {
       scoring_function: 'def score(output: str, reference: str = None, idx: int = 0) -> dict:\n    return {\n        \'length\': len(output.split()),\n        \'has_greeting\': 1.0 if \'hello\' in output.lower() else 0.0,\n    }\n',
@@ -4498,12 +4442,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#10b981',
     maturity: 'stable',
     inputs: [
-      { id: 'dataset', label: 'QA Dataset', dataType: 'data', required: true },
+      { id: 'dataset', label: 'QA Dataset', dataType: 'dataset', required: true },
       { id: 'model', label: 'Judge Model', dataType: 'model', required: false },
     ],
     outputs: [
       { id: 'metrics', label: 'Factuality Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Results', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Annotated Results', dataType: 'dataset', required: false },
       { id: 'report', label: 'Error Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -4626,7 +4570,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'metrics', label: 'Pass@k Scores', dataType: 'metrics', required: false },
       { id: 'results', label: 'Detailed Results', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Problem Results', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Problem Results', dataType: 'dataset', required: false },
     ],
     defaultConfig: {
       model_name: '',
@@ -4749,12 +4693,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     maturity: 'stable',
     inputs: [
       { id: 'model', label: 'Model', dataType: 'model', required: false },
-      { id: 'dataset', label: 'Custom Prompts', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Custom Prompts', dataType: 'dataset', required: false },
     ],
     outputs: [
       { id: 'metrics', label: 'Performance Metrics', dataType: 'metrics', required: false },
       { id: 'results', label: 'Detailed Profiles', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Timing Data', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Timing Data', dataType: 'dataset', required: false },
     ],
     defaultConfig: {
       model_name: '',
@@ -4887,7 +4831,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'metrics', label: 'Benchmark Scores', dataType: 'metrics', required: false },
       { id: 'results', label: 'Full Results', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Per-Task Scores', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Per-Task Scores', dataType: 'dataset', required: false },
     ],
     defaultConfig: {
       tasks: 'hellaswag,arc_easy',
@@ -4998,7 +4942,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'metrics', label: 'MMLU Scores', dataType: 'metrics', required: false },
       { id: 'results', label: 'Detailed Results', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Subject Scores', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Subject Scores', dataType: 'dataset', required: false },
     ],
     defaultConfig: {
       model_name: '',
@@ -5094,6 +5038,101 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
   },
   {
+    type: 'model_diff',
+    name: 'Model Diff',
+    description: 'Compare two models side-by-side — token probabilities, attention patterns, layer activations',
+    category: 'evaluation',
+    tags: [],
+    aliases: [],
+    icon: 'BarChart3',
+    accent: '#10b981',
+    maturity: 'stable',
+    inputs: [
+      { id: 'model_a', label: 'Model A', dataType: 'model', required: true },
+      { id: 'model_b', label: 'Model B', dataType: 'model', required: true },
+    ],
+    outputs: [
+      { id: 'diff_report', label: 'Diff Report', dataType: 'artifact', required: false },
+      { id: 'metrics', label: 'Diff Metrics', dataType: 'metrics', required: false },
+      { id: 'dataset', label: 'Token Comparisons', dataType: 'dataset', required: false },
+    ],
+    defaultConfig: {
+      prompt: 'The capital of France is',
+      max_tokens: 50,
+      top_k: 5,
+      compare_layers: false,
+      model_a_name: '',
+      model_b_name: '',
+      output_format: 'json',
+      decimal_precision: 4,
+    },
+    configFields: [
+      {
+        name: 'prompt',
+        label: 'Test Prompt',
+        type: 'text_area',
+        default: 'The capital of France is',
+        description: 'Prompt to run through both models',
+      },
+      {
+        name: 'max_tokens',
+        label: 'Max Tokens',
+        type: 'integer',
+        default: 50,
+        min: 1,
+        max: 512,
+        description: 'Maximum tokens to generate for comparison',
+      },
+      {
+        name: 'top_k',
+        label: 'Top-K Probabilities',
+        type: 'integer',
+        default: 5,
+        min: 1,
+        max: 20,
+        description: 'Number of top token probabilities to compare per position',
+      },
+      {
+        name: 'compare_layers',
+        label: 'Compare Layer Activations',
+        type: 'boolean',
+        default: false,
+        description: 'Slower but shows per-layer cosine similarity between hidden states',
+      },
+      {
+        name: 'model_a_name',
+        label: 'Model A Name Override',
+        type: 'string',
+        default: '',
+        description: 'Override name for Model A (uses connected model name if empty)',
+      },
+      {
+        name: 'model_b_name',
+        label: 'Model B Name Override',
+        type: 'string',
+        default: '',
+        description: 'Override name for Model B (uses connected model name if empty)',
+      },
+      {
+        name: 'output_format',
+        label: 'Output Format',
+        type: 'select',
+        default: 'json',
+        options: ['json', 'csv'],
+        description: 'Format for dataset and report outputs',
+      },
+      {
+        name: 'decimal_precision',
+        label: 'Decimal Precision',
+        type: 'integer',
+        default: 4,
+        min: 1,
+        max: 6,
+        description: 'Decimal places for computed scores',
+      },
+    ],
+  },
+  {
     type: 'model_telemetry',
     name: 'Model Telemetry',
     description: 'Capture model internals — attention patterns, activations, memory usage, and layer statistics',
@@ -5105,7 +5144,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     maturity: 'stable',
     inputs: [
       { id: 'model', label: 'Model', dataType: 'model', required: true },
-      { id: 'dataset', label: 'Sample Data', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Sample Data', dataType: 'dataset', required: false },
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
@@ -5211,12 +5250,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#10b981',
     maturity: 'stable',
     inputs: [
-      { id: 'dataset', label: 'RAG Results', dataType: 'data', required: true },
+      { id: 'dataset', label: 'RAG Results', dataType: 'dataset', required: true },
       { id: 'model', label: 'Judge Model', dataType: 'model', required: false },
     ],
     outputs: [
       { id: 'metrics', label: 'RAG Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Results', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Annotated Results', dataType: 'dataset', required: false },
       { id: 'report', label: 'RAG Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -5310,11 +5349,11 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#10b981',
     maturity: 'stable',
     inputs: [
-      { id: 'dataset', label: 'Text Pairs', dataType: 'data', required: true },
+      { id: 'dataset', label: 'Text Pairs', dataType: 'dataset', required: true },
     ],
     outputs: [
       { id: 'metrics', label: 'Similarity Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Pairs', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Annotated Pairs', dataType: 'dataset', required: false },
       { id: 'report', label: 'Similarity Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -5405,13 +5444,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#10b981',
     maturity: 'stable',
     inputs: [
-      { id: 'dataset', label: 'Summarization Data', dataType: 'data', required: true },
+      { id: 'dataset', label: 'Summarization Data', dataType: 'dataset', required: true },
       { id: 'model', label: 'Summarization Model', dataType: 'model', required: false },
     ],
     outputs: [
       { id: 'metrics', label: 'Summarization Scores', dataType: 'metrics', required: false },
       { id: 'report', label: 'Detailed Report', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Scored Summaries', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Scored Summaries', dataType: 'dataset', required: false },
     ],
     defaultConfig: {
       summary_column: 'summary',
@@ -5489,13 +5528,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#10b981',
     maturity: 'stable',
     inputs: [
-      { id: 'dataset', label: 'Text Data', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Text Data', dataType: 'dataset', required: false },
       { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
       { id: 'metrics', label: 'Safety Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Data', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Annotated Data', dataType: 'dataset', required: false },
       { id: 'report', label: 'Toxicity Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -5920,7 +5959,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#6366f1',
     maturity: 'stable',
     inputs: [
-      { id: 'artifact', label: 'Artifact', dataType: 'data', required: true },
+      { id: 'artifact', label: 'Artifact', dataType: 'dataset', required: true },
     ],
     outputs: [],
     defaultConfig: { auto_open: true, display_mode: 'preview' },
@@ -6341,11 +6380,11 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     inputs: [
       { id: 'embeddings', label: 'Embeddings', dataType: 'embedding', required: false },
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: false },
-      { id: 'labels', label: 'Labels / Clusters', dataType: 'data', required: false },
+      { id: 'labels', label: 'Labels / Clusters', dataType: 'dataset', required: false },
     ],
     outputs: [
       { id: 'artifact', label: 'Visualization', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Coordinates', dataType: 'data', required: false },
+      { id: 'dataset', label: 'Coordinates', dataType: 'dataset', required: false },
     ],
     defaultConfig: {
       embedding_column: '_embedding',
@@ -10580,7 +10619,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
     ],
     outputs: [
-      { id: 'artifact', label: 'Report', dataType: 'data', required: false },
+      { id: 'artifact', label: 'Report', dataType: 'dataset', required: false },
     ],
     defaultConfig: { format: 'csv', include_config: true },
     configFields: [
@@ -10629,6 +10668,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       text_column: '',
       training_format: '',
       eval_split: 0.0,
+      checkpoint_interval: 0,
     },
     configFields: [
       {
@@ -10688,6 +10728,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.3,
         description: 'Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)',
+      },
+      {
+        name: 'checkpoint_interval',
+        label: 'Checkpoint Interval',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 100,
+        description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
   },
@@ -10761,6 +10810,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       warmup_ratio: 0.05,
       text_column: '',
       eval_split: 0.0,
+      checkpoint_interval: 0,
     },
     configFields: [
       {
@@ -10805,6 +10855,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.3,
         description: 'Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)',
+      },
+      {
+        name: 'checkpoint_interval',
+        label: 'Checkpoint Interval',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 100,
+        description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
   },
@@ -11119,6 +11178,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       text_column: '',
       training_format: '',
       eval_split: 0.0,
+      checkpoint_interval: 0,
     },
     configFields: [
       {
@@ -11186,6 +11246,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.3,
         description: 'Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)',
+      },
+      {
+        name: 'checkpoint_interval',
+        label: 'Checkpoint Interval',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 100,
+        description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
   },
@@ -11289,6 +11358,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       training_format: '',
       eval_split: 0.0,
       save_merged: false,
+      checkpoint_interval: 0,
     },
     configFields: [
       {
@@ -11373,6 +11443,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: false,
         description: 'Merge LoRA adapters into base model weights before saving (creates standalone model instead of adapter-only)',
       },
+      {
+        name: 'checkpoint_interval',
+        label: 'Checkpoint Interval',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 100,
+        description: 'Save checkpoint every N epochs (0 = final only)',
+      },
     ],
   },
   {
@@ -11410,6 +11489,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       training_format: '',
       eval_split: 0.0,
       save_merged: false,
+      checkpoint_interval: 0,
     },
     configFields: [
       {
@@ -11508,6 +11588,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'boolean',
         default: false,
         description: 'Merge QLoRA adapters into base model weights before saving (creates standalone model instead of adapter-only)',
+      },
+      {
+        name: 'checkpoint_interval',
+        label: 'Checkpoint Interval',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 100,
+        description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
   },
