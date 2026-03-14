@@ -34,6 +34,7 @@ from ..database import SessionLocal
 from ..models.run import Run, LiveRun
 from ..block_sdk.context import BlockContext
 from ..block_sdk.exceptions import BlockError, BlockInputError, BlockConfigError, BlockTimeoutError
+from .composite import CompositeBlockContext, execute_sub_pipeline
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
 from .schema_validator import load_block_schema, validate_inputs, validate_config
@@ -107,6 +108,11 @@ def _find_block_module(block_type: str) -> Path | None:
         run_py = block_dir / "run.py"
         if run_py.exists():
             return block_dir
+    # Search plugin blocks (direct lookup per plugin, not a full scan)
+    from ..plugins.registry import plugin_registry
+    plugin_block = plugin_registry.find_block(block_type)
+    if plugin_block is not None:
+        return plugin_block
     return None
 
 
@@ -120,8 +126,17 @@ def _load_and_run_block(
     progress_cb=None,
     message_cb=None,
     metric_cb=None,
+    context_cls=None,
+    _composite_depth: int = 0,
 ) -> tuple[dict[str, Any], dict[str, dict]]:
-    """Load a block's run.py and execute it. Returns (outputs, data_fingerprints)."""
+    """Load a block's run.py and execute it. Returns (outputs, data_fingerprints).
+
+    Args:
+        context_cls: Optional BlockContext subclass to use (e.g. CompositeBlockContext).
+            Defaults to BlockContext.
+        _composite_depth: Current composite nesting depth (for recursion guard).
+            Managed by execute_sub_pipeline; callers should not set this directly.
+    """
     run_py = block_dir / "run.py"
     spec = importlib.util.spec_from_file_location(f"block_{node_id}", str(run_py))
     if spec is None or spec.loader is None:
@@ -132,7 +147,8 @@ def _load_and_run_block(
     if not hasattr(module, "run"):
         raise RuntimeError(f"Block {block_dir.name} missing run() function")
 
-    ctx = BlockContext(
+    cls = context_cls or BlockContext
+    ctx = cls(
         run_dir=run_dir,
         block_dir=str(block_dir),
         config=config,
@@ -143,7 +159,31 @@ def _load_and_run_block(
     )
 
     module.run(ctx)
-    return ctx.get_outputs(), ctx.get_data_fingerprints()
+
+    outputs = ctx.get_outputs()
+    fingerprints = ctx.get_data_fingerprints()
+
+    # If this is a composite block and it defined a sub-pipeline, execute it
+    if isinstance(ctx, CompositeBlockContext) and ctx.has_sub_pipeline():
+        sub_definition = ctx.get_sub_pipeline()
+        sub_outputs, sub_fingerprints = execute_sub_pipeline(
+            sub_definition=sub_definition,
+            run_dir=run_dir,
+            run_id=run_id,
+            parent_node_id=node_id,
+            parent_inputs=inputs,
+            progress_cb=progress_cb,
+            message_cb=message_cb,
+            metric_cb=metric_cb,
+            find_block_fn=_find_block_module,
+            load_and_run_fn=_load_and_run_block,
+            resolve_secrets_fn=_resolve_secrets,
+            depth=_composite_depth,
+        )
+        outputs.update(sub_outputs)
+        fingerprints.update(sub_fingerprints)
+
+    return outputs, fingerprints
 
 
 def _load_and_run_block_with_timeout(
@@ -157,12 +197,14 @@ def _load_and_run_block_with_timeout(
     message_cb=None,
     metric_cb=None,
     timeout_seconds=None,
+    context_cls=None,
 ) -> tuple[dict[str, Any], dict[str, dict]]:
     """Wrapper that enforces a timeout on block execution.
 
     Args:
         timeout_seconds: Maximum execution time. None means no timeout.
             Caller should read this from the block schema to avoid redundant I/O.
+        context_cls: Optional BlockContext subclass (e.g. CompositeBlockContext).
 
     Returns:
         (outputs, data_fingerprints) tuple from _load_and_run_block.
@@ -172,6 +214,8 @@ def _load_and_run_block_with_timeout(
         return _load_and_run_block(
             block_dir, config, inputs, run_dir,
             run_id, node_id, progress_cb, message_cb, metric_cb,
+            context_cls=context_cls,
+            _composite_depth=0,
         )
 
     result: list[tuple[dict, dict]] = []
@@ -183,6 +227,8 @@ def _load_and_run_block_with_timeout(
                 _load_and_run_block(
                     block_dir, config, inputs, run_dir,
                     run_id, node_id, progress_cb, message_cb, metric_cb,
+                    context_cls=context_cls,
+                    _composite_depth=0,
                 )
             )
         except Exception as e:
@@ -556,11 +602,15 @@ async def execute_pipeline(
                 block_schema = load_block_schema(block_dir)
                 timeout_seconds = block_schema.get("timeout") if block_schema else None
                 max_retries = block_schema.get("max_retries", 0) if block_schema else 0
+                is_composite = block_schema.get("composite", False) if block_schema else False
 
                 # --- Pre-execution validation ---
                 if block_schema:
                     validate_inputs(block_schema, node_inputs)
                     config = validate_config(block_schema, config)
+
+                # Choose context class: composite blocks get CompositeBlockContext
+                context_cls = CompositeBlockContext if is_composite else None
 
                 # --- Execute with retry + timeout ---
                 try:
@@ -570,6 +620,7 @@ async def execute_pipeline(
                                 block_dir, config, node_inputs, run_dir,
                                 run_id, node_id, progress_cb, message_cb, metric_cb,
                                 timeout_seconds=timeout_seconds,
+                                context_cls=context_cls,
                             )
                             outputs[node_id] = node_outputs
                             if data_fingerprints:
@@ -710,6 +761,17 @@ async def execute_pipeline(
         live.status = "complete"
         live.overall_progress = 1.0
         db.commit()
+
+        # Auto-generate run export JSON (never crashes execution)
+        try:
+            from .run_export import generate_run_export
+            export = generate_run_export(run, ARTIFACTS_DIR)
+            export_path = ARTIFACTS_DIR / run_id / "run-export.json"
+            export_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(export_path, "w") as f:
+                json.dump(export, f, indent=2)
+        except Exception:
+            pass
 
         log_run_complete(run_id, run.duration_seconds, all_metrics)
 

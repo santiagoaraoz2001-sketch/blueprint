@@ -104,3 +104,10 @@ config:
     label: Save Merged Model
     description: "Merge LoRA adapters into base model weights before saving (creates standalone model instead of adapter-only)"
     default: false
+  checkpoint_interval:
+    type: integer
+    label: Checkpoint Interval
+    description: "Save checkpoint every N epochs (0 = final only)"
+    default: 0
+    min: 0
+    max: 100
