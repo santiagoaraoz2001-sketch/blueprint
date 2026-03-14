@@ -338,6 +338,70 @@ def compare_run_data(
     return {"identical": len(diffs) == 0, "diffs": diffs}
 
 
+@router.get("/{run_id}/checkpoints")
+def list_checkpoints(run_id: str):
+    """List all checkpoints for a training run."""
+    # Prevent path traversal
+    run_dir = ARTIFACTS_DIR / run_id
+    try:
+        run_dir.resolve().relative_to(ARTIFACTS_DIR.resolve())
+    except ValueError:
+        raise HTTPException(400, "Invalid run ID")
+
+    manifest_path = run_dir / "checkpoints" / "manifest.json"
+    if not manifest_path.exists():
+        return {"checkpoints": []}
+    try:
+        with open(manifest_path) as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            return {"checkpoints": []}
+        return {"checkpoints": data}
+    except (json.JSONDecodeError, OSError):
+        return {"checkpoints": []}
+
+
+@router.post("/{run_id}/checkpoints/{epoch}/load")
+def load_checkpoint_as_model(run_id: str, epoch: int, db: Session = Depends(get_db)):
+    """Create a new model reference from a checkpoint, usable as input to other blocks."""
+    # Prevent path traversal
+    run_dir = ARTIFACTS_DIR / run_id
+    try:
+        run_dir.resolve().relative_to(ARTIFACTS_DIR.resolve())
+    except ValueError:
+        raise HTTPException(400, "Invalid run ID")
+
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    manifest_path = run_dir / "checkpoints" / "manifest.json"
+    if not manifest_path.exists():
+        raise HTTPException(404, "No checkpoints found")
+
+    try:
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+        if not isinstance(manifest, list):
+            raise HTTPException(404, "No checkpoints found")
+    except (json.JSONDecodeError, OSError):
+        raise HTTPException(500, "Checkpoint manifest is corrupted")
+
+    checkpoint = next(
+        (c for c in manifest if isinstance(c, dict) and c.get("epoch") == epoch),
+        None,
+    )
+    if not checkpoint:
+        raise HTTPException(404, f"Checkpoint at epoch {epoch} not found")
+
+    return {
+        "model_path": checkpoint.get("path", ""),
+        "source_run": run_id,
+        "source_epoch": epoch,
+        "metrics": checkpoint.get("metrics", {}),
+    }
+
+
 @router.post("/{run_id}/clone-pipeline", response_model=PipelineResponse)
 def clone_pipeline_from_run(run_id: str, db: Session = Depends(get_db)):
     """Create a new pipeline from a run's config_snapshot."""
