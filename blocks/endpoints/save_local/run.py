@@ -7,9 +7,11 @@ import os
 import shutil
 from datetime import datetime, timezone
 
+from backend.block_sdk.exceptions import BlockDependencyError, BlockInputError
+
 
 def _resolve_data(raw):
-    """Resolve raw input to a Python object."""
+    """Resolve raw input to a Python object, handling any upstream format."""
     if isinstance(raw, str):
         if os.path.isfile(raw):
             return raw  # Keep as file path for copying
@@ -19,7 +21,9 @@ def _resolve_data(raw):
             return json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             return raw  # Plain string
-    return raw
+    if isinstance(raw, (dict, list)):
+        return raw
+    return str(raw)
 
 
 def _detect_format(data):
@@ -89,7 +93,10 @@ def run(ctx):
     ctx.report_progress(1, 4)
     raw_data = ctx.load_input("data")
     if raw_data is None:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     data = _resolve_data(raw_data)
 
@@ -111,7 +118,10 @@ def run(ctx):
     if create_dirs:
         os.makedirs(out_dir, exist_ok=True)
     elif not os.path.isdir(out_dir):
-        raise FileNotFoundError(f"Output directory does not exist: {out_dir}. Enable 'Create Directories'.")
+        raise BlockInputError(
+            f"Output directory does not exist: {out_dir}. Enable 'Create Directories'.",
+            recoverable=True,
+        )
 
     # Apply timestamp
     if timestamp_filename:
@@ -128,22 +138,35 @@ def run(ctx):
             ext = os.path.splitext(src_path)[1]
             out_filepath = os.path.join(out_dir, filename + ext)
             if os.path.exists(out_filepath) and not overwrite:
-                raise FileExistsError(f"File already exists: {out_filepath}")
+                raise BlockInputError(
+                    f"File already exists: {out_filepath}",
+                    recoverable=True,
+                )
             shutil.copy2(src_path, out_filepath)
         elif os.path.isdir(src_path):
             out_filepath = os.path.join(out_dir, filename)
             if os.path.exists(out_filepath) and not overwrite:
-                raise FileExistsError(f"Directory already exists: {out_filepath}")
+                raise BlockInputError(
+                    f"Directory already exists: {out_filepath}",
+                    recoverable=True,
+                )
             if os.path.exists(out_filepath):
                 shutil.rmtree(out_filepath)
             shutil.copytree(src_path, out_filepath)
         else:
-            raise FileNotFoundError(f"Source not found: {src_path}")
+            raise BlockInputError(
+                f"Cannot save data in copy format: source not found at {src_path}",
+                details=f"Upstream block produced: {str(data)[:200]}",
+                recoverable=False,
+            )
 
     elif fmt == "json":
         out_filepath = os.path.join(out_dir, filename + ".json")
         if os.path.exists(out_filepath) and not overwrite:
-            raise FileExistsError(f"File already exists: {out_filepath}")
+            raise BlockInputError(
+                f"File already exists: {out_filepath}",
+                recoverable=True,
+            )
         content = json.dumps(data, indent=2, default=str, ensure_ascii=False)
         with open(out_filepath, "w", encoding="utf-8") as f:
             f.write(content)
@@ -151,7 +174,10 @@ def run(ctx):
     elif fmt == "csv":
         out_filepath = os.path.join(out_dir, filename + ".csv")
         if os.path.exists(out_filepath) and not overwrite:
-            raise FileExistsError(f"File already exists: {out_filepath}")
+            raise BlockInputError(
+                f"File already exists: {out_filepath}",
+                recoverable=True,
+            )
         rows = _normalize_rows(data)
         headers = _collect_headers(rows)
         buf = io.StringIO()
@@ -165,7 +191,10 @@ def run(ctx):
     elif fmt == "txt":
         out_filepath = os.path.join(out_dir, filename + ".txt")
         if os.path.exists(out_filepath) and not overwrite:
-            raise FileExistsError(f"File already exists: {out_filepath}")
+            raise BlockInputError(
+                f"File already exists: {out_filepath}",
+                recoverable=True,
+            )
         if isinstance(data, str):
             content = data
         else:
@@ -176,7 +205,10 @@ def run(ctx):
     elif fmt == "yaml":
         out_filepath = os.path.join(out_dir, filename + ".yaml")
         if os.path.exists(out_filepath) and not overwrite:
-            raise FileExistsError(f"File already exists: {out_filepath}")
+            raise BlockInputError(
+                f"File already exists: {out_filepath}",
+                recoverable=True,
+            )
         try:
             import yaml
             content = yaml.dump(data, default_flow_style=False, allow_unicode=True)
@@ -189,7 +221,10 @@ def run(ctx):
     elif fmt == "parquet":
         out_filepath = os.path.join(out_dir, filename + ".parquet")
         if os.path.exists(out_filepath) and not overwrite:
-            raise FileExistsError(f"File already exists: {out_filepath}")
+            raise BlockInputError(
+                f"File already exists: {out_filepath}",
+                recoverable=True,
+            )
         rows = _normalize_rows(data)
         try:
             import pyarrow as pa
@@ -204,15 +239,18 @@ def run(ctx):
                 df = pd.DataFrame(rows)
                 df.to_parquet(out_filepath, index=False)
             except ImportError as e:
-                from backend.block_sdk.exceptions import BlockDependencyError
-                missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+                missing = getattr(e, "name", None) or "pandas"
                 raise BlockDependencyError(
                     missing,
                     f"Required library not installed: {e}",
                     install_hint="pip install pandas",
                 )
     else:
-        raise ValueError(f"Unsupported format: {fmt}")
+        raise BlockInputError(
+            f"Cannot save data in {fmt} format: unsupported format",
+            details="Supported formats: auto, copy, json, csv, txt, yaml, parquet",
+            recoverable=True,
+        )
 
     # Write metadata sidecar
     if include_metadata:
@@ -231,9 +269,9 @@ def run(ctx):
         file_size = os.path.getsize(out_filepath)
     else:
         file_size = sum(
-            os.path.getsize(os.path.join(dp, f))
-            for dp, _, fns in os.walk(out_filepath)
-            for f in fns
+            os.path.getsize(os.path.join(dp, fn))
+            for dp, _, fns in os.walk(out_filepath, followlinks=False)
+            for fn in fns
         )
 
     ctx.log_message(f"Saved to {out_filepath} ({file_size:,} bytes)")

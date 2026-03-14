@@ -1,26 +1,102 @@
 """Database Writer — write pipeline results to a SQL database."""
 
+import csv as csv_mod
 import json
 import os
+import re
 import sqlite3
+
+from backend.block_sdk.exceptions import (
+    BlockDependencyError,
+    BlockExecutionError,
+    BlockInputError,
+)
+
+# Pattern for validating SQL identifiers from user config
+_SAFE_TABLE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_.]*$")
+
+
+def _quote_identifier(name):
+    """Safely quote a SQL identifier using double-quote escaping (SQL standard)."""
+    safe = str(name).replace('"', '""')
+    return f'"{safe}"'
+
+
+def _validate_table_name(name):
+    """Validate table name from user config to prevent SQL injection."""
+    if not _SAFE_TABLE_NAME_RE.match(name):
+        raise BlockInputError(
+            f"Invalid table name: {name!r}. "
+            "Only letters, numbers, underscores, and dots allowed (must start with letter or underscore).",
+            recoverable=True,
+        )
+    return name
+
+
+def _read_jsonl(f):
+    """Read JSONL file with per-line error handling."""
+    records = []
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            records.append({"_raw_line": line, "_parse_error": True})
+    return records
 
 
 def _resolve_data(raw):
-    """Resolve raw input to a Python object."""
+    """Resolve raw input to a Python object, handling any upstream format."""
     if isinstance(raw, str):
         if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                return json.load(f)
+            ext = os.path.splitext(raw)[1].lower()
+            try:
+                if ext == ".jsonl":
+                    with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                        return _read_jsonl(f)
+                elif ext in (".json",):
+                    with open(raw, "r", encoding="utf-8") as f:
+                        return json.load(f)
+                elif ext == ".csv":
+                    with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                        return list(csv_mod.DictReader(f))
+                elif ext in (".yaml", ".yml"):
+                    try:
+                        import yaml
+                        with open(raw, "r", encoding="utf-8") as f:
+                            result = yaml.safe_load(f)
+                            return result if result is not None else []
+                    except ImportError:
+                        with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                            return [{"value": f.read()}]
+                else:
+                    with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                    try:
+                        return json.loads(content)
+                    except (json.JSONDecodeError, ValueError):
+                        return [{"value": content}]
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return [{"value": f"<unreadable file: {os.path.basename(raw)}>"}]
         if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
+            for name in ("data.json", "results.json", "output.json", "data.csv", "data.yaml"):
+                fpath = os.path.join(raw, name)
+                if os.path.isfile(fpath):
+                    return _resolve_data(fpath)
+            try:
+                files = [f for f in os.listdir(raw) if not f.startswith(".")]
+            except OSError:
+                files = []
+            return [{"directory": raw, "files": ", ".join(files)}]
         try:
             return json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             return [{"value": raw}]
-    return raw
+    if isinstance(raw, (dict, list)):
+        return raw
+    return [{"value": str(raw)}]
 
 
 def _normalize_rows(data):
@@ -71,14 +147,21 @@ def _write_with_pandas(rows, connection_string, table_name, if_exists, dtype_map
     try:
         import pandas as pd
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
-        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        missing = getattr(e, "name", None) or "pandas"
         raise BlockDependencyError(
             missing,
             f"Required library not installed: {e}",
             install_hint="pip install pandas",
         )
-    from sqlalchemy import create_engine
+    try:
+        from sqlalchemy import create_engine
+    except ImportError as e:
+        missing = getattr(e, "name", None) or "sqlalchemy"
+        raise BlockDependencyError(
+            missing,
+            f"Required library not installed: {e}",
+            install_hint="pip install sqlalchemy",
+        )
 
     engine = create_engine(connection_string)
     df = pd.DataFrame(rows)
@@ -116,14 +199,28 @@ def _write_with_sqlite(rows, db_path, table_name, if_exists, create_table, schem
     """Write using sqlite3 directly (no external dependencies)."""
     headers = _collect_headers(rows)
     if not headers:
-        raise ValueError("No columns found in data")
+        raise BlockInputError(
+            "Cannot write to database: no columns found in data",
+            details=f"Data has {len(rows)} rows but no dict keys",
+            recoverable=False,
+        )
 
-    conn = sqlite3.connect(db_path)
+    # Quote table name and column names to prevent SQL injection
+    quoted_table = _quote_identifier(table_name)
+    quoted_headers = [_quote_identifier(h) for h in headers]
+
+    try:
+        conn = sqlite3.connect(db_path)
+    except sqlite3.OperationalError as e:
+        raise BlockExecutionError(
+            f"Cannot connect to SQLite database at {db_path}: {e}",
+            recoverable=False,
+        )
     cursor = conn.cursor()
 
     try:
         if if_exists == "replace":
-            cursor.execute(f"DROP TABLE IF EXISTS [{table_name}]")
+            cursor.execute(f"DROP TABLE IF EXISTS {quoted_table}")
 
         if if_exists == "fail":
             cursor.execute(
@@ -131,28 +228,31 @@ def _write_with_sqlite(rows, db_path, table_name, if_exists, create_table, schem
                 (table_name,)
             )
             if cursor.fetchone():
-                raise ValueError(f"Table '{table_name}' already exists and if_exists='fail'")
+                raise BlockInputError(
+                    f"Table '{table_name}' already exists and if_exists='fail'",
+                    recoverable=True,
+                )
 
         # Create table if needed
         if create_table:
             if schema_dict:
                 col_defs = []
-                for h in headers:
+                for h, qh in zip(headers, quoted_headers):
                     sql_type = schema_dict.get(h, "TEXT")
-                    col_defs.append(f"[{h}] {sql_type}")
+                    col_defs.append(f"{qh} {sql_type}")
             else:
                 col_defs = []
-                for h in headers:
+                for h, qh in zip(headers, quoted_headers):
                     values = [row.get(h) for row in rows[:100]]
                     sql_type = _infer_sql_type(values)
-                    col_defs.append(f"[{h}] {sql_type}")
+                    col_defs.append(f"{qh} {sql_type}")
 
-            create_sql = f"CREATE TABLE IF NOT EXISTS [{table_name}] ({', '.join(col_defs)})"
+            create_sql = f"CREATE TABLE IF NOT EXISTS {quoted_table} ({', '.join(col_defs)})"
             cursor.execute(create_sql)
 
         # Insert data in batches
         placeholders = ", ".join(["?"] * len(headers))
-        insert_sql = f"INSERT INTO [{table_name}] ({', '.join(f'[{h}]' for h in headers)}) VALUES ({placeholders})"
+        insert_sql = f"INSERT INTO {quoted_table} ({', '.join(quoted_headers)}) VALUES ({placeholders})"
 
         total_inserted = 0
         for i in range(0, len(rows), batch_size):
@@ -171,6 +271,12 @@ def _write_with_sqlite(rows, db_path, table_name, if_exists, create_table, schem
 
         conn.commit()
         return total_inserted
+    except sqlite3.Error as e:
+        conn.rollback()
+        raise BlockExecutionError(
+            f"SQLite error writing to table '{table_name}': {e}",
+            recoverable=False,
+        )
     finally:
         conn.close()
 
@@ -186,9 +292,18 @@ def run(ctx):
     timestamp_column = ctx.config.get("timestamp_column", "").strip()
 
     if not connection_string:
-        raise ValueError("Connection string is required (e.g. sqlite:///data.db).")
+        raise BlockInputError(
+            "Connection string is required (e.g. sqlite:///data.db).",
+            recoverable=True,
+        )
     if not table_name:
-        raise ValueError("Table name is required.")
+        raise BlockInputError(
+            "Table name is required.",
+            recoverable=True,
+        )
+
+    # Validate table name to prevent SQL injection
+    _validate_table_name(table_name)
 
     ctx.log_message(f"Database Writer starting (table={table_name})")
     ctx.report_progress(0, 4)
@@ -212,7 +327,10 @@ def run(ctx):
     ctx.report_progress(1, 4)
     raw_data = ctx.load_input("data")
     if raw_data is None:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     resolved = _resolve_data(raw_data)
     rows = _normalize_rows(resolved)
@@ -250,20 +368,16 @@ def run(ctx):
         db_path = connection_string.replace("sqlite:///", "").replace("sqlite://", "")
         if not os.path.isabs(db_path):
             db_path = os.path.join(ctx.run_dir, db_path)
-        os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else ".", exist_ok=True)
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
 
         rows_written = _write_with_sqlite(rows, db_path, table_name, if_exists, create_table, schema_dict, batch_size)
         ctx.log_message(f"Written {rows_written} rows to SQLite: {db_path}")
     else:
         # Use pandas + sqlalchemy for other databases
-        try:
-            rows_written = _write_with_pandas(rows, connection_string, table_name, if_exists, dtype_mapping, batch_size)
-            ctx.log_message(f"Written {rows_written} rows via SQLAlchemy")
-        except ImportError:
-            raise ImportError(
-                "pandas and sqlalchemy are required for non-SQLite databases. "
-                "Install with: pip install pandas sqlalchemy"
-            )
+        rows_written = _write_with_pandas(rows, connection_string, table_name, if_exists, dtype_mapping, batch_size)
+        ctx.log_message(f"Written {rows_written} rows via SQLAlchemy")
 
     # ---- Step 4: Finalize ----
     ctx.report_progress(4, 4)

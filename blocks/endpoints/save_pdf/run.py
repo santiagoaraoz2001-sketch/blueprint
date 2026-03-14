@@ -1,30 +1,77 @@
 """Save PDF — export report or results as a PDF document."""
 
+import csv as csv_mod
 import json
 import os
 from datetime import datetime, timezone
 
+from backend.block_sdk.exceptions import BlockInputError
+
+
+def _read_jsonl(f):
+    """Read JSONL file with per-line error handling."""
+    records = []
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            records.append({"_raw_line": line, "_parse_error": True})
+    return records
+
 
 def _resolve_data(raw):
-    """Resolve raw input to a Python object."""
+    """Resolve raw input to a Python object, handling any upstream format."""
     if isinstance(raw, str):
         if os.path.isfile(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except json.JSONDecodeError:
-                    f.seek(0)
-                    return {"text": f.read()}
+            ext = os.path.splitext(raw)[1].lower()
+            try:
+                if ext == ".jsonl":
+                    with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                        return _read_jsonl(f)
+                elif ext in (".json",):
+                    with open(raw, "r", encoding="utf-8") as f:
+                        return json.load(f)
+                elif ext == ".csv":
+                    with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                        return list(csv_mod.DictReader(f))
+                elif ext in (".yaml", ".yml"):
+                    try:
+                        import yaml
+                        with open(raw, "r", encoding="utf-8") as f:
+                            result = yaml.safe_load(f)
+                            return result if result is not None else {}
+                    except ImportError:
+                        with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                            return {"text": f.read()}
+                else:
+                    with open(raw, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                    try:
+                        return json.loads(content)
+                    except (json.JSONDecodeError, ValueError):
+                        return {"text": content}
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return {"text": f"<unreadable file: {os.path.basename(raw)}>"}
         if os.path.isdir(raw):
-            data_file = os.path.join(raw, "data.json")
-            if os.path.isfile(data_file):
-                with open(data_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
+            for name in ("data.json", "results.json", "output.json", "data.csv", "data.yaml"):
+                fpath = os.path.join(raw, name)
+                if os.path.isfile(fpath):
+                    return _resolve_data(fpath)
+            try:
+                files = [f for f in os.listdir(raw) if not f.startswith(".")]
+            except OSError:
+                files = []
+            return {"text": f"Directory: {raw}\nFiles: {', '.join(files)}"}
         try:
             return json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             return {"text": raw}
-    return raw
+    if isinstance(raw, (dict, list)):
+        return raw
+    return {"text": str(raw)}
 
 
 def _normalize_rows(data):
@@ -91,10 +138,11 @@ def _build_pdf_fpdf(data, out_filepath, title, page_size, orientation, include_c
     rows = _normalize_rows(data)
     if rows:
         headers = _collect_headers(rows)
-        pdf.set_font("Helvetica", "B", 10)
-        col_width = (pdf.w - 20) / max(len(headers), 1)
+        num_cols = max(len(headers), 1)
+        col_width = (pdf.w - 20) / num_cols
         col_width = min(col_width, 60)
 
+        pdf.set_font("Helvetica", "B", 10)
         # Header row
         for h in headers:
             pdf.cell(col_width, 8, str(h)[:20], border=1, align="C")
@@ -137,14 +185,19 @@ def _build_pdf_fpdf(data, out_filepath, title, page_size, orientation, include_c
                     pdf.ln(2)
 
     elif isinstance(data, dict):
-        # Render dict as key-value pairs
-        pdf.set_font("Helvetica", "", font_size)
-        for key, value in data.items():
-            pdf.set_font("Helvetica", "B", 10)
-            pdf.cell(60, 7, str(key), border=1)
-            pdf.set_font("Helvetica", "", 10)
-            val_str = str(value)[:100]
-            pdf.cell(0, 7, val_str, border=1, ln=True)
+        # Check for text content first
+        if "text" in data and isinstance(data["text"], str):
+            pdf.set_font("Helvetica", "", font_size)
+            pdf.multi_cell(0, 6, data["text"][:5000])
+        else:
+            # Render dict as key-value pairs
+            pdf.set_font("Helvetica", "", font_size)
+            for key, value in data.items():
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.cell(60, 7, str(key), border=1)
+                pdf.set_font("Helvetica", "", 10)
+                val_str = str(value)[:100]
+                pdf.cell(0, 7, val_str, border=1, ln=True)
     elif isinstance(data, str):
         # Render text content
         pdf.set_font("Helvetica", "", font_size)
@@ -157,7 +210,7 @@ def _build_pdf_fpdf(data, out_filepath, title, page_size, orientation, include_c
 
 
 def _build_pdf_fallback(data, out_filepath, title, include_timestamp):
-    """Fallback: write a styled text file with .pdf extension note."""
+    """Fallback: write a styled text file when fpdf2 is not available."""
     lines = [f"=== {title} ===", ""]
     if include_timestamp:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -172,13 +225,17 @@ def _build_pdf_fallback(data, out_filepath, title, include_timestamp):
         for row in rows[:100]:
             lines.append(" | ".join(str(row.get(h, "")) for h in headers))
     elif isinstance(data, dict):
-        for k, v in data.items():
-            lines.append(f"{k}: {v}")
+        if "text" in data and isinstance(data["text"], str):
+            lines.append(data["text"][:5000])
+        else:
+            for k, v in data.items():
+                lines.append(f"{k}: {v}")
     else:
         lines.append(str(data)[:5000])
 
     # Write as text since fpdf2 is not available
-    txt_path = out_filepath.replace(".pdf", ".txt")
+    base, _ = os.path.splitext(out_filepath)
+    txt_path = base + ".txt"
     with open(txt_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
     return txt_path
@@ -205,7 +262,10 @@ def run(ctx):
     ctx.report_progress(1, 3)
     raw_data = ctx.load_input("data")
     if raw_data is None:
-        raise ValueError("No input data provided. Connect a 'data' input.")
+        raise BlockInputError(
+            "No input data provided. Connect a 'data' input.",
+            recoverable=False,
+        )
 
     data = _resolve_data(raw_data)
 
@@ -215,7 +275,7 @@ def run(ctx):
         if isinstance(report_config, dict):
             title = report_config.get("title", title)
             page_size = report_config.get("page_size", page_size)
-    except Exception:
+    except (KeyError, ValueError):
         pass
 
     # ---- Step 2: Resolve path ----
@@ -231,9 +291,13 @@ def run(ctx):
     out_filepath = os.path.join(out_dir, filename)
 
     if os.path.exists(out_filepath) and not overwrite:
-        raise FileExistsError(f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.")
+        raise BlockInputError(
+            f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
+            recoverable=True,
+        )
 
     # ---- Step 3: Generate PDF ----
+    actual_format = "pdf"
     is_simulated = False
     try:
         _build_pdf_fpdf(data, out_filepath, title, page_size, orientation, include_charts, include_timestamp, font_size, header_text, footer_text, max_rows)
@@ -242,6 +306,7 @@ def run(ctx):
         ctx.log_message("⚠️ SIMULATION MODE: fpdf2 not installed. Generating text-only fallback report. Install fpdf2 for real PDF output: pip install fpdf2")
         is_simulated = True
         out_filepath = _build_pdf_fallback(data, out_filepath, title, include_timestamp)
+        actual_format = "txt_fallback"
 
     ctx.log_metric("simulation_mode", 1.0 if is_simulated else 0.0)
 
@@ -250,7 +315,11 @@ def run(ctx):
     ctx.log_message(f"Saved report to {out_filepath} ({file_size:,} bytes)")
 
     ctx.save_output("file_path", out_filepath)
-    ctx.save_output("summary", {"file_size_bytes": file_size, "page_size": page_size})
+    ctx.save_output("summary", {
+        "file_size_bytes": file_size,
+        "page_size": page_size,
+        "format": actual_format,
+    })
     ctx.save_artifact("pdf_report", out_filepath)
     ctx.log_metric("file_size_bytes", float(file_size))
 
