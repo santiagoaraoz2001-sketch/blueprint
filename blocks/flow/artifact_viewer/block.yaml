@@ -7,10 +7,14 @@ version: "1.0.0"
 inputs:
   - id: artifact
     label: Artifact
-    data_type: dataset
+    data_type: artifact
     required: true
 
-outputs: []
+outputs:
+  - id: summary
+    label: Artifact Manifest
+    data_type: metrics
+    description: "JSON manifest with artifact type, size, preview, and path information"
 
 config:
   auto_open:

@@ -225,23 +225,6 @@ export const ADVANCED_CONFIGS: Record<string, AdvancedConfig> = {
     },
   },
 
-  batch_inference: {
-    defaults: {
-      max_new_tokens: 512,
-      temperature: 0.7,
-      top_p: 0.9,
-      batch_size: 8,
-      show_progress: true,
-    },
-    schema: {
-      max_new_tokens: { type: 'integer', min: 1, max: 16384, description: 'Maximum tokens per generation' },
-      temperature: { type: 'float', min: 0, max: 2, description: 'Sampling temperature' },
-      top_p: { type: 'float', min: 0, max: 1, description: 'Top-p sampling' },
-      batch_size: { type: 'integer', min: 1, max: 64, description: 'Batch size for parallel inference' },
-      show_progress: { type: 'boolean', description: 'Show progress bar' },
-    },
-  },
-
   rlhf_ppo: {
     defaults: {
       gradient_accumulation_steps: 1,

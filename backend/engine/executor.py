@@ -26,6 +26,23 @@ BLOCK_ALIASES = {
     "model_prompt": "llm_inference",
     "huggingface_dataset_loader": "huggingface_loader",
     "huggingface_model": "huggingface_model_loader",
+    "model_loader": "model_selector",
+    "data_exporter": "save_local",
+    "results_exporter": "save_local",
+    # Deprecated inference blocks → llm_inference
+    "batch_inference": "llm_inference",
+    "few_shot_prompting": "llm_inference",
+    "text_translator": "llm_inference",
+    "text_classifier": "llm_inference",
+    "streaming_server": "llm_inference",
+    "text_summarizer": "llm_inference",
+    "structured_output": "llm_inference",
+    "function_calling": "llm_inference",
+    "chat_completion": "llm_inference",
+    # Deprecated model blocks → model_selector
+    "gguf_model": "model_selector",
+    "mlx_model": "model_selector",
+    "ollama_model": "model_selector",
 }
 
 from sqlalchemy.orm import Session

@@ -246,6 +246,24 @@ def run(ctx):
                 json.dump(emb_data, f)
 
     ctx.save_output("dataset", out_dir)
+
+    # Save structured embeddings output for downstream embedding consumers
+    labels = [
+        str(row.get("label", row.get("text", row.get("id", i))))
+        if isinstance(row, dict) else str(row)
+        for i, row in enumerate(rows)
+    ]
+    emb_output = {
+        "embeddings": embeddings,
+        "labels": labels,
+        "model": model_name,
+        "dimensions": embedding_dim,
+    }
+    emb_output_path = os.path.join(ctx.run_dir, "embeddings_output.json")
+    with open(emb_output_path, "w", encoding="utf-8") as f:
+        json.dump(emb_output, f)
+    ctx.save_output("embeddings", emb_output_path)
+
     ctx.save_output("metrics", {
         "num_embeddings": len(embeddings),
         "embedding_dim": embedding_dim,

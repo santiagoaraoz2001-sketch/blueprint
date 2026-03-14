@@ -113,15 +113,10 @@ function hasCycle(nodes: Node[], edges: Edge[]): string[] | null {
 // Critical config fields that must be non-empty for specific block types
 const CRITICAL_CONFIG: Record<string, { field: string; label: string }[]> = {
   llm_inference: [{ field: 'model_name', label: 'Model Name' }],
-  chat_completion: [{ field: 'model_name', label: 'Model Name' }],
-  structured_output: [{ field: 'model_name', label: 'Model Name' }],
   vision_inference: [{ field: 'model_name', label: 'Model Name' }],
-  function_calling: [{ field: 'model_name', label: 'Model Name' }],
-  few_shot_prompting: [{ field: 'model_name', label: 'Model Name' }],
   prompt_chain: [{ field: 'model_name', label: 'Model Name' }],
   model_router: [{ field: 'primary_model', label: 'Primary Model' }],
   ab_test_inference: [{ field: 'model_a', label: 'Model A' }, { field: 'model_b', label: 'Model B' }],
-  batch_inference: [{ field: 'model_name', label: 'Model Name' }],
   local_file_loader: [{ field: 'file_path', label: 'File Path' }],
   huggingface_loader: [{ field: 'dataset_name', label: 'Dataset Name' }],
   huggingface_model_loader: [{ field: 'model_id', label: 'Model ID' }],

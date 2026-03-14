@@ -59,9 +59,6 @@ def _port_compatible(src_type: str, tgt_type: str) -> bool:
 # Critical config fields that must be set for specific block types
 CRITICAL_CONFIG_FIELDS = {
     "llm_inference": ["model_name"],
-    "chat_completion": ["model_name"],
-    "structured_output": ["model_name"],
-    "batch_inference": ["model_name"],
     "local_file_loader": ["file_path"],
     "huggingface_loader": ["dataset_name"],
     "huggingface_model_loader": ["model_id"],

@@ -39,10 +39,8 @@ export const BLOCK_ALIASES: Record<string, string[]> = {
 
   // Inference blocks
   llm_inference: ['chat', 'talk', 'prompt', 'generate', 'ask', 'respond', 'completion', 'gpt', 'llm', 'language model', 'run model', 'ollama', 'mlx', 'gguf', 'local model', 'apple silicon', 'quantized model'],
-  batch_inference: ['bulk', 'batch', 'mass generate', 'multiple prompts', 'batch run'],
   embeddings: ['embed', 'vector', 'vectorize', 'similarity', 'semantic search'],
   text_generation: ['generate text', 'write', 'compose', 'creative writing'],
-  structured_output: ['json output', 'structured', 'schema', 'typed output', 'format output'],
   vllm_inference: ['vllm', 'fast inference', 'high throughput', 'optimized inference'],
 
   // Evaluate blocks
@@ -78,7 +76,6 @@ export const BLOCK_ALIASES: Record<string, string[]> = {
   aggregator: ['aggregate', 'collect', 'gather', 'reduce', 'combine results'],
   parallel_fan_out: ['parallel', 'fan out', 'concurrent', 'split work'],
   python_runner: ['code', 'script', 'python', 'custom logic', 'custom code', 'execute'],
-  data_exporter: ['export', 'save', 'json', 'csv', 'jsonl', 'tsv', 'download data', 'output file', 'write file'],
   results_formatter: ['format', 'output', 'display', 'render results'],
   report_generator: ['report', 'summary', 'document', 'write report'],
   artifact_packager: ['package', 'artifact', 'export', 'bundle', 'save'],

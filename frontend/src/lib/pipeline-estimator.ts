@@ -64,10 +64,6 @@ const BASE_ESTIMATES: Record<string, BaseEst> = {
   config_file_loader:    { seconds: 1,    memoryGB: 0.01, gpuRequired: false },
   model_selector:        { seconds: 2,    memoryGB: 0.1,  gpuRequired: false },
   cloud_compute_provider:{ seconds: 5,    memoryGB: 0.1,  gpuRequired: false },
-  streaming_server:      { seconds: 2,    memoryGB: 0.2,  gpuRequired: false },
-  data_exporter:         { seconds: 3,    memoryGB: 0.2,  gpuRequired: false },
-  results_exporter:      { seconds: 3,    memoryGB: 0.2,  gpuRequired: false },
-
   // ── Transform / Data ──
   filter_sample:         { seconds: 2,    memoryGB: 0.5,  gpuRequired: false },
   column_transform:      { seconds: 3,    memoryGB: 0.5,  gpuRequired: false },
@@ -77,9 +73,6 @@ const BASE_ESTIMATES: Record<string, BaseEst> = {
   data_merger:           { seconds: 3,    memoryGB: 0.5,  gpuRequired: false },
   text_chunker:          { seconds: 5,    memoryGB: 0.3,  gpuRequired: false },
   text_concatenator:     { seconds: 1,    memoryGB: 0.1,  gpuRequired: false },
-  text_classifier:       { seconds: 10,   memoryGB: 2,    gpuRequired: true  },
-  text_summarizer:       { seconds: 20,   memoryGB: 4,    gpuRequired: true  },
-  text_translator:       { seconds: 25,   memoryGB: 4,    gpuRequired: true  },
   prompt_template:       { seconds: 1,    memoryGB: 0.01, gpuRequired: false },
 
   // ── Training ──
@@ -97,18 +90,13 @@ const BASE_ESTIMATES: Record<string, BaseEst> = {
 
   // ── Model / Inference ──
   llm_inference:         { seconds: 10,   memoryGB: 6,    gpuRequired: true  },
-  batch_inference:       { seconds: 60,   memoryGB: 8,    gpuRequired: true  },
   quantize_model:        { seconds: 120,  memoryGB: 10,   gpuRequired: true  },
   reranker:              { seconds: 15,   memoryGB: 4,    gpuRequired: true  },
   artifact_packager:     { seconds: 10,   memoryGB: 2,    gpuRequired: false },
   model_card_writer:     { seconds: 5,    memoryGB: 0.5,  gpuRequired: false },
 
   // ── New Inference ──
-  chat_completion:       { seconds: 12,   memoryGB: 6,    gpuRequired: true  },
-  structured_output:     { seconds: 15,   memoryGB: 6,    gpuRequired: true  },
   vision_inference:      { seconds: 20,   memoryGB: 8,    gpuRequired: true  },
-  function_calling:      { seconds: 12,   memoryGB: 6,    gpuRequired: true  },
-  few_shot_prompting:    { seconds: 15,   memoryGB: 6,    gpuRequired: true  },
   guardrails:            { seconds: 5,    memoryGB: 2,    gpuRequired: false },
   prompt_chain:          { seconds: 30,   memoryGB: 6,    gpuRequired: true  },
   ab_test_inference:     { seconds: 25,   memoryGB: 8,    gpuRequired: true  },

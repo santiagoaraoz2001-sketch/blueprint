@@ -166,8 +166,23 @@ def run(ctx):
     ctx.save_artifact("eval_results", results_path)
 
     # ── Save outputs ──────────────────────────────────────────────────────
+    # ── Build per-task dataset ─────────────────────────────────────────
+    dataset_rows = []
+    for task_name, task_data in task_results.items():
+        if task_name.startswith("_"):
+            continue
+        if isinstance(task_data, dict):
+            row = {"task": task_name}
+            row.update(task_data)
+            dataset_rows.append(row)
+    ds_dir = os.path.join(ctx.run_dir, "dataset")
+    os.makedirs(ds_dir, exist_ok=True)
+    with open(os.path.join(ds_dir, "data.json"), "w") as f:
+        json.dump(dataset_rows, f, indent=2)
+
     ctx.save_output("metrics", task_results)
     ctx.save_output("results", results_path)
+    ctx.save_output("dataset", ds_dir)
     ctx.log_message(f"Evaluation complete: {len(task_results) - 1} tasks, avg acc={avg_acc:.4f}")
 
 
@@ -211,8 +226,16 @@ def _run_fallback(ctx, model_name, model_backend, tasks, num_fewshot, batch_size
     ctx.log_message(f"Benchmark plan saved to {results_path}")
     ctx.log_message("Install lm-eval to execute actual evaluation")
 
+    # Build placeholder dataset
+    ds_rows = [{"task": t, "acc": "pending"} for t in tasks]
+    ds_dir = os.path.join(ctx.run_dir, "dataset")
+    os.makedirs(ds_dir, exist_ok=True)
+    with open(os.path.join(ds_dir, "data.json"), "w") as f:
+        json.dump(ds_rows, f, indent=2)
+
     ctx.save_output("metrics", {"status": "plan_only", "tasks": tasks})
     ctx.save_output("results", results_path)
+    ctx.save_output("dataset", ds_dir)
     ctx.report_progress(1, 1)
 
 
