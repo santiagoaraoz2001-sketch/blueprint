@@ -59,6 +59,26 @@ export interface PipelineSnapshot {
   edges: any[]
 }
 
+export type NodeExecutionState =
+  | 'idle'
+  | 'cached'
+  | 'will_rerun'
+  | 'will_rerun_downstream'
+  | 'running'
+  | 'complete'
+  | 'failed'
+
+export interface RerunMode {
+  active: boolean
+  sourceRunId: string
+  startNodeId: string
+  nodeStates: Record<string, NodeExecutionState>
+  configOverrides: Record<string, Record<string, any>>
+  originalConfigs: Record<string, Record<string, any>>
+  downstreamNodes: string[]
+  cachedNodes: string[]
+}
+
 export interface ResolvedInheritedEntry {
   from_node: string
   value: any
@@ -149,6 +169,14 @@ interface PipelineState {
 
   // Agentic workflow
   applyGeneratedWorkflow: (nodes: Node<BlockNodeData>[], edges: Edge[]) => void
+
+  // Re-run mode
+  rerunMode: RerunMode | null
+  enterRerunMode: (startNodeId: string, sourceRunId: string) => void
+  exitRerunMode: (restoreConfigs?: boolean) => void
+  updateRerunConfigOverride: (nodeId: string, config: Record<string, any>) => void
+  getDownstreamNodes: (startNodeId: string) => string[]
+  getUpstreamNodes: (startNodeId: string) => string[]
 }
 
 let nodeIdCounter = 0
@@ -872,6 +900,127 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       isDirty: true,
     }))
     toast.success(`Added ${newNodes.length} blocks to canvas`)
+  },
+
+  // ── Re-run Mode ──
+  rerunMode: null,
+
+  getDownstreamNodes: (startNodeId: string) => {
+    const { nodes, edges } = get()
+    const downstream = new Set<string>()
+    const queue = [startNodeId]
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      const outEdges = edges.filter(e => e.source === current)
+      for (const edge of outEdges) {
+        if (!downstream.has(edge.target) && edge.target !== startNodeId) {
+          downstream.add(edge.target)
+          queue.push(edge.target)
+        }
+      }
+    }
+    return Array.from(downstream)
+  },
+
+  getUpstreamNodes: (startNodeId: string) => {
+    const { nodes, edges } = get()
+    const upstream = new Set<string>()
+    const queue = [startNodeId]
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      const inEdges = edges.filter(e => e.target === current)
+      for (const edge of inEdges) {
+        if (!upstream.has(edge.source) && edge.source !== startNodeId) {
+          upstream.add(edge.source)
+          queue.push(edge.source)
+        }
+      }
+    }
+    return Array.from(upstream)
+  },
+
+  enterRerunMode: (startNodeId: string, sourceRunId: string) => {
+    const { nodes, edges } = get()
+    const store = get()
+
+    // Validate that the start node exists
+    const startNode = nodes.find((n) => n.id === startNodeId)
+    if (!startNode || startNode.type !== 'blockNode') {
+      toast.error('Cannot re-run from this node')
+      return
+    }
+
+    const downstream = store.getDownstreamNodes(startNodeId)
+    const upstream = store.getUpstreamNodes(startNodeId)
+
+    const nodeStates: Record<string, NodeExecutionState> = {}
+    const originalConfigs: Record<string, Record<string, any>> = {}
+
+    for (const node of nodes) {
+      if (node.type !== 'blockNode') continue
+      if (upstream.includes(node.id)) {
+        nodeStates[node.id] = 'cached'
+      } else if (node.id === startNodeId) {
+        nodeStates[node.id] = 'will_rerun'
+        // Deep copy original config so edits don't mutate the snapshot
+        originalConfigs[node.id] = JSON.parse(JSON.stringify(node.data.config || {}))
+      } else if (downstream.includes(node.id)) {
+        nodeStates[node.id] = 'will_rerun_downstream'
+      } else {
+        // Nodes not on the execution path (disconnected branches) are also cached
+        nodeStates[node.id] = 'cached'
+      }
+    }
+
+    set({
+      rerunMode: {
+        active: true,
+        sourceRunId,
+        startNodeId,
+        nodeStates,
+        configOverrides: {},
+        originalConfigs,
+        downstreamNodes: downstream,
+        cachedNodes: upstream,
+      },
+      selectedNodeId: startNodeId,
+    })
+  },
+
+  exitRerunMode: (restoreConfigs = true) => {
+    const { rerunMode, nodes } = get()
+    if (!rerunMode) {
+      set({ rerunMode: null })
+      return
+    }
+
+    if (restoreConfigs && Object.keys(rerunMode.originalConfigs).length > 0) {
+      // Restore original configs for nodes that were edited during rerun mode
+      const restoredNodes = nodes.map((n) => {
+        const original = rerunMode.originalConfigs[n.id]
+        if (original) {
+          return { ...n, data: { ...n.data, config: JSON.parse(JSON.stringify(original)) } }
+        }
+        return n
+      })
+      set({ rerunMode: null, nodes: restoredNodes as Node<BlockNodeData>[] })
+    } else {
+      set({ rerunMode: null })
+    }
+  },
+
+  updateRerunConfigOverride: (nodeId: string, config: Record<string, any>) => {
+    const { rerunMode } = get()
+    if (!rerunMode) return
+    set({
+      rerunMode: {
+        ...rerunMode,
+        configOverrides: {
+          ...rerunMode.configOverrides,
+          [nodeId]: { ...(rerunMode.configOverrides[nodeId] || {}), ...config },
+        },
+      },
+    })
   },
 
   saveAsTemplate: (name: string, description: string, category: string) => {
