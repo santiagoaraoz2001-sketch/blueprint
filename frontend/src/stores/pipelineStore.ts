@@ -193,6 +193,9 @@ interface PipelineState {
   // Agentic workflow
   applyGeneratedWorkflow: (nodes: Node<BlockNodeData>[], edges: Edge[]) => void
 
+  // Template instantiation
+  instantiateTemplate: (template: import('@/lib/pipeline-templates').PipelineTemplate, variableValues: Record<string, any>) => void
+
   // Inheritance overlay
   inheritanceOverlay: InheritanceOverlay | null
   activateInheritanceOverlay: (key: string, originNodeId: string) => void
@@ -933,6 +936,53 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       isDirty: true,
     }))
     toast.success(`Added ${newNodes.length} blocks to canvas`)
+  },
+
+  instantiateTemplate: (template, variableValues) => {
+    // Deep clone nodes and edges
+    const clonedNodes = JSON.parse(JSON.stringify(template.nodes)) as Node<BlockNodeData>[]
+    const clonedEdges = JSON.parse(JSON.stringify(template.edges)) as Edge[]
+
+    // Apply variable bindings to node configs
+    if (template.variables) {
+      for (const variable of template.variables) {
+        const value = variableValues[variable.id] ?? variable.default
+        for (const binding of variable.bindings) {
+          const node = clonedNodes.find(n => n.id === binding.nodeId)
+          if (node) {
+            node.data.config[binding.configKey] = value
+          }
+        }
+      }
+    }
+
+    // Hydrate ports from block registry
+    const hydratedNodes = _hydrateNodePorts(clonedNodes)
+
+    // Auto-layout using dagre
+    const layoutedNodes = template.nodes.length > 0
+      ? getLayoutedElements(hydratedNodes, clonedEdges, 'LR')
+      : hydratedNodes
+
+    const { activeTabId } = get()
+
+    set({
+      id: null,
+      name: template.name,
+      nodes: layoutedNodes as Node<BlockNodeData>[],
+      edges: clonedEdges,
+      isDirty: true,
+      selectedNodeId: layoutedNodes.length > 0 ? layoutedNodes[0].id : null,
+      past: [],
+      future: [],
+      tabs: get().tabs.map(t =>
+        t.id === activeTabId
+          ? { ...t, nodes: layoutedNodes as Node<BlockNodeData>[], edges: clonedEdges, pipelineId: null, isDirty: true, name: template.name, past: [], future: [] }
+          : t
+      ),
+    })
+
+    toast.success(`Created pipeline from template: ${template.name}`)
   },
 
   // ── Re-run Mode ──

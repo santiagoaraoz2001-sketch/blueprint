@@ -9,6 +9,7 @@ import type { Node } from '@xyflow/react'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { api } from '@/api/client'
 import RecommendedBlocks from './RecommendedBlocks'
+import { useIsSimpleMode } from '@/hooks/useIsSimpleMode'
 import InheritedFieldBadge from './InheritedFieldBadge'
 import toast from 'react-hot-toast'
 
@@ -48,6 +49,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
   const propagationKeys = usePipelineStore((s) => s.propagationKeys)
   const def = getBlockDefinition(node.data.type)
   const IconComponent = getIcon(node.data.icon)
+  const isSimple = useIsSimpleMode()
 
   // Resolve-config API inheritance data for this node
   const apiInherited = useMemo(() => {
@@ -338,7 +340,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
       )}
 
       {/* Inheritance summary banner */}
-      {inheritedCount > 0 && (
+      {!isSimple && inheritedCount > 0 && (
         <button
           onClick={() => setShowInheritanceSummary(!showInheritanceSummary)}
           style={{
@@ -496,6 +498,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
                 expectedOutputType={def?.outputs[0]?.dataType as ConnectorType | undefined}
                 fieldInfo={fieldInfo}
                 inherited={inherited}
+                hideInheritance={isSimple}
                 onShowInheritance={isPropagatable ? () => {
                   // Origin is upstream source if inherited, otherwise this node
                   const originId = inherited ? inherited.sourceId : node.id
@@ -597,8 +600,9 @@ function ConfigFieldInput({
   onRevert,
   onOverride,
   expectedOutputType,
-  fieldInfo,
-  inherited,
+  fieldInfo: rawFieldInfo,
+  inherited: rawInherited,
+  hideInheritance,
   onShowInheritance,
 }: {
   field: ConfigField
@@ -609,8 +613,14 @@ function ConfigFieldInput({
   expectedOutputType?: ConnectorType
   fieldInfo: FieldInfo
   inherited?: { value: any; sourceName: string; sourceId: string }
+  hideInheritance?: boolean
   onShowInheritance?: () => void
 }) {
+  // In simple mode, suppress inheritance visuals
+  const fieldInfo: FieldInfo = hideInheritance
+    ? { state: 'local', effectiveValue: rawFieldInfo.effectiveValue }
+    : rawFieldInfo
+  const inherited = hideInheritance ? undefined : rawInherited
   const isInherited = fieldInfo.state === 'inherited'
   const isOverriddenInherited = fieldInfo.state === 'local' && !!inherited
 

@@ -6,6 +6,7 @@ export type ThemeMode = 'dark' | 'light'
 export type FontChoice = 'jetbrains' | 'inter' | 'fira' | 'ibm-plex'
 export type FontSizeScale = 'compact' | 'default' | 'comfortable' | 'large'
 export type AccentColor = 'cyan' | 'orange' | 'green' | 'blue' | 'purple' | 'pink'
+export type UiMode = 'simple' | 'professional'
 
 export const FONT_SIZE_SCALES: Record<FontSizeScale, number> = {
   compact: 0.85,
@@ -58,6 +59,10 @@ interface SettingsState {
   hardware: HardwareCapabilities | null
   hardwareLoading: boolean
 
+  // UI mode
+  uiMode: UiMode
+  hasSeenWelcome: boolean
+
   // Audio alerts
   audioAlertsEnabled: boolean
   audioVolume: number
@@ -74,6 +79,9 @@ interface SettingsState {
   setApiKey: (provider: string, key: string) => void
   getApiKey: (provider: string) => string
   fetchHardware: () => Promise<void>
+
+  setUiMode: (mode: UiMode) => void
+  setHasSeenWelcome: (seen: boolean) => void
 
   setAudioAlertsEnabled: (enabled: boolean) => void
   setAudioVolume: (volume: number) => void
@@ -94,6 +102,9 @@ export const useSettingsStore = create<SettingsState>()(
       apiKeys: {} as Record<string, string>,
       hardware: null,
       hardwareLoading: false,
+
+      uiMode: 'simple' as UiMode,
+      hasSeenWelcome: false,
 
       audioAlertsEnabled: false,
       audioVolume: 0.5,
@@ -124,6 +135,9 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
 
+      setUiMode: (uiMode) => set({ uiMode }),
+      setHasSeenWelcome: (hasSeenWelcome) => set({ hasSeenWelcome }),
+
       setAudioAlertsEnabled: (enabled) => set({ audioAlertsEnabled: enabled }),
       setAudioVolume: (volume) => set({ audioVolume: volume }),
       setAudioOnStepComplete: (enabled) => set({ audioOnStepComplete: enabled }),
@@ -132,7 +146,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'blueprint-settings',
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         theme: state.theme,
         accentColor: state.accentColor,
@@ -141,6 +155,8 @@ export const useSettingsStore = create<SettingsState>()(
         demoMode: state.demoMode,
         autoSaveInterval: state.autoSaveInterval,
         apiKeys: state.apiKeys,
+        uiMode: state.uiMode,
+        hasSeenWelcome: state.hasSeenWelcome,
         audioAlertsEnabled: state.audioAlertsEnabled,
         audioVolume: state.audioVolume,
         audioOnStepComplete: state.audioOnStepComplete,
@@ -166,11 +182,20 @@ export const useSettingsStore = create<SettingsState>()(
             demoMode: load<boolean>('demoMode', false),
             autoSaveInterval: load<number>('autoSaveInterval', 5000),
             apiKeys: load<Record<string, string>>('apiKeys', {}),
+            uiMode: 'simple' as UiMode,
+            hasSeenWelcome: false,
             audioAlertsEnabled: load<boolean>('audioAlertsEnabled', false),
             audioVolume: load<number>('audioVolume', 0.5),
             audioOnStepComplete: load<boolean>('audioOnStepComplete', true),
             audioOnPipelineComplete: load<boolean>('audioOnPipelineComplete', true),
             audioOnError: load<boolean>('audioOnError', true),
+          }
+        }
+        if (version === 1) {
+          return {
+            ...(persisted as Record<string, unknown>),
+            uiMode: 'simple' as UiMode,
+            hasSeenWelcome: false,
           }
         }
         return persisted as Record<string, unknown>

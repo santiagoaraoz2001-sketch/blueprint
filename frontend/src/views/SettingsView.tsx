@@ -533,6 +533,66 @@ function LlmProvidersSection() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Mode card — card-style selector for UI mode                        */
+/* ------------------------------------------------------------------ */
+
+function ModeCard({
+  active,
+  onClick,
+  title,
+  description,
+  features,
+}: {
+  active: boolean
+  onClick: () => void
+  title: string
+  description: string
+  features: string[]
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1,
+        padding: '14px 16px',
+        border: active ? `1px solid ${T.cyan}` : `1px solid ${T.border}`,
+        background: active ? `${T.cyan}08` : T.surface2,
+        cursor: 'pointer',
+        outline: 'none',
+        boxShadow: active ? `0 0 8px ${T.cyan}30` : 'none',
+        transition: 'all 0.15s ease',
+        borderRadius: 0,
+        textAlign: 'left',
+      }}
+    >
+      <div style={{
+        fontFamily: F, fontSize: FS.md, fontWeight: 900,
+        letterSpacing: '0.1em', textTransform: 'uppercase',
+        color: active ? T.cyan : T.dim, marginBottom: 6,
+      }}>
+        {title}
+      </div>
+      <div style={{
+        fontFamily: F, fontSize: FS.xs, color: T.sec,
+        lineHeight: 1.5, marginBottom: 8,
+      }}>
+        {description}
+      </div>
+      <ul style={{ margin: 0, paddingLeft: 16 }}>
+        {features.map((f, i) => (
+          <li key={i} style={{
+            fontFamily: F, fontSize: FS.xxs, color: T.dim,
+            lineHeight: 1.6,
+          }}>
+            {f}
+          </li>
+        ))}
+      </ul>
+    </button>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  SettingsView                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -540,6 +600,7 @@ export default function SettingsView() {
   const {
     theme, accentColor, font, fontSize, demoMode, autoSaveInterval,
     setTheme, setAccentColor, setFont, setFontSize, setDemoMode, setAutoSaveInterval,
+    uiMode, setUiMode,
     audioAlertsEnabled, audioVolume, audioOnStepComplete, audioOnPipelineComplete, audioOnError,
     setAudioAlertsEnabled, setAudioVolume, setAudioOnStepComplete, setAudioOnPipelineComplete, setAudioOnError,
   } = useSettingsStore()
@@ -575,6 +636,35 @@ export default function SettingsView() {
         </div>
 
         <motion.div variants={stagger} initial="hidden" animate="show">
+          {/* ── UI MODE ────────────────────────────────────── */}
+          <motion.div variants={fadeUp} style={sectionContainer}>
+            <h2 style={sectionHeader}>UI MODE</h2>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <ModeCard
+                active={uiMode === 'simple'}
+                onClick={() => setUiMode('simple')}
+                title="Simple"
+                description="Perfect for getting started. Core ML workflow: load data, train, evaluate."
+                features={[
+                  '6 core block categories',
+                  'Flat config (no inheritance)',
+                  'Essential navigation only',
+                ]}
+              />
+              <ModeCard
+                active={uiMode === 'professional'}
+                onClick={() => setUiMode('professional')}
+                title="Professional"
+                description="Full power. Plugins, export connectors, advanced monitoring, paper writing."
+                features={[
+                  'All 11 block categories',
+                  'Config inheritance from upstream',
+                  'Paper writing, Workshop, Custom blocks',
+                ]}
+              />
+            </div>
+          </motion.div>
+
           {/* ── APPEARANCE ────────────────────────────────── */}
           <motion.div variants={fadeUp} style={sectionContainer}>
             <h2 style={sectionHeader}>APPEARANCE</h2>
