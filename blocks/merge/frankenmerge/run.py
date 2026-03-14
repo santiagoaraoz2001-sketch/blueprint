@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import time
+from pathlib import Path
 
 from backend.block_sdk.exceptions import BlockTimeoutError
 
@@ -128,12 +129,14 @@ slices:
 
         ctx.log_message(f"Running: {' '.join(cmd)}")
 
+        merge_start = time.time()
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=timeout,
         )
+        merge_time = time.time() - merge_start
 
         if result.returncode == 0:
             ctx.log_message("Merge completed successfully!")
@@ -145,7 +148,9 @@ slices:
             if result.stderr:
                 for line in result.stderr.strip().split("\n")[-5:]:
                     ctx.log_message(f"  {line}")
+            raise RuntimeError(f"mergekit exited with code {result.returncode}")
 
+        ctx.log_metric("simulation_mode", 0.0)
         total_layers = sum(
             (lc.get("layer_range", [0, 16])[1] - lc.get("layer_range", [0, 16])[0])
             for lc in layer_config
@@ -161,6 +166,11 @@ slices:
                 "output_dir": output_dir,
                 "demo_mode": False,
             }, f, indent=2)
+        ctx.log_metric("merge_time_s", round(merge_time, 2))
+        ctx.log_metric("layers_merged", total_layers)
+        if os.path.isdir(output_dir):
+            total_bytes = sum(f.stat().st_size for f in Path(output_dir).rglob("*") if f.is_file())
+            ctx.log_metric("output_size_mb", round(total_bytes / (1024 * 1024), 1))
 
         # Branch: mergekit available — real merge
         ctx.save_output("model", {
@@ -177,13 +187,15 @@ slices:
         return
 
     except ImportError:
-        ctx.log_message("'mergekit' not installed (pip install mergekit). Running simulation.")
+        ctx.log_message("⚠️ SIMULATION MODE: mergekit not installed. Layer assembly is simulated. Install mergekit for real model merging: pip install mergekit")
     except subprocess.TimeoutExpired:
         raise BlockTimeoutError(timeout, f"mergekit process timed out after {timeout}s")
     except Exception as e:
-        ctx.log_message(f"mergekit error: {e}. Falling back to simulation.")
+        ctx.log_message(f"⚠️ SIMULATION MODE: mergekit error ({e}). Falling back to simulated layer assembly.")
 
     # ── Simulation fallback ──
+    ctx.log_metric("simulation_mode", 1.0)
+    merge_start = time.time()
     total_layers = sum(
         (lc.get("layer_range", [0, 16])[1] - lc.get("layer_range", [0, 16])[0])
         for lc in layer_config
@@ -203,6 +215,13 @@ slices:
             "merge_embed": merge_embed,
             "demo_mode": True,
         }, f, indent=2)
+
+    merge_time = time.time() - merge_start
+    ctx.log_metric("merge_time_s", round(merge_time, 2))
+    ctx.log_metric("layers_merged", total_layers)
+    if os.path.isdir(model_path):
+        total_bytes = sum(f.stat().st_size for f in Path(model_path).rglob("*") if f.is_file())
+        ctx.log_metric("output_size_mb", round(total_bytes / (1024 * 1024), 1))
 
     # Branch: mergekit unavailable — simulation fallback
     ctx.save_output("model", {

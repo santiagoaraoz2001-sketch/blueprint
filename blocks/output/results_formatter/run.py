@@ -56,6 +56,12 @@ def run(ctx):
         with open(out_file, "w") as f:
             json.dump(output_data, f, indent=2, default=str)
 
+    metrics_formatted = 0
+    if isinstance(metrics, dict):
+        metrics_formatted = sum(1 for v in metrics.values() if not isinstance(v, dict))
+    ctx.log_metric("metrics_formatted", metrics_formatted)
+    ctx.log_metric("output_size_bytes", os.path.getsize(out_file))
+
     ctx.log_message(f"Results saved to {out_file}")
     ctx.report_progress(2, 2)
     ctx.save_output("artifact", out_file)

@@ -42,6 +42,14 @@ def run(ctx):
     if input_data is None:
         input_data = _load_data(ctx, "dataset")
 
+    # Modes that iterate over data require input
+    if input_data is None and mode != "count":
+        raise ValueError(
+            f"Input data required for '{mode}' mode. "
+            f"Connect data to the 'Input Data' port, or use 'count' mode "
+            f"to repeat without input."
+        )
+
     # Normalize to list
     if isinstance(input_data, list):
         rows = input_data

@@ -79,7 +79,7 @@ def run(ctx):
     framework = model_data.get("source", model_data.get("backend",
         ctx.config.get("provider", "ollama")))
     model_name = model_data.get("model_name", model_data.get("model_id",
-        ctx.config.get("model_name", "llama3.2")))
+        ctx.config.get("model_name", "")))
     inf_config = {"endpoint": model_data.get("endpoint", model_data.get("base_url",
         ctx.config.get("endpoint", "http://localhost:11434")))}
 
@@ -152,7 +152,7 @@ def run(ctx):
     ctx.save_output("dataset", out_dir)
 
     # ── Save report output ─────────────────────────────────────────────
-    _flagged = [r for r in scored if r.get("is_toxic")]
+    _flagged = [r for r in results if r.get("is_toxic")]
     _report = {"summary": metrics, "total_flagged": len(_flagged), "flagged_examples": _flagged[:50]}
     _report_path = os.path.join(ctx.run_dir, "toxicity_report.json")
     with open(_report_path, "w", encoding="utf-8") as f:

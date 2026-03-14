@@ -14,6 +14,7 @@ def run(ctx):
     seed = int(ctx.config.get("seed", 42))
 
     random.seed(seed)
+    ctx.log_metric("simulation_mode", 1.0)
 
     # ── Load agent outputs ──────────────────────────────────────────────
     agent_outputs = _load_dataset(ctx, "dataset")
@@ -30,7 +31,7 @@ def run(ctx):
 
     # ── Demo mode ───────────────────────────────────────────────────────
     if not agent_outputs:
-        ctx.log_message("No agent outputs connected. Generating demo evaluation.")
+        ctx.log_message("⚠️ SIMULATION MODE: No agent outputs connected. Generating synthetic evaluation data. Results are heuristic-based, not from a real evaluation framework.")
         agent_outputs = [
             {
                 "task": f"Task {i}",

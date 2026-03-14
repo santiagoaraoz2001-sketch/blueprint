@@ -1,8 +1,9 @@
 name: Hyperparameter Sweep
 type: hyperparameter_sweep
 category: training
-description: Grid or random search over hyperparameters to find optimal training config
+description: "[DEMO] Simulated hyperparameter sweep with synthetic loss curves (real execution requires: torch, transformers)"
 version: "1.0.0"
+maturity: experimental
 
 inputs:
   - id: dataset

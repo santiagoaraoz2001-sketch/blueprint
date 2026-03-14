@@ -102,8 +102,10 @@ def run(ctx):
 
     docs = []
 
-    if folder_path and os.path.exists(folder_path):
+    if folder_path:
         folder_path = os.path.expanduser(folder_path)
+
+    if folder_path and os.path.exists(folder_path):
 
         # Build search path
         if recursive:
@@ -119,6 +121,7 @@ def run(ctx):
             files = files[:max_files]
 
         ctx.log_message(f"Found {len(files)} file(s) to ingest")
+        ctx.log_metric("simulation_mode", 0.0)
 
         failed_files = []
         pdf_missing_warned = False
@@ -286,7 +289,8 @@ def run(ctx):
             ctx.log_metric("files_failed", len(failed_files))
 
     else:
-        ctx.log_message("Directory not provided or invalid. Running in demo mode...")
+        ctx.log_message("⚠️ SIMULATION MODE: No directory provided. Results are synthetic demo documents. Provide a valid directory_path for real document ingestion.")
+        ctx.log_metric("simulation_mode", 1.0)
         time.sleep(0.5)
         docs = [
             {
