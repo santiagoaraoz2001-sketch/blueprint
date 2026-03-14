@@ -13,6 +13,16 @@ import math
 import os
 import urllib.request
 
+_DEFAULT_DEMO_DIM = 384
+_DEFAULT_ENDPOINT = "http://localhost:11434"
+
+
+def _row_label(row, index):
+    """Extract a display label from a row."""
+    if isinstance(row, dict):
+        return str(row.get("label", row.get("text", row.get("id", index))))
+    return str(row)
+
 
 def run(ctx):
     dataset_path = ctx.load_input("dataset")
@@ -31,21 +41,28 @@ def run(ctx):
     # ── Model config: upstream model input takes priority ──────────────
     model_data = {}
     if ctx.inputs.get("model"):
-        model_data = ctx.load_input("model")
-        if isinstance(model_data, dict):
-            ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+        try:
+            raw_model = ctx.load_input("model")
+            if isinstance(raw_model, str) and os.path.isfile(raw_model):
+                with open(raw_model, "r", encoding="utf-8") as f:
+                    raw_model = json.load(f)
+            if isinstance(raw_model, dict):
+                model_data = raw_model
+                ctx.log_message(f"Using connected model: {model_data.get('model_name', 'unknown')}")
+        except Exception as e:
+            ctx.log_message(f"Warning: could not load model input: {e}")
 
     provider = model_data.get("source", model_data.get("backend",
         ctx.config.get("backend", ctx.config.get("provider", "sentence-transformers"))))
     model_name = model_data.get("model_name", model_data.get("model_id",
         ctx.config.get("model_name", "all-MiniLM-L6-v2")))
     endpoint = model_data.get("endpoint", model_data.get("base_url",
-        ctx.config.get("endpoint", "http://localhost:11434")))
+        ctx.config.get("endpoint", _DEFAULT_ENDPOINT)))
     api_key = model_data.get("api_key",
         ctx.config.get("api_key", "")) or os.environ.get("OPENAI_API_KEY", "")
 
     # Config conflict warnings
-    if ctx.inputs.get("model") and ctx.config.get("model_name"):
+    if ctx.inputs.get("model") and model_data and ctx.config.get("model_name"):
         ctx.log_message(
             f"\u26a0 Config conflict: upstream model='{model_data.get('model_name')}' "
             f"but local config has model_name='{ctx.config.get('model_name')}'. "
@@ -62,8 +79,22 @@ def run(ctx):
 
     # Load dataset
     data_file = os.path.join(dataset_path, "data.json") if os.path.isdir(dataset_path) else dataset_path
-    with open(data_file, "r", encoding="utf-8") as f:
-        rows = json.load(f)
+    try:
+        with open(data_file, "r", encoding="utf-8") as f:
+            rows = json.load(f)
+    except FileNotFoundError:
+        raise ValueError(f"Dataset file not found: {data_file}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in dataset file {data_file}: {e}")
+
+    # Normalize to list of rows
+    if isinstance(rows, dict):
+        rows = rows.get("data", rows.get("rows", rows.get("documents", [rows])))
+    if not isinstance(rows, list):
+        raise ValueError(
+            f"Expected a JSON array in {data_file}, got {type(rows).__name__}. "
+            f"The dataset should be a JSON array of objects."
+        )
 
     # Extract texts
     texts = []
@@ -79,7 +110,8 @@ def run(ctx):
 
     ctx.log_message(f"Generating embeddings for {len(texts)} texts")
     ctx.log_message(f"Model: {model_name}, Provider: {provider}")
-    ctx.report_progress(0, len(texts))
+    if texts:
+        ctx.report_progress(0, len(texts))
 
     embeddings = []
     embedding_dim = 0
@@ -128,8 +160,9 @@ def run(ctx):
                     embeddings.extend(batch_embs)
                     if not embedding_dim and batch_embs:
                         embedding_dim = len(batch_embs[0])
-            except Exception:
-                # Fall back to single-item endpoint
+            except Exception as batch_err:
+                # Fall back to single-item endpoint (older Ollama versions)
+                ctx.log_message(f"Batch endpoint failed ({batch_err}), falling back to single-item mode")
                 for text in batch:
                     try:
                         url = f"{ep}/api/embeddings"
@@ -155,7 +188,11 @@ def run(ctx):
         if not api_key:
             raise ValueError("OpenAI API key required. Set api_key config or OPENAI_API_KEY env var.")
 
-        ep = endpoint.rstrip("/") if endpoint and "openai" in endpoint else "https://api.openai.com"
+        # Use custom endpoint if explicitly configured, otherwise default to OpenAI API
+        if endpoint and endpoint.rstrip("/") != _DEFAULT_ENDPOINT:
+            ep = endpoint.rstrip("/")
+        else:
+            ep = "https://api.openai.com"
         openai_model = model_name if model_name != "all-MiniLM-L6-v2" else "text-embedding-3-small"
         ctx.log_message(f"Using OpenAI embeddings: {openai_model}")
 
@@ -191,11 +228,11 @@ def run(ctx):
     else:
         ctx.log_message(f"Unknown provider '{provider}'. Using demo embeddings.")
         method_used = "demo"
-        embeddings = _demo_embeddings(texts, 384)
-        embedding_dim = 384
+        embeddings = _demo_embeddings(texts, _DEFAULT_DEMO_DIM)
+        embedding_dim = _DEFAULT_DEMO_DIM
 
     if not embedding_dim:
-        embedding_dim = 384
+        embedding_dim = _DEFAULT_DEMO_DIM
 
     # Pad any missing embeddings
     for i in range(len(embeddings)):
@@ -209,7 +246,10 @@ def run(ctx):
                 norm = math.sqrt(sum(v * v for v in embeddings[i])) or 1.0
                 embeddings[i] = [round(v / norm, 6) for v in embeddings[i]]
 
-    # Save embeddings alongside original data
+    # ── Compute labels once for reuse ─────────────────────────────
+    labels = [_row_label(row, i) for i, row in enumerate(rows)]
+
+    # ── Save dataset with embedded vectors ────────────────────────
     results = []
     for i, row in enumerate(rows):
         entry = dict(row) if isinstance(row, dict) else {"text": str(row)}
@@ -221,21 +261,15 @@ def run(ctx):
     with open(os.path.join(out_dir, "data.json"), "w", encoding="utf-8") as f:
         json.dump(results, f)
 
-    if output_format == "json":
-        emb_path = os.path.join(ctx.run_dir, "embeddings.json")
-        emb_data = {
-            "embeddings": embeddings,
-            "labels": [str(row.get("label", row.get("text", row.get("id", i)))) if isinstance(row, dict) else str(row) for i, row in enumerate(rows)],
-            "model": model_name,
-            "dimensions": embedding_dim,
-        }
-        with open(emb_path, "w", encoding="utf-8") as f:
-            json.dump(emb_data, f)
-    else:
+
+    ctx.save_output("dataset", out_dir)
+
+    # ── Save format-specific artifact (for manual download/inspection) ──
+    if output_format == "numpy":
         try:
             import numpy as np
-            emb_path = os.path.join(ctx.run_dir, "embeddings.npy")
-            np.save(emb_path, np.array(embeddings, dtype=np.float32))
+            npy_path = os.path.join(ctx.run_dir, "embeddings.npy")
+            np.save(npy_path, np.array(embeddings, dtype=np.float32))
         except ImportError as e:
             from backend.block_sdk.exceptions import BlockDependencyError
             missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
@@ -245,14 +279,8 @@ def run(ctx):
                 install_hint="pip install numpy",
             )
 
-    ctx.save_output("dataset", out_dir)
-
-    # Save structured embeddings output for downstream embedding consumers
-    labels = [
-        str(row.get("label", row.get("text", row.get("id", i))))
-        if isinstance(row, dict) else str(row)
-        for i, row in enumerate(rows)
-    ]
+    # ── Save structured embeddings output for pipeline consumers ──
+    # Always JSON for downstream block compatibility
     emb_output = {
         "embeddings": embeddings,
         "labels": labels,
@@ -274,7 +302,8 @@ def run(ctx):
     ctx.log_metric("num_embeddings", len(embeddings))
     ctx.log_metric("embedding_dim", embedding_dim)
     ctx.log_message(f"Done: {len(embeddings)} embeddings (dim={embedding_dim}) in column '{embedding_column}'")
-    ctx.report_progress(len(texts), len(texts))
+    if texts:
+        ctx.report_progress(len(texts), len(texts))
 
 
 def _demo_embeddings(texts, dim):

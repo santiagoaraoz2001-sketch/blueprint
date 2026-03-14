@@ -96,8 +96,6 @@ def run(ctx):
     )
     ctx.report_progress(1, 1)
 
-    # The final judge's "response" output is automatically exposed
-    # as the composite block's output by the executor (last-child passthrough).
-    # We also explicitly save the consensus output so it's always present.
-    # It will be overwritten by the sub-pipeline's actual output.
+    # Save a placeholder for consensus — the sub-pipeline's actual output
+    # will overwrite this once execution completes.
     ctx.save_output("consensus", "")

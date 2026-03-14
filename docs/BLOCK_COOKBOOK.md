@@ -154,7 +154,12 @@ def run(ctx):
 | **Inputs** | | |
 | `ctx.config.get(key, default)` | `(str, Any) -> Any` | Read a config value |
 | `ctx.inputs` | `dict[str, Any]` | Dict of connected input port values |
-| `ctx.load_input(name)` | `(str) -> Any` | Load input data (raises `ValueError` if not connected). Auto-fingerprints datasets |
+| `ctx.load_input(name)` | `(str) -> Any` | Load raw input data (raises `ValueError` if not connected) |
+| `ctx.resolve_as_file_path(name)` | `(str) -> str` | Resolve input to a file path (serializes dicts/lists to temp files) |
+| `ctx.resolve_as_data(name)` | `(str) -> list[dict]` | Resolve input to in-memory rows (loads files, wraps dicts/strings) |
+| `ctx.resolve_as_text(name)` | `(str) -> str` | Resolve input to a plain string (reads files, serializes dicts) |
+| `ctx.resolve_as_dict(name)` | `(str) -> dict` | Resolve input to a dict (loads JSON files, parses strings) |
+| `ctx.resolve_model_info(name)` | `(str) -> dict` | Resolve model input to normalized model info dict |
 | **Outputs** | | |
 | `ctx.save_output(name, data_or_path)` | `(str, Any) -> None` | Save output for downstream blocks |
 | `ctx.save_artifact(name, file_path)` | `(str, str) -> None` | Copy a file to run artifacts |
@@ -270,9 +275,63 @@ def run(ctx):
     model = model.to(device)
 ```
 
-### 3.4 Reading Upstream Dataset Outputs
+### 3.4 Reading Inputs (The Right Way)
 
-Upstream blocks save outputs as file paths or in-memory objects. Handle both:
+Always use `resolve_*` methods instead of raw `load_input()`. They normalize
+upstream output into the format your block expects, regardless of whether the
+upstream block saved a file path, a directory, a dict, or a raw string.
+
+| What you need | Method | Returns |
+|--------------|--------|---------|
+| A file path to read | `ctx.resolve_as_file_path("dataset")` | String path to a file |
+| In-memory data rows | `ctx.resolve_as_data("dataset")` | `list[dict]` |
+| Plain text content | `ctx.resolve_as_text("prompt")` | `str` |
+| A config/settings dict | `ctx.resolve_as_dict("config")` | `dict` |
+| Model connection info | `ctx.resolve_model_info("model")` | `dict` with model_name, source, etc. |
+
+**Do NOT do this:**
+
+```python
+# BAD — will crash if upstream saves a file path
+data = ctx.load_input("dataset")
+for row in data:  # TypeError if data is a string path!
+    print(row["text"])
+```
+
+**Do this instead:**
+
+```python
+# GOOD — works regardless of upstream format
+data = ctx.resolve_as_data("dataset")
+for row in data:
+    print(row["text"])
+```
+
+**More examples:**
+
+```python
+def run(ctx):
+    # Read a dataset as in-memory rows (handles file paths, dirs, dicts, lists)
+    rows = ctx.resolve_as_data("dataset")
+    ctx.log_message(f"Loaded {len(rows)} rows")
+
+    # Read a prompt as plain text (handles file paths too)
+    prompt = ctx.resolve_as_text("prompt")
+
+    # Read model info with normalized keys
+    model = ctx.resolve_model_info("model")
+    ctx.log_message(f"Using model: {model['model_name']} via {model['source']}")
+
+    # Get a file path (serializes dicts/lists to temp JSON if needed)
+    path = ctx.resolve_as_file_path("dataset")
+    with open(path) as f:
+        raw = f.read()
+```
+
+### 3.5 Reading Upstream Dataset Outputs (Legacy)
+
+> **Prefer `resolve_*` methods above.** The pattern below still works but
+> requires manual format handling that `resolve_as_data()` does automatically.
 
 ```python
 import json
@@ -315,7 +374,7 @@ def run(ctx):
     ctx.report_progress(1, 1)
 ```
 
-### 3.5 Emitting Metrics with Proper Aggregation
+### 3.6 Emitting Metrics with Proper Aggregation
 
 ```python
 def run(ctx):
@@ -342,7 +401,7 @@ Aggregation strategies (used by the metrics system):
 - `"max"` — Use the maximum across all steps
 - `"mean"` — Average across all steps
 
-### 3.6 Error Handling with BlockError Subclasses
+### 3.7 Error Handling with BlockError Subclasses
 
 ```python
 from backend.block_sdk.exceptions import (
@@ -387,7 +446,7 @@ def run(ctx):
     # ... block logic ...
 ```
 
-### 3.7 Checkpoint Saving
+### 3.8 Checkpoint Saving
 
 Use `ctx.save_artifact()` for intermediate checkpoints and `ctx.save_output()` for the final result:
 
@@ -428,7 +487,7 @@ def run(ctx):
     ctx.log_message("Training complete")
 ```
 
-### 3.8 Writing Output Files
+### 3.9 Writing Output Files
 
 Always write to `ctx.run_dir` and pass the path to `ctx.save_output`:
 

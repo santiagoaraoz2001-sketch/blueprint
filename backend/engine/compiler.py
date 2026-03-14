@@ -1,5 +1,6 @@
 import json
 from .executor import _topological_sort, _find_block_module
+from ..config import BUILTIN_BLOCKS_DIR
 from pathlib import Path
 
 def compile_pipeline_to_python(pipeline_name: str, definition: dict) -> str:
@@ -46,6 +47,12 @@ def compile_pipeline_to_python(pipeline_name: str, definition: dict) -> str:
         "import importlib.util",
         "import traceback",
         "from typing import Any, Optional",
+        "",
+        "# Ensure blocks/ parent is on sys.path so cross-block imports work",
+        "# (e.g. `from blocks.inference._inference_utils import ...`)",
+        f"_BLOCKS_PARENT = r'{str(BUILTIN_BLOCKS_DIR.parent)}'",
+        "if os.path.isdir(_BLOCKS_PARENT) and _BLOCKS_PARENT not in sys.path:",
+        "    sys.path.insert(0, _BLOCKS_PARENT)",
         "",
         "class BlockContext:",
         "    def __init__(self, run_dir: str, block_dir: str, config: dict, inputs: dict, project_name: str='', experiment_name: str=''):",
