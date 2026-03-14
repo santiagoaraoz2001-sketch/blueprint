@@ -6,7 +6,7 @@
 
 import type { Node, Edge } from '@xyflow/react'
 import type { BlockNodeData } from '@/stores/pipelineStore'
-import { getBlockDefinition, isPortCompatible } from './block-registry'
+import { getBlockDefinition, isPortCompatible, type ConfigField } from './block-registry'
 import { estimatePipeline, formatTime, type HardwareSpec, type PipelineEstimate } from './pipeline-estimator'
 import { useHardwareStore } from '@/stores/hardwareStore'
 
@@ -129,6 +129,70 @@ const CRITICAL_CONFIG: Record<string, { field: string; label: string }[]> = {
   save_csv: [{ field: 'file_path', label: 'File Path' }],
   save_json: [{ field: 'file_path', label: 'File Path' }],
   save_txt: [{ field: 'file_path', label: 'File Path' }],
+}
+
+// ─── Config Field Validator ────────────────────────────────────────
+
+/** Validate a single config value against its field schema. Returns error messages. */
+function validateConfigField(field: ConfigField, value: unknown): string[] {
+  const errors: string[] = []
+  const label = field.label || field.name
+
+  switch (field.type) {
+    case 'integer': {
+      const num = typeof value === 'string' ? parseInt(value, 10) : value
+      if (typeof num !== 'number' || isNaN(num as number)) {
+        errors.push(`"${label}" must be an integer, got "${value}"`)
+        break
+      }
+      if (!Number.isInteger(num)) {
+        errors.push(`"${label}" must be an integer, got float ${value}`)
+        break
+      }
+      if (field.min !== undefined && (num as number) < field.min) {
+        errors.push(`"${label}" value ${num} is below minimum ${field.min}`)
+      }
+      if (field.max !== undefined && (num as number) > field.max) {
+        errors.push(`"${label}" value ${num} is above maximum ${field.max}`)
+      }
+      break
+    }
+    case 'float': {
+      const num = typeof value === 'string' ? parseFloat(value as string) : value
+      if (typeof num !== 'number' || isNaN(num as number)) {
+        errors.push(`"${label}" must be a number, got "${value}"`)
+        break
+      }
+      if (field.min !== undefined && (num as number) < field.min) {
+        errors.push(`"${label}" value ${num} is below minimum ${field.min}`)
+      }
+      if (field.max !== undefined && (num as number) > field.max) {
+        errors.push(`"${label}" value ${num} is above maximum ${field.max}`)
+      }
+      break
+    }
+    case 'boolean': {
+      if (typeof value !== 'boolean') {
+        const strVal = typeof value === 'string' ? value.toLowerCase() : ''
+        if (strVal !== 'true' && strVal !== 'false') {
+          errors.push(`"${label}" must be a boolean, got "${value}"`)
+        }
+      }
+      break
+    }
+    case 'select': {
+      if (field.options && field.options.length > 0) {
+        const strValue = String(value)
+        if (!field.options.includes(strValue)) {
+          errors.push(`"${label}" value "${strValue}" is not a valid option (expected: ${field.options.join(', ')})`)
+        }
+      }
+      break
+    }
+    // string, text_area, file_path — no further validation needed beyond presence
+  }
+
+  return errors
 }
 
 // ─── Main Validator ────────────────────────────────────────────────
@@ -263,6 +327,34 @@ export function validatePipelineClient(
             suggestion: `Set "${label}" in the block configuration panel`,
           })
         }
+      }
+    }
+  }
+
+  // ═══ DEEP CONFIG VALIDATION ═══
+  // Validates config values against block.yaml schema (types, bounds, select options)
+
+  for (const node of blockNodes) {
+    const def = getBlockDefinition(node.data.type)
+    if (!def || !def.configFields || def.configFields.length === 0) continue
+
+    const config = node.data.config ?? {}
+
+    for (const field of def.configFields) {
+      const value = config[field.name]
+
+      // Skip empty/missing — already handled by critical config checks above
+      if (value === undefined || value === null || value === '') continue
+
+      const fieldErrors = validateConfigField(field, value)
+      for (const msg of fieldErrors) {
+        warnings.push({
+          message: `"${node.data.label}": ${msg}`,
+          nodeId: node.id,
+          severity: 'warning',
+          category: 'config',
+          suggestion: `Check the "${field.label}" setting in the block configuration panel`,
+        })
       }
     }
   }

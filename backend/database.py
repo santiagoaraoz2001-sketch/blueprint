@@ -54,7 +54,7 @@ def get_db():
 
 def init_db():
     # Import all models so they register with Base.metadata
-    from .models import project, experiment, experiment_phase, pipeline, run, dataset, artifact, paper  # noqa: F401
+    from .models import project, experiment, experiment_phase, pipeline, run, dataset, artifact, paper, sweep  # noqa: F401
     try:
         from alembic.config import Config
         from alembic import command

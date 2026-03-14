@@ -3,7 +3,14 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from .block_registry import is_known_block, get_block_types
+from .block_registry import is_known_block, get_block_types, get_block_config_schema
+from ..block_sdk.config_validator import (
+    validate_and_apply_defaults,
+    _validate_type,
+    _validate_bounds,
+    _validate_select,
+)
+from ..block_sdk.exceptions import BlockConfigError
 
 
 @dataclass
@@ -223,6 +230,53 @@ def validate_pipeline(definition: dict) -> ValidationReport:
                 continue  # Already handled as error above
             if key in ("dataset_name", "model_path", "base_url") and not value:
                 report.warnings.append(f"Block '{node_label}': '{key}' is empty — may be required at runtime")
+
+    # ── 5a. Deep config validation against block.yaml schemas ──
+    for node in nodes:
+        if node.get("type") in ("groupNode", "stickyNote"):
+            continue
+        block_type = node.get("data", {}).get("type", node.get("data", {}).get("blockType", ""))
+        if not block_type:
+            continue
+
+        schema = get_block_config_schema(block_type)
+        if not schema:
+            continue
+
+        node_config = node.get("data", {}).get("config", {})
+        node_label = node.get("data", {}).get("label", node.get("id", "?"))
+
+        # Validate each field independently so all issues get reported
+        for field_name, field_spec in schema.items():
+            if not isinstance(field_spec, dict):
+                continue
+            field_type = field_spec.get("type", "string")
+            value = node_config.get(field_name)
+
+            # Apply default if missing
+            if value is None or value == "":
+                if "default" in field_spec:
+                    value = field_spec["default"]
+            if value is None or value == "":
+                continue
+
+            try:
+                _validate_type(field_name, value, field_type)
+            except BlockConfigError as exc:
+                report.warnings.append(f"Block '{node_label}': {exc}")
+                continue  # Skip bounds/select if type is wrong
+
+            if field_type in ("integer", "float"):
+                try:
+                    _validate_bounds(field_name, value, field_spec)
+                except BlockConfigError as exc:
+                    report.warnings.append(f"Block '{node_label}': {exc}")
+
+            if field_type == "select":
+                try:
+                    _validate_select(field_name, value, field_spec)
+                except BlockConfigError as exc:
+                    report.warnings.append(f"Block '{node_label}': {exc}")
 
     # ── 5b. Check port existence on edges ──
     for edge in edges:

@@ -7,5 +7,5 @@ from .exceptions import (
     BlockDependencyError,
     BlockDataError,
 )
-from .context import BlockContext
+from .context import BlockContext, CompositeBlockContext
 from .types import DataType, BlockStatus

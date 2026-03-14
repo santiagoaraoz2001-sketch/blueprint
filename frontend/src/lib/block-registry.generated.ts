@@ -1,5 +1,5 @@
 // AUTO-GENERATED — DO NOT EDIT MANUALLY
-// Generated from 129 block.yaml files across 12 categories
+// Generated from 130 block.yaml files across 12 categories
 // Run: python scripts/generate_block_registry.py
 
 import type { BlockDefinition } from './block-registry-types'
@@ -3805,7 +3805,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  EVALUATION (15 blocks)
+  //  EVALUATION (16 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -3957,98 +3957,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 6,
         description: 'Decimal places for all computed scores',
-      },
-    ],
-  },
-  {
-    type: 'model_diff',
-    name: 'Model Diff',
-    description: 'Compare two models side-by-side — token probabilities, attention patterns, layer activations',
-    category: 'evaluation',
-    tags: [],
-    aliases: [],
-    icon: 'GitCompareArrows',
-    accent: '#10b981',
-    maturity: 'beta',
-    inputs: [
-      { id: 'model_a', label: 'Model A', dataType: 'model', required: true },
-      { id: 'model_b', label: 'Model B', dataType: 'model', required: true },
-    ],
-    outputs: [
-      { id: 'diff_report', label: 'Diff Report', dataType: 'artifact', required: false },
-      { id: 'metrics', label: 'Diff Metrics', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Token Comparisons', dataType: 'data', required: false },
-    ],
-    defaultConfig: {
-      prompt: 'The capital of France is',
-      max_tokens: 50,
-      top_k: 5,
-      compare_layers: false,
-      model_a_name: '',
-      model_b_name: '',
-      output_format: 'json',
-      decimal_precision: 4,
-    },
-    configFields: [
-      {
-        name: 'prompt',
-        label: 'Test Prompt',
-        type: 'text_area',
-        default: 'The capital of France is',
-        description: 'Prompt to run through both models',
-      },
-      {
-        name: 'max_tokens',
-        label: 'Max Tokens',
-        type: 'integer',
-        default: 50,
-        min: 1,
-        max: 512,
-      },
-      {
-        name: 'top_k',
-        label: 'Top-K Probabilities',
-        type: 'integer',
-        default: 5,
-        min: 1,
-        max: 20,
-        description: 'Number of top token probabilities to compare per position',
-      },
-      {
-        name: 'compare_layers',
-        label: 'Compare Layer Activations',
-        type: 'boolean',
-        default: false,
-        description: 'Slower but shows per-layer cosine similarity between hidden states',
-      },
-      {
-        name: 'model_a_name',
-        label: 'Model A Name Override',
-        type: 'string',
-        default: '',
-      },
-      {
-        name: 'model_b_name',
-        label: 'Model B Name Override',
-        type: 'string',
-        default: '',
-      },
-      {
-        name: 'output_format',
-        label: 'Output Format',
-        type: 'select',
-        default: 'json',
-        options: ['json', 'csv'],
-        description: 'Format for dataset and report outputs',
-      },
-      {
-        name: 'decimal_precision',
-        label: 'Decimal Precision',
-        type: 'integer',
-        default: 4,
-        min: 1,
-        max: 6,
-        description: 'Decimal places for computed scores',
       },
     ],
   },
@@ -5090,6 +4998,101 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 6,
         description: 'Decimal places for all computed scores',
+      },
+    ],
+  },
+  {
+    type: 'model_diff',
+    name: 'Model Diff',
+    description: 'Compare two models side-by-side — token probabilities, attention patterns, layer activations',
+    category: 'evaluation',
+    tags: [],
+    aliases: [],
+    icon: 'BarChart3',
+    accent: '#10b981',
+    maturity: 'stable',
+    inputs: [
+      { id: 'model_a', label: 'Model A', dataType: 'model', required: true },
+      { id: 'model_b', label: 'Model B', dataType: 'model', required: true },
+    ],
+    outputs: [
+      { id: 'diff_report', label: 'Diff Report', dataType: 'artifact', required: false },
+      { id: 'metrics', label: 'Diff Metrics', dataType: 'metrics', required: false },
+      { id: 'dataset', label: 'Token Comparisons', dataType: 'data', required: false },
+    ],
+    defaultConfig: {
+      prompt: 'The capital of France is',
+      max_tokens: 50,
+      top_k: 5,
+      compare_layers: false,
+      model_a_name: '',
+      model_b_name: '',
+      output_format: 'json',
+      decimal_precision: 4,
+    },
+    configFields: [
+      {
+        name: 'prompt',
+        label: 'Test Prompt',
+        type: 'text_area',
+        default: 'The capital of France is',
+        description: 'Prompt to run through both models',
+      },
+      {
+        name: 'max_tokens',
+        label: 'Max Tokens',
+        type: 'integer',
+        default: 50,
+        min: 1,
+        max: 512,
+        description: 'Maximum tokens to generate for comparison',
+      },
+      {
+        name: 'top_k',
+        label: 'Top-K Probabilities',
+        type: 'integer',
+        default: 5,
+        min: 1,
+        max: 20,
+        description: 'Number of top token probabilities to compare per position',
+      },
+      {
+        name: 'compare_layers',
+        label: 'Compare Layer Activations',
+        type: 'boolean',
+        default: false,
+        description: 'Slower but shows per-layer cosine similarity between hidden states',
+      },
+      {
+        name: 'model_a_name',
+        label: 'Model A Name Override',
+        type: 'string',
+        default: '',
+        description: 'Override name for Model A (uses connected model name if empty)',
+      },
+      {
+        name: 'model_b_name',
+        label: 'Model B Name Override',
+        type: 'string',
+        default: '',
+        description: 'Override name for Model B (uses connected model name if empty)',
+      },
+      {
+        name: 'output_format',
+        label: 'Output Format',
+        type: 'select',
+        default: 'json',
+        options: ['json', 'csv'],
+        description: 'Format for dataset and report outputs',
+      },
+      {
+        name: 'decimal_precision',
+        label: 'Decimal Precision',
+        type: 'integer',
+        default: 4,
+        min: 1,
+        max: 6,
+        description: 'Decimal places for computed scores',
       },
     ],
   },
@@ -10629,6 +10632,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       text_column: '',
       training_format: '',
       eval_split: 0.0,
+      checkpoint_interval: 0,
     },
     configFields: [
       {
@@ -10688,6 +10692,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.3,
         description: 'Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)',
+      },
+      {
+        name: 'checkpoint_interval',
+        label: 'Checkpoint Interval',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 100,
+        description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
   },
@@ -10761,6 +10774,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       warmup_ratio: 0.05,
       text_column: '',
       eval_split: 0.0,
+      checkpoint_interval: 0,
     },
     configFields: [
       {
@@ -10805,6 +10819,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.3,
         description: 'Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)',
+      },
+      {
+        name: 'checkpoint_interval',
+        label: 'Checkpoint Interval',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 100,
+        description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
   },
@@ -11119,6 +11142,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       text_column: '',
       training_format: '',
       eval_split: 0.0,
+      checkpoint_interval: 0,
     },
     configFields: [
       {
@@ -11186,6 +11210,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.3,
         description: 'Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)',
+      },
+      {
+        name: 'checkpoint_interval',
+        label: 'Checkpoint Interval',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 100,
+        description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
   },
@@ -11289,6 +11322,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       training_format: '',
       eval_split: 0.0,
       save_merged: false,
+      checkpoint_interval: 0,
     },
     configFields: [
       {
@@ -11373,6 +11407,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: false,
         description: 'Merge LoRA adapters into base model weights before saving (creates standalone model instead of adapter-only)',
       },
+      {
+        name: 'checkpoint_interval',
+        label: 'Checkpoint Interval',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 100,
+        description: 'Save checkpoint every N epochs (0 = final only)',
+      },
     ],
   },
   {
@@ -11410,6 +11453,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       training_format: '',
       eval_split: 0.0,
       save_merged: false,
+      checkpoint_interval: 0,
     },
     configFields: [
       {
@@ -11508,6 +11552,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'boolean',
         default: false,
         description: 'Merge QLoRA adapters into base model weights before saving (creates standalone model instead of adapter-only)',
+      },
+      {
+        name: 'checkpoint_interval',
+        label: 'Checkpoint Interval',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 100,
+        description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
   },

@@ -79,6 +79,21 @@ export interface RerunMode {
   cachedNodes: string[]
 }
 
+export interface ResolvedInheritedEntry {
+  from_node: string
+  value: any
+}
+
+export interface ResolvedNodeConfig {
+  [key: string]: any
+  _inherited?: Record<string, ResolvedInheritedEntry>
+}
+
+export interface PropagationKeys {
+  global: string[]
+  by_category: Record<string, string[]>
+}
+
 interface PipelineState {
   id: string | null
   name: string
@@ -87,6 +102,11 @@ interface PipelineState {
   selectedNodeId: string | null
   focusedErrorNodeId: string | null
   isDirty: boolean
+
+  // Config inheritance from resolve-config API
+  resolvedConfigs: Record<string, ResolvedNodeConfig>
+  propagationKeys: PropagationKeys | null
+  resolveConfigs: (pipelineId: string) => Promise<void>
 
   // Multi-pipeline management
   pipelines: PipelineSummary[]
@@ -215,6 +235,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   pipelinesLoading: false,
   tabs: [{ id: DEFAULT_TAB_ID, name: 'Pipeline 1', nodes: [], edges: [], pipelineId: null, isDirty: false, runStatus: 'idle', past: [], future: [] }],
   activeTabId: DEFAULT_TAB_ID,
+  resolvedConfigs: {},
+  propagationKeys: null,
   versions: [],
   past: [],
   future: [],
@@ -643,9 +665,25 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         edges: def.edges || [],
         isDirty: false,
         selectedNodeId: null,
+        resolvedConfigs: {},
+        propagationKeys: null,
       })
+      // Resolve config inheritance after loading pipeline
+      get().resolveConfigs(id)
     } catch {
       toast.error('Failed to load pipeline')
+    }
+  },
+
+  resolveConfigs: async (pipelineId: string) => {
+    try {
+      const res = await api.post<{ resolved: Record<string, ResolvedNodeConfig>; propagation_keys: PropagationKeys }>(
+        `/pipelines/${pipelineId}/resolve-config`
+      )
+      set({ resolvedConfigs: res.resolved || {}, propagationKeys: res.propagation_keys || null })
+    } catch {
+      // Silently fail — inheritance display is best-effort
+      set({ resolvedConfigs: {}, propagationKeys: null })
     }
   },
 
@@ -674,6 +712,11 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       set({ id: created.id })
     }
     set({ isDirty: false })
+    // Re-resolve config inheritance with persisted data
+    const pipelineId = get().id
+    if (pipelineId) {
+      get().resolveConfigs(pipelineId)
+    }
   },
 
   newPipeline: () => {
@@ -686,6 +729,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       edges: [],
       selectedNodeId: null,
       isDirty: false,
+      resolvedConfigs: {},
+      propagationKeys: null,
       tabs: s.tabs.map((t) =>
         t.id === activeTabId
           ? { ...t, nodes: [], edges: [], pipelineId: null, isDirty: false, name: 'Untitled Pipeline' }

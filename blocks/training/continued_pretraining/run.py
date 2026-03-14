@@ -31,6 +31,7 @@ def run(ctx):
     warmup_ratio = float(ctx.config.get("warmup_ratio", 0.05))
     text_column = ctx.config.get("text_column") or _dataset_meta.get("text_column", "")
     eval_split = float(ctx.config.get("eval_split", 0.0))
+    checkpoint_interval = int(ctx.config.get("checkpoint_interval", 0))
 
     # Try to get model from input
     try:
@@ -163,20 +164,6 @@ def run(ctx):
             disable_tqdm=True,
         )
 
-        class ProgressCallback:
-            def __init__(self, ctx, total_steps):
-                self.ctx = ctx
-                self.total_steps = total_steps
-
-            def on_log(self, args, state, control, logs=None, **kwargs):
-                if logs and "loss" in logs:
-                    self.ctx.log_message(f"  Step {state.global_step} — loss: {logs['loss']:.4f}")
-                    self.ctx.log_metric("train/loss", round(logs["loss"], 4), state.global_step)
-                    if "perplexity" not in logs and "loss" in logs:
-                        ppl = math.exp(min(logs["loss"], 20))
-                        self.ctx.log_metric("train/perplexity", round(ppl, 2), state.global_step)
-                self.ctx.report_progress(state.global_step, self.total_steps)
-
         total_steps = math.ceil(len(train_dataset) / batch_size) * epochs
 
         trainer = Trainer(
@@ -199,6 +186,24 @@ def run(ctx):
                     ctx.log_message(f"  Eval loss: {logs['eval_loss']:.4f}")
                     ctx.log_metric("eval/loss", round(logs["eval_loss"], 4), state.global_step)
                 ctx.report_progress(state.global_step, total_steps)
+
+            def on_epoch_end(self, args, state, control, **kwargs):
+                current_epoch = int(state.epoch)
+                if checkpoint_interval > 0 and current_epoch % checkpoint_interval == 0:
+                    ckpt_path = os.path.join(output_dir, f"checkpoint-epoch-{current_epoch}")
+                    os.makedirs(ckpt_path, exist_ok=True)
+                    kwargs.get("model", model).save_pretrained(ckpt_path)
+                    tokenizer.save_pretrained(ckpt_path)
+                    # Search backward for most recent training loss (last entry may be eval)
+                    ckpt_metrics = {}
+                    for entry in reversed(state.log_history):
+                        if "loss" in entry and "loss" not in ckpt_metrics:
+                            ckpt_metrics["loss"] = entry["loss"]
+                        if "eval_loss" in entry and "eval_loss" not in ckpt_metrics:
+                            ckpt_metrics["eval_loss"] = entry["eval_loss"]
+                        if "loss" in ckpt_metrics and "eval_loss" in ckpt_metrics:
+                            break
+                    ctx.save_checkpoint(current_epoch, ckpt_path, ckpt_metrics)
 
         trainer.add_callback(BlueprintCallback())
 
