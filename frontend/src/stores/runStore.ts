@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { api } from '@/api/client'
 import { useSettingsStore } from './settingsStore'
 import { playSound } from '@/lib/audio'
+import { sseManager } from '@/services/sseManager'
 
 export interface NodeStatus {
   nodeId: string
@@ -32,12 +33,16 @@ interface RunState {
   elapsed: number
   error: string | null
   logs: string[]
+  sseStatus: 'connected' | 'reconnecting' | 'stale' | 'disconnected'
   _demoTimer: number | null
   _elapsedTimer: number | null
+  _sseUnsubscribe: (() => void) | null
 
   // Actions
   startRun: (pipelineId: string) => Promise<void>
   stopRun: () => Promise<void>
+  connectSSE: (runId: string) => void
+  disconnectSSE: () => void
   handleSSEEvent: (event: string, data: SSEEventData) => void
   reset: () => void
 }
@@ -68,8 +73,10 @@ export const useRunStore = create<RunState>((set, get) => ({
   elapsed: 0,
   error: null,
   logs: [],
+  sseStatus: 'disconnected' as const,
   _demoTimer: null,
   _elapsedTimer: null,
+  _sseUnsubscribe: null,
 
   startRun: async (pipelineId: string) => {
     if (isDemoMode()) {
@@ -104,11 +111,12 @@ export const useRunStore = create<RunState>((set, get) => ({
     }
     try {
       _clearElapsedTimer(get)
-      await api.post<{ status: string; pipeline_id: string }>(
+      const res = await api.post<{ status: string; pipeline_id: string; run_id: string }>(
         `/pipelines/${pipelineId}/execute`
       )
       const elapsedTimer = _startElapsedTimer(set)
       set({
+        activeRunId: res?.run_id ?? null,
         pipelineId,
         status: 'running',
         nodeStatuses: {},
@@ -130,6 +138,7 @@ export const useRunStore = create<RunState>((set, get) => ({
     const { activeRunId, _demoTimer } = get()
     if (!activeRunId) return
     _clearElapsedTimer(get)
+    get().disconnectSSE()
     if (isDemoMode()) {
       if (_demoTimer) window.clearInterval(_demoTimer)
       set({ status: 'cancelled', error: 'Stopped by user', _demoTimer: null, _elapsedTimer: null })
@@ -141,6 +150,38 @@ export const useRunStore = create<RunState>((set, get) => ({
     } catch {
       // Ignore stop errors
     }
+  },
+
+  connectSSE: (runId: string) => {
+    const { _sseUnsubscribe } = get()
+    if (_sseUnsubscribe) _sseUnsubscribe()
+
+    const unsubscribe = sseManager.subscribe(runId, (event, data) => {
+      // Handle meta-events for connection status
+      if (event === '__sse_stale' || event === '__sse_failed') {
+        set({ sseStatus: 'stale' })
+        return
+      }
+      if (event === '__sse_reconnecting') {
+        set({ sseStatus: 'reconnecting' })
+        return
+      }
+      if (event === '__sse_connected') {
+        set({ sseStatus: 'connected' })
+        return
+      }
+
+      // Forward real SSE events to handler
+      get().handleSSEEvent(event, data)
+    })
+
+    set({ _sseUnsubscribe: unsubscribe, sseStatus: 'connected' })
+  },
+
+  disconnectSSE: () => {
+    const { _sseUnsubscribe } = get()
+    if (_sseUnsubscribe) _sseUnsubscribe()
+    set({ _sseUnsubscribe: null, sseStatus: 'disconnected' })
   },
 
   handleSSEEvent: (event: string, data: SSEEventData) => {
@@ -251,8 +292,9 @@ export const useRunStore = create<RunState>((set, get) => ({
   },
 
   reset: () => {
-    // Clear timers on reset to prevent leaks
-    const { _demoTimer } = get()
+    // Clean up SSE, timers on reset to prevent leaks
+    const { _demoTimer, _sseUnsubscribe } = get()
+    if (_sseUnsubscribe) _sseUnsubscribe()
     if (_demoTimer) window.clearInterval(_demoTimer)
     _clearElapsedTimer(get)
     set({
@@ -266,8 +308,10 @@ export const useRunStore = create<RunState>((set, get) => ({
       elapsed: 0,
       error: null,
       logs: [],
+      sseStatus: 'disconnected',
       _demoTimer: null,
       _elapsedTimer: null,
+      _sseUnsubscribe: null,
     })
   },
 }))

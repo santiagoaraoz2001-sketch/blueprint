@@ -75,8 +75,8 @@ def _validate_type(field_name: str, value: Any, field_type: str) -> None:
         # Reject booleans — isinstance(True, int) is True in Python
         if isinstance(value, bool):
             raise BlockConfigError(
+                field_name,
                 f"'{field_name}' must be an integer, got bool: {value!r}",
-                field=field_name,
             )
         if isinstance(value, int):
             return
@@ -84,8 +84,8 @@ def _validate_type(field_name: str, value: Any, field_type: str) -> None:
             # Accept floats that are whole numbers (e.g. 5.0 from YAML)
             if value != int(value):
                 raise BlockConfigError(
+                    field_name,
                     f"'{field_name}' must be an integer, got float: {value!r}",
-                    field=field_name,
                 )
             return
         # Try to parse string representation
@@ -96,16 +96,16 @@ def _validate_type(field_name: str, value: Any, field_type: str) -> None:
             except ValueError:
                 pass
         raise BlockConfigError(
+            field_name,
             f"'{field_name}' must be an integer, got {type(value).__name__}: {value!r}",
-            field=field_name,
         )
 
     elif field_type == "float":
         # Reject booleans
         if isinstance(value, bool):
             raise BlockConfigError(
+                field_name,
                 f"'{field_name}' must be a number, got bool: {value!r}",
-                field=field_name,
             )
         if isinstance(value, (int, float)):
             return
@@ -116,8 +116,8 @@ def _validate_type(field_name: str, value: Any, field_type: str) -> None:
             except ValueError:
                 pass
         raise BlockConfigError(
+            field_name,
             f"'{field_name}' must be a number, got {type(value).__name__}: {value!r}",
-            field=field_name,
         )
 
     elif field_type == "boolean":
@@ -126,24 +126,24 @@ def _validate_type(field_name: str, value: Any, field_type: str) -> None:
         if isinstance(value, str) and value.lower() in ("true", "false"):
             return
         raise BlockConfigError(
+            field_name,
             f"'{field_name}' must be a boolean, got {type(value).__name__}: {value!r}",
-            field=field_name,
         )
 
     elif field_type == "select":
         if not isinstance(value, str):
             raise BlockConfigError(
+                field_name,
                 f"'{field_name}' must be a string for select, "
                 f"got {type(value).__name__}: {value!r}",
-                field=field_name,
             )
 
     elif field_type in _STRING_TYPES:
         if not isinstance(value, str):
             raise BlockConfigError(
+                field_name,
                 f"'{field_name}' must be a string, "
                 f"got {type(value).__name__}: {value!r}",
-                field=field_name,
             )
 
 
@@ -159,13 +159,13 @@ def _validate_bounds(field_name: str, value: Any, field_spec: dict) -> None:
 
     if min_val is not None and numeric_val < float(min_val):
         raise BlockConfigError(
+            field_name,
             f"'{field_name}' value {value} is below minimum {min_val}",
-            field=field_name,
         )
     if max_val is not None and numeric_val > float(max_val):
         raise BlockConfigError(
+            field_name,
             f"'{field_name}' value {value} is above maximum {max_val}",
-            field=field_name,
         )
 
 
@@ -174,6 +174,6 @@ def _validate_select(field_name: str, value: Any, field_spec: dict) -> None:
     options = field_spec.get("options", [])
     if options and str(value) not in [str(o) for o in options]:
         raise BlockConfigError(
+            field_name,
             f"'{field_name}' value {value!r} not in allowed options: {options}",
-            field=field_name,
         )

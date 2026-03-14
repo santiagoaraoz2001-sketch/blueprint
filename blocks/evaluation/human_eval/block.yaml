@@ -15,11 +15,11 @@ outputs:
   - id: metrics
     label: Pass@k Scores
     data_type: metrics
-    description: Aggregate: pass@{k} for each configured k, num_problems, total_samples, model, temperature
+    description: 'Aggregate: pass@{k} for each configured k, num_problems, total_samples, model, temperature'
   - id: results
     label: Detailed Results
     data_type: artifact
-    description: human_eval_results.json: metrics dict, per-problem results with task_id, passed, completions
+    description: 'human_eval_results.json: metrics dict, per-problem results with task_id, passed, completions'
 
   - id: dataset
     label: Problem Results

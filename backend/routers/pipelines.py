@@ -95,6 +95,48 @@ def clone_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
     return clone
 
 
+@router.post("/{pipeline_id}/resolve-config")
+def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
+    """Resolve config inheritance for preview in the UI (dry run)."""
+    from ..engine.executor import _topological_sort, _find_block_module
+    from ..engine.config_resolver import (
+        resolve_configs,
+        GLOBAL_PROPAGATION_KEYS,
+        CATEGORY_PROPAGATION_KEYS,
+    )
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+
+    if not nodes:
+        return {"resolved": {}, "propagation_keys": {}}
+
+    try:
+        order = _topological_sort(nodes, edges)
+        resolved = resolve_configs(nodes, edges, order, _find_block_module)
+    except Exception as exc:
+        raise HTTPException(
+            500,
+            f"Config resolution failed: {exc}",
+        ) from exc
+
+    return {
+        "resolved": resolved,
+        "propagation_keys": {
+            "global": sorted(GLOBAL_PROPAGATION_KEYS),
+            "by_category": {
+                cat: sorted(keys)
+                for cat, keys in CATEGORY_PROPAGATION_KEYS.items()
+            },
+        },
+    }
+
+
 @router.get("/{pipeline_id}/compile")
 def compile_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
     from ..engine.compiler import compile_pipeline_to_python

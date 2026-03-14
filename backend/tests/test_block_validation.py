@@ -47,26 +47,26 @@ class TestExceptionHierarchy:
     def test_block_error_base(self):
         e = BlockError("base error")
         assert str(e) == "base error"
-        assert e.field == ""
+        assert e.details == ""
         assert e.recoverable is False
 
-    def test_block_error_with_field(self):
-        e = BlockError("error", field="model_name", recoverable=True)
-        assert e.field == "model_name"
+    def test_block_error_with_details(self):
+        e = BlockError("error", details="extra info", recoverable=True)
+        assert e.details == "extra info"
         assert e.recoverable is True
 
     def test_block_config_error_inherits(self):
-        e = BlockConfigError("bad config", field="lr")
+        e = BlockConfigError("lr", "bad config")
         assert isinstance(e, BlockError)
         assert isinstance(e, BlockConfigError)
         assert isinstance(e, Exception)
         assert e.field == "lr"
-        assert e.recoverable is False
+        assert e.recoverable is True  # default for config errors
 
     def test_block_input_error_inherits(self):
-        e = BlockInputError("missing input", field="dataset")
+        e = BlockInputError("missing input", details="dataset field")
         assert isinstance(e, BlockError)
-        assert e.field == "dataset"
+        assert e.details == "dataset field"
 
     def test_block_output_error_defaults_recoverable(self):
         e = BlockOutputError("no output")
@@ -83,24 +83,26 @@ class TestExceptionHierarchy:
         assert e.recoverable is False
 
     def test_block_dependency_error_inherits(self):
-        e = BlockDependencyError("torch not installed")
+        e = BlockDependencyError("torch")
         assert isinstance(e, BlockError)
         assert e.recoverable is False
+        assert "torch" in str(e)
 
     def test_block_timeout_error_inherits(self):
-        e = BlockTimeoutError("exceeded 60s")
+        e = BlockTimeoutError(60)
         assert isinstance(e, BlockError)
         assert e.recoverable is False
+        assert e.timeout_seconds == 60
 
     def test_all_catchable_as_block_error(self):
         """All subclasses should be catchable with ``except BlockError``."""
         exceptions = [
-            BlockConfigError("a"),
+            BlockConfigError("f", "a"),
             BlockInputError("b"),
             BlockOutputError("c"),
             BlockExecutionError("d"),
             BlockDependencyError("e"),
-            BlockTimeoutError("f"),
+            BlockTimeoutError(30),
         ]
         for exc in exceptions:
             try:
@@ -114,15 +116,16 @@ class TestExceptionHierarchy:
         """A BlockConfigError should not be catchable as BlockInputError."""
         with pytest.raises(BlockConfigError):
             try:
-                raise BlockConfigError("config issue")
+                raise BlockConfigError("field", "config issue")
             except BlockInputError:
                 pytest.fail("BlockConfigError caught by BlockInputError")
 
     def test_error_message_preserved(self):
         msg = "model_name is required but was not provided"
-        e = BlockConfigError(msg, field="model_name")
+        e = BlockConfigError("model_name", msg)
         assert str(e) == msg
         assert msg in repr(e)
+        assert e.field == "model_name"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

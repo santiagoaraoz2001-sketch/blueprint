@@ -20,11 +20,11 @@ outputs:
   - id: metrics
     label: Scores
     data_type: metrics
-    description: Aggregate scores: metric value, passed (bool), num_samples — keyed by metric name
+    description: 'Aggregate scores: metric value, passed (bool), num_samples — keyed by metric name'
   - id: report
     label: Detailed Report
     data_type: artifact
-    description: benchmark_report.json: model, metrics, sample_predictions with input, target, prediction, score
+    description: 'benchmark_report.json: model, metrics, sample_predictions with input, target, prediction, score'
 
   - id: dataset
     label: Predictions
