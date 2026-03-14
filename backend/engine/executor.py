@@ -7,6 +7,7 @@ and executes them sequentially, passing outputs between blocks.
 
 import json
 import re
+import sys
 import traceback
 import uuid
 import time
@@ -138,6 +139,11 @@ def _load_and_run_block(
             Managed by execute_sub_pipeline; callers should not set this directly.
     """
     run_py = block_dir / "run.py"
+    # Ensure block parent directories are on sys.path so cross-block imports work
+    # e.g. `from blocks.inference._inference_utils import ...`
+    blocks_parent = str(BUILTIN_BLOCKS_DIR.parent)
+    if blocks_parent not in sys.path:
+        sys.path.insert(0, blocks_parent)
     spec = importlib.util.spec_from_file_location(f"block_{node_id}", str(run_py))
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Cannot load block module from {run_py}")

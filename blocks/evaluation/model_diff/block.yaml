@@ -27,7 +27,7 @@ outputs:
     description: "Aggregate: kl_divergence, cosine_similarity, top1_agreement_rate"
   - id: dataset
     label: Token Comparisons
-    data_type: data
+    data_type: dataset
     description: Per-position token probability comparisons
 
 config:

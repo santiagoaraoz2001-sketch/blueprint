@@ -22,11 +22,16 @@ def _scan_blocks(directory: Path, source: str = "builtin") -> list[dict]:
         for block_dir in sorted(category_dir.iterdir()):
             yaml_path = block_dir / "block.yaml"
             if yaml_path.exists():
-                with open(yaml_path) as f:
-                    meta = yaml.safe_load(f)
-                meta["source"] = source
-                meta["path"] = str(block_dir)
-                blocks.append(meta)
+                try:
+                    with open(yaml_path) as f:
+                        meta = yaml.safe_load(f)
+                    if not isinstance(meta, dict):
+                        continue
+                    meta["source"] = source
+                    meta["path"] = str(block_dir)
+                    blocks.append(meta)
+                except (yaml.YAMLError, OSError):
+                    continue  # Skip malformed block definitions
     return blocks
 
 

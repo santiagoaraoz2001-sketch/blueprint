@@ -12,7 +12,7 @@ export function useAutoSave() {
 
   useEffect(() => {
     const unsub = usePipelineStore.subscribe((state, prev) => {
-      if (state.isDirty && state.id && !prev.isDirty) {
+      if (state.isDirty && !prev.isDirty) {
         // Pipeline became dirty and has an ID — schedule save
         if (timerRef.current) clearTimeout(timerRef.current)
 

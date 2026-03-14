@@ -63,11 +63,13 @@ def publish_event(run_id: str, event_type: str, data: dict):
 
 def _cleanup_run(run_id: str):
     """Clean up buffer and counter for a completed run (after a delay)."""
-    # Keep buffer briefly for late reconnects, then discard
-    # For simplicity, clean up immediately since the final event is buffered
     _event_counters.pop(run_id, None)
-    # Don't pop buffer immediately — let late reconnectors catch up
-    # It will be overwritten if run_id is reused
+    # Remove buffer after brief delay to let late reconnectors catch the final event
+    import threading
+    def _deferred_pop():
+        _run_buffers.pop(run_id, None)
+        _run_queues.pop(run_id, None)
+    threading.Timer(30.0, _deferred_pop).start()
 
 
 @router.get("/runs/{run_id}")

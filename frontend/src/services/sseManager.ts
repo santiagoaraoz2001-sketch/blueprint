@@ -30,8 +30,8 @@ const TERMINAL_EVENTS = new Set(['run_completed', 'run_failed', 'run_cancelled']
 
 const NAMED_EVENT_TYPES = [
   'node_started', 'node_progress', 'node_completed', 'node_failed',
-  'node_output', 'node_log', 'node_retry',
-  'metric', 'system_metrics',
+  'node_output', 'node_log', 'node_retry', 'node_cached',
+  'metric', 'system_metric',
   'run_completed', 'run_failed', 'run_cancelled',
   'sweep_run_completed', 'sweep_run_failed', 'sweep_completed',
 ]

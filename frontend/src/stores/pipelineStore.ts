@@ -906,7 +906,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   rerunMode: null,
 
   getDownstreamNodes: (startNodeId: string) => {
-    const { nodes, edges } = get()
+    const { edges } = get()
     const downstream = new Set<string>()
     const queue = [startNodeId]
     while (queue.length > 0) {
@@ -923,7 +923,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   },
 
   getUpstreamNodes: (startNodeId: string) => {
-    const { nodes, edges } = get()
+    const { edges } = get()
     const upstream = new Set<string>()
     const queue = [startNodeId]
     while (queue.length > 0) {
@@ -940,7 +940,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   },
 
   enterRerunMode: (startNodeId: string, sourceRunId: string) => {
-    const { nodes, edges } = get()
+    const { nodes } = get()
     const store = get()
 
     // Validate that the start node exists

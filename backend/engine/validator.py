@@ -39,13 +39,16 @@ CATEGORY_RUNTIME = {
 }
 
 # Port type compatibility matrix (mirrors frontend isPortCompatible)
+# SOURCE → CAN CONNECT TO (must match frontend block-registry-types.ts COMPAT)
 COMPAT = {
     ("any", "any"), ("dataset", "dataset"), ("text", "text"), ("model", "model"),
     ("config", "config"), ("metrics", "metrics"), ("embedding", "embedding"),
     ("artifact", "artifact"), ("agent", "agent"),
     # Cross-type coercions
     ("dataset", "text"), ("text", "dataset"), ("text", "config"), ("config", "text"),
-    ("metrics", "dataset"), ("metrics", "text"), ("embedding", "dataset"),
+    ("metrics", "dataset"), ("metrics", "text"),
+    ("embedding", "dataset"),
+    ("artifact", "text"),
 }
 
 def _port_compatible(src_type: str, tgt_type: str) -> bool:

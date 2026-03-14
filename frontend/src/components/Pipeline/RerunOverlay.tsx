@@ -117,12 +117,13 @@ export default function RerunOverlay() {
         <span style={{ fontSize: FS.xxs, color: T.blue }}>
           {rerunCount} will run
         </span>
-        <Info
-          size={10}
-          color={T.dim}
-          style={{ cursor: 'help', flexShrink: 0 }}
-          title="Edit the start node's config, then click Re-run. Upstream nodes use cached outputs. Press Escape to cancel."
-        />
+        <span title="Edit the start node's config, then click Re-run. Upstream nodes use cached outputs. Press Escape to cancel.">
+          <Info
+            size={10}
+            color={T.dim}
+            style={{ cursor: 'help', flexShrink: 0 }}
+          />
+        </span>
       </div>
 
       {/* Config diff preview — positioned to the right */}
