@@ -7,7 +7,7 @@ version: "2.0.0"
 inputs:
   - id: dataset
     label: QA Dataset
-    data_type: data
+    data_type: dataset
     required: true
     description: Dataset with model outputs and reference answers
   - id: model
@@ -23,7 +23,7 @@ outputs:
     description: 'Aggregate: accuracy, correct, total, errors count, method used'
   - id: dataset
     label: Annotated Results
-    data_type: data
+    data_type: dataset
     description: 'Per-item: index, output, reference, correct (bool), score, question — filterable'
   - id: report
     label: Error Report

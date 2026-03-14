@@ -7,7 +7,7 @@ version: "1.0.0"
 inputs:
   - id: dataset
     label: Summarization Data
-    data_type: data
+    data_type: dataset
     required: true
     description: "Dataset with source documents and summaries (or references)"
 
@@ -29,7 +29,7 @@ outputs:
 
   - id: dataset
     label: Scored Summaries
-    data_type: data
+    data_type: dataset
     description: "Per-summary scores: summary_preview, reference_preview, rouge1, rouge2, rougeL, compression_ratio"
 
 config:

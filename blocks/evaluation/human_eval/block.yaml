@@ -23,7 +23,7 @@ outputs:
 
   - id: dataset
     label: Problem Results
-    data_type: data
+    data_type: dataset
     description: "Per-problem results: task_id, prompt_preview, passed, num_samples, difficulty"
 
 config:

@@ -12,6 +12,7 @@ import {
   Keyboard,
   HelpCircle,
   AlertTriangle,
+  Terminal,
   ChevronDown,
   ChevronRight,
   Layout,
@@ -283,6 +284,71 @@ const TROUBLESHOOTING = [
 ]
 
 /* ------------------------------------------------------------------ */
+/*  Data: CLI Tools                                                    */
+/* ------------------------------------------------------------------ */
+
+const CLI_TOOLS = [
+  {
+    name: 'Block Test Runner',
+    command: 'python -m backend.tests.block_runner <block_dir>',
+    aliases: [
+      'python -m backend.tests.block_runner',
+      'python -m backend.tests',
+    ],
+    description:
+      'Test a single block in isolation with fixture data — no pipeline setup needed. Validates config, runs the block with auto-generated inputs, and reports outputs, metrics, timing, and memory usage.',
+    options: [
+      { flag: '--fixture small|medium|realistic', desc: 'Use a named fixture dataset (10 / 1,000 / 10,000 rows)' },
+      { flag: '--fixture-path PATH', desc: 'Use a custom JSONL file as the fixture dataset' },
+      { flag: '--config key=value ...', desc: 'Override block config values (repeatable)' },
+      { flag: '--verbose, -v', desc: 'Show block log messages and captured stdout' },
+      { flag: '--timeout SECONDS', desc: 'Maximum execution time (kills the block if exceeded)' },
+    ],
+    examples: [
+      'python -m backend.tests.block_runner blocks/data/text_input --config text_value="Hello"',
+      'python -m backend.tests.block_runner blocks/training/ballast_training --fixture small --config model_name=gpt2',
+      'python -m backend.tests.block_runner blocks/training/lora_finetuning --fixture-path my_data.jsonl -v',
+    ],
+  },
+  {
+    name: 'Pipeline Validator',
+    command: 'POST /api/pipelines/{pipeline_id}/validate',
+    aliases: ['Validate button in Pipeline Editor toolbar'],
+    description:
+      'Check a pipeline for structural errors, missing config, type mismatches, hardware feasibility, and performance estimates — without running any blocks. Available via the Validate button (shield icon) in the Pipeline Editor or the REST API.',
+    options: [
+      { flag: 'Structure', desc: 'Empty pipeline, duplicate IDs, cycles, disconnected blocks' },
+      { flag: 'Configuration', desc: 'Missing required inputs, empty critical config fields' },
+      { flag: 'Compatibility', desc: 'Port type mismatches, self-loops, invalid edge references' },
+      { flag: 'Hardware', desc: 'Memory feasibility, GPU requirements, per-block resource checks' },
+      { flag: 'Performance', desc: 'Runtime estimates, bottleneck detection' },
+    ],
+    examples: [
+      'Click the amber VALIDATE button (shield icon) in the Pipeline Editor toolbar',
+      'The validation panel shows a health score, categorized issues, and per-block suggestions',
+      'Click any issue to focus the affected block on the canvas',
+    ],
+  },
+  {
+    name: 'Test Runner (pytest)',
+    command: 'python -m pytest backend/tests/test_block_validation.py -v',
+    aliases: ['pytest backend/tests/'],
+    description:
+      'Run the validation framework unit tests — covers the exception hierarchy, config type checking, default application, bounds enforcement, select validation, fixture integrity, and block runner integration.',
+    options: [
+      { flag: '-v', desc: 'Verbose output showing each test name and status' },
+      { flag: '-k PATTERN', desc: 'Run only tests matching a name pattern' },
+      { flag: '--tb=short', desc: 'Show shorter tracebacks on failure' },
+    ],
+    examples: [
+      'python -m pytest backend/tests/test_block_validation.py -v',
+      'python -m pytest backend/tests/test_block_validation.py -k "test_integer" -v',
+      'python -m pytest backend/tests/ -v --tb=short',
+    ],
+  },
+]
+
+/* ------------------------------------------------------------------ */
 /*  Sub-components                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -423,13 +489,14 @@ function KeyBadge({ k }: { k: string }) {
 /*  Tab navigation                                                     */
 /* ------------------------------------------------------------------ */
 
-type HelpTab = 'general' | 'modules' | 'shortcuts' | 'faq' | 'troubleshooting' | 'machine'
+type HelpTab = 'general' | 'modules' | 'shortcuts' | 'faq' | 'cli' | 'troubleshooting' | 'machine'
 
 const TABS: { id: HelpTab; label: string; icon: React.ComponentType<any> }[] = [
   { id: 'general', label: 'GUIDE', icon: BookOpen },
   { id: 'modules', label: 'MODULES', icon: Blocks },
   { id: 'shortcuts', label: 'SHORTCUTS', icon: Keyboard },
   { id: 'faq', label: 'FAQ', icon: HelpCircle },
+  { id: 'cli', label: 'CLI TOOLS', icon: Terminal },
   { id: 'troubleshooting', label: 'TROUBLESHOOT', icon: AlertTriangle },
   { id: 'machine', label: 'MACHINE', icon: Cpu },
 ]
@@ -995,6 +1062,99 @@ export default function HelpView() {
                     No FAQ items match your search.
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* ── CLI TOOLS ── */}
+            {activeTab === 'cli' && (
+              <div>
+                <h2 style={sectionHeader}>CLI TOOLS &amp; TESTING</h2>
+                <p style={{ ...bodyText, marginTop: 0, marginBottom: 20 }}>
+                  Command-line tools for block authors and pipeline developers. Run these from the project root directory.
+                </p>
+                {CLI_TOOLS.map((tool, i) => (
+                  <Collapsible key={i} title={tool.name} defaultOpen={i === 0} accent={T.cyan}>
+                    <p style={{ ...bodyText, marginTop: 0, marginBottom: 8 }}>{tool.description}</p>
+                    <div
+                      style={{
+                        fontFamily: 'var(--code-font, "JetBrains Mono", monospace)',
+                        fontSize: FS.xxs,
+                        color: T.cyan,
+                        background: T.bg,
+                        padding: '8px 12px',
+                        marginBottom: 12,
+                        overflowX: 'auto',
+                        whiteSpace: 'pre',
+                        border: `1px solid ${T.border}`,
+                      }}
+                    >
+                      {tool.command}
+                    </div>
+
+                    {tool.aliases.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <span style={labelStyle}>ALIASES</span>
+                        {tool.aliases.map((alias, j) => (
+                          <div
+                            key={j}
+                            style={{
+                              fontFamily: 'var(--code-font, "JetBrains Mono", monospace)',
+                              fontSize: FS.xxs,
+                              color: T.dim,
+                              marginTop: 2,
+                            }}
+                          >
+                            {alias}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ marginBottom: 12 }}>
+                      <span style={labelStyle}>
+                        {tool.name === 'Pipeline Validator' ? 'CHECKS' : 'OPTIONS'}
+                      </span>
+                      {tool.options.map((opt, j) => (
+                        <div key={j} style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                          <code
+                            style={{
+                              fontFamily: 'var(--code-font, "JetBrains Mono", monospace)',
+                              fontSize: FS.xxs,
+                              color: T.amber,
+                              flexShrink: 0,
+                              minWidth: 180,
+                            }}
+                          >
+                            {opt.flag}
+                          </code>
+                          <span style={{ ...bodyText, fontSize: FS.xxs, margin: 0 }}>{opt.desc}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div>
+                      <span style={labelStyle}>EXAMPLES</span>
+                      {tool.examples.map((ex, j) => (
+                        <div
+                          key={j}
+                          style={{
+                            fontFamily: 'var(--code-font, "JetBrains Mono", monospace)',
+                            fontSize: FS.xxs,
+                            color: T.sec,
+                            background: T.bg,
+                            padding: '4px 8px',
+                            marginTop: 4,
+                            overflowX: 'auto',
+                            whiteSpace: 'pre',
+                            border: `1px solid ${T.border}`,
+                          }}
+                        >
+                          {ex}
+                        </div>
+                      ))}
+                    </div>
+                  </Collapsible>
+                ))}
               </div>
             )}
 

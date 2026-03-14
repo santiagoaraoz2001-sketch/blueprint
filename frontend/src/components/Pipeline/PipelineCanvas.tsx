@@ -10,7 +10,7 @@ import {
   BackgroundVariant,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { T, F, FS } from '@/lib/design-tokens'
+import { T } from '@/lib/design-tokens'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useShallow } from 'zustand/react/shallow'
 import { getBlockDefinition, getPortColor, isPortCompatible } from '@/lib/block-registry'
@@ -20,7 +20,8 @@ import GroupNode from './GroupNode'
 import QuickPalette from './QuickPalette'
 import EdgePreviewPanel from './EdgePreviewPanel'
 import InheritanceOverlay, { OVERLAY_COLORS } from './InheritanceOverlay'
-import { Copy, Trash2, Settings, Maximize } from 'lucide-react'
+import NodeContextMenu from './NodeContextMenu'
+import RerunOverlay from './RerunOverlay'
 
 const nodeTypes: NodeTypes = {
   blockNode: BlockNode as any,
@@ -262,7 +263,7 @@ export default function PipelineCanvas() {
       const newDef = getBlockDefinition(newBlockType)
       if (newestNode && newDef) {
         // Find best input port match
-        const targetPort = newDef.inputs.find((i) => i.dataType === paletteParams.sourceType || i.dataType === 'data')
+        const targetPort = newDef.inputs.find((i) => i.dataType === paletteParams.sourceType || i.dataType === 'any')
         if (targetPort) {
           state.onConnect({
             source: paletteParams.sourceNodeId,
@@ -314,6 +315,12 @@ export default function PipelineCanvas() {
         const overlay = usePipelineStore.getState().inheritanceOverlay
         if (overlay) {
           usePipelineStore.getState().deactivateInheritanceOverlay()
+          return
+        }
+        // Exit rerun mode if active
+        const { rerunMode, exitRerunMode } = usePipelineStore.getState()
+        if (rerunMode?.active) {
+          exitRerunMode()
           return
         }
         // Deselect all
@@ -507,98 +514,16 @@ export default function PipelineCanvas() {
       </ReactFlow>
 
       {/* Node context menu */}
-      {contextMenu.visible && (
-        <div
-          style={{
-            position: 'fixed',
-            left: contextMenu.x,
-            top: contextMenu.y,
-            background: T.surface2,
-            border: `1px solid ${T.borderHi}`,
-            boxShadow: `0 4px 16px ${T.shadowHeavy}`,
-            zIndex: 999,
-            minWidth: 160,
-            borderRadius: 4,
-            overflow: 'hidden',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <ContextMenuBtn
-            icon={<Settings size={10} />}
-            label="Edit Config"
-            shortcut=""
-            onClick={() => {
-              selectNode(contextMenu.nodeId)
-              setContextMenu((p) => ({ ...p, visible: false }))
-            }}
-          />
-          <ContextMenuBtn
-            icon={<Copy size={10} />}
-            label="Duplicate"
-            shortcut="⌘C → ⌘V"
-            onClick={() => {
-              usePipelineStore.getState().duplicateNodes([contextMenu.nodeId])
-              setContextMenu((p) => ({ ...p, visible: false }))
-            }}
-          />
-          <ContextMenuBtn
-            icon={<Maximize size={10} />}
-            label="Focus"
-            shortcut="F"
-            onClick={() => {
-              fitView({ nodes: [{ id: contextMenu.nodeId }], duration: 400, padding: 0.5 })
-              setContextMenu((p) => ({ ...p, visible: false }))
-            }}
-          />
-          <div style={{ height: 1, background: T.border, margin: '2px 0' }} />
-          <ContextMenuBtn
-            icon={<Trash2 size={10} />}
-            label="Delete"
-            shortcut="⌫"
-            color={T.red}
-            onClick={() => {
-              usePipelineStore.getState().removeNode(contextMenu.nodeId)
-              setContextMenu((p) => ({ ...p, visible: false }))
-            }}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
+      <NodeContextMenu
+        visible={contextMenu.visible}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        nodeId={contextMenu.nodeId}
+        onClose={() => setContextMenu((p) => ({ ...p, visible: false }))}
+      />
 
-function ContextMenuBtn({ icon, label, shortcut, onClick, color }: {
-  icon: React.ReactNode
-  label: string
-  shortcut: string
-  onClick: () => void
-  color?: string
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        width: '100%',
-        padding: '6px 12px',
-        background: 'none',
-        border: 'none',
-        color: color || T.sec,
-        fontFamily: F,
-        fontSize: FS.xs,
-        cursor: 'pointer',
-        textAlign: 'left',
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = T.surface4 }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
-    >
-      {icon}
-      <span style={{ flex: 1 }}>{label}</span>
-      {shortcut && (
-        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>{shortcut}</span>
-      )}
-    </button>
+      {/* Re-run mode overlay */}
+      <RerunOverlay />
+    </div>
   )
 }

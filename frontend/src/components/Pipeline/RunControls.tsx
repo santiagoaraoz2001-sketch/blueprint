@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useRunStore } from '@/stores/runStore'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { validatePipelineClient } from '@/lib/pipeline-validator'
 import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Check, AlertTriangle, Gauge, FileDown } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useUIStore } from '@/stores/uiStore'
 import PipelineAnalysisPanel from './PipelineAnalysisPanel'
 import { getBlockDefinition } from '@/lib/block-registry'
 import { generateRequirements } from '@/lib/block-dependencies'
@@ -15,9 +14,6 @@ export default function RunControls() {
   const { id: pipelineId, nodes, saveAsTemplate } = usePipelineStore()
   const { status, activeRunId, overallProgress, startRun, stopRun, connectSSE, disconnectSSE, reset } =
     useRunStore()
-  const elapsedRef = useRef(0)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [templateDesc, setTemplateDesc] = useState('')
@@ -39,23 +35,6 @@ export default function RunControls() {
     }
     return () => disconnectSSE()
   }, [activeRunId, isRunning, connectSSE, disconnectSSE])
-
-  // Elapsed timer
-  useEffect(() => {
-    if (isRunning) {
-      elapsedRef.current = 0
-      timerRef.current = setInterval(() => {
-        elapsedRef.current += 1
-        useRunStore.setState({ elapsed: elapsedRef.current })
-      }, 1000)
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
-    }
-  }, [isRunning])
 
   const [showTraceback, setShowTraceback] = useState(false)
 
@@ -103,12 +82,6 @@ export default function RunControls() {
 
     reset()
     await startRun(pipelineId)
-
-    // Auto-navigate to Monitor view
-    const runId = useRunStore.getState().activeRunId
-    if (runId) {
-      useUIStore.getState().openMonitor(runId)
-    }
   }
 
   const handleStop = async () => {

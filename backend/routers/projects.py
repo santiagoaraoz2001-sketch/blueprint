@@ -74,17 +74,16 @@ def project_dashboard(db: Session = Depends(get_db)):
 
     recent_unassigned = []
     if unassigned_count > 0:
-        unassigned_runs = db.query(Run).join(
+        unassigned_rows = db.query(Run, Pipeline.name).join(
             Pipeline, Run.pipeline_id == Pipeline.id
         ).filter(
             Pipeline.experiment_phase_id.is_(None),
             Run.status == "complete",
         ).order_by(Run.finished_at.desc()).limit(10).all()
-        for r in unassigned_runs:
-            p = db.query(Pipeline).filter(Pipeline.id == r.pipeline_id).first()
+        for r, pipeline_name in unassigned_rows:
             recent_unassigned.append({
                 "run_id": r.id,
-                "pipeline_name": p.name if p else "",
+                "pipeline_name": pipeline_name or "",
                 "metrics": r.metrics or {},
             })
 

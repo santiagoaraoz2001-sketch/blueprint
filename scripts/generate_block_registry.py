@@ -9,14 +9,14 @@ Reads: blocks/**/block.yaml
 Writes: frontend/src/lib/block-registry.generated.ts
 """
 
-import json
 import sys
 import yaml
 from pathlib import Path
 from typing import Any
 
-BLOCKS_DIR = Path(__file__).parent.parent / "blocks"
-OUTPUT_FILE = Path(__file__).parent.parent / "frontend" / "src" / "lib" / "block-registry.generated.ts"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BLOCKS_DIR = PROJECT_ROOT / "blocks"
+OUTPUT_FILE = PROJECT_ROOT / "frontend" / "src" / "lib" / "block-registry.generated.ts"
 
 # Map block.yaml config types to TypeScript ConfigField types
 YAML_TYPE_TO_TS = {
@@ -183,6 +183,11 @@ def _convert_config_fields(config_schema: dict | None) -> list[dict]:
     return fields
 
 
+def _esc(s: str) -> str:
+    """Escape a string for embedding in a single-quoted TypeScript literal."""
+    return s.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
+
+
 def _ts_value(value: Any, indent: int = 0) -> str:
     """Convert a Python value to a TypeScript literal string."""
     if value is None:
@@ -201,9 +206,7 @@ def _ts_value(value: Any, indent: int = 0) -> str:
             return s
         return repr(value)
     if isinstance(value, str):
-        # Escape for single-quoted TS string
-        escaped = value.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
-        return f"'{escaped}'"
+        return f"'{_esc(value)}'"
     if isinstance(value, list):
         if not value:
             return "[]"
@@ -219,7 +222,7 @@ def _ts_value(value: Any, indent: int = 0) -> str:
         pad = " " * (indent + 2)
         pairs = []
         for k, v in value.items():
-            key = k if k.isidentifier() else f"'{k}'"
+            key = k if k.isidentifier() else f"'{_esc(k)}'"
             pairs.append(f"{key}: {_ts_value(v, indent + 2)}")
         if sum(len(p) for p in pairs) + len(pairs) * 2 < 80:
             return "{ " + ", ".join(pairs) + " }"
@@ -231,9 +234,9 @@ def _ts_value(value: Any, indent: int = 0) -> str:
 def _format_port(port: dict) -> str:
     """Format a port definition as a single-line TS object."""
     parts = [
-        f"id: '{port['id']}'",
-        f"label: '{port['label']}'",
-        f"dataType: '{port['dataType']}'",
+        f"id: '{_esc(port['id'])}'",
+        f"label: '{_esc(port['label'])}'",
+        f"dataType: '{_esc(port['dataType'])}'",
         f"required: {'true' if port['required'] else 'false'}",
     ]
     return "{ " + ", ".join(parts) + " }"
@@ -242,21 +245,21 @@ def _format_port(port: dict) -> str:
 def _format_config_field(field: dict, indent: str) -> str:
     """Format a config field as a TS object."""
     parts = [
-        f"name: '{field['name']}'",
-        f"label: '{field['label']}'",
-        f"type: '{field['type']}'",
+        f"name: '{_esc(field['name'])}'",
+        f"label: '{_esc(field['label'])}'",
+        f"type: '{_esc(field['type'])}'",
     ]
     for key in ("default", "min", "max"):
         if key in field:
             parts.append(f"{key}: {_ts_value(field[key])}")
     if "options" in field:
-        opts = ", ".join(f"'{o}'" for o in field["options"])
+        opts = ", ".join(f"'{_esc(o)}'" for o in field["options"])
         parts.append(f"options: [{opts}]")
     if "description" in field:
         parts.append(f"description: {_ts_value(field['description'])}")
     if "depends_on" in field:
         dep = field["depends_on"]
-        parts.append(f"depends_on: {{ field: '{dep['field']}', value: {_ts_value(dep['value'])} }}")
+        parts.append(f"depends_on: {{ field: '{_esc(dep['field'])}', value: {_ts_value(dep['value'])} }}")
 
     joined = ", ".join(parts)
     if len(joined) < 100:
@@ -270,25 +273,25 @@ def _format_block(block: dict) -> str:
     """Format a single block definition as a TypeScript object literal."""
     lines = []
     lines.append("  {")
-    lines.append(f"    type: '{block['type']}',")
+    lines.append(f"    type: '{_esc(block['type'])}',")
     lines.append(f"    name: {_ts_value(block['name'])},")
     lines.append(f"    description: {_ts_value(block['description'])},")
-    lines.append(f"    category: '{block['category']}',")
+    lines.append(f"    category: '{_esc(block['category'])}',")
     # tags
     if block["tags"]:
-        tags = ", ".join(f"'{t}'" for t in block["tags"])
+        tags = ", ".join(f"'{_esc(t)}'" for t in block["tags"])
         lines.append(f"    tags: [{tags}],")
     else:
         lines.append("    tags: [],")
     # aliases
     if block["aliases"]:
-        aliases = ", ".join(f"'{a}'" for a in block["aliases"])
+        aliases = ", ".join(f"'{_esc(a)}'" for a in block["aliases"])
         lines.append(f"    aliases: [{aliases}],")
     else:
         lines.append("    aliases: [],")
-    lines.append(f"    icon: '{block['icon']}',")
-    lines.append(f"    accent: '{block['accent']}',")
-    lines.append(f"    maturity: '{block['maturity']}',")
+    lines.append(f"    icon: '{_esc(block['icon'])}',")
+    lines.append(f"    accent: '{_esc(block['accent'])}',")
+    lines.append(f"    maturity: '{_esc(block['maturity'])}',")
 
     # inputs
     if block["inputs"]:
@@ -346,7 +349,7 @@ def generate_typescript(blocks: list[dict]) -> str:
         f"// Generated from {len(blocks)} block.yaml files across {len(categories)} categories",
         "// Run: python scripts/generate_block_registry.py",
         "",
-        "import type { BlockDefinition } from './block-registry-types'",
+        "import type { BlockDefinition } from './block-registry'",
         "",
         "export const BLOCK_REGISTRY: BlockDefinition[] = [",
     ]
@@ -375,6 +378,10 @@ def generate_typescript(blocks: list[dict]) -> str:
 
 
 def main():
+    if not BLOCKS_DIR.is_dir():
+        print(f"ERROR: Blocks directory not found: {BLOCKS_DIR}", file=sys.stderr)
+        sys.exit(1)
+
     blocks = load_all_blocks()
 
     if not blocks:
@@ -388,7 +395,7 @@ def main():
 
     print(f"Generated {OUTPUT_FILE} with {len(blocks)} blocks")
 
-    # Verify: count by category
+    # Summary by category
     categories: dict[str, int] = {}
     for b in blocks:
         cat = b["category"]
