@@ -63,6 +63,14 @@ from ..utils.structured_logger import (
 from .config_resolver import resolve_configs
 from .metrics_schema import create_metric
 
+# Ensure the repo root is on sys.path so blocks can do cross-block imports
+# like `from blocks.inference._inference_utils import ...`.
+# Done at module level (once at import time) to avoid TOCTOU races when
+# _load_and_run_block is called from multiple threads.
+_blocks_parent = str(BUILTIN_BLOCKS_DIR.parent)
+if _blocks_parent not in sys.path:
+    sys.path.insert(0, _blocks_parent)
+
 # Cancel events: threading.Event per run_id, protected by lock for thread safety
 _cancel_events: dict[str, threading.Event] = {}
 _cancel_lock = threading.Lock()
@@ -156,11 +164,6 @@ def _load_and_run_block(
             Managed by execute_sub_pipeline; callers should not set this directly.
     """
     run_py = block_dir / "run.py"
-    # Ensure block parent directories are on sys.path so cross-block imports work
-    # e.g. `from blocks.inference._inference_utils import ...`
-    blocks_parent = str(BUILTIN_BLOCKS_DIR.parent)
-    if blocks_parent not in sys.path:
-        sys.path.insert(0, blocks_parent)
     spec = importlib.util.spec_from_file_location(f"block_{node_id}", str(run_py))
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Cannot load block module from {run_py}")
