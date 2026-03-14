@@ -9,6 +9,14 @@ from ..models.pipeline import Pipeline
 from ..models.run import Run
 from ..engine.executor import execute_pipeline, request_cancel
 from ..engine.validator import validate_pipeline
+from ..engine.block_registry import get_block_config_schema, is_known_block
+from ..block_sdk.config_validator import (
+    validate_and_apply_defaults,
+    _validate_type,
+    _validate_bounds,
+    _validate_select,
+)
+from ..block_sdk.exceptions import BlockConfigError
 
 router = APIRouter(prefix="/api", tags=["execution"])
 _logger = logging.getLogger("blueprint.execution")
@@ -106,6 +114,63 @@ def validate_pipeline_endpoint(pipeline_id: str, db: Session = Depends(get_db)):
         "estimated_runtime_s": report.estimated_runtime_s,
         "block_count": report.block_count,
         "edge_count": report.edge_count,
+    }
+
+
+@router.post("/blocks/{block_type}/validate-config")
+def validate_block_config(block_type: str, config: dict):
+    """Validate a block's config against its block.yaml schema.
+
+    Returns per-field validation results including type errors,
+    bounds violations, and invalid select options.
+    """
+    if not is_known_block(block_type):
+        raise HTTPException(404, f"Unknown block type: {block_type}")
+
+    schema = get_block_config_schema(block_type)
+    if not schema:
+        return {"valid": True, "errors": [], "validated_config": config}
+
+    # Validate each field independently to collect all errors
+    errors = []
+    result = dict(config)
+
+    for field_name, field_spec in schema.items():
+        if not isinstance(field_spec, dict):
+            continue
+        field_type = field_spec.get("type", "string")
+
+        # Apply default if missing
+        if field_name not in result or result[field_name] is None or result[field_name] == "":
+            if "default" in field_spec:
+                result[field_name] = field_spec["default"]
+
+        value = result.get(field_name)
+        if value is None or value == "":
+            continue
+
+        try:
+            _validate_type(field_name, value, field_type)
+        except BlockConfigError as exc:
+            errors.append({"field": exc.field, "message": str(exc), "recoverable": exc.recoverable})
+            continue
+
+        if field_type in ("integer", "float"):
+            try:
+                _validate_bounds(field_name, value, field_spec)
+            except BlockConfigError as exc:
+                errors.append({"field": exc.field, "message": str(exc), "recoverable": exc.recoverable})
+
+        if field_type == "select":
+            try:
+                _validate_select(field_name, value, field_spec)
+            except BlockConfigError as exc:
+                errors.append({"field": exc.field, "message": str(exc), "recoverable": exc.recoverable})
+
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors,
+        "validated_config": result,
     }
 
 
