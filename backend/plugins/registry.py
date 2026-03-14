@@ -32,7 +32,18 @@ _SAFE_NAME = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$")
 _VALID_TYPES = {"generic", "blocks", "connector", "monitor"}
 
 # Valid permission tokens
-_VALID_PERMISSIONS = {"network", "filesystem", "gpu"}
+_VALID_PERMISSIONS = {
+    "network",           # Can make HTTP requests
+    "filesystem:read",   # Can read files in ~/.specific-labs/
+    "filesystem:write",  # Can write files
+    "gpu",               # Can use GPU resources
+    "secrets",           # Can access stored API keys
+}
+
+# Legacy shorthand: "filesystem" expands to both read and write
+_PERMISSION_ALIASES = {
+    "filesystem": {"filesystem:read", "filesystem:write"},
+}
 
 
 @dataclass
@@ -42,7 +53,7 @@ class PluginManifest:
     author: str = ""
     description: str = ""
     plugin_type: str = "generic"  # "blocks", "connector", "monitor", "generic"
-    permissions: list[str] = field(default_factory=list)  # "network", "filesystem", "gpu"
+    permissions: list[str] = field(default_factory=list)
     dependencies: list[str] = field(default_factory=list)  # pip package names
     entry_point: str = "__init__"  # Python module to load
     enabled: bool = True
@@ -58,6 +69,17 @@ class LoadedPlugin:
     @property
     def is_loaded(self) -> bool:
         return self.module is not None and self.error is None
+
+
+def _normalize_permissions(raw_perms: list[str]) -> list[str]:
+    """Expand permission aliases and deduplicate."""
+    result = set()
+    for perm in raw_perms:
+        if perm in _PERMISSION_ALIASES:
+            result.update(_PERMISSION_ALIASES[perm])
+        else:
+            result.add(perm)
+    return sorted(result)
 
 
 def _validate_manifest(raw: dict, plugin_dir: Path) -> PluginManifest:
@@ -83,7 +105,15 @@ def _validate_manifest(raw: dict, plugin_dir: Path) -> PluginManifest:
     permissions = raw.get("permissions", [])
     if not isinstance(permissions, list):
         raise ValueError("'permissions' must be a list")
-    unknown = set(permissions) - _VALID_PERMISSIONS
+    for i, perm in enumerate(permissions):
+        if not isinstance(perm, str):
+            raise ValueError(
+                f"permissions[{i}] must be a string, got {type(perm).__name__}"
+            )
+
+    # Expand aliases before validation
+    expanded = _normalize_permissions(permissions)
+    unknown = set(expanded) - _VALID_PERMISSIONS
     if unknown:
         raise ValueError(
             f"Unknown permissions {unknown}: valid values are {sorted(_VALID_PERMISSIONS)}"
@@ -92,6 +122,11 @@ def _validate_manifest(raw: dict, plugin_dir: Path) -> PluginManifest:
     dependencies = raw.get("dependencies", [])
     if not isinstance(dependencies, list):
         raise ValueError("'dependencies' must be a list")
+    for i, dep in enumerate(dependencies):
+        if not isinstance(dep, str) or not dep.strip():
+            raise ValueError(
+                f"dependencies[{i}] must be a non-empty string"
+            )
 
     entry_point = raw.get("entry_point", "__init__")
     if not isinstance(entry_point, str) or not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", entry_point):
@@ -105,7 +140,7 @@ def _validate_manifest(raw: dict, plugin_dir: Path) -> PluginManifest:
         author=str(raw.get("author", "")),
         description=str(raw.get("description", "")),
         plugin_type=plugin_type,
-        permissions=permissions,
+        permissions=expanded,
         dependencies=dependencies,
         entry_point=entry_point,
         enabled=bool(raw.get("enabled", True)),
@@ -141,6 +176,22 @@ def _resolve_module_path(plugin_path: Path, entry_point: str) -> Path:
         )
 
     return module_path
+
+
+def check_permission(plugin_name: str, permission: str) -> bool:
+    """Check whether a plugin has been granted a specific permission.
+
+    Args:
+        plugin_name: The plugin's registered name.
+        permission: Permission token to check (e.g. "network", "filesystem:read").
+
+    Returns:
+        True if the plugin exists and declares the permission.
+    """
+    plugin = plugin_registry.get_plugin(plugin_name)
+    if not plugin:
+        return False
+    return permission in plugin.manifest.permissions
 
 
 class PluginRegistry:
@@ -221,13 +272,18 @@ class PluginRegistry:
         return list(discovered.values())
 
     def load_plugin(self, name: str) -> LoadedPlugin:
-        """Load a plugin's Python module."""
+        """Load a plugin's Python module with sandbox enforcement.
+
+        If the plugin is already loaded, returns it without re-executing.
+        """
         with self._lock:
             plugin = self._plugins.get(name)
         if not plugin:
             raise ValueError(f"Plugin '{name}' not found")
         if not plugin.manifest.enabled:
             plugin.error = "Plugin is disabled"
+            return plugin
+        if plugin.is_loaded:
             return plugin
 
         try:
@@ -240,6 +296,11 @@ class PluginRegistry:
                 raise RuntimeError(f"Cannot create module spec from {module_path}")
 
             module = importlib.util.module_from_spec(spec)
+
+            # Apply sandbox restrictions before executing the module
+            from .sandbox import apply_sandbox
+            apply_sandbox(module, plugin.manifest)
+
             spec.loader.exec_module(module)
 
             # Call plugin's register() if it exists
@@ -272,6 +333,11 @@ class PluginRegistry:
                     plugin.module.unregister(self)
                 except Exception as e:
                     logger.warning("Error in %s unregister(): %s", name, e)
+
+            # Remove sandbox patches
+            from .sandbox import remove_sandbox
+            remove_sandbox(plugin.module, plugin.manifest)
+
             plugin.module = None
 
         return plugin
@@ -314,6 +380,7 @@ class PluginRegistry:
                 "author": p.manifest.author,
                 "description": p.manifest.description,
                 "type": p.manifest.plugin_type,
+                "permissions": p.manifest.permissions,
                 "enabled": p.manifest.enabled,
                 "loaded": p.is_loaded,
                 "error": p.error,
