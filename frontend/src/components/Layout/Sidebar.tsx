@@ -1,6 +1,7 @@
 import { T, F, FS } from '@/lib/design-tokens'
 import { useUIStore, type View } from '@/stores/uiStore'
 import { useProjectStore } from '@/stores/projectStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { useIsSimpleMode } from '@/hooks/useIsSimpleMode'
 import {
   LayoutDashboard,
@@ -55,6 +56,7 @@ const SIMPLE_HIDDEN_VIEWS: Set<View> = new Set(['paper', 'workshop'])
 export default function Sidebar() {
   const { activeView, setView, sidebarCollapsed, toggleSidebar, selectedProjectId } = useUIStore()
   const projects = useProjectStore((s) => s.projects)
+  const features = useSettingsStore((s) => s.features)
   const isSimple = useIsSimpleMode()
   const width = sidebarCollapsed ? 48 : 180
 
@@ -117,7 +119,9 @@ export default function Sidebar() {
       </div>
 
       <nav style={{ flex: 1, paddingTop: 6 }}>
-        {(isSimple ? NAV_ITEMS.filter((item) => !SIMPLE_HIDDEN_VIEWS.has(item.id)) : NAV_ITEMS).map((item, index) => {
+        {(isSimple ? NAV_ITEMS.filter((item) => !SIMPLE_HIDDEN_VIEWS.has(item.id)) : NAV_ITEMS)
+          .filter((item) => item.id !== 'marketplace' || features?.marketplace)
+          .map((item, index) => {
           const active = activeView === item.id || (item.id === 'research' && activeView === 'research-detail')
           const Icon = item.icon
           return (

@@ -18,6 +18,7 @@ export default function PluginPanelContainer({ runId }: PluginPanelContainerProp
   const [error, setError] = useState<string | null>(null)
   const panelLayouts = useSettingsStore((s) => s.panelLayouts)
   const setPanelLayout = useSettingsStore((s) => s.setPanelLayout)
+  const features = useSettingsStore((s) => s.features)
   const iframeRefs = useRef<Map<string, HTMLIFrameElement>>(new Map())
 
   // Stable ref callback for PluginPanel to register its iframe
@@ -150,22 +151,24 @@ export default function PluginPanelContainer({ runId }: PluginPanelContainerProp
         <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec, flex: 1 }}>
           Want more monitoring tools? Install plugins for W&B, TensorBoard, and more.
         </span>
-        <button
-          onClick={handleBrowsePlugins}
-          style={{
-            padding: '3px 10px',
-            background: `${T.cyan}18`,
-            border: `1px solid ${T.cyan}33`,
-            color: T.cyan,
-            fontFamily: F,
-            fontSize: FS.xxs,
-            letterSpacing: '0.06em',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          Browse Plugins
-        </button>
+        {features?.marketplace && (
+          <button
+            onClick={handleBrowsePlugins}
+            style={{
+              padding: '3px 10px',
+              background: `${T.cyan}18`,
+              border: `1px solid ${T.cyan}33`,
+              color: T.cyan,
+              fontFamily: F,
+              fontSize: FS.xxs,
+              letterSpacing: '0.06em',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Browse Plugins
+          </button>
+        )}
       </div>
     )
   }

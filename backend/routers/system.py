@@ -26,6 +26,20 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 
 
 # ---------------------------------------------------------------------------
+# Feature Flags
+# ---------------------------------------------------------------------------
+
+
+@router.get("/features")
+def get_feature_flags():
+    """Return which optional features are enabled."""
+    from ..config import ENABLE_MARKETPLACE
+    return {
+        "marketplace": ENABLE_MARKETPLACE,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Model Discovery
 # ---------------------------------------------------------------------------
 

@@ -45,6 +45,10 @@ export const FONT_LABELS: Record<FontChoice, string> = {
   'ibm-plex': 'IBM Plex Mono',
 }
 
+export interface FeatureFlags {
+  marketplace: boolean
+}
+
 export interface HardwareCapabilities {
   gpu_available: boolean
   gpu_backend: string
@@ -67,6 +71,7 @@ interface SettingsState {
   apiKeys: Record<string, string>
   hardware: HardwareCapabilities | null
   hardwareLoading: boolean
+  features: FeatureFlags | null
 
   // Plugin panel layouts
   panelLayouts: Record<string, PanelLayoutEntry>
@@ -91,6 +96,7 @@ interface SettingsState {
   setApiKey: (provider: string, key: string) => void
   getApiKey: (provider: string) => string
   fetchHardware: () => Promise<void>
+  fetchFeatures: () => Promise<void>
 
   setPanelLayout: (panelId: string, entry: Partial<PanelLayoutEntry>) => void
   removePanelLayout: (panelId: string) => void
@@ -117,6 +123,7 @@ export const useSettingsStore = create<SettingsState>()(
       apiKeys: {} as Record<string, string>,
       hardware: null,
       hardwareLoading: false,
+      features: null,
 
       panelLayouts: {} as Record<string, PanelLayoutEntry>,
 
@@ -141,6 +148,15 @@ export const useSettingsStore = create<SettingsState>()(
       },
       getApiKey: (provider) => {
         return get().apiKeys[provider] ?? ''
+      },
+      fetchFeatures: async () => {
+        try {
+          const data = await api.get<FeatureFlags>('/system/features')
+          set({ features: data })
+        } catch {
+          // Default to all features disabled if fetch fails
+          set({ features: { marketplace: false } })
+        }
       },
       fetchHardware: async () => {
         set({ hardwareLoading: true })

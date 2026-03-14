@@ -20,6 +20,9 @@ MLX_URL = os.environ.get("MLX_URL", "http://localhost:8080")
 
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
+# Feature flags
+ENABLE_MARKETPLACE = os.environ.get("BLUEPRINT_ENABLE_MARKETPLACE", "false").lower() == "true"
+
 # Ensure all directories exist
 def ensure_dirs():
     for d in [BASE_DIR, MLFLOW_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR, PIPELINES_DIR, ARTIFACTS_DIR, SNAPSHOTS_DIR]:

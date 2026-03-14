@@ -40,6 +40,7 @@ export default function CommandPalette() {
   const pipelines = usePipelineStore((s) => s.pipelines)
   const loadPipeline = usePipelineStore((s) => s.loadPipeline)
   const demoMode = useSettingsStore((s) => s.demoMode)
+  const features = useSettingsStore((s) => s.features)
 
   // Build items list
   const items = useMemo(() => {
@@ -59,13 +60,15 @@ export default function CommandPalette() {
       { id: 'nav-inference', label: 'Go to Inference', view: 'inference', icon: <MessageSquare size={14} /> },
       { id: 'nav-charts', label: 'Go to Charts', view: 'visualization', icon: <LineChart size={14} /> },
     ]
-    navItems.forEach(({ id, label, view, icon }) => {
-      result.push({
-        id, label, category: 'Navigation', icon,
-        action: () => setView(view),
-        searchText: label,
+    navItems
+      .filter(({ view }) => view !== 'marketplace' || features?.marketplace)
+      .forEach(({ id, label, view, icon }) => {
+        result.push({
+          id, label, category: 'Navigation', icon,
+          action: () => setView(view),
+          searchText: label,
+        })
       })
-    })
 
     // Actions
     result.push({
@@ -122,7 +125,7 @@ export default function CommandPalette() {
     }
 
     return result
-  }, [projects, pipelines, demoMode, setView, navigateToMonitor, navigateToPaperDetail, loadPipeline, toggleGuide, toggleSidebar])
+  }, [projects, pipelines, demoMode, features, setView, navigateToMonitor, navigateToPaperDetail, loadPipeline, toggleGuide, toggleSidebar])
 
   // Filter
   const filtered = useMemo(() => {
