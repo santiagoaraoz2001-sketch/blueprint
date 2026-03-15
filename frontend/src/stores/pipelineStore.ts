@@ -11,6 +11,7 @@ import {
 } from '@xyflow/react'
 import { api } from '@/api/client'
 import { getBlockDefinition, getPortColor, isPortCompatible, resolvePort, type PortDefinition } from '@/lib/block-registry'
+import { type ConnectionSuggestion, suggestConnections, findNearbyNodes } from '@/lib/auto-wiring'
 import { getLayoutedElements } from '@/lib/layout-utils'
 import { useSettingsStore } from './settingsStore'
 import { DEMO_PIPELINE, DEMO_PIPELINES_LIST } from '@/lib/demo-data'
@@ -208,6 +209,12 @@ interface PipelineState {
   updateRerunConfigOverride: (nodeId: string, config: Record<string, any>) => void
   getDownstreamNodes: (startNodeId: string) => string[]
   getUpstreamNodes: (startNodeId: string) => string[]
+
+  // Auto-wiring suggestions
+  connectionSuggestions: ConnectionSuggestion[]
+  autoWiringNodeId: string | null // The node that was dropped/moved to trigger suggestions
+  clearConnectionSuggestions: () => void
+  triggerAutoWiring: (nodeId: string) => void
 }
 
 let nodeIdCounter = 0
@@ -1404,5 +1411,22 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
 
   deactivateInheritanceOverlay: () => {
     set({ inheritanceOverlay: null })
+  },
+
+  // ── Auto-wiring suggestions ──
+  connectionSuggestions: [],
+  autoWiringNodeId: null,
+  clearConnectionSuggestions: () => set({ connectionSuggestions: [], autoWiringNodeId: null }),
+  triggerAutoWiring: (nodeId) => {
+    const { nodes, edges } = get()
+    const droppedNode = nodes.find((n) => n.id === nodeId)
+    if (!droppedNode || droppedNode.type !== 'blockNode') return
+    const nearbyIds = findNearbyNodes(droppedNode, nodes, 300)
+    if (nearbyIds.length === 0) {
+      set({ connectionSuggestions: [], autoWiringNodeId: null })
+      return
+    }
+    const suggestions = suggestConnections(nodeId, nearbyIds, nodes, edges)
+    set({ connectionSuggestions: suggestions, autoWiringNodeId: suggestions.length > 0 ? nodeId : null })
   },
 }))

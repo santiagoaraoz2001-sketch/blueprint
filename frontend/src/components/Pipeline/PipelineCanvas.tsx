@@ -10,10 +10,11 @@ import {
   BackgroundVariant,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { T } from '@/lib/design-tokens'
+import { T, F, FS } from '@/lib/design-tokens'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useShallow } from 'zustand/react/shallow'
 import { getBlockDefinition, getPortColor, isPortCompatible, resolvePort, findBestInputPort, type PortDefinition } from '@/lib/block-registry'
+import { computeBlockWidth } from '@/lib/block-registry-types'
 import BlockNode from './BlockNode'
 import StickyNote from './StickyNote'
 import GroupNode from './GroupNode'
@@ -30,7 +31,7 @@ const nodeTypes: NodeTypes = {
 }
 
 export default function PipelineCanvas() {
-  const { fitView } = useReactFlow()
+  const { fitView, flowToScreenPosition } = useReactFlow()
   const {
     nodes,
     edges,
@@ -41,6 +42,10 @@ export default function PipelineCanvas() {
     selectNode,
     inheritanceOverlay,
     deactivateInheritanceOverlay,
+    connectionSuggestions,
+    autoWiringNodeId,
+    clearConnectionSuggestions,
+    triggerAutoWiring,
   } = usePipelineStore(useShallow((s) => ({
     nodes: s.nodes,
     edges: s.edges,
@@ -51,6 +56,10 @@ export default function PipelineCanvas() {
     selectNode: s.selectNode,
     inheritanceOverlay: s.inheritanceOverlay,
     deactivateInheritanceOverlay: s.deactivateInheritanceOverlay,
+    connectionSuggestions: s.connectionSuggestions,
+    autoWiringNodeId: s.autoWiringNodeId,
+    clearConnectionSuggestions: s.clearConnectionSuggestions,
+    triggerAutoWiring: s.triggerAutoWiring,
   })))
 
   // Drop zone visual feedback
@@ -127,9 +136,54 @@ export default function PipelineCanvas() {
       }
 
       addNode(blockType, position)
+
+      // Trigger auto-wiring suggestions for the newly dropped block
+      setTimeout(() => {
+        const state = usePipelineStore.getState()
+        const newestNode = state.nodes[state.nodes.length - 1]
+        if (newestNode) {
+          triggerAutoWiring(newestNode.id)
+        }
+      }, 50)
     },
-    [addNode]
+    [addNode, triggerAutoWiring]
   )
+
+  // Auto-wiring: trigger on node drag stop (debounced)
+  const dragStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onNodeDragStop = useCallback((_: any, node: any) => {
+    if (dragStopTimerRef.current) clearTimeout(dragStopTimerRef.current)
+    dragStopTimerRef.current = setTimeout(() => {
+      triggerAutoWiring(node.id)
+    }, 200)
+  }, [triggerAutoWiring])
+
+  // Cleanup drag stop timer on unmount
+  useEffect(() => {
+    return () => {
+      if (dragStopTimerRef.current) clearTimeout(dragStopTimerRef.current)
+    }
+  }, [])
+
+  // Auto-dismiss suggestions after 5 seconds
+  const suggestionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (connectionSuggestions.length > 0) {
+      if (suggestionTimerRef.current) clearTimeout(suggestionTimerRef.current)
+      suggestionTimerRef.current = setTimeout(() => {
+        clearConnectionSuggestions()
+      }, 5000)
+    }
+    return () => {
+      if (suggestionTimerRef.current) clearTimeout(suggestionTimerRef.current)
+    }
+  }, [connectionSuggestions, clearConnectionSuggestions])
+
+  // Wrap onConnect to also clear suggestions on manual edge creation
+  const handleManualConnect = useCallback((connection: Connection) => {
+    onConnect(connection)
+    clearConnectionSuggestions()
+  }, [onConnect, clearConnectionSuggestions])
 
   // Connection validation — only allow compatible port types
   const isValidConnection = useCallback((connection: Connection | { source?: string; target?: string; sourceHandle?: string | null; targetHandle?: string | null }) => {
@@ -164,7 +218,8 @@ export default function PipelineCanvas() {
     setPaletteParams((p: any) => ({ ...p, visible: false }))
     setContextMenu((p) => ({ ...p, visible: false }))
     deactivateInheritanceOverlay()
-  }, [selectNode, deactivateInheritanceOverlay])
+    clearConnectionSuggestions()
+  }, [selectNode, deactivateInheritanceOverlay, clearConnectionSuggestions])
 
   // Node right-click context menu
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: any) => {
@@ -284,6 +339,17 @@ export default function PipelineCanvas() {
     setPaletteParams((p: { visible: boolean; x: number; y: number; sourceType: string; sourceNodeId: string; sourceHandleId: string; }) => ({ ...p, visible: false }))
   }
 
+  // Accept a connection suggestion
+  const handleAcceptSuggestion = useCallback((s: typeof connectionSuggestions[number]) => {
+    onConnect({
+      source: s.sourceNodeId,
+      sourceHandle: s.sourcePortId,
+      target: s.targetNodeId,
+      targetHandle: s.targetPortId,
+    })
+    clearConnectionSuggestions()
+  }, [onConnect, clearConnectionSuggestions])
+
   // ── Keyboard shortcuts: Copy, Paste, Delete, Select All, Escape, Fit View, Redo ──
   const clipboardRef = useRef<{ nodeIds: string[] } | null>(null)
 
@@ -317,6 +383,12 @@ export default function PipelineCanvas() {
         e.preventDefault()
         usePipelineStore.getState().redo()
       } else if (e.key === 'Escape') {
+        // Dismiss auto-wiring suggestions first
+        const { connectionSuggestions: currentSuggestions } = usePipelineStore.getState()
+        if (currentSuggestions.length > 0) {
+          usePipelineStore.getState().clearConnectionSuggestions()
+          return
+        }
         // Dismiss inheritance overlay first, then deselect
         const overlay = usePipelineStore.getState().inheritanceOverlay
         if (overlay) {
@@ -468,13 +540,14 @@ export default function PipelineCanvas() {
         edges={coloredEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onConnect={handleManualConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
         onEdgeMouseEnter={onEdgeMouseEnter}
         onEdgeMouseLeave={onEdgeMouseLeave}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={onPaneClick}
@@ -530,6 +603,103 @@ export default function PipelineCanvas() {
 
       {/* Re-run mode overlay */}
       <RerunOverlay />
+
+      {/* Auto-wiring suggestions popup */}
+      {connectionSuggestions.length > 0 && (() => {
+        // Position popup near the node that was dropped/moved
+        const anchorNodeId = autoWiringNodeId ?? connectionSuggestions[0].targetNodeId
+        const anchorNode = nodes.find((n) => n.id === anchorNodeId)
+        if (!anchorNode) return null
+        const def = getBlockDefinition((anchorNode.data as any)?.type)
+        // Use actual measured width if available, fall back to computed width
+        const blockW = anchorNode.measured?.width ?? (def ? computeBlockWidth(def) : 280)
+
+        // Convert flow coordinates → screen coordinates
+        const screenPos = flowToScreenPosition({
+          x: anchorNode.position.x + blockW + 16,
+          y: anchorNode.position.y,
+        })
+
+        // Offset by the container's bounding rect so it's positioned inside the outer div
+        const containerRect = reactFlowRef.current?.getBoundingClientRect()
+        const containerW = containerRect?.width ?? 0
+        const containerH = containerRect?.height ?? 0
+        let popupLeft = screenPos.x - (containerRect?.left ?? 0)
+        let popupTop = screenPos.y - (containerRect?.top ?? 0)
+
+        // Clamp to viewport bounds (estimate popup size: 240px wide, ~30px per item + header)
+        const popupW = 240
+        const popupH = 28 + connectionSuggestions.length * 30
+        if (popupLeft + popupW > containerW) popupLeft = Math.max(8, containerW - popupW - 8)
+        if (popupTop + popupH > containerH) popupTop = Math.max(8, containerH - popupH - 8)
+        if (popupLeft < 8) popupLeft = 8
+        if (popupTop < 8) popupTop = 8
+
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              left: popupLeft,
+              top: popupTop,
+              background: T.surface4,
+              border: `1px solid ${T.border}`,
+              borderRadius: 6,
+              padding: 8,
+              zIndex: 100,
+              maxWidth: popupW,
+              boxShadow: T.shadow,
+              pointerEvents: 'auto',
+            }}
+          >
+            <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, marginBottom: 4 }}>
+              Suggested connections:
+            </div>
+            {connectionSuggestions.map((s) => (
+              <button
+                key={`${s.sourceNodeId}:${s.sourcePortId}-${s.targetNodeId}:${s.targetPortId}`}
+                onClick={() => handleAcceptSuggestion(s)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  width: '100%',
+                  padding: '4px 8px',
+                  marginBottom: 2,
+                  background: 'transparent',
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 4,
+                  color: T.text,
+                  fontFamily: F,
+                  fontSize: FS.xxs,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+                onMouseEnter={(e) => {
+                  ;(e.currentTarget as HTMLButtonElement).style.background = T.surface2
+                  ;(e.currentTarget as HTMLButtonElement).style.borderColor = T.cyan
+                }}
+                onMouseLeave={(e) => {
+                  ;(e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                  ;(e.currentTarget as HTMLButtonElement).style.borderColor = T.border
+                }}
+              >
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: getPortColor(s.dataType),
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {s.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        )
+      })()}
     </div>
   )
 }
