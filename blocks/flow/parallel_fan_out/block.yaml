@@ -65,3 +65,9 @@ config:
     default: 0
     min: 0
     description: "Seed for reproducible random splits (split_ratio mode). 0 = different each run."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -43,3 +43,9 @@ config:
     default: -1
     min: -1
     description: "Extract a single row by index (-1 = all rows)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

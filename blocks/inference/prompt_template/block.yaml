@@ -46,3 +46,9 @@ config:
     label: Output Format
     options: [text, json]
     default: text
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -79,3 +79,9 @@ config:
     options: [raw, markdown, json]
     default: raw
     description: "raw: code only, markdown: fenced code block, json: structured object"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -62,3 +62,9 @@ config:
     label: Columns to Lowercase
     default: ""
     description: Comma-separated columns to convert to lowercase
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

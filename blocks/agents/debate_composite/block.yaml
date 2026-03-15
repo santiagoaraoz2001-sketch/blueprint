@@ -38,3 +38,9 @@ config:
     default: 3
     min: 1
     max: 10
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

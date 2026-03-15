@@ -115,3 +115,9 @@ config:
     min: -2.0
     max: 2.0
     description: "Penalize tokens already present (positive = more diverse topics)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

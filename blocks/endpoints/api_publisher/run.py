@@ -63,6 +63,14 @@ def run(ctx):
     ctx.log_message(f"API Publisher starting ({method} {url})")
     ctx.report_progress(0, 4)
 
+    # ── Loop-aware metadata ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        iteration = loop.get("iteration", 0)
+        ctx.log_message(f"[Loop iter {iteration}] Publishing data")
+    else:
+        iteration = 0
+
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 4)
     raw_data = ctx.resolve_as_data("data")
@@ -188,13 +196,16 @@ def run(ctx):
     ctx.log_message(status_msg)
 
     ctx.save_output("status", status_msg)
-    ctx.save_output("summary", {
+    summary = {
         "records_sent": total_sent,
         "records_failed": total_failed,
         "batches": len(batches),
         "url": url,
         "method": method,
-    })
+    }
+    if iteration > 0:
+        summary["loop_iteration"] = iteration
+    ctx.save_output("summary", summary)
     ctx.save_output("results", responses)
     ctx.log_metric("records_sent", float(total_sent))
     ctx.log_metric("records_failed", float(total_failed))

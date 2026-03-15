@@ -28,3 +28,9 @@ config:
     description: How to display the artifact
     default: preview
     options: [preview, raw, download]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

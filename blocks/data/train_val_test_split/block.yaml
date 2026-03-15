@@ -79,3 +79,9 @@ config:
     label: Sort Column
     default: ""
     description: Sort rows by this column before splitting (for temporal/ordered splits — use with shuffle=false)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

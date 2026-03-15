@@ -105,3 +105,9 @@ config:
     type: integer
     label: Random Seed
     default: 42
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

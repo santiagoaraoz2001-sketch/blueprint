@@ -106,3 +106,9 @@ config:
     options: [json, native]
     default: json
     description: "json = pipeline-compatible JSON array (recommended). native = HuggingFace Arrow format (faster for HF workflows)."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -52,3 +52,9 @@ config:
     description: Whether to minimize or maximize the target metric
     default: min
     options: [min, max]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

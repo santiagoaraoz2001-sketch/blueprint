@@ -68,3 +68,9 @@ config:
     label: Missing Value
     default: ""
     description: String to use for missing/null values
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

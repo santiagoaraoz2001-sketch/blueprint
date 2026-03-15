@@ -81,3 +81,9 @@ config:
     options: [plain, markdown, json]
     default: plain
     description: "plain: raw text, markdown: formatted with headers, json: structured JSON object"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

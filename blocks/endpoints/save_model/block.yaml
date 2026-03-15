@@ -57,3 +57,9 @@ config:
     type: boolean
     label: Overwrite Existing
     default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

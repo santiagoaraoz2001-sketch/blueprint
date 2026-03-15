@@ -34,3 +34,9 @@ config:
     description: Whether to pick the checkpoint with min or max metric value
     default: min
     options: [min, max]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

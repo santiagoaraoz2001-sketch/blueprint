@@ -68,3 +68,9 @@ config:
     label: Text Column for Text Output
     default: "text"
     description: "Which column to output as text (auto-detects if not found)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false
