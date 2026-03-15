@@ -37,7 +37,7 @@ outputs:
     description: "Inference metadata: tokens, latency, model used, framework"
   - id: llm_config
     label: LLM Config
-    data_type: config
+    data_type: llm
     description: "Framework + model + config for downstream blocks to make their own calls"
 
 config:
