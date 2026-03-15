@@ -26,6 +26,7 @@ export interface PortDefinition {
   dataType: PortType
   required: boolean
   aliases?: string[]  // Additional port IDs this port accepts connections from
+  position?: 'top' | 'bottom' | 'left' | 'right'
 }
 
 export interface ConfigField {
@@ -69,6 +70,7 @@ export interface BlockDefinition {
   deprecated?: boolean
   deprecatedMessage?: string
   recommended?: boolean
+  side_inputs?: PortDefinition[]
 }
 
 /** Backward-compat aliases — map old type names to new 10-type system */
