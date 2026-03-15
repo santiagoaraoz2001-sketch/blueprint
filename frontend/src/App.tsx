@@ -18,7 +18,7 @@ const MarketplaceView = lazy(() => import('@/views/MarketplaceView'))
 import SettingsView from '@/views/SettingsView'
 import PaperView from '@/views/PaperView'
 import WorkshopView from '@/views/WorkshopView'
-import InferenceView from '@/views/InferenceView'
+import OutputView from '@/views/OutputView'
 import DataView from '@/views/DataView'
 import VisualizationView from '@/views/VisualizationView'
 import ResearchDashboardView from '@/views/ResearchDashboardView'
@@ -35,7 +35,7 @@ const baseViewComponents: Record<string, React.ComponentType> = {
   datasets: DatasetView,
   data: DataView,
   visualization: VisualizationView,
-  inference: InferenceView,
+  output: OutputView,
   workshop: WorkshopView,
   settings: SettingsView,
   paper: PaperView,
