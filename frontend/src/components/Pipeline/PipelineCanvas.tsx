@@ -13,7 +13,7 @@ import '@xyflow/react/dist/style.css'
 import { T } from '@/lib/design-tokens'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useShallow } from 'zustand/react/shallow'
-import { getBlockDefinition, getPortColor, isPortCompatible, findBestInputPort, type PortDefinition } from '@/lib/block-registry'
+import { getBlockDefinition, getPortColor, isPortCompatible, resolvePort, findBestInputPort, type PortDefinition } from '@/lib/block-registry'
 import BlockNode from './BlockNode'
 import StickyNote from './StickyNote'
 import GroupNode from './GroupNode'
@@ -143,8 +143,8 @@ export default function PipelineCanvas() {
     const targetDef = getBlockDefinition(targetNode.data.type)
     if (!sourceDef || !targetDef) return true
 
-    const sourcePort = sourceDef.outputs.find((p) => p.id === connection.sourceHandle)
-    const targetPort = targetDef.inputs.find((p) => p.id === connection.targetHandle)
+    const sourcePort = resolvePort(sourceDef.outputs, connection.sourceHandle)
+    const targetPort = resolvePort(targetDef.inputs, connection.targetHandle)
     if (!sourcePort || !targetPort) return true
 
     return isPortCompatible(sourcePort.dataType, targetPort.dataType)
@@ -183,7 +183,7 @@ export default function PipelineCanvas() {
     if (!node) return
     const def = getBlockDefinition(node.data.type)
     if (!def) return
-    const port = def.outputs.find(o => o.id === params.handleId)
+    const port = resolvePort(def.outputs, params.handleId)
     if (port) {
       edgeTempRef.current = { nodeId: params.nodeId, handleId: params.handleId, type: port.dataType }
     }
@@ -229,7 +229,7 @@ export default function PipelineCanvas() {
     if (!sourceNode) return
     const def = getBlockDefinition(sourceNode.data.type)
     if (!def) return
-    const port = def.outputs.find(o => o.id === edge.sourceHandle)
+    const port = resolvePort(def.outputs, edge.sourceHandle)
     if (!port) return
 
     setHoveredEdgeParams({
@@ -379,7 +379,7 @@ export default function PipelineCanvas() {
       if (!baseStroke || baseStroke === T.borderHi) {
         const sourceNode = currentNodes.find((n) => n.id === edge.source)
         const def = sourceNode ? getBlockDefinition((sourceNode.data as any)?.type) : undefined
-        const port = def?.outputs.find((o) => o.id === edge.sourceHandle)
+        const port = def ? resolvePort(def.outputs, edge.sourceHandle) : undefined
         baseStroke = port ? getPortColor(port.dataType) : T.borderHi
       }
 

@@ -10,7 +10,7 @@ import {
   addEdge,
 } from '@xyflow/react'
 import { api } from '@/api/client'
-import { getBlockDefinition, getPortColor, isPortCompatible, type PortDefinition } from '@/lib/block-registry'
+import { getBlockDefinition, getPortColor, isPortCompatible, resolvePort, type PortDefinition } from '@/lib/block-registry'
 import { getLayoutedElements } from '@/lib/layout-utils'
 import { useSettingsStore } from './settingsStore'
 import { DEMO_PIPELINE, DEMO_PIPELINES_LIST } from '@/lib/demo-data'
@@ -244,6 +244,62 @@ function _hydrateNodePorts(nodes: Node<BlockNodeData>[]): Node<BlockNodeData>[] 
 }
 
 /**
+ * Migrate edge handle IDs that reference old (aliased) port names to new canonical IDs.
+ * Ensures saved pipelines from before port renames still render correct edges.
+ */
+function _migrateEdgeHandles(edges: Edge[], nodes: Node<BlockNodeData>[]): Edge[] {
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+  let changed = false
+  const migrated = edges.map((edge) => {
+    let { sourceHandle, targetHandle } = edge
+    let edgeChanged = false
+
+    // Migrate source handle (output port)
+    if (sourceHandle) {
+      const sourceNode = nodeMap.get(edge.source)
+      if (sourceNode) {
+        const def = getBlockDefinition(sourceNode.data.type)
+        if (def) {
+          const direct = def.outputs.find((p) => p.id === sourceHandle)
+          if (!direct) {
+            const aliased = def.outputs.find((p) => p.aliases?.includes(sourceHandle!))
+            if (aliased) {
+              sourceHandle = aliased.id
+              edgeChanged = true
+            }
+          }
+        }
+      }
+    }
+
+    // Migrate target handle (input port)
+    if (targetHandle) {
+      const targetNode = nodeMap.get(edge.target)
+      if (targetNode) {
+        const def = getBlockDefinition(targetNode.data.type)
+        if (def) {
+          const direct = def.inputs.find((p) => p.id === targetHandle)
+          if (!direct) {
+            const aliased = def.inputs.find((p) => p.aliases?.includes(targetHandle!))
+            if (aliased) {
+              targetHandle = aliased.id
+              edgeChanged = true
+            }
+          }
+        }
+      }
+    }
+
+    if (edgeChanged) {
+      changed = true
+      return { ...edge, sourceHandle, targetHandle }
+    }
+    return edge
+  })
+  return changed ? migrated : edges
+}
+
+/**
  * Helper: returns the history snapshot portion for a single set() call.
  * Call inside set() with the current state to push history + apply changes atomically.
  */
@@ -369,8 +425,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       const targetDef = getBlockDefinition(targetNode.data.type)
 
       if (sourceDef && targetDef) {
-        const sourcePort = sourceDef.outputs.find((p) => p.id === connection.sourceHandle)
-        const targetPort = targetDef.inputs.find((p) => p.id === connection.targetHandle)
+        const sourcePort = resolvePort(sourceDef.outputs, connection.sourceHandle)
+        const targetPort = resolvePort(targetDef.inputs, connection.targetHandle)
 
         if (sourcePort && targetPort && !isPortCompatible(sourcePort.dataType, targetPort.dataType)) {
           toast.error(`Type mismatch: ${sourcePort.dataType} \u2192 ${targetPort.dataType}`)
@@ -677,11 +733,12 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     if (isDemoMode()) {
       // In demo mode, load the demo pipeline for any ID
       const def = DEMO_PIPELINE.definition
+      const hydratedNodes = _hydrateNodePorts(def.nodes as any[])
       set({
         id: DEMO_PIPELINE.id,
         name: DEMO_PIPELINE.name,
-        nodes: _hydrateNodePorts(def.nodes as any[]),
-        edges: def.edges as any[],
+        nodes: hydratedNodes,
+        edges: _migrateEdgeHandles(def.edges as any[], hydratedNodes),
         isDirty: false,
         selectedNodeId: null,
         inheritanceOverlay: null,
@@ -691,11 +748,12 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     try {
       const pipeline = await api.get<any>(`/pipelines/${id}`)
       const def = pipeline.definition || {}
+      const hydratedNodes = _hydrateNodePorts(def.nodes || [])
       set({
         id: pipeline.id,
         name: pipeline.name,
-        nodes: _hydrateNodePorts(def.nodes || []),
-        edges: def.edges || [],
+        nodes: hydratedNodes,
+        edges: _migrateEdgeHandles(def.edges || [], hydratedNodes),
         isDirty: false,
         selectedNodeId: null,
         inheritanceOverlay: null,
@@ -882,11 +940,12 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         toast.error('Invalid pipeline file: missing nodes array')
         return
       }
+      const hydratedNodes = _hydrateNodePorts(data.nodes)
       set({
         id: null,
         name: data.name || 'Imported Pipeline',
-        nodes: _hydrateNodePorts(data.nodes),
-        edges: data.edges || [],
+        nodes: hydratedNodes,
+        edges: _migrateEdgeHandles(data.edges || [], hydratedNodes),
         isDirty: true,
         selectedNodeId: null,
         inheritanceOverlay: null,
@@ -918,10 +977,11 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       toast.error('Version not found')
       return
     }
+    const hydratedNodes = _hydrateNodePorts(JSON.parse(JSON.stringify(snapshot.nodes)))
     set({
       name: snapshot.name,
-      nodes: _hydrateNodePorts(JSON.parse(JSON.stringify(snapshot.nodes))),
-      edges: JSON.parse(JSON.stringify(snapshot.edges)),
+      nodes: hydratedNodes,
+      edges: _migrateEdgeHandles(JSON.parse(JSON.stringify(snapshot.edges)), hydratedNodes),
       isDirty: true,
       selectedNodeId: null,
     })

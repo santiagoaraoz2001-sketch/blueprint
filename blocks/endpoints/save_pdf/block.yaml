@@ -16,9 +16,12 @@ inputs:
 
 outputs:
   - id: file_path
-    label: File Path
-    data_type: text
+    label: Saved File Path
+    data_type: artifact
     description: "Absolute path to the saved PDF file"
+  - id: status
+    label: Save Status
+    data_type: metrics
   - id: summary
     label: Export Summary
     data_type: metrics

@@ -39,7 +39,8 @@ outputs:
     aliases: [metrics]
   - id: llm_config
     label: LLM Config
-    data_type: config
+    data_type: llm
+    aliases: [llm]
     description: "Framework + model + config for downstream blocks to make their own calls"
 
 config:

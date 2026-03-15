@@ -114,7 +114,7 @@ def run(ctx):
     out_path = os.path.join(ctx.run_dir, f"prompt.{ext}")
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(result)
-    ctx.save_output("text", out_path)
+    ctx.save_output("rendered_text", out_path)
 
     # Save metrics
     ctx.save_output("metrics", {

@@ -27,11 +27,11 @@ outputs:
     data_type: artifact
     description: 'latency_profiles.json: per batch_size x input_length: avg/min/max/p50/p95 ms, throughput'
 
-  - id: dataset
+  - id: profiled_dataset
     label: Timing Data
     data_type: dataset
+    aliases: [dataset]
     description: "Per-config timings: batch_size, input_length, avg_ms, p50_ms, p95_ms, throughput"
-
 config:
   model_name:
     type: string

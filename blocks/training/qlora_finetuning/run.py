@@ -292,7 +292,7 @@ def run(ctx):
     ctx.log_metric("final_loss", final_loss)
     ctx.log_metric("epochs_completed", epochs)
     ctx.log_metric("trainable_params", trainable)
-    ctx.save_output("model", output_dir)
+    ctx.save_output("trained_model", output_dir)
     ctx.save_output("metrics", {
         "final_loss": final_loss,
         "total_steps": result.global_step,

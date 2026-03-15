@@ -1,5 +1,5 @@
 // AUTO-GENERATED — DO NOT EDIT MANUALLY
-// Generated from 125 block.yaml files across 12 categories
+// Generated from 126 block.yaml files across 12 categories
 // Run: python scripts/generate_block_registry.py
 
 import type { BlockDefinition } from './block-registry'
@@ -25,7 +25,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'references', label: 'Reference Answers', dataType: 'dataset', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Evaluation Results', dataType: 'dataset', required: false },
+      { id: 'evaluation_dataset', label: 'Evaluation Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Eval Report', dataType: 'artifact', required: false },
       { id: 'metrics', label: 'Aggregate Scores', dataType: 'metrics', required: false },
     ],
@@ -155,7 +155,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Task / Prompt', dataType: 'text', required: true },
       { id: 'tools', label: 'Tool Registry', dataType: 'config', required: false },
       { id: 'memory', label: 'Agent Memory', dataType: 'config', required: false },
@@ -249,7 +250,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'text', label: 'Extracted Text', dataType: 'text', required: false, aliases: ['response', 'output'] },
-      { id: 'dataset', label: 'Full Responses', dataType: 'dataset', required: false },
+      { id: 'output_dataset', label: 'Full Responses', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Extraction Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -311,7 +312,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Question / Prompt', dataType: 'text', required: true },
     ],
     outputs: [
@@ -393,7 +395,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Task Description', dataType: 'text', required: true },
       { id: 'context', label: 'Code Context', dataType: 'text', required: false },
     ],
@@ -481,7 +484,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: false },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Debate Topic', dataType: 'text', required: true },
     ],
     outputs: [
@@ -517,7 +521,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Topic / Prompt', dataType: 'text', required: true },
     ],
     outputs: [
@@ -599,14 +604,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'store', label: 'Vector Store Config', dataType: 'config', required: true },
       { id: 'dataset', label: 'Queries', dataType: 'dataset', required: false },
       { id: 'query', label: 'Single Query', dataType: 'text', required: false },
     ],
     outputs: [
       { id: 'response', label: 'Response Text', dataType: 'text', required: false, aliases: ['text', 'output'] },
-      { id: 'dataset', label: 'Responses', dataType: 'dataset', required: false },
+      { id: 'retrieval_log', label: 'Responses', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'RAG Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -760,7 +766,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       api_key_header: 'X-API-Key',
     },
     configFields: [
-      { name: 'url', label: 'API URL', type: 'string', description: 'REST API endpoint URL' },
+      {
+        name: 'url',
+        label: 'API URL',
+        type: 'string',
+        description: 'REST API endpoint URL',
+        mandatory: true,
+      },
       {
         name: 'method',
         label: 'Method',
@@ -875,7 +887,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'dataset', label: 'Transformed', dataType: 'dataset', required: false },
+      { id: 'transformed_dataset', label: 'Transformed', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'stats', label: 'Transform Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -1059,8 +1071,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Augmented', dataType: 'dataset', required: false },
-      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
+      { id: 'augmented_dataset', label: 'Augmented', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'output_dataset_meta', label: 'Dataset Info', dataType: 'config', required: false, aliases: ['dataset_meta'] },
       { id: 'metrics', label: 'Augmentation Stats', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -1180,7 +1192,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'dataset', label: 'Merged', dataType: 'dataset', required: false },
-      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
+      { id: 'output_dataset_meta', label: 'Dataset Info', dataType: 'config', required: false, aliases: ['dataset_meta'] },
       { id: 'stats', label: 'Merge Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -1300,7 +1312,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'stats', label: 'Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
       { id: 'preview', label: 'Preview Rows', dataType: 'dataset', required: false, aliases: ['dataset'] },
-      { id: 'dataset', label: 'Dataset (passthrough)', dataType: 'dataset', required: false },
+      { id: 'preview_dataset', label: 'Dataset (passthrough)', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       num_rows: 20,
@@ -1372,7 +1384,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'dataset', label: 'Selected Rows', dataType: 'dataset', required: false },
+      { id: 'selected_dataset', label: 'Selected Rows', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'text', label: 'First Row as Text', dataType: 'text', required: false, aliases: ['response', 'output'] },
       { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
     ],
@@ -1523,6 +1535,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Folder Path',
         type: 'file_path',
         description: 'Directory containing documents to ingest',
+        mandatory: true,
       },
       {
         name: 'glob_pattern',
@@ -1617,9 +1630,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Filtered', dataType: 'dataset', required: false },
+      { id: 'filtered_dataset', label: 'Filtered', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'rejected', label: 'Rejected', dataType: 'dataset', required: false, aliases: ['dataset'] },
-      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
+      { id: 'output_dataset_meta', label: 'Dataset Info', dataType: 'config', required: false, aliases: ['dataset_meta'] },
       { id: 'stats', label: 'Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -1778,6 +1791,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Dataset Name',
         type: 'string',
         description: 'HuggingFace dataset identifier (e.g. \'imdb\', \'squad\', \'databricks/dolly-15k\')',
+        mandatory: true,
       },
       {
         name: 'subset',
@@ -1994,7 +2008,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       sheet_name: '',
     },
     configFields: [
-      { name: 'file_path', label: 'File Path', type: 'file_path', description: 'Path to the data file' },
+      {
+        name: 'file_path',
+        label: 'File Path',
+        type: 'file_path',
+        description: 'Path to the data file',
+        mandatory: true,
+      },
       {
         name: 'format',
         label: 'Format',
@@ -2124,7 +2144,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: false },
-      { id: 'metrics', label: 'Conversion Stats', dataType: 'metrics', required: false },
+      { id: 'output_metrics', label: 'Conversion Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: { format: 'rows', label: '' },
     configFields: [
@@ -2158,6 +2178,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     inputs: [],
     outputs: [
       { id: 'model', label: 'Model', dataType: 'model', required: false },
+      { id: 'llm', label: 'LLM Config', dataType: 'llm', required: false },
     ],
     defaultConfig: {
       source: 'huggingface',
@@ -2434,8 +2455,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Chunked Data', dataType: 'dataset', required: false },
-      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
+      { id: 'chunked_dataset', label: 'Chunked Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'output_dataset_meta', label: 'Dataset Info', dataType: 'config', required: false, aliases: ['dataset_meta'] },
       { id: 'stats', label: 'Chunking Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -2701,7 +2722,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'train', label: 'Train', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'val', label: 'Validation', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'test', label: 'Test', dataType: 'dataset', required: false, aliases: ['dataset'] },
-      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
+      { id: 'output_dataset_meta', label: 'Dataset Info', dataType: 'config', required: false, aliases: ['dataset_meta'] },
       { id: 'stats', label: 'Split Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -3269,7 +3290,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -3353,7 +3375,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'embeddings', label: 'Embeddings', dataType: 'embedding', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -3415,7 +3438,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -3502,7 +3526,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Input', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -3575,7 +3600,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Model Data', dataType: 'model', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -3649,7 +3675,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -3704,7 +3731,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'config', label: 'Report Config', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -3807,7 +3835,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Data', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -3907,7 +3936,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
@@ -4069,7 +4099,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Comparison Results', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Comparisons', dataType: 'dataset', required: false },
+      { id: 'comparison_dataset', label: 'Annotated Comparisons', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Comparison Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -4289,7 +4319,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Fairness Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Results', dataType: 'dataset', required: false },
+      { id: 'annotated_dataset', label: 'Annotated Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Bias Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -4448,7 +4478,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Quality Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Data', dataType: 'dataset', required: false },
+      { id: 'scored_dataset', label: 'Annotated Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Quality Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -4546,7 +4576,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'metrics', label: 'Scores', dataType: 'metrics', required: false },
       { id: 'report', label: 'Detailed Report', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Predictions', dataType: 'dataset', required: false },
+      { id: 'benchmark_dataset', label: 'Predictions', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       model_name: 'llama3.2',
@@ -4773,7 +4803,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Factuality Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Results', dataType: 'dataset', required: false },
+      { id: 'checked_dataset', label: 'Annotated Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Error Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -5066,7 +5096,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'metrics', label: 'Performance Metrics', dataType: 'metrics', required: false },
       { id: 'results', label: 'Detailed Profiles', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Timing Data', dataType: 'dataset', required: false },
+      { id: 'profiled_dataset', label: 'Timing Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       model_name: '',
@@ -5623,7 +5653,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'RAG Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Results', dataType: 'dataset', required: false },
+      { id: 'eval_dataset', label: 'Annotated Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'RAG Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -5746,7 +5776,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Similarity Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Pairs', dataType: 'dataset', required: false },
+      { id: 'similarity_dataset', label: 'Annotated Pairs', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Similarity Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -5843,7 +5873,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'metrics', label: 'Summarization Scores', dataType: 'metrics', required: false },
       { id: 'report', label: 'Detailed Report', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Scored Summaries', dataType: 'dataset', required: false },
+      { id: 'eval_dataset', label: 'Scored Summaries', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       summary_column: 'summary',
@@ -5927,7 +5957,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Safety Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Data', dataType: 'dataset', required: false },
+      { id: 'scored_dataset', label: 'Annotated Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Toxicity Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -6520,7 +6550,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'config', label: 'Connection Details', dataType: 'config', required: false },
-      { id: 'dataset', label: 'Output Data', dataType: 'dataset', required: false },
+      { id: 'output_dataset', label: 'Output Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       provider: 'modal',
@@ -6674,7 +6704,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'telemetry', label: 'Data / Telemetry', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'telemetry', label: 'Telemetry Sent', dataType: 'any', required: false },
+      { id: 'output_telemetry', label: 'Telemetry Sent', dataType: 'any', required: false, aliases: ['telemetry'] },
     ],
     defaultConfig: { host: 'http://localhost', port: 4173 },
     configFields: [
@@ -6716,7 +6746,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'artifact', label: 'Visualization', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Coordinates', dataType: 'dataset', required: false },
+      { id: 'viz_dataset', label: 'Coordinates', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       embedding_column: '_embedding',
@@ -7813,7 +7843,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  INFERENCE (17 blocks)
+  //  INFERENCE (18 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -7833,7 +7863,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Comparison Results', dataType: 'dataset', required: false },
+      { id: 'results_dataset', label: 'Comparison Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Quality Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -7937,6 +7967,60 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
   },
   {
+    type: 'chat_completion',
+    name: 'Chat Completion',
+    description: 'Multi-turn chat completion — send a conversation history to an LLM and get a response',
+    category: 'inference',
+    tags: [],
+    aliases: [],
+    icon: 'Cpu',
+    accent: '#8b5cf6',
+    maturity: 'stable',
+    inputs: [
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
+      { id: 'prompt', label: 'User Message', dataType: 'text', required: true },
+      { id: 'system_prompt', label: 'System Prompt', dataType: 'text', required: false },
+      { id: 'history', label: 'Chat History', dataType: 'dataset', required: false },
+    ],
+    outputs: [
+      { id: 'response', label: 'Response', dataType: 'text', required: false, aliases: ['text'] },
+      { id: 'output_dataset', label: 'Conversation Log', dataType: 'dataset', required: false },
+      { id: 'metadata', label: 'Metadata', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'config', required: false },
+    ],
+    defaultConfig: {
+      model_name: '',
+      temperature: 0.7,
+      max_tokens: 1024,
+      system_prompt: 'You are a helpful assistant.',
+      backend: '',
+    },
+    configFields: [
+      {
+        name: 'model_name',
+        label: 'Model Name',
+        type: 'string',
+        default: '',
+        description: 'Model to use (overridden by model input port)',
+      },
+      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.7, min: 0.0, max: 2.0 },
+      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 1024, min: 1, max: 32768 },
+      {
+        name: 'system_prompt',
+        label: 'Default System Prompt',
+        type: 'text_area',
+        default: 'You are a helpful assistant.',
+      },
+      {
+        name: 'backend',
+        label: 'Inference Backend',
+        type: 'select',
+        default: '',
+        options: ['', 'ollama', 'mlx', 'pytorch'],
+      },
+    ],
+  },
+  {
     type: 'embedding_clustering',
     name: 'Embedding Clustering',
     description: 'Cluster embedding vectors using K-Means, DBSCAN, HDBSCAN, or Agglomerative algorithms',
@@ -7952,8 +8036,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'labels', label: 'Labels', dataType: 'any', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Clustered Data', dataType: 'dataset', required: false },
-      { id: 'embeddings', label: 'Labeled Embeddings', dataType: 'embedding', required: false },
+      { id: 'clustered_dataset', label: 'Clustered Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'clustered_embeddings', label: 'Labeled Embeddings', dataType: 'embedding', required: false, aliases: ['embeddings'] },
       { id: 'metrics', label: 'Cluster Stats', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8075,10 +8159,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
-      { id: 'model', label: 'Model', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Dataset with Embeddings', dataType: 'dataset', required: false },
+      { id: 'enriched_dataset', label: 'Dataset with Embeddings', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'embeddings', label: 'Embeddings', dataType: 'embedding', required: false },
       { id: 'metrics', label: 'Embedding Metrics', dataType: 'metrics', required: false },
     ],
@@ -8199,7 +8282,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'metadata', label: 'Metadata', dataType: 'any', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Search Results', dataType: 'dataset', required: false },
+      { id: 'search_results', label: 'Search Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Search Stats', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8308,7 +8391,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Text to Check', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'text', label: 'Filtered Text', dataType: 'text', required: false, aliases: ['response', 'output'] },
+      { id: 'filtered_text', label: 'Filtered Text', dataType: 'text', required: false, aliases: ['text', 'response', 'output'] },
       { id: 'metrics', label: 'Safety Scores', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8403,7 +8486,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'response', label: 'Response', dataType: 'text', required: false, aliases: ['text', 'output'] },
       { id: 'metadata', label: 'Metadata', dataType: 'metrics', required: false, aliases: ['metrics'] },
-      { id: 'llm_config', label: 'LLM Config', dataType: 'config', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false, aliases: ['llm'] },
     ],
     defaultConfig: {
       prompt_template: '{input}',
@@ -8491,7 +8574,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Benchmark Results', dataType: 'dataset', required: false },
+      { id: 'benchmark_results', label: 'Benchmark Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Summary Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8583,7 +8666,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Comparison Results', dataType: 'dataset', required: false },
+      { id: 'comparison_results', label: 'Comparison Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Comparison Summary', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8879,7 +8962,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: false },
     ],
     outputs: [
-      { id: 'text', label: 'Rendered Prompt', dataType: 'text', required: false, aliases: ['response', 'output'] },
+      { id: 'rendered_text', label: 'Rendered Prompt', dataType: 'text', required: false, aliases: ['text', 'response', 'output'] },
       { id: 'metrics', label: 'Template Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: { template: '{input}', variables: '{}', output_format: 'text' },
@@ -8921,7 +9004,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Model', dataType: 'model', required: true },
     ],
     outputs: [
-      { id: 'model', label: 'Quantized Model', dataType: 'model', required: false },
+      { id: 'quantized_model', label: 'Quantized Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Quant Stats', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8983,7 +9066,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'text', label: 'Answer', dataType: 'text', required: false, aliases: ['response', 'output'] },
-      { id: 'dataset', label: 'Context Chunks', dataType: 'dataset', required: false },
+      { id: 'output_dataset', label: 'Context Chunks', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'RAG Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -9092,7 +9175,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Reranked Results', dataType: 'dataset', required: false },
+      { id: 'reranked_dataset', label: 'Reranked Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Reranking Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -9185,7 +9268,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Raw Response', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'text', label: 'Parsed Text', dataType: 'text', required: false, aliases: ['response', 'output'] },
+      { id: 'parsed_text', label: 'Parsed Text', dataType: 'text', required: false, aliases: ['text', 'response', 'output'] },
       { id: 'config', label: 'Extracted Fields', dataType: 'config', required: false },
       { id: 'dataset', label: 'Extracted Records', dataType: 'dataset', required: false },
     ],
@@ -9257,7 +9340,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Input Text', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'text', label: 'Token Breakdown', dataType: 'text', required: false, aliases: ['response', 'output'] },
+      { id: 'token_text', label: 'Token Breakdown', dataType: 'text', required: false, aliases: ['text', 'response', 'output'] },
       { id: 'dataset', label: 'Token Analysis', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Token Counts', dataType: 'metrics', required: false },
     ],
@@ -9839,7 +9922,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'artifact', label: 'Submission', dataType: 'artifact', required: false },
-      { id: 'metrics', label: 'Stats', dataType: 'metrics', required: false },
+      { id: 'output_metrics', label: 'Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       title: 'Model Leaderboard',
@@ -10091,7 +10174,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Trained Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'Trained Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Training Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10113,6 +10196,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'layer_depth',
@@ -10191,7 +10275,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Training Output', dataType: 'model', required: true },
     ],
     outputs: [
-      { id: 'model', label: 'Best Checkpoint', dataType: 'model', required: false },
+      { id: 'selected_model', label: 'Best Checkpoint', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Checkpoint Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: { checkpoint_dir: '', metric: 'eval_loss', mode: 'min' },
@@ -10201,6 +10285,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Checkpoint Directory',
         type: 'string',
         description: 'Path to scan for checkpoints (overridden by model input port if connected)',
+        mandatory: true,
       },
       {
         name: 'metric',
@@ -10235,7 +10320,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Pre-trained Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'Pre-trained Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Loss Curve', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10255,6 +10340,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       { name: 'lr', label: 'Learning Rate', type: 'float', default: 1e-05, min: 1e-07, max: 0.001 },
       { name: 'epochs', label: 'Epochs', type: 'integer', default: 1, min: 1, max: 50 },
@@ -10320,7 +10406,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Trained Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'Trained Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Curriculum Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10341,6 +10427,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'num_stages',
@@ -10438,12 +10525,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Teacher Model',
         type: 'string',
         description: 'HuggingFace name or path for the teacher model (overridden by input port)',
+        mandatory: true,
       },
       {
         name: 'student_model',
         label: 'Student Model',
         type: 'string',
         description: 'HuggingFace name or path for the student model (overridden by input port)',
+        mandatory: true,
       },
       {
         name: 'temperature',
@@ -10499,7 +10588,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Base Model', dataType: 'model', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Aligned Model', dataType: 'model', required: false },
+      { id: 'aligned_model', label: 'Aligned Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'DPO Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10521,6 +10610,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'beta',
@@ -10600,7 +10690,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Fine-tuned Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'Fine-tuned Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Training Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10623,6 +10713,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       { name: 'lr', label: 'Learning Rate', type: 'float', default: 2e-05, min: 1e-07, max: 0.01 },
       { name: 'epochs', label: 'Epochs', type: 'integer', default: 3, min: 1, max: 100 },
@@ -10710,7 +10801,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Base Model', dataType: 'model', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Best Model', dataType: 'model', required: false },
+      { id: 'best_model', label: 'Best Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Sweep Results', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10778,7 +10869,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Fine-tuned Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'Fine-tuned Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Training Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10803,6 +10894,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path (e.g. meta-llama/Llama-3-8B)',
+        mandatory: true,
       },
       {
         name: 'r',
@@ -10907,7 +10999,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'QLoRA Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'QLoRA Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Training Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10934,6 +11026,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'r',
@@ -11052,7 +11145,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Base Model', dataType: 'model', required: true },
     ],
     outputs: [
-      { id: 'model', label: 'Reward Model', dataType: 'model', required: false },
+      { id: 'reward_model', label: 'Reward Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'RM Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -11141,7 +11234,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'reward_model', label: 'Reward Model', dataType: 'model', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'RLHF Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'RLHF Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'PPO Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -11162,12 +11255,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Policy Model',
         type: 'string',
         description: 'HuggingFace model name or local path for the policy model',
+        mandatory: true,
       },
       {
         name: 'reward_model',
         label: 'Reward Model',
         type: 'string',
         description: 'HuggingFace model name or path for the reward model (leave empty for heuristic reward)',
+        mandatory: true,
       },
       { name: 'lr', label: 'Learning Rate', type: 'float', default: 1.4e-05, min: 1e-07, max: 0.001 },
       {

@@ -23,10 +23,11 @@ inputs:
     required: false
 
 outputs:
-  - id: text
+  - id: rendered_text
     label: Rendered Prompt
+    aliases: [text, response, output]
     data_type: text
-    aliases: [response, output]
+
   - id: metrics
     label: Template Metrics
     data_type: metrics

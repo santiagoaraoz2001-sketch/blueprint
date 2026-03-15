@@ -28,9 +28,10 @@ outputs:
       {"answer": str, "query": str, "model": str, "provider": str,
        "num_chunks_used": int, "elapsed_s": float}.
     aliases: [response, output]
-  - id: dataset
+  - id: output_dataset
     label: Context Chunks
     data_type: dataset
+    aliases: [dataset]
     description: >
       JSON array of retrieved context chunk objects. Each row contains:
       text (str) — the chunk text content;
@@ -38,6 +39,7 @@ outputs:
       index (int) — original row index in the knowledge base;
       source (str, optional) — source field from original row if present.
       Output format configurable via dataset_format (json, jsonl, csv).
+
   - id: metrics
     label: RAG Metrics
     data_type: metrics

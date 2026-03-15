@@ -32,6 +32,7 @@ config:
     type: string
     label: Dataset Name
     description: "HuggingFace dataset identifier (e.g. 'imdb', 'squad', 'databricks/dolly-15k')"
+    mandatory: true
   subset:
     type: string
     label: Subset

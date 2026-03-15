@@ -106,6 +106,11 @@ def load_all_blocks() -> list[dict]:
                 "configFields": _convert_config_fields(schema.get("config", {})),
             }
 
+            # Side inputs (control ports rendered on left edge)
+            side_inputs = _convert_ports(schema.get("side_inputs", []))
+            if side_inputs:
+                block["side_inputs"] = side_inputs
+
             # Optional detail fields
             if "detail" in schema:
                 block["detail"] = schema["detail"]
@@ -126,7 +131,7 @@ def _convert_ports(ports: list[dict] | None) -> list[dict]:
         return []
     result = []
     for p in ports:
-        port: dict = {
+        port: dict[str, Any] = {
             "id": p.get("id", ""),
             "label": p.get("label", p.get("id", "")),
             "dataType": p.get("data_type", "any"),
@@ -182,6 +187,8 @@ def _convert_config_fields(config_schema: dict | None) -> list[dict]:
             field["description"] = field_def["description"]
         if "depends_on" in field_def:
             field["depends_on"] = field_def["depends_on"]
+        if field_def.get("mandatory"):
+            field["mandatory"] = True
         fields.append(field)
     return fields
 
@@ -266,6 +273,8 @@ def _format_config_field(field: dict, indent: str) -> str:
     if "depends_on" in field:
         dep = field["depends_on"]
         parts.append(f"depends_on: {{ field: '{_esc(dep['field'])}', value: {_ts_value(dep['value'])} }}")
+    if field.get("mandatory"):
+        parts.append("mandatory: true")
 
     joined = ", ".join(parts)
     if len(joined) < 100:
@@ -328,6 +337,13 @@ def _format_block(block: dict) -> str:
         lines.append("    ],")
     else:
         lines.append("    configFields: [],")
+
+    # Side inputs (control ports on left edge)
+    if block.get("side_inputs"):
+        port_strs = [f"      {_format_port(p)}," for p in block["side_inputs"]]
+        lines.append("    side_inputs: [")
+        lines.extend(port_strs)
+        lines.append("    ],")
 
     # Optional fields
     if "detail" in block:

@@ -25,10 +25,12 @@ outputs:
     label: Fairness Scores
     data_type: metrics
     description: 'Aggregate: total_texts, flagged_count/rate, avg_bias, threshold, per-dimension avg bias, group averages'
-  - id: dataset
+  - id: annotated_dataset
     label: Annotated Results
     data_type: dataset
+    aliases: [dataset]
     description: 'Per-text: text, group, {dimension}_bias scores, overall_bias, flagged (bool) — filterable'
+
   - id: report
     label: Bias Report
     data_type: artifact

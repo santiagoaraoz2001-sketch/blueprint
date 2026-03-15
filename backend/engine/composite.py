@@ -18,6 +18,7 @@ from typing import Any, Callable
 
 from ..block_sdk.context import CompositeBlockContext
 from ..block_sdk.exceptions import BlockError
+from .block_registry import resolve_output_handle
 from .schema_validator import load_block_schema, validate_config
 
 logger = logging.getLogger(__name__)
@@ -145,6 +146,12 @@ def execute_sub_pipeline(
                 src_id = edge.get("source", "")
                 src_handle = edge.get("sourceHandle", "")
                 tgt_handle = edge.get("targetHandle", "")
+                # Resolve aliased output handle IDs from renamed ports
+                if src_id in child_outputs and src_handle not in child_outputs[src_id]:
+                    src_node = node_map.get(src_id)
+                    if src_node:
+                        src_type = src_node.get("data", {}).get("type", src_node.get("type", ""))
+                        src_handle = resolve_output_handle(src_type, src_handle)
                 if src_id in child_outputs and src_handle in child_outputs[src_id]:
                     value = child_outputs[src_id][src_handle]
                     _multi_counts[tgt_handle] = _multi_counts.get(tgt_handle, 0) + 1

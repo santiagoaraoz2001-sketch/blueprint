@@ -11,14 +11,15 @@ inputs:
     required: true
 
 outputs:
-  - id: text
+  - id: token_text
     label: Token Breakdown
     data_type: text
+    aliases: [text, response, output]
     description: >
       Plain text file (breakdown.txt) with a human-readable summary. Contains lines:
       Tokens: <count>, Characters: <count>, Words: <count>, Lines: <count>,
       Chars/Token: <ratio>, Method: <method_used>.
-    aliases: [response, output]
+
   - id: dataset
     label: Token Analysis
     data_type: dataset

@@ -4,7 +4,7 @@
 
 import { CONNECTOR_COLORS } from './design-tokens'
 
-/** The 9 wire types that flow between blocks */
+/** The 10 wire types that flow between blocks */
 export type ConnectorType =
   | 'dataset'     // structured tabular data (DataFrames, HF datasets, rows/columns)
   | 'text'        // raw text, prompts, strings, documents
@@ -14,6 +14,7 @@ export type ConnectorType =
   | 'embedding'   // vector embeddings, dense representations
   | 'artifact'    // files, reports, packages, exported assets
   | 'agent'       // autonomous agent instances
+  | 'llm'         // LLM provider config (model info dict or full llm_config)
   | 'any'         // accepts anything (generic utilities, interventions)
 
 /** Backward compat alias */
@@ -24,7 +25,9 @@ export interface PortDefinition {
   label: string
   dataType: PortType
   required: boolean
+  /** Old port IDs that resolve to this port (backward compat for saved pipelines) */
   aliases?: string[]
+  position?: 'top' | 'bottom' | 'left' | 'right'
 }
 
 export interface ConfigField {
@@ -37,6 +40,7 @@ export interface ConfigField {
   options?: string[]
   description?: string
   depends_on?: { field: string; value: any }
+  mandatory?: boolean
 }
 
 export type BlockMaturity = 'stable' | 'beta' | 'experimental'
@@ -68,9 +72,10 @@ export interface BlockDefinition {
   deprecated?: boolean
   deprecatedMessage?: string
   recommended?: boolean
+  side_inputs?: PortDefinition[]
 }
 
-/** Backward-compat aliases — map old type names to new 9-type system */
+/** Backward-compat aliases — map old type names to new 10-type system */
 const PORT_TYPE_ALIASES: Record<string, string> = {
   data:         'dataset',     // old catch-all → dataset
   external:     'dataset',     // old external → dataset
@@ -83,6 +88,7 @@ const PORT_TYPE_ALIASES: Record<string, string> = {
   api:          'dataset',
   file:         'dataset',
   cloud:        'config',
+  llm_config:   'llm',         // old type name → new llm type
 }
 
 /** Get port color from CONNECTOR_COLORS map (handles legacy port types) */
@@ -96,31 +102,53 @@ export function getPortColor(dataType: ConnectorType | string): string {
  *
  * SOURCE     → CAN CONNECT TO
  * dataset    → dataset, text, any
- * text       → text, dataset, config, any
- * model      → model, any
- * config     → config, text, any
+ * text       → text, dataset, any                (REMOVED config — no more text→config)
+ * model      → model, llm, any                   (ADDED llm — model_selector→agent works)
+ * config     → config, text, llm, any             (ADDED llm — config→llm for llm_config outputs)
  * metrics    → metrics, dataset, text, any
  * embedding  → embedding, dataset, any
  * artifact   → artifact, text, any
  * agent      → agent, any
+ * llm        → llm, model, config, any            (accepts model AND config)
  * any        → ALL TYPES
  */
 const COMPAT: Record<string, Set<string>> = {
   dataset:   new Set(['dataset', 'text', 'any']),
-  text:      new Set(['text', 'dataset', 'config', 'any']),
-  model:     new Set(['model', 'any']),
-  config:    new Set(['config', 'text', 'any']),
+  text:      new Set(['text', 'dataset', 'any']),
+  model:     new Set(['model', 'llm', 'any']),
+  config:    new Set(['config', 'text', 'llm', 'any']),
   metrics:   new Set(['metrics', 'dataset', 'text', 'any']),
   embedding: new Set(['embedding', 'dataset', 'any']),
   artifact:  new Set(['artifact', 'text', 'any']),
   agent:     new Set(['agent', 'any']),
-  any:       new Set(['any', 'dataset', 'text', 'model', 'config', 'metrics', 'embedding', 'artifact', 'agent']),
+  llm:       new Set(['llm', 'model', 'config', 'any']),
+  any:       new Set(['any', 'dataset', 'text', 'model', 'config', 'metrics', 'embedding', 'artifact', 'agent', 'llm']),
 }
 
 export function isPortCompatible(source: ConnectorType | string, target: ConnectorType | string): boolean {
   const s = (PORT_TYPE_ALIASES[source] || source) as string
   const t = (PORT_TYPE_ALIASES[target] || target) as string
   return COMPAT[s]?.has(t) ?? false
+}
+
+/**
+ * Find a port by ID, falling back to aliases for backward compatibility.
+ * Saved pipelines may reference old port IDs that have since been renamed.
+ */
+export function resolvePort(ports: PortDefinition[], handleId: string | null | undefined): PortDefinition | undefined {
+  if (!handleId) return undefined
+  return ports.find((p) => p.id === handleId) ??
+         ports.find((p) => p.aliases?.includes(handleId))
+}
+
+/** Check if a source port can connect to a target port (type compatibility + alias awareness) */
+export function canConnect(sourcePort: PortDefinition, targetPort: PortDefinition): boolean {
+  return isPortCompatible(sourcePort.dataType, targetPort.dataType)
+}
+
+/** Get all IDs a port responds to: its own id plus any aliases */
+export function getPortAliases(port: PortDefinition): string[] {
+  return [port.id, ...(port.aliases || [])]
 }
 
 /** File extension → expected port types mapping for format warnings */
@@ -209,9 +237,9 @@ export function findBestInputPort(
 //  DYNAMIC BLOCK SIZING
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const PORT_SLOT_WIDTH = 56
+const PORT_SLOT_WIDTH = 72
 const MIN_BLOCK_WIDTH = 280
-const MAX_BLOCK_WIDTH = 560
+const MAX_BLOCK_WIDTH = 640
 
 /** Compute block width based on number of ports */
 export function computeBlockWidth(def: BlockDefinition): number {
