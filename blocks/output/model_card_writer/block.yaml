@@ -22,6 +22,7 @@ outputs:
     label: Card Text
     data_type: text
 
+    aliases: [response, output]
 config:
   model_name:
     type: string

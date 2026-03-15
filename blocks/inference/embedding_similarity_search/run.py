@@ -293,7 +293,7 @@ def run(ctx):
         out_path = os.path.join(out_dir, "data.json")
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(all_results, f, indent=2)
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("search_results", out_dir)
 
     # ── Save stats ───────────────────────────────────────────────
     best_score = max((r["score"] for r in all_results), default=0.0)

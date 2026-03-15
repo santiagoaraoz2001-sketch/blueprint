@@ -8,9 +8,14 @@ composite: true
 inputs:
   - id: llm
     label: LLM
-    data_type: config
+    data_type: llm
     required: false
-    description: "Connected LLM Inference block for model config. If not connected, uses model_name config."
+    description: "LLM config from llm_inference or model info from model_selector"
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Direct model connection (alternative to LLM port)"
   - id: input
     label: Debate Topic
     data_type: text

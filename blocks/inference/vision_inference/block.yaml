@@ -22,6 +22,7 @@ outputs:
   - id: response
     label: Description / Response
     data_type: text
+    aliases: [text, output]
   - id: metrics
     label: Metrics
     data_type: metrics

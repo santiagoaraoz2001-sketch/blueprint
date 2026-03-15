@@ -222,7 +222,7 @@ def run(ctx):
             }, f, indent=2)
 
         # Branch: real PPO training succeeded
-        ctx.save_output("model", output_dir)
+        ctx.save_output("trained_model", output_dir)
         # Branch: real PPO training succeeded
         ctx.save_output("metrics", {
             "final_reward": final_reward,
@@ -289,7 +289,7 @@ def run(ctx):
         }, f, indent=2)
 
     # Branch: PPO training failed — simulation fallback
-    ctx.save_output("model", model_path)
+    ctx.save_output("trained_model", model_path)
     # Branch: PPO training failed — simulation fallback
     ctx.save_output("metrics", {
         "final_reward": final_reward,

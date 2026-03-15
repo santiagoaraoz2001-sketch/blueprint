@@ -35,6 +35,42 @@ def run(ctx):
     model = ctx.config.get("model_name", "")
     rounds = ctx.config.get("rounds", 3)
 
+    # ── Load LLM config — accept llm port OR model port ───────────────
+    llm_source = ""  # track where model came from for logging
+
+    # Try llm port first (preferred — contains framework + config)
+    try:
+        llm_data = ctx.load_input("llm")
+        if isinstance(llm_data, dict):
+            if "framework" in llm_data:
+                model = model or llm_data.get("model", "")
+                if model:
+                    llm_source = f"{llm_data.get('framework', 'unknown')} via llm port"
+            elif "model_name" in llm_data or "model_id" in llm_data:
+                model = model or llm_data.get("model_name", llm_data.get("model_id", ""))
+                if model:
+                    llm_source = f"{llm_data.get('source', 'unknown')} via llm port"
+    except (ValueError, Exception):
+        pass
+
+    # Try model port as fallback (direct model_selector connection)
+    if not model:
+        try:
+            model_data = ctx.load_input("model")
+            if isinstance(model_data, dict):
+                model = model_data.get("model_name", model_data.get("model_id", ""))
+                if model:
+                    llm_source = f"{model_data.get('source', 'unknown')} via model port"
+            elif isinstance(model_data, str):
+                model = model_data
+                if model:
+                    llm_source = "model port (string)"
+        except (ValueError, Exception):
+            pass
+
+    if not model and not llm_source:
+        llm_source = "config" if ctx.config.get("model_name") else "none"
+
     if not topic:
         raise BlockInputError(
             "No debate topic provided",
@@ -107,9 +143,12 @@ def run(ctx):
         prev_judge_id = judge_id
 
     ctx.log_message(
-        f"Debate composite: {rounds} round(s) with model={model or 'default'}, "
-        f"sub-blocks={ctx.sub_block_count}"
+        f"Debate composite: {rounds} round(s) with model={model or 'default'} "
+        f"(source={llm_source}), sub-blocks={ctx.sub_block_count}"
     )
+    if not model:
+        ctx.log_message("No model connected. Sub-blocks will use auto-detection or demo mode. "
+                        "Connect a Model Selector or LLM Inference block for real output.")
     ctx.log_metric("rounds_completed", rounds)
     ctx.log_metric("sub_blocks_created", ctx.sub_block_count)
     ctx.report_progress(1, 1)

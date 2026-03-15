@@ -515,6 +515,16 @@ def run(ctx):
         json.dump(standardized, f, indent=2, default=str, ensure_ascii=False)
 
     ctx.save_output("model", standardized)
+
+    # Also save llm config format for direct agent connection
+    ctx.save_output("llm", {
+        "framework": source,
+        "model": _name,
+        "config": {
+            "endpoint": _default_endpoint(source),
+        },
+    })
+
     ctx.save_artifact("model_info", model_info_path)
     ctx.log_metric("model_validated", 1.0 if standardized.get("validated") else 0.0)
 

@@ -11,9 +11,11 @@ inputs:
     required: true
 
 outputs:
-  - id: text
+  - id: parsed_text
     label: Parsed Text
+    aliases: [text, response, output]
     data_type: text
+
   - id: config
     label: Extracted Fields
     data_type: config

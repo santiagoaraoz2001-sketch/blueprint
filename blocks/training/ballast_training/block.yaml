@@ -19,9 +19,11 @@ inputs:
     required: false
 
 outputs:
-  - id: model
+  - id: trained_model
     label: Trained Model
+    aliases: [model]
     data_type: model
+
   - id: metrics
     label: Training Metrics
     data_type: metrics
@@ -31,6 +33,7 @@ config:
     type: string
     label: Base Model
     description: HuggingFace model name or local path
+    mandatory: true
   layer_depth:
     type: float
     label: Layer Depth

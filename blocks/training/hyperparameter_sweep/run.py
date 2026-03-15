@@ -233,7 +233,7 @@ def run(ctx):
                 "demo_mode": False,
             }, f, indent=2)
 
-        ctx.save_output("model", {
+        ctx.save_output("best_model", {
             "path": out_model_path,
             "model_name": model_name,
             "source": "hyperparameter_sweep",
@@ -316,7 +316,7 @@ def run(ctx):
             "demo_mode": True,
         }, f, indent=2)
 
-    ctx.save_output("model", {
+    ctx.save_output("best_model", {
         "path": out_model_path,
         "model_name": model_name,
         "source": "hyperparameter_sweep",

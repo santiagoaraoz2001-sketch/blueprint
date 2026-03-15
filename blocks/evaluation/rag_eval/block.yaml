@@ -21,10 +21,12 @@ outputs:
     label: RAG Scores
     data_type: metrics
     description: 'Aggregate: total_samples, method, avg_faithfulness, avg_answer_relevance, avg_context_relevance, avg_answer_correctness'
-  - id: dataset
+  - id: eval_dataset
     label: Annotated Results
     data_type: dataset
+    aliases: [dataset]
     description: 'Per-sample: question, answer_preview, faithfulness, answer_relevance, context_relevance, answer_correctness scores'
+
   - id: report
     label: RAG Report
     data_type: artifact

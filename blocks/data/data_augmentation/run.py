@@ -407,9 +407,9 @@ def run(ctx):
     # Pass through dataset metadata
     if _dataset_meta:
         _dataset_meta["num_rows"] = len(augmented)
-        ctx.save_output("dataset_meta", _dataset_meta)
+        ctx.save_output("output_dataset_meta", _dataset_meta)
 
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("augmented_dataset", out_dir)
     ctx.save_output("metrics", stats)
     ctx.log_metric("original_rows", original_count)
     ctx.log_metric("augmented_rows", len(augmented))

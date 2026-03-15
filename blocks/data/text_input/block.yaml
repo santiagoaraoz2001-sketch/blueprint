@@ -12,6 +12,7 @@ outputs:
     data_type: text
     description: "Plain text file (text_input.txt) with specified encoding. Sidecar metadata.json contains {format, encoding, char_count, line_count}."
 
+    aliases: [response, output]
 config:
   text_value:
     type: text_area

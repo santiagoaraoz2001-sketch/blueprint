@@ -16,9 +16,11 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: evaluation_dataset
     label: Evaluation Results
+    aliases: [dataset]
     data_type: dataset
+
   - id: report
     label: Eval Report
     data_type: artifact

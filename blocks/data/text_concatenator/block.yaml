@@ -24,6 +24,7 @@ outputs:
     data_type: text
     description: "Single text file containing the concatenated result. Template placeholders are replaced, prefix/suffix applied, then truncated to max_length if set."
 
+    aliases: [response, output]
 config:
   separator:
     type: string

@@ -15,19 +15,24 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: chunked_dataset
     label: Chunked Data
     data_type: dataset
+    aliases: [dataset]
     description: "JSON array of chunk objects. Each row contains the text column with chunk content. When include_chunk_id is true: doc_id, chunk_id, chunk_index columns are added. When keep_metadata is true: all non-text columns from the source document are copied."
-  - id: dataset_meta
+
+  - id: output_dataset_meta
     label: Dataset Info
     data_type: config
+    aliases: [dataset_meta]
     required: false
+
   - id: stats
     label: Chunking Stats
     data_type: metrics
     description: "Object with total_documents, total_chunks, avg_chunk_size, min_chunk_size, max_chunk_size"
 
+    aliases: [metrics]
 config:
   chunk_size:
     type: integer

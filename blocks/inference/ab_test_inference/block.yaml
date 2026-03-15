@@ -24,9 +24,10 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: results_dataset
     label: Comparison Results
     data_type: dataset
+    aliases: [dataset]
     description: >
       JSON array of per-prompt comparison objects. Each row contains:
       prompt (str) — the input prompt text (truncated to 500 chars);
@@ -42,6 +43,7 @@ outputs:
       std_latency_b (float, optional) — latency standard deviation for B (when num_runs > 1);
       num_runs (int, optional) — number of runs per prompt (when num_runs > 1).
       Output format configurable via dataset_format (json, jsonl, csv).
+
   - id: metrics
     label: Quality Metrics
     data_type: metrics

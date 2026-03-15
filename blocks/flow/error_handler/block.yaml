@@ -20,6 +20,7 @@ outputs:
     data_type: metrics
     description: "JSON on failure: {error, error_type, traceback, attempts}. None on success."
 
+    aliases: [metrics]
 config:
   max_retries:
     type: integer
