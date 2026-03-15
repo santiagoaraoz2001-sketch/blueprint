@@ -179,6 +179,8 @@ def _convert_config_fields(config_schema: dict | None) -> list[dict]:
             field["description"] = field_def["description"]
         if "depends_on" in field_def:
             field["depends_on"] = field_def["depends_on"]
+        if field_def.get("mandatory"):
+            field["mandatory"] = True
         fields.append(field)
     return fields
 
@@ -260,6 +262,8 @@ def _format_config_field(field: dict, indent: str) -> str:
     if "depends_on" in field:
         dep = field["depends_on"]
         parts.append(f"depends_on: {{ field: '{_esc(dep['field'])}', value: {_ts_value(dep['value'])} }}")
+    if field.get("mandatory"):
+        parts.append("mandatory: true")
 
     joined = ", ".join(parts)
     if len(joined) < 100:

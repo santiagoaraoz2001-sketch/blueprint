@@ -674,6 +674,9 @@ function ConfigFieldInput({
         }}
       >
         {field.label}
+        {field.mandatory && (
+          <span style={{ color: T.red, fontWeight: 900, marginLeft: 2 }}>*</span>
+        )}
         {onShowInheritance && (
           <span style={{ fontSize: FS.xxs, color: T.blue, opacity: 0.6 }} title="Click to visualize inheritance">
             &#x25C9;
@@ -800,6 +803,18 @@ function ConfigFieldInput({
           </div>
         )
       })()}
+
+      {field.mandatory && (value === '' || value === undefined || value === null) && (
+        <div style={{
+          fontFamily: F,
+          fontSize: FS.xxs,
+          color: T.dim,
+          marginTop: 2,
+          fontStyle: 'italic',
+        }}>
+          Required — set a value or connect the input port
+        </div>
+      )}
 
       {field.description && (
         <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, lineHeight: 1.4 }}>

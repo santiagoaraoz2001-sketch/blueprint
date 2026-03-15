@@ -31,10 +31,12 @@ config:
     type: string
     label: Policy Model
     description: HuggingFace model name or local path for the policy model
+    mandatory: true
   reward_model:
     type: string
     label: Reward Model
     description: HuggingFace model name or path for the reward model (leave empty for heuristic reward)
+    mandatory: true
   lr:
     type: float
     label: Learning Rate

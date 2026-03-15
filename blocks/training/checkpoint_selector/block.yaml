@@ -23,6 +23,7 @@ config:
     type: string
     label: Checkpoint Directory
     description: Path to scan for checkpoints (overridden by model input port if connected)
+    mandatory: true
   metric:
     type: string
     label: Selection Metric
