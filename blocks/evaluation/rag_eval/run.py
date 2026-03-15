@@ -174,7 +174,7 @@ def run(ctx):
     ctx.save_artifact("rag_report", report_path)
 
     ctx.save_output("metrics", metrics)
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("eval_dataset", out_dir)
     ctx.save_output("report", report_path)
     for k, v in metrics.items():
         if isinstance(v, (int, float)):

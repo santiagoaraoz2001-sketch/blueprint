@@ -15,18 +15,22 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: filtered_dataset
     label: Filtered
     data_type: dataset
+    aliases: [dataset]
     description: "JSON array of rows that passed the filter. Same schema as input."
+
   - id: rejected
     label: Rejected
     data_type: dataset
     description: "JSON array of rows that failed the filter. Useful for inspecting what was removed."
-  - id: dataset_meta
+  - id: output_dataset_meta
     label: Dataset Info
     data_type: config
+    aliases: [dataset_meta]
     required: false
+
   - id: stats
     label: Stats
     data_type: metrics

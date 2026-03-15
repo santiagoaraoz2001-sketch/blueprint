@@ -55,6 +55,7 @@ from ..block_sdk.exceptions import BlockError, BlockInputError, BlockConfigError
 from .composite import CompositeBlockContext, execute_sub_pipeline
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
+from .block_registry import resolve_output_handle
 from .schema_validator import load_block_schema, validate_inputs, validate_config
 from ..utils.structured_logger import (
     log_run_start, log_run_complete, log_run_failed,
@@ -536,6 +537,12 @@ async def execute_pipeline(
                     src_id = edge.get("source", "")
                     src_handle = edge.get("sourceHandle", "")
                     tgt_handle = edge.get("targetHandle", "")
+                    # Resolve aliased output handle IDs from renamed ports
+                    if src_id in outputs and src_handle not in outputs[src_id]:
+                        src_node = node_map.get(src_id)
+                        if src_node:
+                            src_type = src_node.get("data", {}).get("type", src_node.get("type", ""))
+                            src_handle = resolve_output_handle(src_type, src_handle)
                     if src_id in outputs and src_handle in outputs[src_id]:
                         value = outputs[src_id][src_handle]
                         _multi_counts[tgt_handle] = _multi_counts.get(tgt_handle, 0) + 1

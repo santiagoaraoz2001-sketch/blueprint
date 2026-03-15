@@ -19,9 +19,11 @@ inputs:
     required: false
 
 outputs:
-  - id: model
+  - id: trained_model
     label: RLHF Model
+    aliases: [model]
     data_type: model
+
   - id: metrics
     label: PPO Metrics
     data_type: metrics

@@ -166,7 +166,7 @@ def run(ctx):
     with open(os.path.join(out_dir, "data.json"), "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
 
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("scored_dataset", out_dir)
 
     # ── Save report output ─────────────────────────────────────────────
     _flagged = [r for r in results if r.get("is_toxic")]

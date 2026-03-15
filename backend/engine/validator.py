@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from .block_registry import is_known_block, get_block_types, get_block_config_schema
+from .block_registry import is_known_block, get_block_types, get_block_config_schema, resolve_output_handle
 from ..block_sdk.config_validator import (
     validate_and_apply_defaults,
     _validate_type,
@@ -205,8 +205,10 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         src_port_type = "any"
         tgt_port_type = "any"
         
+        # Resolve aliased output handle IDs (old port names from saved pipelines)
+        resolved_src_handle = resolve_output_handle(src_data.get("type", ""), src_handle) if src_handle else src_handle
         for out_port in src_data.get("outputs", []):
-            if out_port.get("id") == src_handle:
+            if out_port.get("id") == resolved_src_handle:
                 src_port_type = out_port.get("dataType", "any")
                 break
 
@@ -299,9 +301,11 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         tgt_handle = edge.get("targetHandle", "")
 
         if src in node_map:
-            src_outputs = [p.get("id") for p in node_map[src].get("data", {}).get("outputs", [])]
-            if src_handle and src_outputs and src_handle not in src_outputs:
-                src_label = node_map[src].get("data", {}).get("label", src)
+            src_data_check = node_map[src].get("data", {})
+            src_outputs = [p.get("id") for p in src_data_check.get("outputs", [])]
+            resolved_handle = resolve_output_handle(src_data_check.get("type", ""), src_handle) if src_handle else src_handle
+            if src_handle and src_outputs and src_handle not in src_outputs and resolved_handle not in src_outputs:
+                src_label = src_data_check.get("label", src)
                 report.warnings.append(f"Edge from '{src_label}' references non-existent output port '{src_handle}'")
 
         if tgt in node_map:

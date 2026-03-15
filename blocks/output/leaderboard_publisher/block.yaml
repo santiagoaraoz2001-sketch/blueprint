@@ -20,11 +20,11 @@ outputs:
     label: Submission
     data_type: artifact
     description: Published leaderboard output
-  - id: metrics
+  - id: output_metrics
     label: Stats
     data_type: metrics
+    aliases: [metrics]
     description: Publishing statistics (num_entries, num_columns, format)
-
 config:
   title:
     type: string

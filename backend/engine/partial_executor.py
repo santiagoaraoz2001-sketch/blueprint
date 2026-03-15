@@ -33,6 +33,7 @@ from .executor import (
     BLOCK_ALIASES,
     SAFE_BLOCK_TYPE,
 )
+from .block_registry import resolve_output_handle
 from .composite import CompositeBlockContext
 from .schema_validator import load_block_schema
 
@@ -343,6 +344,12 @@ async def execute_partial_pipeline(
                     src_id = edge.get("source", "")
                     src_handle = edge.get("sourceHandle", "")
                     tgt_handle = edge.get("targetHandle", "")
+                    # Resolve aliased output handle IDs from renamed ports
+                    if src_id in outputs and src_handle not in outputs[src_id]:
+                        src_node = node_map.get(src_id)
+                        if src_node:
+                            src_type = src_node.get("data", {}).get("type", src_node.get("type", ""))
+                            src_handle = resolve_output_handle(src_type, src_handle)
                     if src_id in outputs and src_handle in outputs[src_id]:
                         value = outputs[src_id][src_handle]
                         _multi_counts[tgt_handle] = _multi_counts.get(tgt_handle, 0) + 1

@@ -13,9 +13,11 @@ inputs:
     required: true
 
 outputs:
-  - id: dataset
+  - id: selected_dataset
     label: Selected Rows
+    aliases: [dataset]
     data_type: dataset
+
   - id: text
     label: First Row as Text
     data_type: text

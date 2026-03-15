@@ -20,9 +20,10 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: comparison_results
     label: Comparison Results
     data_type: dataset
+    aliases: [dataset]
     description: >
       JSON array of per-prompt comparison objects. Each row contains:
       prompt (str) — the input prompt text (truncated to 500 chars);
@@ -36,6 +37,7 @@ outputs:
       fastest_model (str) — name of the model with lowest latency for this prompt;
       longest_response_model (str) — name of the model with longest response.
       Output format configurable via dataset_format (json, jsonl, csv).
+
   - id: metrics
     label: Comparison Summary
     data_type: metrics
