@@ -147,35 +147,90 @@ def validate_pipeline(definition: dict) -> ValidationReport:
             node_label = node.get("data", {}).get("label", node.get("id", "?"))
             report.warnings.append(f"Block '{node_label}' uses unknown type '{block_type}' — it may not have a run.py implementation")
 
-    # ── 2. Check for cycles (DFS) ──
+    # ── 2. Check for cycles (Kahn's + Kosaraju's SCC) ──
+    # Cycles through exactly one loop_controller node are allowed (loop subgraphs).
+    # All other cycles are rejected.
+    # Uses fully iterative algorithms (no recursion limit risk on large graphs).
     adjacency: dict[str, list[str]] = {nid: [] for nid in node_map}
+    reverse_adj: dict[str, list[str]] = {nid: [] for nid in node_map}
+    in_deg: dict[str, int] = {nid: 0 for nid in node_map}
     for edge in edges:
         src = edge.get("source", "")
         tgt = edge.get("target", "")
-        if src in adjacency:
+        if src in adjacency and tgt in adjacency:
             adjacency[src].append(tgt)
+            reverse_adj[tgt].append(src)
+            in_deg[tgt] += 1
 
-    # DFS cycle detection
-    WHITE, GRAY, BLACK = 0, 1, 2
-    color = {nid: WHITE for nid in node_map}
+    def _is_loop_controller(nid: str) -> bool:
+        n = node_map.get(nid, {})
+        return n.get("data", {}).get("type", "") == "loop_controller"
 
-    def dfs(node_id: str) -> bool:
-        color[node_id] = GRAY
-        for neighbor in adjacency.get(node_id, []):
-            if color.get(neighbor) == GRAY:
-                return True  # cycle found
-            if color.get(neighbor) == WHITE:
-                if dfs(neighbor):
-                    return True
-        color[node_id] = BLACK
-        return False
+    # Step 1: Kahn's algorithm to find cyclic nodes
+    kahn_deg = dict(in_deg)
+    queue = [nid for nid, d in kahn_deg.items() if d == 0]
+    acyclic: set[str] = set()
+    while queue:
+        n = queue.pop(0)
+        acyclic.add(n)
+        for nb in adjacency.get(n, []):
+            kahn_deg[nb] -= 1
+            if kahn_deg[nb] == 0:
+                queue.append(nb)
 
-    for nid in node_map:
-        if color[nid] == WHITE:
-            if dfs(nid):
-                report.errors.append("Pipeline contains a cycle — blocks cannot have circular dependencies")
+    cyclic_nodes = set(node_map.keys()) - acyclic
+
+    if cyclic_nodes:
+        # Step 2: Kosaraju's SCC (iterative) among cyclic nodes
+        # Phase A: Forward DFS → finish order
+        visited: set[str] = set()
+        finish_order: list[str] = []
+        for start in sorted(cyclic_nodes):
+            if start in visited:
+                continue
+            stack: list[tuple[str, bool]] = [(start, False)]
+            while stack:
+                node, processed = stack.pop()
+                if processed:
+                    finish_order.append(node)
+                    continue
+                if node in visited:
+                    continue
+                visited.add(node)
+                stack.append((node, True))
+                for nb in adjacency.get(node, []):
+                    if nb in cyclic_nodes and nb not in visited:
+                        stack.append((nb, False))
+
+        # Phase B: Reverse DFS in reverse finish order → SCCs
+        visited = set()
+        sccs: list[list[str]] = []
+        for node in reversed(finish_order):
+            if node in visited:
+                continue
+            component: list[str] = []
+            stack_b: list[str] = [node]
+            while stack_b:
+                n = stack_b.pop()
+                if n in visited:
+                    continue
+                visited.add(n)
+                component.append(n)
+                for nb in reverse_adj.get(n, []):
+                    if nb in cyclic_nodes and nb not in visited:
+                        stack_b.append(nb)
+            sccs.append(component)
+
+        # Step 3: Validate each SCC has exactly 1 loop_controller
+        for scc in sccs:
+            controllers = [n for n in scc if _is_loop_controller(n)]
+            if len(controllers) != 1:
+                report.errors.append(
+                    "Pipeline contains a cycle that doesn't pass through "
+                    "a Loop Controller block."
+                )
                 report.valid = False
-                break
+                break  # One invalid cycle is enough to reject
 
     # ── 3. Check disconnected nodes & required ports ──
     connected_target_handles = set()

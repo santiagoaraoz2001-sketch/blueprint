@@ -155,8 +155,14 @@ class BlockContext:
     # ── Loop metadata helpers ────────────────────────────────────────
 
     def get_loop_metadata(self) -> dict | None:
-        """Return loop iteration metadata if this block is inside a loop, else None."""
-        return self._loop_metadata
+        """Return read-only loop metadata if this block is executing inside a loop.
+
+        Returns None if the block is not part of a loop body.
+        The dict contains: iteration, total_iterations, file_mode,
+        context_management, seed, previous_output, accumulated_data,
+        and prompt_variation.
+        """
+        return dict(self._loop_metadata) if self._loop_metadata else None
 
     def is_in_loop(self) -> bool:
         """Check if this block is currently executing inside a loop."""
