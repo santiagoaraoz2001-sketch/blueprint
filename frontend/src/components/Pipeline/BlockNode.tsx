@@ -94,9 +94,10 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
   // Dynamic width based on port count
   const blockWidth = def ? computeBlockWidth(def) : 280
 
-  // Should we truncate port labels? (5+ ports on a side)
-  const maxPorts = Math.max(inputCount, outputCount)
-  const truncateLabels = maxPorts >= 5
+  // Tiered label rendering: per-side based on port count
+  // Tier 1 (1-3): horizontal labels, Tier 2 (4-5): rotated -45°, Tier 3 (6+): hover-only + dots
+  const inputTier = inputCount >= 6 ? 3 : inputCount >= 4 ? 2 : 1
+  const outputTier = outputCount >= 6 ? 3 : outputCount >= 4 ? 2 : 1
 
   // Time estimate for this block — stringify config to avoid unstable object reference
   const timeEst = useMemo(() => {
@@ -439,9 +440,13 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
         const connCount = handleConnectionCounts[`in-${input.id}`] || 0
         const portSpacing = blockWidth / (inputCount + 1)
         const leftPx = portSpacing * (i + 1)
-        const labelText = truncateLabels && input.label.length > 8
-          ? input.label.slice(0, 7) + '…'
+        const maxLabelChars = inputTier === 3 ? 6 : inputTier === 2 ? 12 : 20
+        const labelText = input.label.length > maxLabelChars
+          ? input.label.slice(0, maxLabelChars - 1) + '…'
           : input.label
+        const showLabel = inputTier < 3 || isPortHovered
+        const labelRotation = inputTier === 2 ? -45 : 0
+        const labelOffset = inputTier === 2 ? -28 : -22
         return (
           <div key={`in-${input.id}`}>
             <Handle
@@ -465,37 +470,65 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
                 zIndex: 10,
               }}
             />
-            {/* Port label — above block, outside boundary */}
-            <div style={{
-              position: 'absolute',
-              left: leftPx,
-              top: -22,
-              transform: 'translateX(-50%)',
-              fontFamily: F,
-              fontSize: 8,
-              color: portColor,
-              letterSpacing: '0.04em',
-              fontWeight: 600,
-              pointerEvents: 'none',
-              whiteSpace: 'nowrap',
-              textAlign: 'center',
-              opacity: 0.9,
-              zIndex: 15,
-              textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-              maxWidth: truncateLabels ? portSpacing - 4 : undefined,
-              overflow: truncateLabels ? 'hidden' : undefined,
-              textOverflow: truncateLabels ? 'ellipsis' : undefined,
-            }}>
-              {isRequired && <span style={{ color: T.red, fontWeight: 900 }}>*</span>}
-              {labelText}
-              {!isRequired && <span style={{ opacity: 0.5 }}> ?</span>}
-            </div>
+            {/* Required indicator on handle (always visible) */}
+            {isRequired && (
+              <div style={{
+                position: 'absolute',
+                left: leftPx + 7,
+                top: -3,
+                color: T.red,
+                fontSize: 10,
+                fontWeight: 900,
+                pointerEvents: 'none',
+                zIndex: 20,
+              }}>*</div>
+            )}
+            {/* Port label — above block, tiered rendering */}
+            {showLabel && (
+              <div style={{
+                position: 'absolute',
+                left: leftPx,
+                top: labelOffset,
+                transform: `translateX(-50%)${labelRotation ? ` rotate(${labelRotation}deg)` : ''}`,
+                transformOrigin: 'center bottom',
+                fontFamily: F,
+                fontSize: inputTier === 2 ? 7.5 : 8,
+                color: portColor,
+                letterSpacing: '0.04em',
+                fontWeight: 600,
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                textAlign: 'center',
+                opacity: 0.9,
+                zIndex: 15,
+                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+              }}>
+                {labelText}
+                {!isRequired && inputTier < 3 && <span style={{ opacity: 0.5 }}> ?</span>}
+              </div>
+            )}
+            {/* Color dot indicator for Tier 3 (hover-only labels) */}
+            {inputTier === 3 && !isPortHovered && (
+              <div style={{
+                position: 'absolute',
+                left: leftPx,
+                top: -14,
+                transform: 'translateX(-50%)',
+                width: 4,
+                height: 4,
+                borderRadius: '50%',
+                background: portColor,
+                opacity: 0.6,
+                pointerEvents: 'none',
+                zIndex: 15,
+              }} />
+            )}
             {/* Multi-connection badge */}
             {connCount > 1 && (
               <div style={{
                 position: 'absolute',
                 left: leftPx,
-                top: -34,
+                top: inputTier === 3 ? (isPortHovered ? -34 : -20) : inputTier === 2 ? -42 : -34,
                 transform: 'translateX(-50%)',
                 background: portColor,
                 color: '#000',
@@ -507,6 +540,7 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
                 lineHeight: '12px',
                 zIndex: 16,
                 pointerEvents: 'none',
+                transition: 'top 0.15s',
               }}>
                 x{connCount}
               </div>
@@ -523,9 +557,13 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
         const connCount = handleConnectionCounts[`out-${output.id}`] || 0
         const portSpacing = blockWidth / (outputCount + 1)
         const leftPx = portSpacing * (i + 1)
-        const labelText = truncateLabels && output.label.length > 8
-          ? output.label.slice(0, 7) + '…'
+        const maxLabelChars = outputTier === 3 ? 6 : outputTier === 2 ? 12 : 20
+        const labelText = output.label.length > maxLabelChars
+          ? output.label.slice(0, maxLabelChars - 1) + '…'
           : output.label
+        const showLabel = outputTier < 3 || isPortHovered
+        const labelRotation = outputTier === 2 ? 45 : 0
+        const labelOffset = outputTier === 2 ? -28 : -22
         return (
           <div key={`out-${output.id}`}>
             <Handle
@@ -549,35 +587,64 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
                 zIndex: 10,
               }}
             />
-            {/* Port label — below block, outside boundary */}
-            <div style={{
-              position: 'absolute',
-              left: leftPx,
-              bottom: -22,
-              transform: 'translateX(-50%)',
-              fontFamily: F,
-              fontSize: 8,
-              color: portColor,
-              letterSpacing: '0.04em',
-              fontWeight: 600,
-              pointerEvents: 'none',
-              whiteSpace: 'nowrap',
-              textAlign: 'center',
-              opacity: 0.9,
-              zIndex: 15,
-              textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-              maxWidth: truncateLabels ? portSpacing - 4 : undefined,
-              overflow: truncateLabels ? 'hidden' : undefined,
-              textOverflow: truncateLabels ? 'ellipsis' : undefined,
-            }}>
-              {labelText}
-            </div>
+            {/* Required indicator on handle (always visible) */}
+            {isRequired && (
+              <div style={{
+                position: 'absolute',
+                left: leftPx + 7,
+                bottom: -3,
+                color: T.red,
+                fontSize: 10,
+                fontWeight: 900,
+                pointerEvents: 'none',
+                zIndex: 20,
+              }}>*</div>
+            )}
+            {/* Port label — below block, tiered rendering */}
+            {showLabel && (
+              <div style={{
+                position: 'absolute',
+                left: leftPx,
+                bottom: labelOffset,
+                transform: `translateX(-50%)${labelRotation ? ` rotate(${labelRotation}deg)` : ''}`,
+                transformOrigin: 'center top',
+                fontFamily: F,
+                fontSize: outputTier === 2 ? 7.5 : 8,
+                color: portColor,
+                letterSpacing: '0.04em',
+                fontWeight: 600,
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                textAlign: 'center',
+                opacity: 0.9,
+                zIndex: 15,
+                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+              }}>
+                {labelText}
+              </div>
+            )}
+            {/* Color dot indicator for Tier 3 (hover-only labels) */}
+            {outputTier === 3 && !isPortHovered && (
+              <div style={{
+                position: 'absolute',
+                left: leftPx,
+                bottom: -14,
+                transform: 'translateX(-50%)',
+                width: 4,
+                height: 4,
+                borderRadius: '50%',
+                background: portColor,
+                opacity: 0.6,
+                pointerEvents: 'none',
+                zIndex: 15,
+              }} />
+            )}
             {/* Multi-connection badge */}
             {connCount > 1 && (
               <div style={{
                 position: 'absolute',
                 left: leftPx,
-                bottom: -34,
+                bottom: outputTier === 3 ? (isPortHovered ? -34 : -20) : outputTier === 2 ? -42 : -34,
                 transform: 'translateX(-50%)',
                 background: portColor,
                 color: '#000',
@@ -589,6 +656,7 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
                 lineHeight: '12px',
                 zIndex: 16,
                 pointerEvents: 'none',
+                transition: 'bottom 0.15s',
               }}>
                 x{connCount}
               </div>
@@ -606,11 +674,13 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
           : def.outputs.find((p) => p.id === pid)
         if (!port) return null
         const pc = getPortColor(port.dataType)
+        const hoverTier = isInput ? inputTier : outputTier
+        const tooltipOffset = hoverTier === 2 ? -54 : -40
         return (
           <div
             style={{
               position: 'absolute',
-              [isInput ? 'top' : 'bottom']: isInput ? -40 : -40,
+              [isInput ? 'top' : 'bottom']: tooltipOffset,
               left: '50%',
               transform: 'translateX(-50%)',
               background: T.surface5,
