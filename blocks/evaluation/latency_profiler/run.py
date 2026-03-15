@@ -187,7 +187,7 @@ def run(ctx):
         else:
             with open(os.path.join(_ds_dir, "data.json"), "w", encoding="utf-8") as _f:
                 json.dump(_rows, _f, indent=2)
-        ctx.save_output("dataset", _ds_dir)
+        ctx.save_output("profiled_dataset", _ds_dir)
 
     ctx.save_output("metrics", metrics)
     ctx.save_output("results", results_path)

@@ -25,9 +25,10 @@ outputs:
     label: Safety Scores
     data_type: metrics
     description: 'Aggregate: total_texts, toxic_count, toxic_rate, avg/max per category (toxicity, obscene, threat, etc.)'
-  - id: dataset
+  - id: scored_dataset
     label: Annotated Data
     data_type: dataset
+    aliases: [dataset]
     description: 'Per-text: text, category_scores dict, is_toxic flag — ready for downstream filtering'
 
   - id: report

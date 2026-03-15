@@ -11,9 +11,11 @@ inputs:
     required: true
 
 outputs:
-  - id: model
+  - id: selected_model
     label: Best Checkpoint
+    aliases: [model]
     data_type: model
+
   - id: metrics
     label: Checkpoint Metrics
     data_type: metrics

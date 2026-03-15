@@ -27,9 +27,11 @@ outputs:
   - id: response
     label: Response Text
     data_type: text
-  - id: dataset
+  - id: retrieval_log
     label: Responses
+    aliases: [dataset]
     data_type: dataset
+
   - id: metrics
     label: RAG Metrics
     data_type: metrics

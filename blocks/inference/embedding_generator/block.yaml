@@ -24,13 +24,15 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: enriched_dataset
     label: Dataset with Embeddings
     data_type: dataset
+    aliases: [dataset]
     description: >
       JSON array of row objects. Each row: {...original_row_fields, <embedding_column>: [float, ...]}.
       The embedding vector is stored under the column name configured by embedding_column (default: "_embedding").
       Each embedding is an array of floats with length equal to the model's output dimension.
+
   - id: embeddings
     label: Embeddings
     data_type: embedding

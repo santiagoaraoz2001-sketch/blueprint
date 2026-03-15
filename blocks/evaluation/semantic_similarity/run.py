@@ -145,7 +145,7 @@ def run(ctx):
     ctx.save_output("report", _report_path)
 
     ctx.save_output("metrics", metrics)
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("similarity_dataset", out_dir)
     for k, v in metrics.items():
         if isinstance(v, (int, float)):
             ctx.log_metric(k, v)

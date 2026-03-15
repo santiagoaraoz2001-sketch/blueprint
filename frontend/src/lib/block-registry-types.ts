@@ -24,6 +24,8 @@ export interface PortDefinition {
   label: string
   dataType: PortType
   required: boolean
+  /** Old port IDs that resolve to this port (backward compat for saved pipelines) */
+  aliases?: string[]
 }
 
 export interface ConfigField {
@@ -120,6 +122,16 @@ export function isPortCompatible(source: ConnectorType | string, target: Connect
   const s = (PORT_TYPE_ALIASES[source] || source) as string
   const t = (PORT_TYPE_ALIASES[target] || target) as string
   return COMPAT[s]?.has(t) ?? false
+}
+
+/**
+ * Find a port by ID, falling back to aliases for backward compatibility.
+ * Saved pipelines may reference old port IDs that have since been renamed.
+ */
+export function resolvePort(ports: PortDefinition[], handleId: string | null | undefined): PortDefinition | undefined {
+  if (!handleId) return undefined
+  return ports.find((p) => p.id === handleId) ??
+         ports.find((p) => p.aliases?.includes(handleId))
 }
 
 /** File extension → expected port types mapping for format warnings */

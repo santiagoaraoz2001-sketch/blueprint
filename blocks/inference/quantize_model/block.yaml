@@ -11,9 +11,10 @@ inputs:
     required: true
 
 outputs:
-  - id: model
+  - id: quantized_model
     label: Quantized Model
     data_type: model
+    aliases: [model]
     description: >
       JSON object describing the quantized model. Fields:
       source (str) — quantization method used, one of "gptq", "bitsandbytes", "awq";
@@ -22,6 +23,7 @@ outputs:
       bits (int) — quantization bit-width (2, 3, 4, or 8);
       estimation_only (bool, optional) — true if no quantization library was available
       and only size estimation was performed.
+
   - id: metrics
     label: Quant Stats
     data_type: metrics

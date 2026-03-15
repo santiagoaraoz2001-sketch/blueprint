@@ -180,7 +180,7 @@ def run(ctx):
         with open(os.path.join(out_dir, "data.json"), "w", encoding="utf-8") as f:
             json.dump(comparisons, f, indent=2)
 
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("comparison_dataset", out_dir)
 
     # ── Save report output ─────────────────────────────────────────────
     _report = {"summary": metrics, "comparisons": comparisons[:50]}

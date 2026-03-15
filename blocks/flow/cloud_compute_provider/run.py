@@ -107,4 +107,4 @@ def run(ctx):
     ctx.log_message("Cloud compute link successfully established.")
 
     ctx.save_output("config", out_config)
-    ctx.save_output("dataset", dataset_out)
+    ctx.save_output("output_dataset", dataset_out)

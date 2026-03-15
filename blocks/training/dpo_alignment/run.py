@@ -213,7 +213,7 @@ def run(ctx):
         "preference_pairs": len(dataset),
     }
 
-    ctx.save_output("model", output_dir)
+    ctx.save_output("aligned_model", output_dir)
     ctx.save_output("metrics", final_metrics)
     ctx.log_metric("final_loss", final_loss)
     ctx.log_message(f"DPO training complete. Final loss: {final_loss}")
