@@ -1,5 +1,5 @@
 // AUTO-GENERATED — DO NOT EDIT MANUALLY
-// Generated from 125 block.yaml files across 12 categories
+// Generated from 126 block.yaml files across 12 categories
 // Run: python scripts/generate_block_registry.py
 
 import type { BlockDefinition } from './block-registry'
@@ -3269,7 +3269,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -3353,7 +3354,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'embeddings', label: 'Embeddings', dataType: 'embedding', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -3415,7 +3417,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -3502,7 +3505,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Input', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -3575,7 +3579,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Model Data', dataType: 'model', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -3649,7 +3654,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -3704,7 +3710,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'config', label: 'Report Config', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -3807,7 +3814,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Data', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -3907,7 +3915,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
       { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -7813,7 +7822,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  INFERENCE (17 blocks)
+  //  INFERENCE (18 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -7933,6 +7942,60 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'json',
         options: ['json', 'jsonl', 'csv'],
         description: 'Output format for results — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
+      },
+    ],
+  },
+  {
+    type: 'chat_completion',
+    name: 'Chat Completion',
+    description: 'Multi-turn chat completion — send a conversation history to an LLM and get a response',
+    category: 'inference',
+    tags: [],
+    aliases: [],
+    icon: 'Cpu',
+    accent: '#8b5cf6',
+    maturity: 'stable',
+    inputs: [
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
+      { id: 'prompt', label: 'User Message', dataType: 'text', required: true },
+      { id: 'system_prompt', label: 'System Prompt', dataType: 'text', required: false },
+      { id: 'history', label: 'Chat History', dataType: 'dataset', required: false },
+    ],
+    outputs: [
+      { id: 'response', label: 'Response', dataType: 'text', required: false },
+      { id: 'output_dataset', label: 'Conversation Log', dataType: 'dataset', required: false },
+      { id: 'metadata', label: 'Metadata', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'config', required: false },
+    ],
+    defaultConfig: {
+      model_name: '',
+      temperature: 0.7,
+      max_tokens: 1024,
+      system_prompt: 'You are a helpful assistant.',
+      backend: '',
+    },
+    configFields: [
+      {
+        name: 'model_name',
+        label: 'Model Name',
+        type: 'string',
+        default: '',
+        description: 'Model to use (overridden by model input port)',
+      },
+      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.7, min: 0.0, max: 2.0 },
+      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 1024, min: 1, max: 32768 },
+      {
+        name: 'system_prompt',
+        label: 'Default System Prompt',
+        type: 'text_area',
+        default: 'You are a helpful assistant.',
+      },
+      {
+        name: 'backend',
+        label: 'Inference Backend',
+        type: 'select',
+        default: '',
+        options: ['', 'ollama', 'mlx', 'pytorch'],
       },
     ],
   },
@@ -8075,7 +8138,6 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
-      { id: 'model', label: 'Model', dataType: 'config', required: false },
     ],
     outputs: [
       { id: 'dataset', label: 'Dataset with Embeddings', dataType: 'dataset', required: false },
