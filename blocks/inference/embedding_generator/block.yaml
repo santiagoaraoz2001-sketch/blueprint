@@ -18,10 +18,6 @@ inputs:
     label: Dataset Info
     data_type: config
     required: false
-  - id: model
-    label: Model
-    data_type: config
-    required: false
 
 outputs:
   - id: enriched_dataset

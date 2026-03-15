@@ -43,15 +43,26 @@ CATEGORY_RUNTIME = {
 COMPAT = {
     ("any", "any"), ("dataset", "dataset"), ("text", "text"), ("model", "model"),
     ("config", "config"), ("metrics", "metrics"), ("embedding", "embedding"),
-    ("artifact", "artifact"), ("agent", "agent"),
+    ("artifact", "artifact"), ("agent", "agent"), ("llm", "llm"),
     # Cross-type coercions
-    ("dataset", "text"), ("text", "dataset"), ("text", "config"), ("config", "text"),
+    ("dataset", "text"), ("text", "dataset"),
+    # REMOVED: ("text", "config"), ("config", "text") — no more text↔config
+    ("config", "text"),  # config→text still allowed (config can serialize to text)
+    ("config", "llm"), ("model", "llm"),  # config/model → llm (agent inputs)
+    ("llm", "model"), ("llm", "config"),  # llm → model/config (backward compat)
     ("metrics", "dataset"), ("metrics", "text"),
     ("embedding", "dataset"),
     ("artifact", "text"),
 }
 
+# Backward-compat aliases for old port type names
+_PORT_TYPE_ALIASES = {
+    "llm_config": "llm",
+}
+
 def _port_compatible(src_type: str, tgt_type: str) -> bool:
+    src_type = _PORT_TYPE_ALIASES.get(src_type, src_type)
+    tgt_type = _PORT_TYPE_ALIASES.get(tgt_type, tgt_type)
     if src_type == "any" or tgt_type == "any":
         return True
     return (src_type, tgt_type) in COMPAT
@@ -160,10 +171,12 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         if node.get("type") in ("groupNode", "stickyNote"):
             continue
         nid = node.get("id", "")
-        inputs = node.get("data", {}).get("inputs", [])
-        for in_port in inputs:
+        node_data = node.get("data", {})
+        # Check both regular inputs and side inputs for required connections
+        all_target_ports = node_data.get("inputs", []) + node_data.get("side_inputs", [])
+        for in_port in all_target_ports:
             if in_port.get("required", False) and (nid, in_port.get("id")) not in connected_target_handles:
-                node_label = node.get("data", {}).get("label", nid)
+                node_label = node_data.get("label", nid)
                 report.errors.append(f"Block '{node_label}' is missing required input: {in_port.get('label', in_port.get('id'))}")
                 report.valid = False
 
@@ -198,8 +211,8 @@ def validate_pipeline(definition: dict) -> ValidationReport:
             if out_port.get("id") == resolved_src_handle:
                 src_port_type = out_port.get("dataType", "any")
                 break
-                
-        for in_port in tgt_data.get("inputs", []):
+
+        for in_port in tgt_data.get("inputs", []) + tgt_data.get("side_inputs", []):
             if in_port.get("id") == tgt_handle:
                 tgt_port_type = in_port.get("dataType", "any")
                 break
@@ -296,9 +309,12 @@ def validate_pipeline(definition: dict) -> ValidationReport:
                 report.warnings.append(f"Edge from '{src_label}' references non-existent output port '{src_handle}'")
 
         if tgt in node_map:
-            tgt_inputs = [p.get("id") for p in node_map[tgt].get("data", {}).get("inputs", [])]
-            if tgt_handle and tgt_inputs and tgt_handle not in tgt_inputs:
-                tgt_label = node_map[tgt].get("data", {}).get("label", tgt)
+            tgt_data = node_map[tgt].get("data", {})
+            tgt_inputs = [p.get("id") for p in tgt_data.get("inputs", [])]
+            tgt_side_inputs = [p.get("id") for p in tgt_data.get("side_inputs", [])]
+            tgt_all_inputs = tgt_inputs + tgt_side_inputs
+            if tgt_handle and tgt_all_inputs and tgt_handle not in tgt_all_inputs:
+                tgt_label = tgt_data.get("label", tgt)
                 report.warnings.append(f"Edge to '{tgt_label}' references non-existent input port '{tgt_handle}'")
 
     # ── 6. Estimate runtime ──
