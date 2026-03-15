@@ -155,7 +155,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'llm', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Task / Prompt', dataType: 'text', required: true },
       { id: 'tools', label: 'Tool Registry', dataType: 'config', required: false },
       { id: 'memory', label: 'Agent Memory', dataType: 'config', required: false },
@@ -311,7 +312,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'llm', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Question / Prompt', dataType: 'text', required: true },
     ],
     outputs: [
@@ -393,7 +395,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'llm', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Task Description', dataType: 'text', required: true },
       { id: 'context', label: 'Code Context', dataType: 'text', required: false },
     ],
@@ -482,6 +485,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     maturity: 'stable',
     inputs: [
       { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Debate Topic', dataType: 'text', required: true },
     ],
     outputs: [
@@ -517,7 +521,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'llm', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Topic / Prompt', dataType: 'text', required: true },
     ],
     outputs: [
@@ -599,7 +604,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'llm', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'store', label: 'Vector Store Config', dataType: 'config', required: true },
       { id: 'dataset', label: 'Queries', dataType: 'dataset', required: false },
       { id: 'query', label: 'Single Query', dataType: 'text', required: false },
@@ -2172,6 +2178,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     inputs: [],
     outputs: [
       { id: 'model', label: 'Model', dataType: 'model', required: false },
+      { id: 'llm', label: 'LLM Config', dataType: 'llm', required: false },
     ],
     defaultConfig: {
       source: 'huggingface',
@@ -7976,7 +7983,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'history', label: 'Chat History', dataType: 'dataset', required: false },
     ],
     outputs: [
-      { id: 'response', label: 'Response', dataType: 'text', required: false },
+      { id: 'response', label: 'Response', dataType: 'text', required: false, aliases: ['text'] },
       { id: 'output_dataset', label: 'Conversation Log', dataType: 'dataset', required: false },
       { id: 'metadata', label: 'Metadata', dataType: 'metrics', required: false },
       { id: 'llm_config', label: 'LLM Config', dataType: 'config', required: false },
@@ -8479,7 +8486,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'response', label: 'Response', dataType: 'text', required: false },
       { id: 'metadata', label: 'Metadata', dataType: 'metrics', required: false },
-      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false, aliases: ['llm'] },
     ],
     defaultConfig: {
       prompt_template: '{input}',

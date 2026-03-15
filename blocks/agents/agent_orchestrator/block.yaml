@@ -8,8 +8,13 @@ inputs:
   - id: llm
     label: LLM
     data_type: llm
-    required: true
-    description: "Connected LLM Inference block for model calls"
+    required: false
+    description: "LLM config from llm_inference or model info from model_selector"
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Direct model connection (alternative to LLM port)"
   - id: input
     label: Task / Prompt
     data_type: text
