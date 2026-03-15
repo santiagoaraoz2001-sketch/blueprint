@@ -43,15 +43,26 @@ CATEGORY_RUNTIME = {
 COMPAT = {
     ("any", "any"), ("dataset", "dataset"), ("text", "text"), ("model", "model"),
     ("config", "config"), ("metrics", "metrics"), ("embedding", "embedding"),
-    ("artifact", "artifact"), ("agent", "agent"),
+    ("artifact", "artifact"), ("agent", "agent"), ("llm", "llm"),
     # Cross-type coercions
-    ("dataset", "text"), ("text", "dataset"), ("text", "config"), ("config", "text"),
+    ("dataset", "text"), ("text", "dataset"),
+    # REMOVED: ("text", "config"), ("config", "text") — no more text↔config
+    ("config", "text"),  # config→text still allowed (config can serialize to text)
+    ("config", "llm"), ("model", "llm"),  # config/model → llm (agent inputs)
+    ("llm", "model"), ("llm", "config"),  # llm → model/config (backward compat)
     ("metrics", "dataset"), ("metrics", "text"),
     ("embedding", "dataset"),
     ("artifact", "text"),
 }
 
+# Backward-compat aliases for old port type names
+_PORT_TYPE_ALIASES = {
+    "llm_config": "llm",
+}
+
 def _port_compatible(src_type: str, tgt_type: str) -> bool:
+    src_type = _PORT_TYPE_ALIASES.get(src_type, src_type)
+    tgt_type = _PORT_TYPE_ALIASES.get(tgt_type, tgt_type)
     if src_type == "any" or tgt_type == "any":
         return True
     return (src_type, tgt_type) in COMPAT

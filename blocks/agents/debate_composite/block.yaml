@@ -8,7 +8,7 @@ composite: true
 inputs:
   - id: llm
     label: LLM
-    data_type: config
+    data_type: llm
     required: false
     description: "Connected LLM Inference block for model config. If not connected, uses model_name config."
   - id: input
