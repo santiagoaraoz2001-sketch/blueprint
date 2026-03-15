@@ -106,3 +106,9 @@ config:
     default: "text"
     options: ["text", "json"]
     description: "text = raw LLM output string, json = attempt to parse refined output as JSON object"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

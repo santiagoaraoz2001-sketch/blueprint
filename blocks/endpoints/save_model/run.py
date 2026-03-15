@@ -34,6 +34,19 @@ def run(ctx):
     ctx.log_message(f"Save Model starting (format={fmt})")
     ctx.report_progress(0, 4)
 
+    # ── Loop-aware file handling ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        file_mode = loop.get("file_mode", "overwrite")
+        iteration = loop.get("iteration", 0)
+        ctx.log_message(f"[Loop iter {iteration}] file_mode={file_mode}")
+        if file_mode == "append":
+            ctx.log_message("WARNING: Model format does not support append mode, using overwrite")
+            file_mode = "overwrite"
+    else:
+        file_mode = "overwrite"
+        iteration = 0
+
     # ---- Step 1: Load model data ----
     ctx.report_progress(1, 4)
     model_info = ctx.resolve_model_info("model")
@@ -51,10 +64,14 @@ def run(ctx):
 
     # ---- Step 2: Resolve output directory ----
     ctx.report_progress(2, 4)
+    # Loop versioned: create iteration-specific directory
+    effective_filename = filename
+    if file_mode == "versioned":
+        effective_filename = f"{filename}_iter{iteration}"
     if os.path.isabs(output_path):
-        out_dir = os.path.join(output_path, filename)
+        out_dir = os.path.join(output_path, effective_filename)
     else:
-        out_dir = os.path.join(ctx.run_dir, output_path, filename)
+        out_dir = os.path.join(ctx.run_dir, output_path, effective_filename)
 
     if os.path.exists(out_dir) and not overwrite:
         raise BlockInputError(

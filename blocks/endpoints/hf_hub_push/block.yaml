@@ -59,3 +59,9 @@ config:
     label: Path in Repo
     default: ""
     description: Subdirectory within repo to upload to (e.g. models/v2)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

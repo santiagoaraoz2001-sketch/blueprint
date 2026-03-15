@@ -112,3 +112,9 @@ config:
     description: "Format for the embeddings artifact file in the run directory. The pipeline 'embeddings' output port always uses JSON for downstream compatibility. Choose numpy for faster loading in external tools, or json for human-readable inspection."
     default: numpy
     options: [numpy, json]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

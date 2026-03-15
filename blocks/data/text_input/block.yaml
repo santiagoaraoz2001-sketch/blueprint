@@ -31,3 +31,9 @@ config:
     options: [utf-8, ascii, latin-1]
     default: utf-8
     description: "Output text encoding"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

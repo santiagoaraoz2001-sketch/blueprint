@@ -91,3 +91,9 @@ config:
     default: 0.0
     min: 0.0
     max: 0.3
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

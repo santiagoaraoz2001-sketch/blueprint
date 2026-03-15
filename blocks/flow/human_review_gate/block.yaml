@@ -76,3 +76,9 @@ config:
     label: Include Data Summary in Notes
     default: true
     description: "Include a data preview in the review_notes output (disable to reduce output size)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

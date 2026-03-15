@@ -72,3 +72,9 @@ config:
     description: "Compute precision for BitsAndBytes quantization"
     options: [float16, bfloat16, float32]
     default: "float16"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

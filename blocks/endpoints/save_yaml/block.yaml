@@ -60,3 +60,9 @@ config:
     label: Header Comment
     default: ""
     description: Comment block prepended to YAML file (each line gets # prefix)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -59,3 +59,9 @@ config:
     options: [float32, float16]
     default: float32
     description: float16 halves file size with minimal quality loss
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

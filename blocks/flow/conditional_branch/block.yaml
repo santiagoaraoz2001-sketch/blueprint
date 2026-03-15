@@ -70,3 +70,9 @@ config:
     label: Use External Condition Data
     default: false
     description: "When enabled, evaluates the condition against the 'Condition Data' input port instead of the main input"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

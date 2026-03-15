@@ -103,3 +103,9 @@ config:
     min: 1
     max: 50
     description: Repeat factor for Dataset C
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

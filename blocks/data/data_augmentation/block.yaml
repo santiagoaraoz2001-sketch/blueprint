@@ -106,3 +106,9 @@ config:
     min: 10
     max: 4096
     description: Maximum tokens per augmented text
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

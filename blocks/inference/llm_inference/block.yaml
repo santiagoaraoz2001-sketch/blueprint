@@ -96,3 +96,9 @@ config:
     default: text
     options: [text, json]
     description: "text = raw response, json = wrapped with metadata"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

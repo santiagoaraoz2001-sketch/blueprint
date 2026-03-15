@@ -47,3 +47,9 @@ config:
     label: Torch Dtype
     options: [auto, float16, bfloat16, float32]
     default: "auto"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -89,3 +89,9 @@ config:
     label: Random Seed
     default: 42
     description: Seed for reproducible demo outputs
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

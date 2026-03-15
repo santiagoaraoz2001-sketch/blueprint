@@ -94,3 +94,9 @@ config:
     min: 0
     max: 4096
     description: "Resize if larger than this (pixels). 0 = no resize. Reduces token cost"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

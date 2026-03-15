@@ -83,3 +83,9 @@ config:
     label: Custom Sections (Markdown)
     description: "Extra markdown appended before Citation. Use for Intended Use, Out-of-Scope, etc."
     default: ""
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

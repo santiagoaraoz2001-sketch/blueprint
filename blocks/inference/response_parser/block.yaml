@@ -55,3 +55,9 @@ config:
     label: CSV Delimiter
     default: ","
     description: "Column delimiter for CSV mode (e.g. ',', '\\t', '|')"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

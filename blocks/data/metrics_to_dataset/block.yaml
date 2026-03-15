@@ -36,3 +36,9 @@ config:
     label: Run Label
     default: ""
     description: "Label to identify this metrics set (useful when merging)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

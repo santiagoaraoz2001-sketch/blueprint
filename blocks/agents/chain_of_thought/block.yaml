@@ -81,3 +81,9 @@ config:
     options: [plain, markdown, json]
     default: markdown
     description: "plain: raw text, markdown: headers per step, json: structured {steps, final_answer, metadata}"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -64,3 +64,9 @@ config:
     label: Timestamp Column
     default: ""
     description: Auto-inject UTC timestamp column (e.g. inserted_at)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

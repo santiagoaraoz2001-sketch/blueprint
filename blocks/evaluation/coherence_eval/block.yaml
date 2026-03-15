@@ -86,3 +86,9 @@ config:
     min: 1
     max: 6
     description: "Decimal places for all computed scores"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

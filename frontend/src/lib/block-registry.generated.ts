@@ -6317,7 +6317,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -6532,7 +6532,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -6837,7 +6837,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -7076,9 +7076,105 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
+  {
+    type: 'loop_controller',
+    name: 'Loop Controller',
+    description: 'Repeatedly executes a pipeline segment. Connect the \'body\' output to the first block in your loop, then connect the last block\'s output back to \'feedback\'. Configure iterations, file modes, context management, and early stopping.\n',
+    category: 'flow',
+    tags: ['loop', 'iteration', 'flow', 'synthetic_data', 'refinement'],
+    aliases: [],
+    icon: 'Workflow',
+    accent: '#6366f1',
+    maturity: 'stable',
+    inputs: [
+      { id: 'input', label: 'Seed Data', dataType: 'any', required: false },
+      { id: 'feedback', label: 'Feedback', dataType: 'any', required: false },
+    ],
+    outputs: [
+      { id: 'body', label: 'Loop Body', dataType: 'any', required: false },
+      { id: 'result', label: 'Final Result', dataType: 'dataset', required: false },
+      { id: 'metrics', label: 'Loop Metrics', dataType: 'metrics', required: false },
+    ],
+    defaultConfig: {
+      iterations: 10,
+      stop_metric: '',
+      stop_threshold: 0.0,
+      stop_direction: 'above',
+      context_management: 'clear',
+      file_mode: 'append',
+      seed_mode: 'increment',
+      base_seed: 42,
+      iteration_delay_ms: 0,
+      accumulate_results: true,
+      prompt_variation: '',
+    },
+    configFields: [
+      { name: 'iterations', label: 'Iterations', type: 'integer', default: 10, min: 1, max: 10000 },
+      {
+        name: 'stop_metric',
+        label: 'Stop Metric',
+        type: 'string',
+        default: '',
+        description: 'Metric name for early stopping (e.g., \'accuracy\'). Leave empty to run all iterations.',
+      },
+      { name: 'stop_threshold', label: 'Stop Threshold', type: 'float', default: 0.0 },
+      {
+        name: 'stop_direction',
+        label: 'Stop Direction',
+        type: 'select',
+        default: 'above',
+        options: ['above', 'below'],
+      },
+      {
+        name: 'context_management',
+        label: 'Context Management',
+        type: 'select',
+        default: 'clear',
+        options: ['clear', 'keep', 'summarize'],
+        description: 'clear: reset LLM context each iteration (best for diverse generation). keep: accumulate context (best for refinement). summarize: compress previous context.',
+      },
+      {
+        name: 'file_mode',
+        label: 'File Write Mode',
+        type: 'select',
+        default: 'append',
+        options: ['append', 'overwrite', 'versioned'],
+        description: 'append: grow files across iterations. overwrite: replace each time. versioned: create separate files per iteration.',
+      },
+      {
+        name: 'seed_mode',
+        label: 'Seed Behavior',
+        type: 'select',
+        default: 'increment',
+        options: ['fixed', 'increment', 'random'],
+      },
+      { name: 'base_seed', label: 'Base Seed', type: 'integer', default: 42 },
+      {
+        name: 'iteration_delay_ms',
+        label: 'Delay Between Iterations (ms)',
+        type: 'integer',
+        default: 0,
+        min: 0,
+      },
+      {
+        name: 'accumulate_results',
+        label: 'Accumulate All Results',
+        type: 'boolean',
+        default: true,
+        description: 'true: collect outputs from ALL iterations into final result. false: only keep last.',
+      },
+      {
+        name: 'prompt_variation',
+        label: 'Prompt Variation Template',
+        type: 'text_area',
+        default: '',
+        description: 'Template for varying prompts per iteration. Use {{iteration}}, {{total}}, {{seed}}, {{previous_output}}.',
+      },
+    ],
+  },
   {
     type: 'loop_iterator',
     name: 'Loop Iterator',
@@ -7523,7 +7619,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {

@@ -76,3 +76,9 @@ config:
     default: "detailed"
     options: ["detailed", "summary"]
     description: "detailed = full check results + metrics, summary = pass/fail counts + failed metric names only"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

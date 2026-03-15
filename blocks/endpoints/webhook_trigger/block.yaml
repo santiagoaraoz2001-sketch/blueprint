@@ -92,3 +92,9 @@ config:
     label: Include Run ID
     default: false
     description: Add pipeline run ID to webhook payload
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

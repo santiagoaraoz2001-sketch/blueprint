@@ -110,3 +110,9 @@ config:
     options: [skip, fail]
     default: skip
     description: "skip = continue on error, fail = abort entire batch"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

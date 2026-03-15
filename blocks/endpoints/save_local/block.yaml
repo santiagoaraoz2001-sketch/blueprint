@@ -60,3 +60,9 @@ config:
     label: Timestamp Filename
     default: false
     description: Append timestamp to filename for versioning
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

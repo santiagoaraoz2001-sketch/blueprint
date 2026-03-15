@@ -54,3 +54,9 @@ config:
     min: 0
     max: 100000
     description: "Maximum memory entries (0 = unlimited). Oldest entries evicted when limit reached."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

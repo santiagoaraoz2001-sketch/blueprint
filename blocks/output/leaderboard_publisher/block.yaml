@@ -47,3 +47,9 @@ config:
     options: [markdown, csv, json]
     default: markdown
     description: Format for the leaderboard output
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

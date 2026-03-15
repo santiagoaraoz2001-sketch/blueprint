@@ -94,3 +94,9 @@ config:
     default: "info"
     options: ["info", "warning", "error", "critical"]
     description: "Only send if severity meets or exceeds this level (filters out noise)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -51,3 +51,9 @@ config:
     label: Verify Checksum
     description: Verify file integrity for local models
     default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -87,3 +87,9 @@ config:
     label: Language
     default: "en"
     description: "Language hint for processing"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

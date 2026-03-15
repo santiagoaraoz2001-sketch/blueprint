@@ -64,3 +64,9 @@ config:
     label: Filter Value
     default: ""
     description: Value to match in filter_column (blank = show non-empty rows)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

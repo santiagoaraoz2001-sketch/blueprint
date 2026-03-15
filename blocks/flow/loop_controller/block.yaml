@@ -1,0 +1,99 @@
+name: Loop Controller
+type: loop_controller
+category: flow
+description: >
+  Repeatedly executes a pipeline segment. Connect the 'body' output to the first block
+  in your loop, then connect the last block's output back to 'feedback'. Configure
+  iterations, file modes, context management, and early stopping.
+version: "1.0.0"
+maturity: stable
+tags: [loop, iteration, flow, synthetic_data, refinement]
+
+inputs:
+  - id: input
+    label: Seed Data
+    data_type: any
+    required: false
+    description: "Initial data to feed into the first iteration"
+  - id: feedback
+    label: Feedback
+    data_type: any
+    required: false
+    description: "Connect from the last block in the loop body"
+
+outputs:
+  - id: body
+    label: Loop Body
+    data_type: any
+    description: "Connect to the first block in the loop body"
+  - id: result
+    label: Final Result
+    data_type: dataset
+    description: "Accumulated results from all iterations (or last iteration output)"
+  - id: metrics
+    label: Loop Metrics
+    data_type: metrics
+
+config:
+  iterations:
+    type: integer
+    label: Iterations
+    default: 10
+    min: 1
+    max: 10000
+  stop_metric:
+    type: string
+    label: Stop Metric
+    default: ""
+    description: "Metric name for early stopping (e.g., 'accuracy'). Leave empty to run all iterations."
+  stop_threshold:
+    type: float
+    label: Stop Threshold
+    default: 0.0
+  stop_direction:
+    type: select
+    label: Stop Direction
+    options: [above, below]
+    default: above
+  context_management:
+    type: select
+    label: Context Management
+    options: [clear, keep, summarize]
+    default: clear
+    description: "clear: reset LLM context each iteration (best for diverse generation). keep: accumulate context (best for refinement). summarize: compress previous context."
+  file_mode:
+    type: select
+    label: File Write Mode
+    options: [append, overwrite, versioned]
+    default: append
+    description: "append: grow files across iterations. overwrite: replace each time. versioned: create separate files per iteration."
+  seed_mode:
+    type: select
+    label: Seed Behavior
+    options: [fixed, increment, random]
+    default: increment
+  base_seed:
+    type: integer
+    label: Base Seed
+    default: 42
+  iteration_delay_ms:
+    type: integer
+    label: Delay Between Iterations (ms)
+    default: 0
+    min: 0
+  accumulate_results:
+    type: boolean
+    label: Accumulate All Results
+    default: true
+    description: "true: collect outputs from ALL iterations into final result. false: only keep last."
+  prompt_variation:
+    type: text_area
+    label: Prompt Variation Template
+    default: ""
+    description: "Template for varying prompts per iteration. Use {{iteration}}, {{total}}, {{seed}}, {{previous_output}}."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

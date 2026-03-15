@@ -85,3 +85,9 @@ config:
     label: Text Column
     description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
     default: ""
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

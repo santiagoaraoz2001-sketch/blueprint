@@ -44,3 +44,9 @@ config:
     label: Snapshot Metadata
     default: ""
     description: "Custom tags attached to each snapshot (one per line: key: value). E.g., 'stage: preprocessing'"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

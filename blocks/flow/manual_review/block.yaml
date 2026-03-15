@@ -84,3 +84,9 @@ config:
     label: Custom Decision Labels
     default: ""
     description: "Comma-separated custom labels for reviewers (e.g., 'safe, flagged, escalate, remove'). Empty = standard approve/reject."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

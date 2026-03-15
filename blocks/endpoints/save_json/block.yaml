@@ -77,3 +77,9 @@ config:
     label: Root Key
     default: ""
     description: 'Wrap data under a root key (e.g. "results" produces {"results": [...]})'
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

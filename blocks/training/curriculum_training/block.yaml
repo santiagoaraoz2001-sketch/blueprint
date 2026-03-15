@@ -87,3 +87,9 @@ config:
     label: Training Format
     description: "Template for structuring training examples. Use {text}, {instruction}, {output} placeholders."
     default: ""
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

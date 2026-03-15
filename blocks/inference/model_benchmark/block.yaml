@@ -113,3 +113,9 @@ config:
     description: "Output format for results — json (default), jsonl (one JSON object per line), csv (comma-separated values)"
     default: json
     options: [json, jsonl, csv]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

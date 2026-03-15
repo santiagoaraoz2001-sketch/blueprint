@@ -80,3 +80,9 @@ config:
     label: Trim Whitespace
     default: false
     description: Strip trailing whitespace from each line
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -86,3 +86,9 @@ config:
     description: "Format for text output — text returns raw result, json wraps with metadata"
     default: text
     options: [text, json]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

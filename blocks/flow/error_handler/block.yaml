@@ -71,3 +71,9 @@ config:
     label: Retry Error Pattern
     default: ""
     description: "Regex pattern — only retry if the error message matches (e.g., 'ConnectionError|Timeout'). Empty = retry on all errors."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -61,3 +61,9 @@ config:
     label: Output Name
     description: Name for the merged model
     default: "dare-merged-model"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

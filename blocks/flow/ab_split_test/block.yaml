@@ -60,3 +60,9 @@ config:
     label: Stratify By Column
     default: ""
     description: "Column name for stratified splits — ensures proportional representation in each path (e.g., 'category')"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -81,3 +81,9 @@ config:
     label: Include Chunk IDs
     default: true
     description: Add doc_id, chunk_id, and chunk_index columns to output (disable for clean flat output)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false
