@@ -184,9 +184,9 @@ export function getFileFormatWarning(filePath: string, expectedType: ConnectorTy
 //  DYNAMIC BLOCK SIZING
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const PORT_SLOT_WIDTH = 56
+const PORT_SLOT_WIDTH = 72
 const MIN_BLOCK_WIDTH = 280
-const MAX_BLOCK_WIDTH = 560
+const MAX_BLOCK_WIDTH = 640
 
 /** Compute block width based on number of ports */
 export function computeBlockWidth(def: BlockDefinition): number {
