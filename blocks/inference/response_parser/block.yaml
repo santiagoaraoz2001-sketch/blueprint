@@ -13,7 +13,7 @@ inputs:
 outputs:
   - id: parsed_text
     label: Parsed Text
-    aliases: [text]
+    aliases: [text, response, output]
     data_type: text
 
   - id: config

@@ -27,6 +27,7 @@ outputs:
     data_type: metrics
     description: "Object with keys: file_size_bytes (int), page_size (string)"
 
+    aliases: [metrics]
 config:
   output_path:
     type: string

@@ -13,7 +13,7 @@ import '@xyflow/react/dist/style.css'
 import { T } from '@/lib/design-tokens'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useShallow } from 'zustand/react/shallow'
-import { getBlockDefinition, getPortColor, isPortCompatible, resolvePort } from '@/lib/block-registry'
+import { getBlockDefinition, getPortColor, isPortCompatible, resolvePort, findBestInputPort, type PortDefinition } from '@/lib/block-registry'
 import BlockNode from './BlockNode'
 import StickyNote from './StickyNote'
 import GroupNode from './GroupNode'
@@ -262,8 +262,14 @@ export default function PipelineCanvas() {
       const newestNode = state.nodes[state.nodes.length - 1]
       const newDef = getBlockDefinition(newBlockType)
       if (newestNode && newDef) {
-        // Find best input port match
-        const targetPort = newDef.inputs.find((i) => i.dataType === paletteParams.sourceType || i.dataType === 'any')
+        // Find best input port — prefer alias-matched ports over plain type matches
+        const sourceNode = state.nodes.find((n) => n.id === paletteParams.sourceNodeId)
+        const sourceDef = sourceNode ? getBlockDefinition(sourceNode.data.type) : undefined
+        const sourcePort = sourceDef?.outputs.find((p: PortDefinition) => p.id === paletteParams.sourceHandleId)
+
+        const targetPort = sourcePort
+          ? findBestInputPort(sourcePort, newDef.inputs)
+          : newDef.inputs.find((i) => i.dataType === paletteParams.sourceType || i.dataType === 'any')
         if (targetPort) {
           state.onConnect({
             source: paletteParams.sourceNodeId,

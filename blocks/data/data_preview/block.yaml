@@ -15,10 +15,12 @@ outputs:
     label: Stats
     data_type: metrics
     description: "Object with total_rows, columns, num_columns, per-column null_count/unique/min/max/mean, and optional text length stats (min_len, max_len, mean_len, median_len) per string column"
+    aliases: [metrics]
   - id: preview
     label: Preview Rows
     data_type: dataset
     description: "JSON array of sampled/filtered rows (up to num_rows). Same schema as input."
+    aliases: [dataset]
   - id: preview_dataset
     label: Dataset (passthrough)
     data_type: dataset

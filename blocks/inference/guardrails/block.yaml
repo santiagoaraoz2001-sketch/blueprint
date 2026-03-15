@@ -14,7 +14,7 @@ outputs:
   - id: filtered_text
     label: Filtered Text
     data_type: text
-    aliases: [text]
+    aliases: [text, response, output]
     description: >
       When output_format is "text", a plain text file (filtered.txt) with the
       processed content. Depending on the action setting the text may be

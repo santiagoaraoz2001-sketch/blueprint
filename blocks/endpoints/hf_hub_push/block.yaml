@@ -20,6 +20,7 @@ outputs:
     data_type: metrics
     description: "Object with keys: repo_id (string), repo_type (string), files_uploaded (int), private (bool), revision (string)"
 
+    aliases: [metrics]
 config:
   repo_id:
     type: string

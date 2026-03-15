@@ -32,6 +32,7 @@ outputs:
   - id: response
     label: Final Response
     data_type: text
+    aliases: [text, output]
   - id: dataset
     label: Step Log
     data_type: dataset

@@ -32,6 +32,7 @@ outputs:
   - id: response
     label: Response Text
     data_type: text
+    aliases: [text, output]
   - id: retrieval_log
     label: Responses
     aliases: [dataset]

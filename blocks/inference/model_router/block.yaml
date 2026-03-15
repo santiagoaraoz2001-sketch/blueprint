@@ -18,6 +18,7 @@ outputs:
   - id: response
     label: Response
     data_type: text
+    aliases: [text, output]
   - id: routing
     label: Routing Decision
     data_type: config

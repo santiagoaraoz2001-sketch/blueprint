@@ -25,6 +25,7 @@ outputs:
     label: Rejected
     data_type: dataset
     description: "JSON array of rows that failed the filter. Useful for inspecting what was removed."
+    aliases: [dataset]
   - id: output_dataset_meta
     label: Dataset Info
     data_type: config
@@ -36,6 +37,7 @@ outputs:
     data_type: metrics
     description: "Object with original, kept, rejected, drop_rate"
 
+    aliases: [metrics]
 config:
   method:
     type: select

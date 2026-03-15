@@ -23,11 +23,13 @@ outputs:
     label: Webhook Summary
     data_type: metrics
     description: "Object with keys: status (string), status_code (int), url (string), method (string), payload_size_bytes (int)"
+    aliases: [metrics]
   - id: response
     label: Response Body
     data_type: text
     description: "Raw response body from the webhook endpoint (up to 500 chars)"
 
+    aliases: [text, output]
 config:
   webhook_url:
     type: string

@@ -24,6 +24,7 @@ outputs:
     data_type: metrics
     description: "JSON: {final_score, best_score, quality_threshold, passed, iterations_used, iteration_log[{iteration, score, judge_feedback, output_preview}]}"
 
+    aliases: [metrics]
 config:
   max_iterations:
     type: integer

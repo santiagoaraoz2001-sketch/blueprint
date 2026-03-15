@@ -20,6 +20,7 @@ outputs:
     data_type: metrics
     description: "JSON: {snapshot_id, label, snapshot_path, rolled_back, auto_rollback_on_failure, total_snapshots, created_at}"
 
+    aliases: [metrics]
 config:
   label:
     type: string

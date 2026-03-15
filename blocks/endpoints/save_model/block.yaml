@@ -23,6 +23,7 @@ outputs:
     data_type: metrics
     description: "Object with keys: total_size_bytes (int), files_saved (int), format (string), quantize (string)"
 
+    aliases: [metrics]
 config:
   output_path:
     type: string

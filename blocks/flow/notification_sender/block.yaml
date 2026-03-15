@@ -19,6 +19,7 @@ outputs:
     label: Send Status
     data_type: metrics
     description: "JSON: {channel, severity, message, delivered, timestamp, details}. If skipped: {skipped, reason, channel}."
+    aliases: [metrics]
   - id: pass_through
     label: Pass Through
     data_type: any

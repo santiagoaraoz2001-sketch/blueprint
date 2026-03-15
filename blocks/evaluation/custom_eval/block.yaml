@@ -21,6 +21,7 @@ outputs:
     label: Scores
     data_type: metrics
     description: 'Aggregate: user-defined score keys aggregated by chosen method (mean/median/min/max/sum)'
+    aliases: [metrics]
   - id: report
     label: Detailed Report
     data_type: artifact

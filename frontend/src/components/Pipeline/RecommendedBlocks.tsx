@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
-import { BLOCK_REGISTRY, type BlockDefinition, isPortCompatible } from '@/lib/block-registry'
+import { BLOCK_REGISTRY, type BlockDefinition, isPortCompatible, getPortNames } from '@/lib/block-registry'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { getIcon } from '@/lib/icon-utils'
 import { Sparkles, Plus, Lightbulb, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
@@ -245,7 +245,7 @@ function computeRecommendations(
     edges.map((e) => `${e.source}:${e.sourceHandle}`)
   )
 
-  const openOutputs: { nodeType: string; portType: string; portLabel: string }[] = []
+  const openOutputs: { nodeType: string; portType: string; portLabel: string; portNames: Set<string> }[] = []
   for (const node of nodes) {
     const def = BLOCK_REGISTRY.find((b) => b.type === node.data?.type)
     if (!def) continue
@@ -256,6 +256,7 @@ function computeRecommendations(
           nodeType: def.type,
           portType: out.dataType,
           portLabel: out.label,
+          portNames: new Set(getPortNames(out)),
         })
       }
     }
@@ -269,14 +270,18 @@ function computeRecommendations(
         isPortCompatible(open.portType, inp.dataType)
       )
       if (hasCompatibleInput) {
+        // Bonus: port alias overlap means a stronger semantic match
+        const aliasBonus = candidate.inputs.some((inp) =>
+          getPortNames(inp).some((n) => open.portNames.has(n))
+        ) ? 2 : 0
         const existing = outputRecs.find((r) => r.block.type === candidate.type)
         if (existing) {
-          existing.score += 1
+          existing.score += 1 + aliasBonus
         } else {
           outputRecs.push({
             block: candidate,
             reason: `Connects to open "${open.portLabel}" output`,
-            score: 3,
+            score: 3 + aliasBonus,
           })
         }
       }
@@ -288,7 +293,7 @@ function computeRecommendations(
     edges.map((e) => `${e.target}:${e.targetHandle}`)
   )
 
-  const openInputs: { nodeType: string; portType: string; portLabel: string }[] = []
+  const openInputs: { nodeType: string; portType: string; portLabel: string; portNames: Set<string> }[] = []
   for (const node of nodes) {
     const def = BLOCK_REGISTRY.find((b) => b.type === node.data?.type)
     if (!def) continue
@@ -300,6 +305,7 @@ function computeRecommendations(
           nodeType: def.type,
           portType: inp.dataType,
           portLabel: inp.label,
+          portNames: new Set(getPortNames(inp)),
         })
       }
     }
@@ -313,14 +319,18 @@ function computeRecommendations(
         isPortCompatible(out.dataType, open.portType)
       )
       if (hasCompatibleOutput) {
+        // Bonus: port alias overlap means a stronger semantic match
+        const aliasBonus = candidate.outputs.some((out) =>
+          getPortNames(out).some((n) => open.portNames.has(n))
+        ) ? 2 : 0
         const existing = inputRecs.find((r) => r.block.type === candidate.type)
         if (existing) {
-          existing.score += 1
+          existing.score += 1 + aliasBonus
         } else {
           inputRecs.push({
             block: candidate,
             reason: `Provides "${open.portLabel}" input`,
-            score: 4,
+            score: 4 + aliasBonus,
           })
         }
       }

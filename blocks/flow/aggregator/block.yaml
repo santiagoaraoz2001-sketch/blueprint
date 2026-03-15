@@ -30,6 +30,7 @@ outputs:
   - id: output
     label: Combined Output
     data_type: dataset
+    aliases: [dataset]
   - id: metrics
     label: Aggregation Metrics
     data_type: metrics

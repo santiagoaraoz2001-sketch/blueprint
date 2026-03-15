@@ -18,6 +18,7 @@ outputs:
   - id: text
     label: Extracted Text
     data_type: text
+    aliases: [response, output]
   - id: output_dataset
     label: Full Responses
     aliases: [dataset]

@@ -23,6 +23,7 @@ outputs:
     data_type: metrics
     description: "Object with keys: rows (int), columns (int), file_size_bytes (int), delimiter (string)"
 
+    aliases: [metrics]
 config:
   output_path:
     type: string

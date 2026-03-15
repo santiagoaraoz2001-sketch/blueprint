@@ -19,14 +19,17 @@ outputs:
     label: Train
     data_type: dataset
     description: "JSON array of training rows. Schema matches input."
+    aliases: [dataset]
   - id: val
     label: Validation
     data_type: dataset
     description: "JSON array of validation rows. Empty array if val_ratio=0."
+    aliases: [dataset]
   - id: test
     label: Test
     data_type: dataset
     description: "JSON array of test rows. Schema matches input."
+    aliases: [dataset]
   - id: output_dataset_meta
     label: Dataset Info
     data_type: config
@@ -38,6 +41,7 @@ outputs:
     data_type: metrics
     description: "Object with train, val, test counts, total, and stratified flag"
 
+    aliases: [metrics]
 config:
   train_ratio:
     type: float
