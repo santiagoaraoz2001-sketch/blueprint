@@ -597,8 +597,64 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
         )
       })}
 
+      {/* ── Side input handles — LEFT side, vertically distributed ── */}
+      {def?.side_inputs?.map((sideInput, i) => {
+        const portColor = getPortColor(sideInput.dataType)
+        const isPortHovered = hoveredPort === `side-${sideInput.id}`
+        const sideCount = def.side_inputs?.length ?? 0
+        // Use percentage-based positioning so ports adapt to any block height
+        const topPct = ((i + 1) / (sideCount + 1)) * 100
+
+        return (
+          <div key={`side-${sideInput.id}`}>
+            <Handle
+              type="target"
+              position={Position.Left}
+              id={sideInput.id}
+              onMouseEnter={() => setHoveredPort(`side-${sideInput.id}`)}
+              onMouseLeave={() => setHoveredPort(null)}
+              style={{
+                width: 10,
+                height: 10,
+                background: T.surface0,
+                border: `2px solid ${portColor}`,
+                borderRadius: 2,
+                left: -5,
+                top: `${topPct}%`,
+                transform: 'translateY(-50%)',
+                boxShadow: isPortHovered ? `0 0 12px ${portColor}` : `0 1px 4px ${T.shadow}`,
+                transition: 'box-shadow 0.15s',
+                zIndex: 10,
+              }}
+            />
+            {/* Side port label — to the left of the handle */}
+            {isPortHovered && (
+              <div style={{
+                position: 'absolute',
+                left: -60,
+                top: `${topPct}%`,
+                transform: 'translateY(-50%)',
+                fontFamily: F,
+                fontSize: 7,
+                color: portColor,
+                fontWeight: 600,
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                textAlign: 'right',
+                opacity: 0.9,
+                zIndex: 15,
+              }}>
+                {sideInput.label}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
       {/* Hovered port tooltip — shows detailed info on handle hover */}
       {hoveredPort && def && (() => {
+        const isSide = hoveredPort.startsWith('side-')
+        if (isSide) return null // Side ports show their own hover label
         const isInput = hoveredPort.startsWith('in-')
         const pid = hoveredPort.replace(/^(in|out)-/, '')
         const port = isInput

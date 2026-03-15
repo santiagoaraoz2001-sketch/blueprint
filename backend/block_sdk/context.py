@@ -39,6 +39,7 @@ class BlockContext:
         progress_callback=None,
         message_callback=None,
         metric_callback=None,
+        loop_metadata: dict | None = None,
     ):
         self.run_dir = run_dir
         self.block_dir = block_dir
@@ -51,6 +52,7 @@ class BlockContext:
         self._progress_callback = progress_callback
         self._message_callback = message_callback
         self._metric_callback = metric_callback
+        self._loop_metadata = loop_metadata
         self._outputs: dict[str, Any] = {}
         self._metrics: dict[str, Any] = {}
         self._data_fingerprints: dict[str, dict] = {}
@@ -149,6 +151,34 @@ class BlockContext:
 
     def get_data_fingerprints(self) -> dict[str, dict]:
         return self._data_fingerprints
+
+    # ── Loop metadata helpers ────────────────────────────────────────
+
+    def get_loop_metadata(self) -> dict | None:
+        """Return loop iteration metadata if this block is inside a loop, else None."""
+        return self._loop_metadata
+
+    def is_in_loop(self) -> bool:
+        """Check if this block is currently executing inside a loop."""
+        return self._loop_metadata is not None
+
+    def get_iteration(self) -> int:
+        """Get current loop iteration (0-indexed). Returns -1 if not in a loop."""
+        if self._loop_metadata:
+            return self._loop_metadata.get("iteration", -1)
+        return -1
+
+    def get_file_mode(self) -> str:
+        """Get loop file mode: 'append', 'overwrite', or 'versioned'. Returns 'overwrite' if not in loop."""
+        if self._loop_metadata:
+            return self._loop_metadata.get("file_mode", "overwrite")
+        return "overwrite"
+
+    def get_context_mode(self) -> str:
+        """Get loop context management: 'clear', 'keep', or 'summarize'. Returns 'keep' if not in loop."""
+        if self._loop_metadata:
+            return self._loop_metadata.get("context_management", "keep")
+        return "keep"
 
     # ── resolve_* helpers ─────────────────────────────────────────────
     # Normalize upstream outputs into the format the downstream block

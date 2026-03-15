@@ -106,6 +106,11 @@ def load_all_blocks() -> list[dict]:
                 "configFields": _convert_config_fields(schema.get("config", {})),
             }
 
+            # Side inputs (control ports rendered on left edge)
+            side_inputs = _convert_ports(schema.get("side_inputs", []))
+            if side_inputs:
+                block["side_inputs"] = side_inputs
+
             # Optional detail fields
             if "detail" in schema:
                 block["detail"] = schema["detail"]
@@ -322,6 +327,13 @@ def _format_block(block: dict) -> str:
         lines.append("    ],")
     else:
         lines.append("    configFields: [],")
+
+    # Side inputs (control ports on left edge)
+    if block.get("side_inputs"):
+        port_strs = [f"      {_format_port(p)}," for p in block["side_inputs"]]
+        lines.append("    side_inputs: [")
+        lines.extend(port_strs)
+        lines.append("    ],")
 
     # Optional fields
     if "detail" in block:
