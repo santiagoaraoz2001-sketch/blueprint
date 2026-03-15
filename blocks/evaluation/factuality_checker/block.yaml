@@ -21,10 +21,12 @@ outputs:
     label: Factuality Scores
     data_type: metrics
     description: 'Aggregate: accuracy, correct, total, errors count, method used'
-  - id: dataset
+  - id: checked_dataset
     label: Annotated Results
     data_type: dataset
+    aliases: [dataset]
     description: 'Per-item: index, output, reference, correct (bool), score, question — filterable'
+
   - id: report
     label: Error Report
     data_type: artifact

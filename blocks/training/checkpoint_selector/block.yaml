@@ -11,9 +11,11 @@ inputs:
     required: true
 
 outputs:
-  - id: model
+  - id: selected_model
     label: Best Checkpoint
+    aliases: [model]
     data_type: model
+
   - id: metrics
     label: Checkpoint Metrics
     data_type: metrics
@@ -23,6 +25,7 @@ config:
     type: string
     label: Checkpoint Directory
     description: Path to scan for checkpoints (overridden by model input port if connected)
+    mandatory: true
   metric:
     type: string
     label: Selection Metric

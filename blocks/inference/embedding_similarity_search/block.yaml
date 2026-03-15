@@ -23,9 +23,10 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: search_results
     label: Search Results
     data_type: dataset
+    aliases: [dataset]
     description: >
       Array of result rows. Each row: {rank, index, label, score, ...metadata_fields}.
       rank: 1-based position in results. index: original corpus index. label: text label from corpus.
@@ -33,6 +34,7 @@ outputs:
       Multi-query mode adds query_index field. Enable include_vectors to add _embedding vector to each row.
       When include_metadata is true, all original metadata fields are merged into each result row.
       Output format configurable via dataset_format (json, jsonl, csv).
+
   - id: metrics
     label: Search Stats
     data_type: metrics

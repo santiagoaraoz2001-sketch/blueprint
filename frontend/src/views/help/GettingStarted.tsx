@@ -175,7 +175,7 @@ export default function GettingStarted() {
         </ol>
         <div style={tip}>
           Hover over any port to see its data type. Port colors match: green=dataset, pink=text,
-          violet=model, cyan=config, amber=metrics.
+          violet=model, cyan=config, amber=metrics, gold=llm.
         </div>
       </div>
     </div>

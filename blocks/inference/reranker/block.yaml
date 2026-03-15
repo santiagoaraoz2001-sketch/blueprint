@@ -19,15 +19,17 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: reranked_dataset
     label: Reranked Results
     data_type: dataset
+    aliases: [dataset]
     description: >
       Array of reranked result objects. Each row: {...original_row_fields, <score_column>, _rank}.
       score_column: reranking relevance score (configurable name, default: "_rerank_score").
       _rank: 1-based position after reranking (1 = most relevant).
       Results are sorted descending by score. Rows below score_threshold are filtered out.
       Only top_k results are returned. Output format configurable via dataset_format (json, jsonl, csv).
+
   - id: metrics
     label: Reranking Metrics
     data_type: metrics

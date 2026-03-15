@@ -20,10 +20,10 @@ outputs:
   - id: dataset
     label: Dataset
     data_type: dataset
-  - id: metrics
+  - id: output_metrics
     label: Conversion Stats
+    aliases: [metrics]
     data_type: metrics
-
 config:
   format:
     type: select

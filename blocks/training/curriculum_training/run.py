@@ -234,7 +234,7 @@ def run(ctx):
             }, f, indent=2)
 
         # Branch: real training succeeded
-        ctx.save_output("model", output_dir)
+        ctx.save_output("trained_model", output_dir)
         # Branch: real training succeeded
         ctx.save_output("metrics", {
             "final_loss": final_loss,
@@ -306,7 +306,7 @@ def run(ctx):
         }, f, indent=2)
 
     # Branch: training failed — simulation fallback
-    ctx.save_output("model", model_path)
+    ctx.save_output("trained_model", model_path)
     # Branch: training failed — simulation fallback
     ctx.save_output("metrics", {
         "final_loss": final_loss,

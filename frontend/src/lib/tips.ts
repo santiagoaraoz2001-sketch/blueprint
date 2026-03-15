@@ -15,7 +15,7 @@ export const VIEW_TIPS: Record<ViewId, GuideTip[]> = {
   ],
   editor: [
     { id: 'ed-blocks', label: 'BLOCK LIBRARY', description: 'Drag blocks from the library panel on the left onto the canvas to build your pipeline. 100+ blocks across 11 categories.', level: 'dash' },
-    { id: 'ed-ports', label: 'PORT COLORS', description: 'Each color represents a data type: green=dataset, pink=text, violet=model, cyan=config, amber=metrics, teal=embedding, red=artifact, sky=agent, gray=any. Match colors for compatible connections.', level: 'dash' },
+    { id: 'ed-ports', label: 'PORT COLORS', description: 'Each color represents a data type: green=dataset, pink=text, violet=model, cyan=config, amber=metrics, teal=embedding, red=artifact, sky=agent, gold=llm, gray=any. Match colors for compatible connections.', level: 'dash' },
     { id: 'ed-connect', label: 'CONNECTIONS', description: 'Drag from an output handle (bottom) to an input handle (top) to connect blocks. Mismatched types will be rejected.', level: 'dash' },
     { id: 'ed-config', label: 'CONFIGURATION', description: 'Click a block to open its config panel on the right. Each block has type-specific parameters.', level: 'deep' },
     { id: 'ed-run', label: 'EXECUTION', description: 'Click Run to execute the pipeline. Blocks execute in topological order with real-time progress tracking.', level: 'deep' },

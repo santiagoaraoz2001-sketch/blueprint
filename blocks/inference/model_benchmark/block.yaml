@@ -19,9 +19,10 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: benchmark_results
     label: Benchmark Results
     data_type: dataset
+    aliases: [dataset]
     description: >
       JSON array of per-prompt result objects. Each row contains:
       prompt (str) — the input prompt text (truncated to 500 chars);
@@ -32,6 +33,7 @@ outputs:
       success (bool) — whether the request completed without error;
       error (str, optional) — error message if the request failed.
       Output format configurable via dataset_format (json, jsonl, csv).
+
   - id: metrics
     label: Summary Metrics
     data_type: metrics

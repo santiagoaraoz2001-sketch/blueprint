@@ -11,10 +11,12 @@ inputs:
     required: true
 
 outputs:
-  - id: dataset
+  - id: transformed_dataset
     label: Transformed
     data_type: dataset
+    aliases: [dataset]
     description: "JSON array with columns transformed according to the selected operation. Schema depends on operation: rename changes column names, drop/keep modifies which columns exist, cast changes value types, template adds a new derived column, lowercase lowercases string values."
+
   - id: stats
     label: Transform Stats
     data_type: metrics

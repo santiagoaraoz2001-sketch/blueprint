@@ -1,4 +1,5 @@
 import json
+from .block_registry import resolve_output_handle
 from .executor import _topological_sort, _find_block_module
 from ..config import BUILTIN_BLOCKS_DIR
 from pathlib import Path
@@ -171,6 +172,12 @@ def compile_pipeline_to_python(pipeline_name: str, definition: dict) -> str:
                 src_handle = edge.get("sourceHandle", "")
                 safe_src_id = f"node_{src_id.replace('-', '_')}"
 
+                # Resolve aliased output port IDs at compile time
+                src_node = node_map.get(src_id)
+                if src_node:
+                    src_block_type = src_node.get("data", {}).get("type", src_node.get("type", ""))
+                    src_handle = resolve_output_handle(src_block_type, src_handle)
+
                 # Skip edges from missing/skipped blocks
                 if src_id in missing_blocks:
                     script_lines.append(f"        # Skipped: input from missing block '{src_id}'")
@@ -186,6 +193,12 @@ def compile_pipeline_to_python(pipeline_name: str, definition: dict) -> str:
                     src_id = edge.get("source", "")
                     src_handle = edge.get("sourceHandle", "")
                     safe_src_id = f"node_{src_id.replace('-', '_')}"
+
+                    # Resolve aliased output port IDs at compile time
+                    src_node = node_map.get(src_id)
+                    if src_node:
+                        src_block_type = src_node.get("data", {}).get("type", src_node.get("type", ""))
+                        src_handle = resolve_output_handle(src_block_type, src_handle)
 
                     if src_id in missing_blocks:
                         script_lines.append(f"        # Skipped: input from missing block '{src_id}'")

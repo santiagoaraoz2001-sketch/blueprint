@@ -19,11 +19,11 @@ outputs:
     label: Preview Rows
     data_type: dataset
     description: "JSON array of sampled/filtered rows (up to num_rows). Same schema as input."
-  - id: dataset
+  - id: preview_dataset
     label: Dataset (passthrough)
     data_type: dataset
+    aliases: [dataset]
     description: "Full input dataset forwarded unchanged (when passthrough is enabled)"
-
 config:
   num_rows:
     type: integer

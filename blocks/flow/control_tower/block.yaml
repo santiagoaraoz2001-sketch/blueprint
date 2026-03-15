@@ -11,11 +11,11 @@ inputs:
     required: true
 
 outputs:
-  - id: telemetry
+  - id: output_telemetry
     label: Telemetry Sent
     data_type: any
+    aliases: [telemetry]
     description: "Copy of the telemetry payload sent to Control Tower (saved locally)"
-
 config:
   host:
     type: string

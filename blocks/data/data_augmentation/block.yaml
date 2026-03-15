@@ -27,14 +27,18 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: augmented_dataset
     label: Augmented
     data_type: dataset
+    aliases: [dataset]
     description: "JSON array containing original rows followed by augmented copies. When add_metadata is true, augmented rows include _augmented (bool) and _aug_strategy (string) columns. Comma-separated strategies randomly select one per row for diversity."
-  - id: dataset_meta
+
+  - id: output_dataset_meta
     label: Dataset Info
     data_type: config
+    aliases: [dataset_meta]
     required: false
+
   - id: metrics
     label: Augmentation Stats
     data_type: metrics

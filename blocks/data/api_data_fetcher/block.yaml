@@ -27,6 +27,7 @@ config:
     type: string
     label: API URL
     description: "REST API endpoint URL"
+    mandatory: true
   method:
     type: select
     label: Method

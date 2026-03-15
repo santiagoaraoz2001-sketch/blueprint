@@ -207,7 +207,7 @@ def run(ctx):
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "data.json"), "w") as f:
         json.dump(responses, f, indent=2)
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("retrieval_log", out_dir)
 
     output_format = ctx.config.get("output_format", "plain")
     if output_format == "json":

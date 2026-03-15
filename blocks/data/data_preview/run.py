@@ -113,7 +113,7 @@ def run(ctx):
 
     # Passthrough: forward the full dataset so downstream blocks can use it
     if passthrough:
-        ctx.save_output("dataset", dataset_path)
+        ctx.save_output("preview_dataset", dataset_path)
 
     ctx.log_metric("total_rows", stats["total_rows"])
     ctx.log_metric("num_columns", stats.get("num_columns", 0))
