@@ -67,7 +67,11 @@ def validate_inputs(schema: dict, inputs: dict[str, Any]) -> None:
             )
 
 
-def validate_config(schema: dict, config: dict[str, Any]) -> dict[str, Any]:
+def validate_config(
+    schema: dict,
+    config: dict[str, Any],
+    inputs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Validate config values against block.yaml schema.
 
@@ -76,11 +80,42 @@ def validate_config(schema: dict, config: dict[str, Any]) -> dict[str, Any]:
     - Applies defaults for missing keys
     - Returns cleaned config with defaults applied
 
+    Args:
+        schema: The full block.yaml schema dict.
+        config: User-supplied config values.
+        inputs: Runtime inputs dict (optional). When provided, mandatory
+            config fields are skipped if the corresponding input port
+            already supplies a value.
+
     Raises BlockConfigError if validation fails.
     """
     config_schema = schema.get("config", {})
     if not isinstance(config_schema, dict):
         return dict(config)
+
+    # Build a set of input port IDs that have data, so we can skip mandatory
+    # checks for config fields that are satisfied by a connected input port.
+    _config_to_port: dict[str, str] = {
+        "model_name": "model",
+        "model_id": "model",
+        "dataset_name": "dataset",
+        "file_path": "dataset",
+        "directory_path": "dataset",
+        "teacher_model": "teacher",
+        "student_model": "student",
+        "reward_model": "reward_model",
+        "checkpoint_dir": "model",
+        "url": "config",
+    }
+
+    def _input_provides(field_name: str) -> bool:
+        """Return True if a connected input port supplies this config field."""
+        if inputs is None:
+            return False
+        port_id = _config_to_port.get(field_name)
+        if not port_id:
+            return False
+        return port_id in inputs and inputs[port_id] is not None
 
     cleaned = dict(config)  # Start with user config
 
@@ -92,8 +127,17 @@ def validate_config(schema: dict, config: dict[str, Any]) -> dict[str, Any]:
         default = field_def.get("default")
         label = field_def.get("label", field_name)
 
-        # Apply default if missing or empty string
+        # Check mandatory fields — skip if an input port provides the value
         value = cleaned.get(field_name)
+        if field_def.get("mandatory") and (value is None or (isinstance(value, str) and value == "")):
+            if default is None and not _input_provides(field_name):
+                raise BlockConfigError(
+                    field_name,
+                    f"'{label}' is required — set a value or connect the input port",
+                    recoverable=False,
+                )
+
+        # Apply default if missing or empty string
         if value is None or (isinstance(value, str) and value == ""):
             if field_name not in cleaned or (isinstance(value, str) and value == ""):
                 if default is not None:
@@ -188,4 +232,4 @@ def validate_block(block_dir: Path, inputs: dict, config: dict) -> dict:
         return config  # No schema, pass through
 
     validate_inputs(schema, inputs)
-    return validate_config(schema, config)
+    return validate_config(schema, config, inputs=inputs)

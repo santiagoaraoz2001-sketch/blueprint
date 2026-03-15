@@ -40,6 +40,7 @@ export interface ConfigField {
   options?: string[]
   description?: string
   depends_on?: { field: string; value: any }
+  mandatory?: boolean
 }
 
 export type BlockMaturity = 'stable' | 'beta' | 'experimental'

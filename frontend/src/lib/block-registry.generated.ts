@@ -760,7 +760,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       api_key_header: 'X-API-Key',
     },
     configFields: [
-      { name: 'url', label: 'API URL', type: 'string', description: 'REST API endpoint URL' },
+      {
+        name: 'url',
+        label: 'API URL',
+        type: 'string',
+        description: 'REST API endpoint URL',
+        mandatory: true,
+      },
       {
         name: 'method',
         label: 'Method',
@@ -1523,6 +1529,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Folder Path',
         type: 'file_path',
         description: 'Directory containing documents to ingest',
+        mandatory: true,
       },
       {
         name: 'glob_pattern',
@@ -1778,6 +1785,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Dataset Name',
         type: 'string',
         description: 'HuggingFace dataset identifier (e.g. \'imdb\', \'squad\', \'databricks/dolly-15k\')',
+        mandatory: true,
       },
       {
         name: 'subset',
@@ -1994,7 +2002,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       sheet_name: '',
     },
     configFields: [
-      { name: 'file_path', label: 'File Path', type: 'file_path', description: 'Path to the data file' },
+      {
+        name: 'file_path',
+        label: 'File Path',
+        type: 'file_path',
+        description: 'Path to the data file',
+        mandatory: true,
+      },
       {
         name: 'format',
         label: 'Format',
@@ -10175,6 +10189,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'layer_depth',
@@ -10263,6 +10278,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Checkpoint Directory',
         type: 'string',
         description: 'Path to scan for checkpoints (overridden by model input port if connected)',
+        mandatory: true,
       },
       {
         name: 'metric',
@@ -10317,6 +10333,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       { name: 'lr', label: 'Learning Rate', type: 'float', default: 1e-05, min: 1e-07, max: 0.001 },
       { name: 'epochs', label: 'Epochs', type: 'integer', default: 1, min: 1, max: 50 },
@@ -10403,6 +10420,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'num_stages',
@@ -10500,12 +10518,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Teacher Model',
         type: 'string',
         description: 'HuggingFace name or path for the teacher model (overridden by input port)',
+        mandatory: true,
       },
       {
         name: 'student_model',
         label: 'Student Model',
         type: 'string',
         description: 'HuggingFace name or path for the student model (overridden by input port)',
+        mandatory: true,
       },
       {
         name: 'temperature',
@@ -10583,6 +10603,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'beta',
@@ -10685,6 +10706,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       { name: 'lr', label: 'Learning Rate', type: 'float', default: 2e-05, min: 1e-07, max: 0.01 },
       { name: 'epochs', label: 'Epochs', type: 'integer', default: 3, min: 1, max: 100 },
@@ -10865,6 +10887,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path (e.g. meta-llama/Llama-3-8B)',
+        mandatory: true,
       },
       {
         name: 'r',
@@ -10996,6 +11019,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'r',
@@ -11224,12 +11248,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Policy Model',
         type: 'string',
         description: 'HuggingFace model name or local path for the policy model',
+        mandatory: true,
       },
       {
         name: 'reward_model',
         label: 'Reward Model',
         type: 'string',
         description: 'HuggingFace model name or path for the reward model (leave empty for heuristic reward)',
+        mandatory: true,
       },
       { name: 'lr', label: 'Learning Rate', type: 'float', default: 1.4e-05, min: 1e-07, max: 0.001 },
       {

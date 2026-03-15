@@ -33,6 +33,7 @@ config:
     type: string
     label: Base Model
     description: HuggingFace model name or local path
+    mandatory: true
   layer_depth:
     type: float
     label: Layer Depth

@@ -77,6 +77,33 @@ CRITICAL_CONFIG_FIELDS = {
 }
 
 
+# Map config field names to the input port that can satisfy them
+_CONFIG_TO_PORT = {
+    "model_name": "model",
+    "model_id": "model",
+    "dataset_name": "dataset",
+    "file_path": "dataset",
+    "directory_path": "dataset",
+    "teacher_model": "teacher",
+    "student_model": "student",
+    "reward_model": "reward_model",
+    "checkpoint_dir": "model",
+    "url": "config",
+}
+
+
+def _has_connected_input(node: dict, edges: list[dict], config_field_name: str) -> bool:
+    """Check if a config field has a corresponding connected input port."""
+    port_id = _CONFIG_TO_PORT.get(config_field_name)
+    if not port_id:
+        return False
+    node_id = node.get("id", "")
+    for edge in edges:
+        if edge.get("target") == node_id and edge.get("targetHandle") == port_id:
+            return True
+    return False
+
+
 def validate_pipeline(definition: dict) -> ValidationReport:
     """
     Validate a pipeline definition without running any blocks.
@@ -246,7 +273,37 @@ def validate_pipeline(definition: dict) -> ValidationReport:
             if key in ("dataset_name", "model_path", "base_url") and not value:
                 report.warnings.append(f"Block '{node_label}': '{key}' is empty — may be required at runtime")
 
-    # ── 5a. Deep config validation against block.yaml schemas ──
+    # ── 5a. Mandatory config field enforcement ──
+    for node in nodes:
+        if node.get("type") in ("groupNode", "stickyNote"):
+            continue
+        block_type = node.get("data", {}).get("type", node.get("data", {}).get("blockType", ""))
+        if not block_type:
+            continue
+
+        schema = get_block_config_schema(block_type)
+        if not schema:
+            continue
+
+        node_config = node.get("data", {}).get("config", {})
+        node_label = node.get("data", {}).get("label", node.get("id", "?"))
+
+        for field_name, field_def in schema.items():
+            if not isinstance(field_def, dict):
+                continue
+            if not field_def.get("mandatory"):
+                continue
+            raw = node_config.get(field_name)
+            is_empty = raw is None or (isinstance(raw, str) and raw.strip() == "")
+            if is_empty and not _has_connected_input(node, edges, field_name):
+                    label = field_def.get("label", field_name)
+                    report.errors.append(
+                        f"Block '{node_label}': '{label}' is required "
+                        f"(set in config or connect the input port)"
+                    )
+                    report.valid = False
+
+    # ── 5b. Deep config validation against block.yaml schemas ──
     for node in nodes:
         if node.get("type") in ("groupNode", "stickyNote"):
             continue
@@ -293,7 +350,7 @@ def validate_pipeline(definition: dict) -> ValidationReport:
                 except BlockConfigError as exc:
                     report.warnings.append(f"Block '{node_label}': {exc}")
 
-    # ── 5b. Check port existence on edges ──
+    # ── 5c. Check port existence on edges ──
     for edge in edges:
         src = edge.get("source", "")
         tgt = edge.get("target", "")

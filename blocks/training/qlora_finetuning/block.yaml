@@ -33,6 +33,7 @@ config:
     type: string
     label: Base Model
     description: HuggingFace model name or local path
+    mandatory: true
   r:
     type: integer
     label: LoRA Rank (r)
