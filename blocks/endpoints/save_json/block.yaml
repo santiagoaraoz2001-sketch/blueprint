@@ -20,6 +20,7 @@ outputs:
     data_type: metrics
     description: "Object with keys: records (int), file_size_bytes (int), format (string: json|jsonl)"
 
+    aliases: [metrics]
 config:
   output_path:
     type: string

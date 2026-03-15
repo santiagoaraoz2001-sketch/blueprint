@@ -26,6 +26,7 @@ outputs:
   - id: text
     label: Rendered Prompt
     data_type: text
+    aliases: [response, output]
   - id: metrics
     label: Template Metrics
     data_type: metrics

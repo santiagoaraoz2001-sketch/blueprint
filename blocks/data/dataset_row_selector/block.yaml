@@ -19,6 +19,7 @@ outputs:
   - id: text
     label: First Row as Text
     data_type: text
+    aliases: [response, output]
   - id: metrics
     label: Metrics
     data_type: metrics

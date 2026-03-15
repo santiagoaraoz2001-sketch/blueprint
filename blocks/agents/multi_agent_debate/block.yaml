@@ -19,6 +19,7 @@ outputs:
   - id: response
     label: Debate Summary
     data_type: text
+    aliases: [text, output]
   - id: dataset
     label: Debate Log
     data_type: dataset

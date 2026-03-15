@@ -27,6 +27,7 @@ outputs:
       When output_format=json: JSON file (answer.json) with schema:
       {"answer": str, "query": str, "model": str, "provider": str,
        "num_chunks_used": int, "elapsed_s": float}.
+    aliases: [response, output]
   - id: dataset
     label: Context Chunks
     data_type: dataset

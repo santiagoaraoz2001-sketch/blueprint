@@ -14,6 +14,7 @@ outputs:
   - id: text
     label: Parsed Text
     data_type: text
+    aliases: [response, output]
   - id: config
     label: Extracted Fields
     data_type: config

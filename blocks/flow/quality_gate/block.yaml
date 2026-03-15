@@ -28,6 +28,7 @@ outputs:
     data_type: metrics
     description: "JSON: {gate_passed, total_checks, passed/failed counts, checks[{metric, value, operator, threshold, passed}], all_metrics}"
 
+    aliases: [metrics]
 config:
   metric_name:
     type: string

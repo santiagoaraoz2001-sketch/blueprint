@@ -27,6 +27,7 @@ outputs:
       evidence), action_taken (string, the action applied — or "none" if no
       flags), model (string, always "rule-based"), provider (string, always
       "built-in"), and timestamp (ISO-8601 string).
+    aliases: [response, output]
   - id: metrics
     label: Safety Scores
     data_type: metrics

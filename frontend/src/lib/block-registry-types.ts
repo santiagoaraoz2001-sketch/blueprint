@@ -24,6 +24,7 @@ export interface PortDefinition {
   label: string
   dataType: PortType
   required: boolean
+  aliases?: string[]
 }
 
 export interface ConfigField {
@@ -149,6 +150,59 @@ export function getFileFormatWarning(filePath: string, expectedType: ConnectorTy
   if (FILE_FORMAT_COMPAT[ext].includes(expectedType)) return null
   const expected = FILE_FORMAT_COMPAT[ext].join(', ')
   return `File "${ext}" is typically used for ${expected} data, but this block expects ${expectedType}. The pipeline may produce unexpected results.`
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  PORT ALIAS MATCHING
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/** Get all names a port responds to: its own ID plus any aliases */
+export function getPortNames(port: PortDefinition): string[] {
+  return port.aliases ? [port.id, ...port.aliases] : [port.id]
+}
+
+/** Check whether a port matches a given name (by ID or alias) */
+export function portMatchesName(port: PortDefinition, name: string): boolean {
+  return port.id === name || (port.aliases?.includes(name) ?? false)
+}
+
+/**
+ * Find the best type-compatible input port on a target block for a given source port.
+ *
+ * Preference order:
+ *   1. Exact ID match (source.id === input.id)
+ *   2. Alias overlap (source names ∩ input names)
+ *   3. First type-compatible port
+ *   4. First 'any'-typed port
+ *
+ * Returns undefined when no compatible port exists.
+ */
+export function findBestInputPort(
+  sourcePort: PortDefinition,
+  targetInputs: PortDefinition[],
+): PortDefinition | undefined {
+  const sourceNames = new Set(getPortNames(sourcePort))
+
+  let typeMatch: PortDefinition | undefined
+  let anyMatch: PortDefinition | undefined
+
+  for (const inp of targetInputs) {
+    // Exact ID match — best possible
+    if (inp.id === sourcePort.id) return inp
+
+    // Alias overlap
+    if (getPortNames(inp).some((n) => sourceNames.has(n))) return inp
+
+    // Track first type-compatible and first 'any' as fallbacks
+    if (!typeMatch && isPortCompatible(sourcePort.dataType, inp.dataType)) {
+      typeMatch = inp
+    }
+    if (!anyMatch && inp.dataType === 'any') {
+      anyMatch = inp
+    }
+  }
+
+  return typeMatch ?? anyMatch
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

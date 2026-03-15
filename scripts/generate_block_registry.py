@@ -124,15 +124,18 @@ def _convert_ports(ports: list[dict] | None) -> list[dict]:
     """Convert block.yaml port definitions to TypeScript PortDefinition format."""
     if not ports:
         return []
-    return [
-        {
+    result = []
+    for p in ports:
+        port: dict = {
             "id": p.get("id", ""),
             "label": p.get("label", p.get("id", "")),
             "dataType": p.get("data_type", "any"),
             "required": p.get("required", False),
         }
-        for p in ports
-    ]
+        if p.get("aliases"):
+            port["aliases"] = p["aliases"]
+        result.append(port)
+    return result
 
 
 def _extract_defaults(config_schema: dict | None) -> dict:
@@ -239,6 +242,9 @@ def _format_port(port: dict) -> str:
         f"dataType: '{_esc(port['dataType'])}'",
         f"required: {'true' if port['required'] else 'false'}",
     ]
+    if port.get("aliases"):
+        aliases_str = ", ".join(f"'{_esc(a)}'" for a in port["aliases"])
+        parts.append(f"aliases: [{aliases_str}]")
     return "{ " + ", ".join(parts) + " }"
 
 

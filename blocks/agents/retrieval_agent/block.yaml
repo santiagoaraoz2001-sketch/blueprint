@@ -27,6 +27,7 @@ outputs:
   - id: response
     label: Response Text
     data_type: text
+    aliases: [text, output]
   - id: dataset
     label: Responses
     data_type: dataset

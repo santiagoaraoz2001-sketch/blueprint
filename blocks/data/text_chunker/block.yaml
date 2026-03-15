@@ -28,6 +28,7 @@ outputs:
     data_type: metrics
     description: "Object with total_documents, total_chunks, avg_chunk_size, min_chunk_size, max_chunk_size"
 
+    aliases: [metrics]
 config:
   chunk_size:
     type: integer

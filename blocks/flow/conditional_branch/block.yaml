@@ -25,6 +25,7 @@ outputs:
     label: Result
     data_type: metrics
 
+    aliases: [metrics]
 config:
   field:
     type: string

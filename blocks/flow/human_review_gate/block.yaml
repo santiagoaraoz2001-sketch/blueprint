@@ -24,6 +24,7 @@ outputs:
     data_type: metrics
     description: "JSON: {review_id, approved, reviewer_comment, urgency, created_at, decided_at, data_summary}"
 
+    aliases: [metrics]
 config:
   review_prompt:
     type: text_area

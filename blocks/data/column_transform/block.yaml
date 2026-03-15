@@ -20,6 +20,7 @@ outputs:
     data_type: metrics
     description: "Object with rows, columns_before, columns_after, operation, original_columns, result_columns"
 
+    aliases: [metrics]
 config:
   operation:
     type: select

@@ -36,6 +36,7 @@ outputs:
     data_type: metrics
     description: "Object with rows_a, rows_b, rows_c, merged_rows, method"
 
+    aliases: [metrics]
 config:
   method:
     type: select

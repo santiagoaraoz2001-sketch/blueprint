@@ -24,6 +24,7 @@ outputs:
     data_type: metrics
     description: "JSON: {split_ratio, split_method, random_seed, label_a, label_b, count_a, count_b, total_items}"
 
+    aliases: [metrics]
 config:
   split_ratio:
     type: float

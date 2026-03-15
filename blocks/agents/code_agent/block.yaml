@@ -23,6 +23,7 @@ outputs:
   - id: text
     label: Generated Code
     data_type: text
+    aliases: [response, output]
   - id: artifact
     label: Code File
     data_type: artifact

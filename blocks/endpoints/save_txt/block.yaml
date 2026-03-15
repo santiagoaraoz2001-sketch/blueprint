@@ -20,6 +20,7 @@ outputs:
     data_type: metrics
     description: "Object with keys: characters (int), file_size_bytes (int), append_mode (bool)"
 
+    aliases: [metrics]
 config:
   output_path:
     type: string

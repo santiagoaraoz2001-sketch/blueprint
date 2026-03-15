@@ -16,6 +16,7 @@ outputs:
   - id: text
     label: Extracted Text
     data_type: text
+    aliases: [response, output]
   - id: metrics
     label: Metrics
     data_type: metrics

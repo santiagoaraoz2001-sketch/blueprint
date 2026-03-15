@@ -19,6 +19,7 @@ outputs:
   - id: response
     label: Final Answer
     data_type: text
+    aliases: [text, output]
   - id: dataset
     label: Reasoning Chain
     data_type: dataset
