@@ -5,10 +5,13 @@ Provides:
 - prepare_dataset(): Convert Blueprint dataset format to framework-specific format
 - call_training(): Unified entry point for all training operations
 - TrainingConfig: Standardized training configuration
+- prepare_mlx_data(): Convenience wrapper for MLX data preparation
 """
 
 import json
 import os
+import re
+import subprocess
 import time
 from dataclasses import dataclass, field
 from typing import Optional, Callable
@@ -41,6 +44,7 @@ class TrainingConfig:
     training_type: str = "lora"  # lora, qlora, full, dora
 
     # Dataset
+    data_path: str = ""
     text_column: str = "text"
     training_format: str = ""  # Prompt template
     eval_split: float = 0.0
@@ -241,6 +245,26 @@ def prepare_dataset(
         }
 
 
+def prepare_mlx_data(
+    blueprint_data_path: str,
+    output_dir: str,
+    text_column: str = "text",
+    training_format: str = "",
+    eval_split: float = 0.1,
+) -> str:
+    """Convenience wrapper: convert Blueprint dataset to MLX training directory.
+
+    Returns path to the directory containing train.jsonl and valid.jsonl.
+    """
+    result = prepare_dataset(
+        blueprint_data_path, output_dir, "mlx",
+        text_column=text_column,
+        training_format=training_format,
+        eval_split=eval_split,
+    )
+    return result["train_path"]
+
+
 # ── Training Dispatcher ────────────────────────────────────────────────
 
 def call_training(config: TrainingConfig) -> dict:
@@ -314,28 +338,245 @@ def _run_simulation(config: TrainingConfig) -> dict:
     }
 
 
+# ── Iteration Estimation ──────────────────────────────────────────────
+
+def _estimate_iters(config: TrainingConfig) -> int:
+    """Estimate total training iterations from epochs and dataset size.
+
+    MLX-LM uses iterations, not epochs. We need to estimate:
+    iters = epochs * (num_samples / batch_size)
+
+    Since we may not know num_samples at this point, use a reasonable default.
+    """
+    # Default: 1000 iterations if we can't estimate
+    default_samples = 1000
+    return max(100, config.epochs * (default_samples // config.batch_size))
+
+
+# ── MLX Training Backend ──────────────────────────────────────────────
+
+def _run_mlx_training(config: TrainingConfig) -> dict:
+    """Run LoRA/QLoRA/full training via MLX-LM.
+
+    Uses mlx_lm.lora module for training. Supports:
+    - LoRA: Standard low-rank adaptation
+    - QLoRA: LoRA on quantized models (4-bit)
+    - DoRA: Decomposed weight LoRA
+    - Full: Full parameter fine-tuning
+
+    MLX-LM is invoked as a subprocess to avoid import conflicts
+    and to capture its stdout/stderr for real-time progress logging.
+    """
+    try:
+        import mlx  # noqa: F401
+    except ImportError:
+        raise RuntimeError("MLX not installed. Run: pip install mlx mlx-lm")
+
+    if config.log_fn:
+        config.log_fn(
+            f"MLX Training: {config.training_type} on {config.model_name}"
+        )
+
+    # Prepare dataset in MLX format (train.jsonl, valid.jsonl)
+    data_dir = os.path.join(config.output_dir, "mlx_data")
+    prepare_dataset(
+        config.data_path or config.model_name,
+        data_dir,
+        "mlx",
+        text_column=config.text_column,
+        training_format=config.training_format,
+        eval_split=config.eval_split,
+    )
+
+    adapter_path = os.path.join(config.output_dir, "adapters")
+    os.makedirs(adapter_path, exist_ok=True)
+
+    total_iters = _estimate_iters(config)
+
+    # Build mlx_lm.lora CLI command
+    cmd = [
+        "python", "-m", "mlx_lm.lora",
+        "--model", config.model_name,
+        "--train",
+        "--data", data_dir,
+        "--adapter-path", adapter_path,
+        "--batch-size", str(config.batch_size),
+        "--learning-rate", str(config.learning_rate),
+        "--iters", str(total_iters),
+    ]
+
+    # LoRA-specific arguments
+    if config.training_type in ("lora", "qlora", "dora"):
+        cmd.extend([
+            "--lora-layers", str(len(config.target_modules) or 16),
+        ])
+        # mlx_lm uses --lora-layers (number of layers), not target_modules
+        # The r parameter maps to default LoRA rank in mlx_lm
+
+        if config.training_type == "dora":
+            cmd.extend(["--fine-tune-type", "dora"])
+    elif config.training_type == "full":
+        cmd.extend(["--fine-tune-type", "full"])
+    # Default is "lora" — qlora is automatic when model is quantized
+
+    # Max sequence length
+    if config.max_seq_length:
+        cmd.extend(["--max-seq-length", str(config.max_seq_length)])
+
+    # Checkpoint saving
+    save_every = config.checkpoint_interval or max(
+        100, total_iters // 10
+    )
+    cmd.extend(["--save-every", str(save_every)])
+
+    if config.log_fn:
+        config.log_fn(f"Command: {' '.join(cmd)}")
+
+    # Run training as subprocess for real-time output capture
+    start_time = time.time()
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,  # Line buffered
+    )
+
+    # Parse MLX-LM training output for progress and metrics
+    metrics = {}
+    last_loss = 0.0
+    last_iter = 0
+
+    for line in iter(process.stdout.readline, ''):
+        line = line.strip()
+        if not line:
+            continue
+
+        if config.log_fn:
+            config.log_fn(line)
+
+        # Parse MLX-LM output format:
+        # "Iter 10: Train loss 5.889, Learning Rate 1.000e-05, ..."
+        # "Iter 1: Val loss 5.617, Val took 10.292s"
+        iter_match = re.search(r'Iter\s+(\d+):', line)
+        if iter_match:
+            last_iter = int(iter_match.group(1))
+            if config.progress_fn:
+                config.progress_fn(last_iter, total_iters)
+
+        loss_match = re.search(r'Train loss\s+([\d.]+)', line)
+        if loss_match:
+            last_loss = float(loss_match.group(1))
+            metrics["train/loss"] = last_loss
+            if config.metric_fn:
+                config.metric_fn("train/loss", last_loss, last_iter)
+
+        val_loss_match = re.search(r'Val loss\s+([\d.]+)', line)
+        if val_loss_match:
+            val_loss = float(val_loss_match.group(1))
+            metrics["eval/loss"] = val_loss
+            if config.metric_fn:
+                config.metric_fn("eval/loss", val_loss, last_iter)
+
+        lr_match = re.search(r'Learning Rate\s+([\d.e+-]+)', line)
+        if lr_match:
+            lr = float(lr_match.group(1))
+            if config.metric_fn:
+                config.metric_fn("learning_rate", lr, last_iter)
+
+        tps_match = re.search(r'Tokens/sec\s+([\d.]+)', line)
+        if tps_match:
+            tps = float(tps_match.group(1))
+            metrics["tokens_per_second"] = tps
+            if config.metric_fn:
+                config.metric_fn("tokens_per_second", tps, last_iter)
+
+        peak_mem_match = re.search(r'Peak mem\s+([\d.]+)\s*GB', line)
+        if peak_mem_match:
+            peak_mem = float(peak_mem_match.group(1))
+            metrics["peak_memory_gb"] = peak_mem
+
+    process.wait(timeout=7200)
+    elapsed = time.time() - start_time
+
+    if process.returncode != 0:
+        raise RuntimeError(
+            f"MLX training failed with exit code {process.returncode}"
+        )
+
+    # Fuse adapters if requested
+    fused_path = config.output_dir
+    if config.save_merged and config.training_type in (
+        "lora", "qlora", "dora"
+    ):
+        if config.log_fn:
+            config.log_fn("Fusing LoRA adapters into base model...")
+
+        fused_path = os.path.join(config.output_dir, "fused_model")
+        fuse_cmd = [
+            "python", "-m", "mlx_lm.fuse",
+            "--model", config.model_name,
+            "--adapter-path", adapter_path,
+            "--save-path", fused_path,
+        ]
+        fuse_result = subprocess.run(
+            fuse_cmd, capture_output=True, text=True, timeout=600
+        )
+        if fuse_result.returncode != 0:
+            if config.log_fn:
+                config.log_fn(f"Fuse failed: {fuse_result.stderr}")
+            fused_path = adapter_path  # Fallback to adapters
+        else:
+            if config.log_fn:
+                config.log_fn(f"Fused model saved to {fused_path}")
+
+    metrics.update({
+        "framework": "mlx",
+        "training_type": config.training_type,
+        "total_iters": last_iter,
+        "final_loss": last_loss,
+        "elapsed_seconds": round(elapsed, 1),
+    })
+
+    return {
+        "model_path": fused_path if config.save_merged else adapter_path,
+        "adapter_path": adapter_path,
+        "metrics": metrics,
+        "framework": "mlx",
+    }
+
+
+# ── PyTorch Training Backend ─────────────────────────────────────────
+
 def _run_pytorch_training(config: TrainingConfig) -> dict:
     """Run training with PyTorch/Transformers/PEFT.
 
-    This is a DISPATCHER that the individual training blocks will call.
-    The actual PyTorch training logic remains in each block's run.py
-    (since each training type — LoRA, DPO, RLHF — has unique logic).
+    This is the EXISTING PyTorch training logic, extracted into a common
+    interface. Individual training blocks will be migrated to use this in
+    FW-7/FW-8.
 
-    For FW-5, this function establishes the interface. The full implementation
-    is completed in FW-7 when training blocks are migrated.
+    For now, this raises NotImplementedError to signal blocks should use
+    their existing implementation until migration is complete.
     """
+    try:
+        import torch  # noqa: F401
+        from transformers import AutoModelForCausalLM, AutoTokenizer  # noqa: F401, E501
+    except ImportError:
+        raise RuntimeError(
+            "PyTorch/Transformers not installed. "
+            "Run: pip install torch transformers"
+        )
+
+    if config.training_type in ("lora", "qlora"):
+        try:
+            from peft import LoraConfig, get_peft_model  # noqa: F401
+        except ImportError:
+            raise RuntimeError(
+                "PEFT not installed for LoRA training. Run: pip install peft"
+            )
+
+    # Signal that migration is not yet complete for this block
     raise NotImplementedError(
-        "PyTorch training dispatch not yet migrated. "
-        "Use the block's existing PyTorch implementation."
-    )
-
-
-def _run_mlx_training(config: TrainingConfig) -> dict:
-    """Run training with MLX-LM.
-
-    Placeholder — full implementation in FW-6.
-    """
-    raise NotImplementedError(
-        "MLX training backend not yet implemented. "
-        "Will be added in FW-6."
+        "PyTorch training dispatch not yet migrated for this training type. "
+        "The block will use its existing PyTorch implementation as fallback."
     )
