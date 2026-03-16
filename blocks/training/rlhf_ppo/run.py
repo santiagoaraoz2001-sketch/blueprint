@@ -26,6 +26,12 @@ except ImportError:
     class BlockExecutionError(RuntimeError):
         def __init__(self, message, **kw): super().__init__(message)
 
+try:
+    from blocks.training._validation import _validate_model_for_training
+except ImportError:
+    def _validate_model_for_training(model_name, model_info, ctx, field_name="model_name"):
+        return model_name
+
 
 def run(ctx):
     dataset_path = ctx.resolve_as_file_path("dataset")
@@ -41,6 +47,7 @@ def run(ctx):
     temperature = float(ctx.config.get("temperature", 0.7))
 
     # Try to get model from input port
+    model_info = {}
     try:
         model_info = ctx.load_input("model")
         if isinstance(model_info, dict):
@@ -51,6 +58,7 @@ def run(ctx):
         pass
 
     # Try to get reward model from input port
+    rm_info = {}
     try:
         rm_info = ctx.load_input("reward_model")
         if isinstance(rm_info, dict):
@@ -62,6 +70,13 @@ def run(ctx):
 
     if not model_name:
         raise BlockConfigError("model_name", "Model name is required")
+
+    # ── Validate models for training ──
+    model_name = _validate_model_for_training(model_name, model_info, ctx)
+    if reward_model_name:
+        reward_model_name = _validate_model_for_training(
+            reward_model_name, rm_info, ctx, field_name="reward_model"
+        )
 
     ctx.log_message(f"RLHF (PPO) Training: {model_name}")
     ctx.log_message(f"LR={lr}, KL coeff={kl_coeff}, Clip range={clip_range}")

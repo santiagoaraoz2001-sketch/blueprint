@@ -29,12 +29,19 @@ except ImportError:
     class BlockExecutionError(RuntimeError):
         def __init__(self, message, **kw): super().__init__(message)
 
+try:
+    from blocks.training._validation import _validate_model_for_training
+except ImportError:
+    def _validate_model_for_training(model_name, model_info, ctx, field_name="model_name"):
+        return model_name
+
 
 def run(ctx):
     dataset_path = ctx.resolve_as_file_path("dataset")
 
     # model input is optional
     model_name = "base_model"
+    model_info = {}
     try:
         model_info = ctx.load_input("model")
         if isinstance(model_info, dict):
@@ -43,6 +50,9 @@ def run(ctx):
             model_name = model_info
     except (ValueError, Exception):
         pass
+
+    # ── Validate model for training ──
+    model_name = _validate_model_for_training(model_name, model_info, ctx)
 
     search_type = ctx.config.get("search_type", "grid")
     param_space_str = ctx.config.get("param_space", "{}")
