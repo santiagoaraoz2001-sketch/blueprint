@@ -27,12 +27,18 @@ outputs:
   - id: response
     label: Response Text
     data_type: text
+    aliases: [text, output]
   - id: dataset
     label: Responses
     data_type: dataset
   - id: metrics
     label: RAG Metrics
     data_type: metrics
+  - id: llm_config
+    label: LLM Config
+    data_type: llm
+    aliases: [llm]
+    description: "Passthrough of the LLM configuration — enables agent chaining and downstream inference"
 
 config:
   top_k:

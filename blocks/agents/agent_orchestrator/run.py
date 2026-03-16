@@ -248,6 +248,17 @@ def run(ctx):
         if isinstance(v, (int, float)):
             ctx.log_metric(k, v)
 
+    # ── Passthrough LLM config for agent chaining ──
+    if llm_config:
+        ctx.save_output("llm_config", llm_config)
+    else:
+        ctx.save_output("llm_config", {
+            "framework": framework or "demo",
+            "model": model_name or "demo",
+            "config": inf_config or {},
+            "demo_mode": not use_real,
+        })
+
     ctx.log_message(f"Agent complete: {len(steps)} steps, {total_tokens} tokens")
     ctx.report_progress(1, 1)
 

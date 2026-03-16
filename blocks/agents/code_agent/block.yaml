@@ -23,6 +23,7 @@ outputs:
   - id: text
     label: Generated Code
     data_type: text
+    aliases: [response, output]
   - id: artifact
     label: Code File
     data_type: artifact
@@ -32,6 +33,11 @@ outputs:
   - id: metrics
     label: Code Metrics
     data_type: metrics
+  - id: llm_config
+    label: LLM Config
+    data_type: llm
+    aliases: [llm]
+    description: "Passthrough of the LLM configuration — enables agent chaining and downstream inference"
 
 config:
   task:

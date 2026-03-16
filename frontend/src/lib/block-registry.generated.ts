@@ -164,6 +164,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'response', label: 'Final Response', dataType: 'text', required: false },
       { id: 'dataset', label: 'Step Log', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Run Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false },
     ],
     defaultConfig: {
       task: '',
@@ -318,6 +319,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'response', label: 'Final Answer', dataType: 'text', required: false },
       { id: 'dataset', label: 'Reasoning Chain', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Reasoning Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false },
     ],
     defaultConfig: {
       input_text: '',
@@ -402,6 +404,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'artifact', label: 'Code File', dataType: 'artifact', required: false },
       { id: 'dataset', label: 'Full Results', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Code Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false },
     ],
     defaultConfig: {
       task: '',
@@ -486,6 +489,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'consensus', label: 'Consensus', dataType: 'text', required: false },
+      { id: 'dataset', label: 'Debate Log', dataType: 'dataset', required: false },
+      { id: 'metrics', label: 'Debate Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false },
     ],
     defaultConfig: { topic: '', model_name: '', rounds: 3 },
     configFields: [
@@ -524,6 +530,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'response', label: 'Debate Summary', dataType: 'text', required: false },
       { id: 'dataset', label: 'Debate Log', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Consensus Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false },
     ],
     defaultConfig: {
       topic: '',
@@ -608,6 +615,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'response', label: 'Response Text', dataType: 'text', required: false },
       { id: 'dataset', label: 'Responses', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'RAG Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false },
     ],
     defaultConfig: {
       top_k: 5,
