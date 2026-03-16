@@ -6,6 +6,7 @@ and executes them sequentially, passing outputs between blocks.
 """
 
 import json
+import random
 import re
 import sys
 import traceback
@@ -14,6 +15,7 @@ import time
 import asyncio
 import threading
 import importlib.util
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -55,6 +57,7 @@ from ..block_sdk.exceptions import BlockError, BlockInputError, BlockConfigError
 from .composite import CompositeBlockContext, execute_sub_pipeline
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
+from .block_registry import resolve_output_handle
 from .schema_validator import load_block_schema, validate_inputs, validate_config
 from ..utils.structured_logger import (
     log_run_start, log_run_complete, log_run_failed,
@@ -110,6 +113,200 @@ def _topological_sort(nodes: list[dict], edges: list[dict]) -> list[str]:
     return order
 
 
+# Maximum loop iterations to prevent infinite loops from misconfiguration
+MAX_LOOP_ITERATIONS = 10_000
+
+
+@dataclass
+class LoopDefinition:
+    """Describes a valid loop subgraph in the pipeline."""
+    controller_id: str
+    body_node_ids: list[str] = field(default_factory=list)
+    feedback_edges: list[dict] = field(default_factory=list)
+    entry_edges: list[dict] = field(default_factory=list)
+
+
+def _detect_loops(
+    nodes: list[dict], edges: list[dict]
+) -> list[LoopDefinition]:
+    """Identify valid loop subgraphs in the pipeline.
+
+    Uses Kahn's algorithm to find cyclic nodes, then Kosaraju's algorithm
+    to find strongly connected components (SCCs).  Each SCC must contain
+    exactly one loop_controller node.
+
+    This approach is fully iterative (no recursion-limit risk), correctly
+    handles multiple paths through the same controller, and naturally
+    unions all body nodes from overlapping cycles.
+
+    Returns a list of LoopDefinition.
+    Raises ValueError if a cycle has zero or 2+ loop_controller nodes.
+    """
+    node_map = {n["id"]: n for n in nodes}
+    if not node_map:
+        return []
+
+    adjacency: dict[str, list[str]] = {nid: [] for nid in node_map}
+    reverse_adj: dict[str, list[str]] = {nid: [] for nid in node_map}
+    in_degree: dict[str, int] = {nid: 0 for nid in node_map}
+
+    for edge in edges:
+        src = edge.get("source", "")
+        tgt = edge.get("target", "")
+        if src in adjacency and tgt in adjacency:
+            adjacency[src].append(tgt)
+            reverse_adj[tgt].append(src)
+            in_degree[tgt] += 1
+
+    # ── Step 1: Kahn's algorithm to find nodes involved in cycles ──
+    kahn_deg = dict(in_degree)
+    queue = [nid for nid, d in kahn_deg.items() if d == 0]
+    acyclic: set[str] = set()
+    while queue:
+        n = queue.pop(0)
+        acyclic.add(n)
+        for nb in adjacency.get(n, []):
+            kahn_deg[nb] -= 1
+            if kahn_deg[nb] == 0:
+                queue.append(nb)
+
+    cyclic_nodes = set(node_map.keys()) - acyclic
+    if not cyclic_nodes:
+        return []
+
+    # ── Step 2: Kosaraju's SCC (iterative) among cyclic nodes ──
+    # Phase A: DFS on forward graph → finish order
+    visited: set[str] = set()
+    finish_order: list[str] = []
+    for start in sorted(cyclic_nodes):
+        if start in visited:
+            continue
+        stack: list[tuple[str, bool]] = [(start, False)]
+        while stack:
+            node, processed = stack.pop()
+            if processed:
+                finish_order.append(node)
+                continue
+            if node in visited:
+                continue
+            visited.add(node)
+            stack.append((node, True))
+            for nb in adjacency.get(node, []):
+                if nb in cyclic_nodes and nb not in visited:
+                    stack.append((nb, False))
+
+    # Phase B: DFS on reverse graph in reverse finish order → SCCs
+    visited = set()
+    sccs: list[list[str]] = []
+    for node in reversed(finish_order):
+        if node in visited:
+            continue
+        component: list[str] = []
+        stack_b: list[str] = [node]
+        while stack_b:
+            n = stack_b.pop()
+            if n in visited:
+                continue
+            visited.add(n)
+            component.append(n)
+            for nb in reverse_adj.get(n, []):
+                if nb in cyclic_nodes and nb not in visited:
+                    stack_b.append(nb)
+        sccs.append(component)
+
+    # ── Step 3: Validate each SCC and build LoopDefinitions ──
+    def _is_loop_controller(nid: str) -> bool:
+        n = node_map.get(nid, {})
+        return n.get("data", {}).get("type", "") == "loop_controller"
+
+    loops: list[LoopDefinition] = []
+    for scc in sccs:
+        controllers = [n for n in scc if _is_loop_controller(n)]
+        if len(controllers) != 1:
+            raise ValueError(
+                "Pipeline contains a cycle that doesn't pass through "
+                "a Loop Controller block."
+            )
+
+        controller_id = controllers[0]
+        body_nodes_set = set(scc) - {controller_id}
+
+        # Topo-sort body nodes (edges within body only, no feedback edges)
+        body_adj: dict[str, list[str]] = {n: [] for n in body_nodes_set}
+        body_in_deg: dict[str, int] = {n: 0 for n in body_nodes_set}
+        for edge in edges:
+            src = edge.get("source", "")
+            tgt = edge.get("target", "")
+            if src in body_nodes_set and tgt in body_nodes_set:
+                body_adj[src].append(tgt)
+                body_in_deg[tgt] += 1
+
+        queue = sorted(n for n, d in body_in_deg.items() if d == 0)
+        body_order: list[str] = []
+        while queue:
+            n = queue.pop(0)
+            body_order.append(n)
+            for nb in body_adj.get(n, []):
+                body_in_deg[nb] -= 1
+                if body_in_deg[nb] == 0:
+                    queue.append(nb)
+        # Safety: append any unreached nodes (possible in complex topologies)
+        for n in sorted(body_nodes_set):
+            if n not in body_order:
+                body_order.append(n)
+
+        # Collect ALL entry edges (controller → body) and feedback edges (body → controller)
+        entry_edges = [
+            e for e in edges
+            if e.get("source") == controller_id and e.get("target") in body_nodes_set
+        ]
+        feedback_edges = [
+            e for e in edges
+            if e.get("target") == controller_id and e.get("source") in body_nodes_set
+        ]
+
+        loops.append(LoopDefinition(
+            controller_id=controller_id,
+            body_node_ids=body_order,
+            feedback_edges=feedback_edges,
+            entry_edges=entry_edges,
+        ))
+
+    return loops
+
+
+def _topological_sort_with_loops(
+    nodes: list[dict], edges: list[dict], loops: list[LoopDefinition]
+) -> list[str]:
+    """Sort pipeline with loop awareness.
+
+    1. Remove ALL feedback edges (body → controller) to break cycles
+    2. Topological sort the resulting DAG
+    3. Return execution order (loop bodies handled separately by _execute_loop)
+    """
+    if not loops:
+        return _topological_sort(nodes, edges)
+
+    # Collect ALL feedback edges to exclude (there may be multiple per loop
+    # when the loop body has branches that converge back to the controller)
+    feedback_edge_keys: set[tuple[str, str, str, str]] = set()
+    for loop_def in loops:
+        for fe in loop_def.feedback_edges:
+            feedback_edge_keys.add(
+                (fe.get("source", ""), fe.get("target", ""),
+                 fe.get("sourceHandle", ""), fe.get("targetHandle", ""))
+            )
+
+    non_feedback_edges = [
+        e for e in edges
+        if (e.get("source", ""), e.get("target", ""),
+            e.get("sourceHandle", ""), e.get("targetHandle", ""))
+        not in feedback_edge_keys
+    ]
+
+    return _topological_sort(nodes, non_feedback_edges)
+
+
 def _find_block_module(block_type: str) -> Path | None:
     """Find the run.py for a given block type."""
     # Resolve aliases (e.g. model_prompt → llm_inference)
@@ -154,6 +351,7 @@ def _load_and_run_block(
     metric_cb=None,
     context_cls=None,
     _composite_depth: int = 0,
+    loop_metadata: dict | None = None,
 ) -> tuple[dict[str, Any], dict[str, dict]]:
     """Load a block's run.py and execute it. Returns (outputs, data_fingerprints).
 
@@ -162,6 +360,7 @@ def _load_and_run_block(
             Defaults to BlockContext.
         _composite_depth: Current composite nesting depth (for recursion guard).
             Managed by execute_sub_pipeline; callers should not set this directly.
+        loop_metadata: Optional dict of loop iteration info (set by _execute_loop).
     """
     run_py = block_dir / "run.py"
     spec = importlib.util.spec_from_file_location(f"block_{node_id}", str(run_py))
@@ -182,6 +381,7 @@ def _load_and_run_block(
         progress_callback=progress_cb,
         message_callback=message_cb,
         metric_callback=metric_cb,
+        loop_metadata=loop_metadata,
     )
 
     module.run(ctx)
@@ -224,6 +424,7 @@ def _load_and_run_block_with_timeout(
     metric_cb=None,
     timeout_seconds=None,
     context_cls=None,
+    loop_metadata: dict | None = None,
 ) -> tuple[dict[str, Any], dict[str, dict]]:
     """Wrapper that enforces a timeout on block execution.
 
@@ -231,6 +432,7 @@ def _load_and_run_block_with_timeout(
         timeout_seconds: Maximum execution time. None means no timeout.
             Caller should read this from the block schema to avoid redundant I/O.
         context_cls: Optional BlockContext subclass (e.g. CompositeBlockContext).
+        loop_metadata: Optional dict of loop iteration info.
 
     Returns:
         (outputs, data_fingerprints) tuple from _load_and_run_block.
@@ -242,6 +444,7 @@ def _load_and_run_block_with_timeout(
             run_id, node_id, progress_cb, message_cb, metric_cb,
             context_cls=context_cls,
             _composite_depth=0,
+            loop_metadata=loop_metadata,
         )
 
     result: list[tuple[dict, dict]] = []
@@ -255,6 +458,7 @@ def _load_and_run_block_with_timeout(
                     run_id, node_id, progress_cb, message_cb, metric_cb,
                     context_cls=context_cls,
                     _composite_depth=0,
+                    loop_metadata=loop_metadata,
                 )
             )
         except Exception as e:
@@ -369,6 +573,420 @@ def _start_heartbeat(run_id: str, interval: float = 30.0):
     return stop_event
 
 
+def _safe_int(value: Any, default: int) -> int:
+    """Safely coerce a config value to int."""
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
+    return default
+
+
+def _safe_float(value: Any, default: float) -> float:
+    """Safely coerce a config value to float."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return default
+    return default
+
+
+def _safe_bool(value: Any, default: bool) -> bool:
+    """Safely coerce a config value to bool."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() in ("true", "1", "yes")
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return default
+
+
+@dataclass
+class _BodyBlockInfo:
+    """Pre-computed per-body-block metadata (computed once, reused each iteration)."""
+    node_id: str
+    block_type: str
+    category: str
+    block_dir: Path
+    schema: dict | None
+    config: dict
+    timeout_seconds: int | None
+    is_composite: bool
+    context_cls: type | None
+    run_dir: str
+    # Edges targeting this body node (pre-filtered for faster input gathering)
+    incoming_edges: list[dict] = field(default_factory=list)
+
+
+async def _execute_loop(
+    loop: LoopDefinition,
+    node_map: dict[str, dict],
+    edges: list[dict],
+    outputs: dict[str, dict[str, Any]],
+    all_metrics: dict[str, Any],
+    all_fingerprints: dict[str, dict],
+    run_id: str,
+    resolved_configs: dict,
+    metrics_file,
+    metrics_log_buffer: list[dict],
+    start_time: float,
+    db: Session,
+    live: LiveRun,
+):
+    """Execute a loop body repeatedly.
+
+    1. Read seed input and config from the loop_controller node
+    2. Pre-compute per-body-block metadata (block_dir, schema, config, etc.)
+    3. For each iteration:
+       a. Build loop_metadata dict
+       b. Execute body blocks with proper SSE events (started/output/completed)
+       c. Collect output from last body block
+       d. Feed back to controller (via feedback port)
+       e. Check stop condition
+       f. Emit node_iteration SSE event
+    4. After all iterations, controller emits final accumulated output
+    """
+    controller_node = node_map[loop.controller_id]
+    controller_data = controller_node.get("data", {})
+    controller_config = resolved_configs.get(
+        loop.controller_id,
+        controller_data.get("config", {}),
+    )
+    controller_config = {k: v for k, v in controller_config.items() if k != "_inherited"}
+
+    # Parse controller config with safe type coercion
+    iterations = min(
+        _safe_int(controller_config.get("iterations", 10), 10),
+        MAX_LOOP_ITERATIONS,
+    )
+    stop_metric = str(controller_config.get("stop_metric", "") or "")
+    stop_threshold = _safe_float(controller_config.get("stop_threshold", 0), 0.0)
+    stop_direction = str(controller_config.get("stop_direction", "above") or "above")
+    context_management = str(controller_config.get("context_management", "clear") or "clear")
+    file_mode = str(controller_config.get("file_mode", "append") or "append")
+    seed_mode = str(controller_config.get("seed_mode", "increment") or "increment")
+    base_seed = _safe_int(controller_config.get("base_seed", 42), 42)
+    accumulate_results = _safe_bool(controller_config.get("accumulate_results", True), True)
+    prompt_variation = str(controller_config.get("prompt_variation", "") or "")
+    iteration_delay_ms = _safe_int(controller_config.get("iteration_delay_ms", 0), 0)
+
+    # ── Pre-compute per-body-block metadata (done once, reused every iteration) ──
+    body_block_infos: list[_BodyBlockInfo] = []
+    for body_node_id in loop.body_node_ids:
+        body_node = node_map.get(body_node_id)
+        if not body_node:
+            continue
+
+        body_data = body_node.get("data", {})
+        body_type = body_data.get("type", "")
+        body_config = resolved_configs.get(
+            body_node_id, body_data.get("config", {}),
+        )
+        body_config = {k: v for k, v in body_config.items() if k != "_inherited"}
+        body_config = _resolve_secrets(body_config)
+
+        category = body_data.get("category", "flow")
+
+        block_dir = _find_block_module(body_type)
+        if block_dir is None:
+            base_type = body_config.get("baseType", "")
+            if base_type and SAFE_BLOCK_TYPE.match(base_type):
+                base_type = BLOCK_ALIASES.get(base_type, base_type)
+                block_dir = _find_block_module(base_type)
+
+        if block_dir is None:
+            raise RuntimeError(
+                f"Block type '{body_type}' not found in loop body"
+            )
+
+        block_schema = load_block_schema(block_dir)
+        timeout_seconds = block_schema.get("timeout") if block_schema else None
+        is_composite = block_schema.get("composite", False) if block_schema else False
+
+        # Validate config once (static across iterations)
+        if block_schema:
+            body_config = validate_config(block_schema, body_config)
+
+        context_cls = CompositeBlockContext if is_composite else None
+        run_dir = str(ARTIFACTS_DIR / run_id / body_node_id)
+
+        # Pre-filter edges targeting this body node
+        incoming_edges = [e for e in edges if e.get("target") == body_node_id]
+
+        body_block_infos.append(_BodyBlockInfo(
+            node_id=body_node_id,
+            block_type=body_type,
+            category=category,
+            block_dir=block_dir,
+            schema=block_schema,
+            config=body_config,
+            timeout_seconds=timeout_seconds,
+            is_composite=is_composite,
+            context_cls=context_cls,
+            run_dir=run_dir,
+            incoming_edges=incoming_edges,
+        ))
+
+    # ── Iteration loop ──
+    accumulated: list[Any] = []
+    previous_output: Any = None
+    last_iteration = 0
+
+    for i in range(iterations):
+        last_iteration = i
+
+        # Check cancellation
+        if _check_cancelled(run_id):
+            break
+
+        # Compute iteration seed
+        if seed_mode == "fixed":
+            seed = base_seed
+        elif seed_mode == "increment":
+            seed = base_seed + i
+        else:  # random
+            seed = random.randint(0, 2**31)
+
+        # Render prompt variation template
+        variation = ""
+        if prompt_variation:
+            try:
+                variation = prompt_variation.replace("{{iteration}}", str(i))
+                variation = variation.replace("{{total}}", str(iterations))
+                variation = variation.replace("{{seed}}", str(seed))
+                if previous_output:
+                    variation = variation.replace(
+                        "{{previous_output}}", str(previous_output)[:1000]
+                    )
+            except Exception:
+                variation = prompt_variation
+
+        # Build loop metadata
+        loop_metadata = {
+            "iteration": i,
+            "total_iterations": iterations,
+            "file_mode": file_mode,
+            "context_management": context_management,
+            "seed": seed,
+            "previous_output": str(previous_output)[:2000] if previous_output else None,
+            "accumulated_data": list(accumulated) if accumulate_results else None,
+            "prompt_variation": variation or None,
+        }
+
+        # Execute each body block with loop_metadata
+        for info in body_block_infos:
+            if _check_cancelled(run_id):
+                break
+
+            _nid = info.node_id
+            _block_type = info.block_type
+            _category = info.category
+
+            # Emit node_started for body block
+            started_event = {
+                "node_id": _nid,
+                "block_type": _block_type,
+                "category": _category,
+                "iteration": i,
+            }
+            try:
+                publish_event(run_id, "node_started", started_event)
+            except Exception:
+                pass
+            metrics_log_buffer.append({"type": "node_started", "timestamp": time.time(), **started_event})
+            metrics_file.write(json.dumps({"type": "node_started", "timestamp": time.time(), **started_event}) + "\n")
+            metrics_file.flush()
+
+            body_block_start = time.time()
+
+            # Gather inputs from upstream edges (including controller outputs)
+            node_inputs: dict[str, Any] = {}
+            _multi_counts: dict[str, int] = {}
+            for edge in info.incoming_edges:
+                src_id = edge.get("source", "")
+                src_handle = edge.get("sourceHandle", "")
+                tgt_handle = edge.get("targetHandle", "")
+                if src_id in outputs and src_handle in outputs[src_id]:
+                    value = outputs[src_id][src_handle]
+                    _multi_counts[tgt_handle] = _multi_counts.get(tgt_handle, 0) + 1
+                    if tgt_handle in node_inputs:
+                        if not isinstance(node_inputs[tgt_handle], list) or _multi_counts[tgt_handle] == 2:
+                            node_inputs[tgt_handle] = [node_inputs[tgt_handle], value]
+                        else:
+                            node_inputs[tgt_handle].append(value)
+                    else:
+                        node_inputs[tgt_handle] = value
+
+            # Validate inputs each iteration (inputs may change across iterations)
+            if info.schema:
+                validate_inputs(info.schema, node_inputs)
+
+            # Build callbacks with default-arg capture to avoid closure pitfalls
+            def progress_cb(current, total, __nid=_nid):
+                if _check_cancelled(run_id):
+                    raise InterruptedError("Run cancelled by user")
+                try:
+                    publish_event(run_id, "node_progress", {
+                        "node_id": __nid,
+                        "progress": current / total if total > 0 else 0,
+                    })
+                except Exception:
+                    pass
+
+            def message_cb(msg, __nid=_nid):
+                try:
+                    publish_event(run_id, "node_log", {
+                        "node_id": __nid, "message": msg,
+                    })
+                except Exception:
+                    pass
+
+            def metric_cb(name, value, step, __nid=_nid, __type=_block_type, __cat=_category):
+                metric_event_obj = create_metric(
+                    node_id=__nid, name=name, value=value,
+                    category=__cat, step=step,
+                )
+                event_dict = metric_event_obj.to_dict()
+                all_metrics[f"{__type}.{name}"] = value
+                try:
+                    publish_event(run_id, "metric", event_dict)
+                except Exception:
+                    pass
+                metrics_file.write(json.dumps(event_dict) + "\n")
+                metrics_file.flush()
+                metrics_log_buffer.append(event_dict)
+
+            # Execute block with loop_metadata injected into context
+            node_outputs, data_fingerprints = _load_and_run_block_with_timeout(
+                info.block_dir, info.config, node_inputs, info.run_dir,
+                run_id, _nid, progress_cb, message_cb, metric_cb,
+                timeout_seconds=info.timeout_seconds,
+                context_cls=info.context_cls,
+                loop_metadata=loop_metadata,
+            )
+            outputs[_nid] = node_outputs
+            if data_fingerprints:
+                all_fingerprints[_nid] = data_fingerprints
+
+            # Emit node_output for body block
+            safe_outputs = {}
+            for k, v in node_outputs.items():
+                try:
+                    json.dumps(v)
+                    safe_outputs[k] = v if not isinstance(v, str) or len(v) < 200 else v[:200] + '...'
+                except Exception:
+                    safe_outputs[k] = str(v)[:200]
+            try:
+                publish_event(run_id, "node_output", {"node_id": _nid, "outputs": safe_outputs})
+            except Exception:
+                pass
+
+            # Emit node_completed for body block
+            completed_event = {"node_id": _nid, "iteration": i}
+            try:
+                publish_event(run_id, "node_completed", completed_event)
+            except Exception:
+                pass
+            metrics_log_buffer.append({"type": "node_completed", "timestamp": time.time(), **completed_event})
+            metrics_file.write(json.dumps({"type": "node_completed", "timestamp": time.time(), **completed_event}) + "\n")
+            metrics_file.flush()
+
+            log_block_complete(run_id, _nid, _block_type, time.time() - body_block_start)
+
+        # Update LiveRun progress during loop
+        live.block_progress = (i + 1) / iterations
+        _safe_commit(db)
+
+        # Collect output from last body block
+        if body_block_infos:
+            last_body_id = body_block_infos[-1].node_id
+            last_body_output = outputs.get(last_body_id, {})
+            # Use first output value as the feedback value
+            if last_body_output:
+                first_key = next(iter(last_body_output))
+                previous_output = last_body_output[first_key]
+            else:
+                previous_output = None
+            if accumulate_results:
+                accumulated.append(previous_output)
+
+        # Emit SSE event
+        try:
+            publish_event(run_id, "node_iteration", {
+                "node_id": loop.controller_id,
+                "iteration": i,
+                "total": iterations,
+                "body_output_preview": str(previous_output)[:200] if previous_output else "",
+            })
+        except Exception:
+            pass
+
+        # Check stop condition
+        if stop_metric and body_block_infos:
+            last_body_id = body_block_infos[-1].node_id
+            # Look for metric from the last body block
+            metric_value = None
+            for mkey, mval in all_metrics.items():
+                if mkey.endswith(f".{stop_metric}"):
+                    metric_value = mval
+                    break
+            if metric_value is None:
+                # Also check block-level outputs for metrics
+                last_outputs = outputs.get(last_body_id, {})
+                if "metrics" in last_outputs and isinstance(last_outputs["metrics"], dict):
+                    metric_value = last_outputs["metrics"].get(stop_metric)
+
+            if metric_value is not None:
+                try:
+                    metric_value = float(metric_value)
+                except (ValueError, TypeError):
+                    metric_value = None
+
+            if metric_value is not None:
+                if stop_direction == "above" and metric_value > stop_threshold:
+                    try:
+                        publish_event(run_id, "node_log", {
+                            "node_id": loop.controller_id,
+                            "message": f"Early stop: {stop_metric}={metric_value} > {stop_threshold}",
+                        })
+                    except Exception:
+                        pass
+                    break
+                elif stop_direction == "below" and metric_value < stop_threshold:
+                    try:
+                        publish_event(run_id, "node_log", {
+                            "node_id": loop.controller_id,
+                            "message": f"Early stop: {stop_metric}={metric_value} < {stop_threshold}",
+                        })
+                    except Exception:
+                        pass
+                    break
+
+        # Iteration delay
+        if iteration_delay_ms > 0:
+            await asyncio.sleep(iteration_delay_ms / 1000.0)
+
+    # Final output from controller
+    controller_output = accumulated if accumulate_results else previous_output
+    outputs[loop.controller_id] = {
+        "result": controller_output,
+        "metrics": {
+            "iterations_completed": last_iteration + 1,
+            "total_planned": iterations,
+            "early_stopped": last_iteration + 1 < iterations,
+        },
+    }
+
+
 async def execute_pipeline(
     pipeline_id: str,
     run_id: str,
@@ -410,8 +1028,6 @@ async def execute_pipeline(
     # Start continuous heartbeat thread (every 30s, own DB session)
     heartbeat_stop = _start_heartbeat(run_id)
 
-    # Topological sort
-    order = _topological_sort(nodes, edges)
     node_map = {n["id"]: n for n in nodes}
     outputs: dict[str, dict[str, Any]] = {}
     all_metrics: dict[str, Any] = {}
@@ -456,8 +1072,21 @@ async def execute_pipeline(
     start_time = time.time()
 
     try:
-        # Resolve config inheritance across the DAG (inside try so failures
-        # are recorded as run errors instead of leaving the run stuck as "running")
+        # Detect loops and perform loop-aware topological sort
+        # (inside try/finally so heartbeat is always cleaned up on failure)
+        loops = _detect_loops(nodes, edges)
+        order = _topological_sort_with_loops(nodes, edges, loops)
+
+        # Build lookup: which nodes are loop body nodes (skip in main loop)
+        loop_body_node_ids: set[str] = set()
+        loop_controller_ids: set[str] = set()
+        loop_by_controller: dict[str, LoopDefinition] = {}
+        for loop_def in loops:
+            loop_controller_ids.add(loop_def.controller_id)
+            loop_body_node_ids.update(loop_def.body_node_ids)
+            loop_by_controller[loop_def.controller_id] = loop_def
+
+        # Resolve config inheritance across the DAG
         resolved_configs = resolve_configs(
             nodes, edges, order,
             find_block_dir_fn=_find_block_module,
@@ -470,6 +1099,10 @@ async def execute_pipeline(
 
             # Skip visual grouping nodes
             if node.get("type") == "groupNode":
+                continue
+
+            # Skip loop body nodes — they are executed by _execute_loop
+            if node_id in loop_body_node_ids:
                 continue
 
             # Check for cancellation before each block
@@ -527,6 +1160,96 @@ async def execute_pipeline(
             log_block_start(run_id, node_id, block_type, idx, len(nodes))
             block_start_time = time.time()
 
+            # Handle loop_controller nodes: execute the full loop
+            if node_id in loop_controller_ids:
+                loop_def = loop_by_controller[node_id]
+                try:
+                    await _execute_loop(
+                        loop=loop_def,
+                        node_map=node_map,
+                        edges=edges,
+                        outputs=outputs,
+                        all_metrics=all_metrics,
+                        all_fingerprints=all_fingerprints,
+                        run_id=run_id,
+                        resolved_configs=resolved_configs,
+                        metrics_file=metrics_file,
+                        metrics_log_buffer=metrics_log_buffer,
+                        start_time=start_time,
+                        db=db,
+                        live=live,
+                    )
+                except InterruptedError:
+                    run.status = "cancelled"
+                    run.error_message = "Cancelled by user"
+                    run.finished_at = datetime.now(timezone.utc)
+                    run.duration_seconds = time.time() - start_time
+                    run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    run.data_fingerprints = all_fingerprints
+                    live.status = "cancelled"
+                    db.commit()
+                    try:
+                        publish_event(run_id, "run_cancelled", {
+                            "run_id": run_id,
+                            "duration": run.duration_seconds,
+                        })
+                    except Exception:
+                        pass
+                    return
+                except BlockError as e:
+                    log_block_failed(run_id, node_id, block_type, e.message)
+                    error_payload = {
+                        "node_id": node_id,
+                        "error": e.message,
+                        "error_type": type(e).__name__,
+                        "recoverable": e.recoverable,
+                        "details": e.details,
+                    }
+                    try:
+                        publish_event(run_id, "node_failed", error_payload)
+                    except Exception:
+                        pass
+                    run.status = "failed"
+                    run.error_message = f"[{type(e).__name__}] {e.message}"
+                    run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    live.status = "failed"
+                    db.commit()
+                    log_run_failed(run_id, e.message, node_id)
+                    return
+                except Exception as e:
+                    tb = traceback.format_exc()
+                    log_block_failed(run_id, node_id, block_type, str(e), tb)
+                    try:
+                        publish_event(run_id, "node_failed", {"node_id": node_id, "error": str(e)})
+                    except Exception:
+                        pass
+                    run.status = "failed"
+                    run.error_message = f"Loop {block_type} failed: {str(e)}\n\n{tb}"
+                    run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    run.data_fingerprints = all_fingerprints
+                    live.status = "failed"
+                    db.commit()
+                    _write_error_log(run_id, tb)
+                    log_run_failed(run_id, str(e), node_id)
+                    return
+
+                # Loop completed — emit node_completed and continue
+                node_outputs = outputs.get(node_id, {})
+                run.last_heartbeat = datetime.now(timezone.utc)
+                run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                db.commit()
+
+                log_block_complete(run_id, node_id, block_type, time.time() - block_start_time)
+                completed_event = {"node_id": node_id, "index": idx}
+                try:
+                    publish_event(run_id, "node_completed", completed_event)
+                except Exception:
+                    pass
+                metrics_log_buffer.append({"type": "node_completed", "timestamp": time.time(), **completed_event})
+                metrics_file.write(json.dumps({"type": "node_completed", "timestamp": time.time(), **completed_event}) + "\n")
+                metrics_file.flush()
+                continue
+
             # Gather inputs from upstream edges
             # When multiple edges connect to the same target handle, collect values into a list
             node_inputs: dict[str, Any] = {}
@@ -536,6 +1259,12 @@ async def execute_pipeline(
                     src_id = edge.get("source", "")
                     src_handle = edge.get("sourceHandle", "")
                     tgt_handle = edge.get("targetHandle", "")
+                    # Resolve aliased output handle IDs from renamed ports
+                    if src_id in outputs and src_handle not in outputs[src_id]:
+                        src_node = node_map.get(src_id)
+                        if src_node:
+                            src_type = src_node.get("data", {}).get("type", src_node.get("type", ""))
+                            src_handle = resolve_output_handle(src_type, src_handle)
                     if src_id in outputs and src_handle in outputs[src_id]:
                         value = outputs[src_id][src_handle]
                         _multi_counts[tgt_handle] = _multi_counts.get(tgt_handle, 0) + 1

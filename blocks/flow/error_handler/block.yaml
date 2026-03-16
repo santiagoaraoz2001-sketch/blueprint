@@ -20,6 +20,7 @@ outputs:
     data_type: metrics
     description: "JSON on failure: {error, error_type, traceback, attempts}. None on success."
 
+    aliases: [metrics]
 config:
   max_retries:
     type: integer
@@ -70,3 +71,9 @@ config:
     label: Retry Error Pattern
     default: ""
     description: "Regex pattern — only retry if the error message matches (e.g., 'ConnectionError|Timeout'). Empty = retry on all errors."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -509,12 +509,91 @@ def run(ctx):
     # Merge any extra metadata from validation (tags, downloads, etc.)
     standardized.update({k: v for k, v in model_info.items() if k not in standardized})
 
+    # ---- Enriched metadata defaults (stable output schema) ----
+    # Always present so downstream blocks can rely on these keys existing.
+    standardized.setdefault("hf_id", "")
+    standardized.setdefault("mlx_id", "")
+    standardized.setdefault("family", "")
+    standardized.setdefault("parameter_size", "")
+    standardized.setdefault("format", "")
+    standardized.setdefault("capabilities", [])
+
+    # ---- Enrich with resolved metadata from _model_resolver (FW-1) ----
+    user_set_quantization = quantization != "none"
+    try:
+        from blocks.inference._model_resolver import resolve_model
+        resolved = resolve_model(_name, source)
+        resolved_caps = list(resolved.capabilities or [])
+        standardized.update({
+            "hf_id": resolved.hf_id or "",
+            "mlx_id": resolved.mlx_id or "",
+            "family": resolved.family or "",
+            "parameter_size": resolved.parameter_size or "",
+            "format": resolved.format or "",
+            "capabilities": resolved_caps,
+        })
+        # Only override quantization from resolver when the user did NOT
+        # explicitly select one (i.e. they left it at "none").
+        if resolved.quantization and not user_set_quantization:
+            standardized["quantization"] = resolved.quantization
+        if resolved.hf_id and resolved.hf_id != _name:
+            ctx.log_message(f"Resolved HuggingFace ID: {resolved.hf_id}")
+        if resolved.parameter_size:
+            ctx.log_message(f"Model size: {resolved.parameter_size}")
+        if resolved_caps:
+            ctx.log_message(
+                f"Capabilities: {', '.join(str(c) for c in resolved_caps)}"
+            )
+    except ImportError:
+        # _model_resolver not available yet (FW-1) — continue with basic info
+        pass
+    except Exception as exc:
+        # Resolver failed at runtime — log but don't block the pipeline
+        ctx.log_message(
+            f"WARNING: Model resolver failed ({type(exc).__name__}: {exc}). "
+            f"Continuing with basic model info."
+        )
+
+    # ---- Apply HuggingFace ID override ----
+    hf_override = ctx.config.get("hf_override", "").strip()
+    if hf_override:
+        standardized["hf_id"] = hf_override
+        ctx.log_message(f"Using HuggingFace ID override: {hf_override}")
+
+    # ---- Capability warnings ----
+    capabilities = standardized.get("capabilities", [])
+    if capabilities:
+        ctx.log_message(
+            f"Model capabilities: {', '.join(str(c) for c in capabilities)}"
+        )
+    if capabilities and "training" not in capabilities:
+        ctx.log_message(
+            "\u26a0\ufe0f This model may not be directly usable for training. "
+            "Set 'HuggingFace ID Override' in config if needed."
+        )
+
+    # ---- Log enriched metrics ----
+    ctx.log_metric("model_source", source)
+    ctx.log_metric("model_family", standardized.get("family") or "unknown")
+    if standardized.get("parameter_size"):
+        ctx.log_metric("model_size", standardized["parameter_size"])
+
     # Write model info to a file for downstream reference
     model_info_path = os.path.join(ctx.run_dir, "model_info.json")
     with open(model_info_path, "w", encoding="utf-8") as f:
         json.dump(standardized, f, indent=2, default=str, ensure_ascii=False)
 
     ctx.save_output("model", standardized)
+
+    # Also save llm config format for direct agent connection
+    ctx.save_output("llm", {
+        "framework": source,
+        "model": _name,
+        "config": {
+            "endpoint": _default_endpoint(source),
+        },
+    })
+
     ctx.save_artifact("model_info", model_info_path)
     ctx.log_metric("model_validated", 1.0 if standardized.get("validated") else 0.0)
 

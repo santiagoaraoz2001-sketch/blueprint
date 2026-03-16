@@ -194,9 +194,9 @@ def run(ctx):
     # Pass through dataset metadata
     if _dataset_meta:
         _dataset_meta["num_rows"] = len(chunked_data)
-        ctx.save_output("dataset_meta", _dataset_meta)
+        ctx.save_output("output_dataset_meta", _dataset_meta)
 
-    ctx.save_output("dataset", out_path)
+    ctx.save_output("chunked_dataset", out_path)
     ctx.save_output("stats", stats)
     ctx.log_metric("total_documents", len(docs))
     ctx.log_metric("total_chunks", len(chunked_data))

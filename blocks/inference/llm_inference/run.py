@@ -99,6 +99,32 @@ def run(ctx):
         elif isinstance(context_data, list):
             context_text = "\n".join(str(item) for item in context_data)
 
+    # ── Loop-aware context management ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        iteration = loop.get("iteration", 0)
+        context_mode = loop.get("context_management", "keep")
+        if context_mode == "clear":
+            # Don't include any conversation history — reset context and system prompt
+            context_text = ""
+            system_prompt_cfg = ctx.config.get("system_prompt", "")
+            ctx.log_message(f"[Loop iter {iteration}] Context and system prompt cleared")
+        elif context_mode == "summarize" and loop.get("previous_output"):
+            # Prepend a summary of previous iteration output
+            prev_output = loop["previous_output"]
+            if isinstance(prev_output, (dict, list)):
+                import json as _json
+                prev_summary = _json.dumps(prev_output, default=str, ensure_ascii=False)[:500]
+            else:
+                prev_summary = str(prev_output)[:500]
+            system_prompt_cfg = f"Summary of previous iterations:\n{prev_summary}\n\n{system_prompt_cfg}"
+            ctx.log_message(f"[Loop iter {iteration}] Prepended previous output summary ({len(prev_summary)} chars)")
+
+        # Apply prompt variation if provided
+        if loop.get("prompt_variation"):
+            user_input = loop["prompt_variation"]
+            ctx.log_message(f"[Loop iter {iteration}] Using prompt variation")
+
     # ── Build prompt ───────────────────────────────────────────────────
     prompt = prompt_template.replace("{context}", context_text).replace("{input}", user_input)
 
@@ -121,6 +147,9 @@ def run(ctx):
         val = ctx.config.get(key)
         if val is not None and val != "":
             overrides[key] = val
+    # Apply iteration seed from loop controller
+    if loop and loop.get("seed") is not None:
+        overrides["seed"] = loop["seed"]
     inf_config = build_config(framework, overrides)
 
     # ── Run inference ──────────────────────────────────────────────────

@@ -24,6 +24,7 @@ outputs:
     data_type: metrics
     description: "JSON: {final_score, best_score, quality_threshold, passed, iterations_used, iteration_log[{iteration, score, judge_feedback, output_preview}]}"
 
+    aliases: [metrics]
 config:
   max_iterations:
     type: integer
@@ -105,3 +106,9 @@ config:
     default: "text"
     options: ["text", "json"]
     description: "text = raw LLM output string, json = attempt to parse refined output as JSON object"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

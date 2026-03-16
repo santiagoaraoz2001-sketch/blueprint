@@ -16,11 +16,11 @@ outputs:
     label: Connection Details
     data_type: config
     description: "JSON file (connection.json): {status, provider, instance, region, timeout_minutes, gpu_count, memory_gb, container_image}"
-  - id: dataset
+  - id: output_dataset
     label: Output Data
     data_type: dataset
+    aliases: [dataset]
     description: "Dataset directory with sync_manifest.json if input was connected, otherwise empty.json"
-
 config:
   provider:
     type: select
@@ -66,3 +66,9 @@ config:
     label: Container Image
     default: ""
     description: "Docker image or environment slug (e.g. 'python:3.11-slim'). Empty = provider default."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

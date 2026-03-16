@@ -20,6 +20,14 @@ except ImportError:
     class BlockExecutionError(RuntimeError):
         def __init__(self, message, **kw): super().__init__(message)
 
+try:
+    from blocks.merge._merge_validation import _validate_model_for_merge, _load_model_info
+except ImportError:
+    def _validate_model_for_merge(name, info, ctx, label="model"):
+        return name
+    def _load_model_info(ctx, *ids):
+        return {}
+
 
 def run(ctx):
     try:
@@ -50,6 +58,10 @@ def run(ctx):
     model_b = _resolve_model(ctx, "model_b", ctx.config.get("model_b_name", ""))
     base_model = _resolve_model(ctx, "base", "")
 
+    # Validate model identifiers are compatible with mergekit
+    model_a = _validate_model_for_merge(model_a, _load_model_info(ctx, "model_a"), ctx, "Model A")
+    model_b = _validate_model_for_merge(model_b, _load_model_info(ctx, "model_b"), ctx, "Model B")
+
     if not model_a or not model_b:
         raise BlockInputError("Both model_a and model_b are required", recoverable=False)
 
@@ -67,6 +79,7 @@ def run(ctx):
                 "WARNING: No base model connected. Using Model A as base. "
                 "For proper TIES/DARE merging, connect the pre-trained base model."
             )
+        base_model = _validate_model_for_merge(base_model, _load_model_info(ctx, "base"), ctx, "Base Model")
         ctx.log_message(f"  Base Model: {base_model}")
         ctx.log_message(f"  Density: {density}")
         config_dict = {

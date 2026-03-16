@@ -24,3 +24,9 @@ config:
     type: boolean
     label: Include Config
     default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

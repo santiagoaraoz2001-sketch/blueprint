@@ -12,14 +12,18 @@ inputs:
 
 outputs:
   - id: file_path
-    label: File Path
-    data_type: text
+    label: Saved File Path
+    data_type: artifact
     description: "Absolute path to the saved JSON/JSONL file"
+  - id: status
+    label: Save Status
+    data_type: metrics
   - id: summary
     label: Export Summary
     data_type: metrics
     description: "Object with keys: records (int), file_size_bytes (int), format (string: json|jsonl)"
 
+    aliases: [metrics]
 config:
   output_path:
     type: string
@@ -73,3 +77,9 @@ config:
     label: Root Key
     default: ""
     description: 'Wrap data under a root key (e.g. "results" produces {"results": [...]})'
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -103,7 +103,7 @@ def run(ctx):
     }
 
     ctx.save_output("dataset", out_dir)
-    ctx.save_output("metrics", stats)
+    ctx.save_output("output_metrics", stats)
     ctx.log_metric("row_count", len(data))
     ctx.log_metric("metric_count", total_metric_count)
     ctx.log_message(

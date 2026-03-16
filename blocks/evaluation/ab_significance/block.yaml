@@ -54,3 +54,9 @@ config:
     min: 5
     max: 10000
     description: "Minimum samples per group for reliable results"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

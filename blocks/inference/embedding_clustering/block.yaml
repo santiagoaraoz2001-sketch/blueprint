@@ -19,23 +19,27 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: clustered_dataset
     label: Clustered Data
     data_type: dataset
+    aliases: [dataset]
     description: >
       Array of rows. Each row: {index, label, cluster, ...original_metadata_fields}.
       index: 0-based position in input. label: text label from input or external labels.
       cluster: integer cluster assignment (-1 means noise for DBSCAN/HDBSCAN).
       Embedding vectors are stripped from this output for compactness.
       Output format configurable via dataset_format (json, jsonl, csv).
-  - id: embeddings
+
+  - id: clustered_embeddings
     label: Labeled Embeddings
     data_type: embedding
+    aliases: [embeddings]
     description: >
       {embeddings: [[float, ...], ...], labels: [string, ...], clusters: [int, ...]}.
       embeddings: list of full embedding vectors (same order as input).
       labels: string labels for each embedding. clusters: integer cluster assignment per embedding.
       Full embedding vectors with cluster assignments for downstream Visualizer.
+
   - id: metrics
     label: Cluster Stats
     data_type: metrics
@@ -117,3 +121,9 @@ config:
     description: "Output format for the dataset — json (default), jsonl (one JSON object per line), csv (comma-separated values)"
     default: json
     options: [json, jsonl, csv]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

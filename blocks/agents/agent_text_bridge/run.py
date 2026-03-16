@@ -101,7 +101,7 @@ def run(ctx):
     }
     with open(os.path.join(ds_dir, "data.json"), "w", encoding="utf-8") as f:
         json.dump([full_record], f, indent=2, default=str)
-    ctx.save_output("dataset", ds_dir)
+    ctx.save_output("output_dataset", ds_dir)
 
     # ── Save metrics ────────────────────────────────────────────────────
     metrics = {

@@ -27,6 +27,12 @@ except ImportError:
     class BlockExecutionError(RuntimeError):
         def __init__(self, message, **kw): super().__init__(message)
 
+try:
+    from blocks.training._validation import _validate_model_for_training
+except ImportError:
+    def _validate_model_for_training(model_name, model_info, ctx, field_name="model_name"):
+        return model_name
+
 
 def run(ctx):
     dataset_path = ctx.resolve_as_file_path("dataset")
@@ -51,6 +57,7 @@ def run(ctx):
     max_seq_length = int(ctx.config.get("max_seq_length", 512))
 
     # Try to get models from input ports (port IDs: "teacher" and "student")
+    teacher_info = {}
     try:
         teacher_info = ctx.load_input("teacher")
         if isinstance(teacher_info, dict):
@@ -60,6 +67,7 @@ def run(ctx):
     except (ValueError, Exception):
         pass
 
+    student_info = {}
     try:
         student_info = ctx.load_input("student")
         if isinstance(student_info, dict):
@@ -73,6 +81,14 @@ def run(ctx):
         raise BlockConfigError("teacher_model", "Teacher model is required (via config or input)")
     if not student_name:
         raise BlockConfigError("student_model", "Student model is required (via config or input)")
+
+    # ── Validate models for training ──
+    teacher_name = _validate_model_for_training(
+        teacher_name, teacher_info, ctx, field_name="teacher_model"
+    )
+    student_name = _validate_model_for_training(
+        student_name, student_info, ctx, field_name="student_model"
+    )
 
     ctx.log_message(f"Knowledge Distillation")
     ctx.log_message(f"  Teacher: {teacher_name}")

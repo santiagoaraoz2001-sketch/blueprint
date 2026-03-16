@@ -23,6 +23,7 @@ outputs:
       last step of the chain. When pass_context is true this is the cumulative
       result of every step; when false it is only the output of the final
       prompt template. The file is UTF-8 encoded with no surrounding wrapper.
+    aliases: [text, output]
   - id: steps
     label: Intermediate Steps
     data_type: dataset
@@ -34,6 +35,7 @@ outputs:
       clock seconds for the API call), and tokens (integer, total tokens used
       in the step). The array length equals the number of configured chain
       steps.
+    aliases: [dataset]
   - id: metrics
     label: Metrics
     data_type: metrics
@@ -115,3 +117,9 @@ config:
     min: -2.0
     max: 2.0
     description: "Penalize tokens already present (positive = more diverse topics)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

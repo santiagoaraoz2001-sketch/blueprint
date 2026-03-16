@@ -186,7 +186,7 @@ def run(ctx):
         out_path = os.path.join(ctx.run_dir, "results.json")
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(comparison_results, f, indent=2)
-    ctx.save_output("dataset", out_path)
+    ctx.save_output("comparison_results", out_path)
 
     # Build summary metrics
     metrics = {

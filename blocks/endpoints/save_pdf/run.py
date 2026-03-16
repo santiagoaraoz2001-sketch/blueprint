@@ -206,6 +206,19 @@ def run(ctx):
     ctx.log_message("Save PDF starting")
     ctx.report_progress(0, 3)
 
+    # ── Loop-aware file handling ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        file_mode = loop.get("file_mode", "overwrite")
+        iteration = loop.get("iteration", 0)
+        ctx.log_message(f"[Loop iter {iteration}] file_mode={file_mode}")
+        if file_mode == "append":
+            ctx.log_message("WARNING: PDF format does not support append mode, using overwrite")
+            file_mode = "overwrite"
+    else:
+        file_mode = "overwrite"
+        iteration = 0
+
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_data("data")
@@ -236,6 +249,12 @@ def run(ctx):
 
     if not filename.endswith(".pdf"):
         filename += ".pdf"
+
+    # Loop versioned: create iteration-specific filename
+    if file_mode == "versioned":
+        base, fext = os.path.splitext(filename)
+        filename = f"{base}_iter{iteration}{fext}"
+
     out_filepath = os.path.join(out_dir, filename)
 
     if os.path.exists(out_filepath) and not overwrite:

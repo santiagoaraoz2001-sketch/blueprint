@@ -27,6 +27,7 @@ config:
     type: file_path
     label: Folder Path
     description: "Directory containing documents to ingest"
+    mandatory: true
   glob_pattern:
     type: string
     label: File Type Pattern
@@ -86,3 +87,9 @@ config:
     label: Language
     default: "en"
     description: "Language hint for processing"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false
