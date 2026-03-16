@@ -6,6 +6,19 @@ the unfrozen layers with per-group learning-rate scaling (balance_factor).
 
 import json
 import os
+import sys
+
+# Import shared training utilities
+_TRAINING_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _TRAINING_PKG_DIR not in sys.path:
+    sys.path.insert(0, _TRAINING_PKG_DIR)
+try:
+    from _training_utils import (
+        detect_training_framework, prepare_dataset as _prepare_texts,
+        call_training, TrainingConfig, write_training_data,
+    )
+except ImportError:
+    detect_training_framework = None
 
 try:
     from backend.block_sdk.exceptions import (
@@ -77,6 +90,64 @@ def run(ctx):
         raise BlockDataError("Dataset must be a non-empty JSON list", details="Received empty or invalid dataset from upstream block")
 
     ctx.log_message(f"Dataset: {len(raw_data)} samples")
+
+    # ── Framework detection & MLX dispatch ───────────────────────────────
+    prefer = ctx.config.get("prefer_framework", "auto")
+    framework = detect_training_framework(model_name, prefer) if detect_training_framework else "pytorch"
+
+    if framework == "mlx":
+        ctx.log_message("Using MLX framework for BALLAST training (LoRA with layer selection)")
+        texts = _prepare_texts(raw_data, text_column, training_format)
+        data_dir = write_training_data(
+            texts, os.path.join(ctx.run_dir, "mlx_data"), eval_split,
+        )
+        # Map BALLAST layer_depth to MLX --lora-layers:
+        # layer_depth = fraction of layers to train
+        layer_estimate = _estimate_layers(model_name)
+        total_layers = layer_estimate["num_layers"]
+        lora_layers = max(1, int(total_layers * layer_depth))
+        ctx.log_message(
+            f"Estimated {total_layers} layers; applying LoRA to top {lora_layers} "
+            f"(layer_depth={layer_depth})"
+        )
+        output_dir = os.path.join(ctx.run_dir, "model")
+        mlx_config = TrainingConfig(
+            model_name=model_name,
+            output_dir=output_dir,
+            data_dir=data_dir,
+            epochs=epochs,
+            learning_rate=lr,
+            batch_size=batch_size,
+            max_seq_length=max_seq_length,
+            lora_layers=lora_layers,
+        )
+        mlx_result = call_training(mlx_config, ctx=ctx)
+        if mlx_result["success"]:
+            with open(os.path.join(output_dir, "ballast_config.json"), "w") as f:
+                json.dump({
+                    "base_model": model_name,
+                    "method": "ballast",
+                    "framework": "mlx",
+                    "layer_depth": layer_depth,
+                    "balance_factor": balance_factor,
+                    "lora_layers": lora_layers,
+                    "total_layers": total_layers,
+                }, f, indent=2)
+            ctx.save_output("model", output_dir)
+            ctx.save_output("metrics", {
+                "framework": "mlx",
+                "lora_layers": lora_layers,
+                "total_layers": total_layers,
+                "layer_depth": layer_depth,
+            })
+            ctx.log_message("BALLAST training complete (MLX)")
+            ctx.report_progress(1, 1)
+            return
+        ctx.log_message(
+            f"MLX training failed: {mlx_result.get('error', '')}. "
+            "Falling back to PyTorch."
+        )
+        framework = "pytorch"
 
     # ── Guard heavy imports ──────────────────────────────────────────────
     try:

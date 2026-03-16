@@ -7,7 +7,17 @@ TRL's PPOTrainer.  Falls back to a realistic simulation when not available.
 import json
 import math
 import os
+import sys
 import time
+
+# Import shared training utilities
+_TRAINING_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _TRAINING_PKG_DIR not in sys.path:
+    sys.path.insert(0, _TRAINING_PKG_DIR)
+try:
+    from _training_utils import detect_training_framework
+except ImportError:
+    detect_training_framework = None
 
 try:
     from backend.block_sdk.exceptions import (
@@ -78,6 +88,17 @@ def run(ctx):
         num_rows = 100
 
     ctx.log_message(f"Training data: {num_rows} samples")
+
+    # ── Framework detection ──────────────────────────────────────────────
+    prefer = ctx.config.get("prefer_framework", "auto")
+    framework = detect_training_framework(model_name, prefer) if detect_training_framework else "pytorch"
+    if framework == "mlx":
+        ctx.log_message(
+            "⚠️ RLHF/PPO training is not supported on MLX. "
+            "It requires TRL PPOTrainer not available in mlx_lm. "
+            "Falling back to PyTorch. Install: pip install torch transformers trl"
+        )
+        framework = "pytorch"
 
     # ── Guard heavy imports ──
     try:

@@ -84,3 +84,9 @@ config:
     label: Training Format
     description: "Template for structuring training examples. Use {text}, {instruction}, {output} placeholders."
     default: ""
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."

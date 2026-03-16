@@ -8,7 +8,20 @@ dependencies are not available.
 import json
 import math
 import os
+import sys
 import time
+
+# Import shared training utilities
+_TRAINING_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _TRAINING_PKG_DIR not in sys.path:
+    sys.path.insert(0, _TRAINING_PKG_DIR)
+try:
+    from _training_utils import (
+        detect_training_framework, prepare_dataset as _prepare_texts,
+        call_training, TrainingConfig, write_training_data,
+    )
+except ImportError:
+    detect_training_framework = None
 
 try:
     from backend.block_sdk.exceptions import (
@@ -80,6 +93,57 @@ def run(ctx):
         est_tokens = 50000
 
     ctx.log_message(f"Training data: {num_rows} documents, ~{est_tokens:,} tokens estimated")
+
+    # ── Framework detection & MLX dispatch ───────────────────────────────
+    prefer = ctx.config.get("prefer_framework", "auto")
+    framework = detect_training_framework(model_name, prefer) if detect_training_framework else "pytorch"
+
+    if framework == "mlx" and rows:
+        ctx.log_message("Using MLX framework for continued pretraining (full fine-tune)")
+        texts = _prepare_texts(
+            rows, text_column,
+            training_format="",  # pretraining uses raw text
+        )
+        data_dir = write_training_data(
+            texts, os.path.join(ctx.run_dir, "mlx_data"), eval_split,
+        )
+        output_dir = os.path.join(ctx.run_dir, "model")
+        mlx_config = TrainingConfig(
+            model_name=model_name,
+            output_dir=output_dir,
+            data_dir=data_dir,
+            epochs=epochs,
+            learning_rate=lr,
+            batch_size=batch_size,
+            max_seq_length=max_seq_length,
+            fine_tune_type="full",
+        )
+        mlx_result = call_training(mlx_config, ctx=ctx)
+        if mlx_result["success"]:
+            final_loss = 0.0  # MLX doesn't report loss back via CLI
+            with open(os.path.join(output_dir, "training_config.json"), "w") as f:
+                json.dump({
+                    "base_model": model_name,
+                    "method": "continued_pretraining",
+                    "framework": "mlx",
+                    "learning_rate": lr,
+                    "epochs": epochs,
+                    "estimated_tokens": est_tokens,
+                    "demo_mode": False,
+                }, f, indent=2)
+            ctx.save_output("model", output_dir)
+            ctx.save_output("metrics", {
+                "framework": "mlx",
+                "estimated_tokens": est_tokens,
+                "epochs_completed": epochs,
+            })
+            ctx.log_message("Continued pretraining complete (MLX)")
+            ctx.report_progress(1, 1)
+            return
+        ctx.log_message(
+            f"MLX training failed: {mlx_result.get('error', '')}. "
+            "Falling back to PyTorch."
+        )
 
     # ── Guard heavy imports ──
     try:

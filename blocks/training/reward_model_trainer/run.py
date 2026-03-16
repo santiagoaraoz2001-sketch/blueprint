@@ -2,8 +2,18 @@
 
 import json
 import os
+import sys
 import time
 import random
+
+# Import shared training utilities
+_TRAINING_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _TRAINING_PKG_DIR not in sys.path:
+    sys.path.insert(0, _TRAINING_PKG_DIR)
+try:
+    from _training_utils import detect_training_framework
+except ImportError:
+    detect_training_framework = None
 
 try:
     from backend.block_sdk.exceptions import (
@@ -66,6 +76,17 @@ def run(ctx):
         n_samples = len(dataset.get("data", dataset.get("rows", [])))
     else:
         n_samples = 1
+
+    # ── Framework detection ──────────────────────────────────────────────
+    prefer = ctx.config.get("prefer_framework", "auto")
+    framework = detect_training_framework(model_path, prefer) if detect_training_framework else "pytorch"
+    if framework == "mlx":
+        ctx.log_message(
+            "⚠️ Reward model training is not supported on MLX. "
+            "It requires AutoModelForSequenceClassification not available in mlx_lm. "
+            "Falling back to PyTorch. Install: pip install torch transformers trl"
+        )
+        framework = "pytorch"
 
     ctx.log_message(f"Preference dataset: {n_samples} samples")
     ctx.log_message(f"Config: lr={lr}, epochs={epochs}, batch_size={batch_size}, max_length={max_length}, loss={loss_fn}")
