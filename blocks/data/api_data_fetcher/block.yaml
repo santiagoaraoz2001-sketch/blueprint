@@ -27,6 +27,7 @@ config:
     type: string
     label: API URL
     description: "REST API endpoint URL"
+    mandatory: true
   method:
     type: select
     label: Method
@@ -109,3 +110,9 @@ config:
     depends_on:
       field: auth_type
       value: api_key
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-DataType = Literal["dataset", "text", "model", "metrics", "artifact", "config", "embedding", "agent", "any"]
+DataType = Literal["dataset", "text", "model", "metrics", "artifact", "config", "embedding", "agent", "llm", "any"]
 
 BlockStatus = Literal["pending", "running", "complete", "failed", "skipped"]
 

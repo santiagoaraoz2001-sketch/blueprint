@@ -249,6 +249,26 @@ def run(ctx):
     # Validate table name to prevent SQL injection
     _validate_table_name(table_name)
 
+    # ── Loop-aware file handling ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        file_mode = loop.get("file_mode", "overwrite")
+        iteration = loop.get("iteration", 0)
+        ctx.log_message(f"[Loop iter {iteration}] file_mode={file_mode}")
+        # Reconcile loop file_mode with the block's if_exists setting
+        if file_mode == "append":
+            if_exists = "append"
+        elif file_mode == "overwrite" and iteration > 0:
+            if_exists = "replace"
+    else:
+        file_mode = "overwrite"
+        iteration = 0
+
+    # Loop versioned: create iteration-specific table name
+    if file_mode == "versioned":
+        table_name = f"{table_name}_iter{iteration}"
+        _validate_table_name(table_name)
+
     ctx.log_message(f"Database Writer starting (table={table_name})")
     ctx.report_progress(0, 4)
 

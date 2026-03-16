@@ -88,6 +88,19 @@ def run(ctx):
     ctx.log_message("Save Local starting")
     ctx.report_progress(0, 4)
 
+    # ── Loop-aware file handling ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        file_mode_loop = loop.get("file_mode", "overwrite")
+        iteration = loop.get("iteration", 0)
+        ctx.log_message(f"[Loop iter {iteration}] file_mode={file_mode_loop}")
+    else:
+        file_mode_loop = "overwrite"
+        iteration = 0
+
+    # Loop append: for text-based formats, append to existing file
+    loop_append = file_mode_loop == "append" and iteration > 0
+
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 4)
     # Use load_input directly — save_local needs to handle file/dir copy mode,
@@ -129,6 +142,10 @@ def run(ctx):
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{filename}_{ts}"
 
+    # Loop versioned: create iteration-specific filename
+    if file_mode_loop == "versioned":
+        filename = f"{filename}_iter{iteration}"
+
     # ---- Step 4: Write output ----
     ctx.report_progress(3, 4)
 
@@ -163,35 +180,59 @@ def run(ctx):
 
     elif fmt == "json":
         out_filepath = os.path.join(out_dir, filename + ".json")
-        if os.path.exists(out_filepath) and not overwrite:
+        if not loop_append and os.path.exists(out_filepath) and not overwrite:
             raise BlockInputError(
                 f"File already exists: {out_filepath}",
                 recoverable=True,
             )
+        if loop_append and os.path.isfile(out_filepath):
+            # Merge with existing JSON
+            try:
+                with open(out_filepath, "r", encoding="utf-8") as f:
+                    existing = json.load(f)
+            except (json.JSONDecodeError, ValueError):
+                existing = None
+            if existing is not None:
+                if isinstance(existing, list) and isinstance(data, list):
+                    data = existing + data
+                elif isinstance(existing, list):
+                    existing.append(data)
+                    data = existing
+                else:
+                    data = [existing, data]
         content = json.dumps(data, indent=2, default=str, ensure_ascii=False)
         with open(out_filepath, "w", encoding="utf-8") as f:
             f.write(content)
 
     elif fmt == "csv":
         out_filepath = os.path.join(out_dir, filename + ".csv")
-        if os.path.exists(out_filepath) and not overwrite:
+        if not loop_append and os.path.exists(out_filepath) and not overwrite:
             raise BlockInputError(
                 f"File already exists: {out_filepath}",
                 recoverable=True,
             )
         rows = _normalize_rows(data)
         headers = _collect_headers(rows)
-        buf = io.StringIO()
-        writer = csv.writer(buf)
-        writer.writerow(headers)
-        for row in rows:
-            writer.writerow([str(row.get(h, "")) for h in headers])
-        with open(out_filepath, "w", encoding="utf-8", newline="") as f:
-            f.write(buf.getvalue())
+        if loop_append and os.path.isfile(out_filepath):
+            # Append rows without header
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            for row in rows:
+                writer.writerow([str(row.get(h, "")) for h in headers])
+            with open(out_filepath, "a", encoding="utf-8", newline="") as f:
+                f.write(buf.getvalue())
+        else:
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(headers)
+            for row in rows:
+                writer.writerow([str(row.get(h, "")) for h in headers])
+            with open(out_filepath, "w", encoding="utf-8", newline="") as f:
+                f.write(buf.getvalue())
 
     elif fmt == "txt":
         out_filepath = os.path.join(out_dir, filename + ".txt")
-        if os.path.exists(out_filepath) and not overwrite:
+        if not loop_append and os.path.exists(out_filepath) and not overwrite:
             raise BlockInputError(
                 f"File already exists: {out_filepath}",
                 recoverable=True,
@@ -200,8 +241,13 @@ def run(ctx):
             content = data
         else:
             content = json.dumps(data, indent=2, default=str, ensure_ascii=False)
-        with open(out_filepath, "w", encoding="utf-8") as f:
-            f.write(content)
+        if loop_append and os.path.isfile(out_filepath):
+            with open(out_filepath, "a", encoding="utf-8") as f:
+                f.write("\n")
+                f.write(content)
+        else:
+            with open(out_filepath, "w", encoding="utf-8") as f:
+                f.write(content)
 
     elif fmt == "yaml":
         out_filepath = os.path.join(out_dir, filename + ".yaml")

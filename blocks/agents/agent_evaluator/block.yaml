@@ -16,9 +16,11 @@ inputs:
     required: false
 
 outputs:
-  - id: dataset
+  - id: evaluation_dataset
     label: Evaluation Results
+    aliases: [dataset]
     data_type: dataset
+
   - id: report
     label: Eval Report
     data_type: artifact
@@ -65,3 +67,9 @@ config:
     type: integer
     label: Random Seed
     default: 42
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

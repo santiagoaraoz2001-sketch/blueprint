@@ -108,9 +108,44 @@ def get_block_config_schema(block_type: str) -> dict[str, Any]:
     return block_yaml.get("config", {})
 
 
+# Cache output alias maps: block_type -> {old_id: new_id}
+_output_alias_cache: dict[str, dict[str, str]] = {}
+
+
+def get_output_alias_map(block_type: str) -> dict[str, str]:
+    """Build a map from aliased (old) output port IDs to canonical (current) IDs.
+
+    Returns {old_id: canonical_id} for any output port that declares aliases.
+    Used by the executor to resolve edge sourceHandles that reference old port names.
+    """
+    if block_type in _output_alias_cache:
+        return _output_alias_cache[block_type]
+
+    alias_map: dict[str, str] = {}
+    schema = get_block_yaml(block_type)
+    if schema:
+        for output in schema.get("outputs", []):
+            canonical = output.get("id", "")
+            for alias in output.get("aliases", []):
+                alias_map[alias] = canonical
+
+    _output_alias_cache[block_type] = alias_map
+    return alias_map
+
+
+def resolve_output_handle(block_type: str, handle: str) -> str:
+    """Resolve an output handle ID, mapping old aliases to canonical IDs.
+
+    Returns the canonical ID if the handle is an alias, otherwise returns handle unchanged.
+    """
+    alias_map = get_output_alias_map(block_type)
+    return alias_map.get(handle, handle)
+
+
 def reset() -> None:
     """Clear all cached state so the next scan_blocks() re-discovers blocks."""
-    global _registry, _scanned, _yaml_cache
+    global _registry, _scanned, _yaml_cache, _output_alias_cache
     _scanned = False
     _registry = {}
     _yaml_cache = {}
+    _output_alias_cache = {}

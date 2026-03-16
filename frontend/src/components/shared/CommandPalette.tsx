@@ -57,7 +57,7 @@ export default function CommandPalette() {
       { id: 'nav-paper', label: 'Go to Paper', view: 'paper', icon: <FileText size={14} /> },
       { id: 'nav-settings', label: 'Go to Settings', view: 'settings', icon: <Settings size={14} /> },
       { id: 'nav-workshop', label: 'Go to Workshop', view: 'workshop', icon: <Wrench size={14} /> },
-      { id: 'nav-inference', label: 'Go to Inference', view: 'inference', icon: <MessageSquare size={14} /> },
+      { id: 'nav-output', label: 'Go to Output', view: 'output', icon: <MessageSquare size={14} /> },
       { id: 'nav-charts', label: 'Go to Charts', view: 'visualization', icon: <LineChart size={14} /> },
     ]
     navItems

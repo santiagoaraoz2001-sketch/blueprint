@@ -11,7 +11,7 @@ import { api } from '@/api/client'
 const STORAGE_KEY = 'blueprint-custom-blocks'
 
 const CATEGORY_OPTIONS = ['external', 'data', 'model', 'inference', 'training', 'metrics', 'embedding', 'utilities', 'agents', 'interventions', 'endpoints']
-const PORT_TYPE_OPTIONS: ConnectorType[] = ['dataset', 'text', 'model', 'config', 'metrics', 'embedding', 'artifact', 'agent', 'any']
+const PORT_TYPE_OPTIONS: ConnectorType[] = ['dataset', 'text', 'model', 'config', 'metrics', 'embedding', 'artifact', 'agent', 'llm', 'any']
 
 interface PortDef {
   id: string

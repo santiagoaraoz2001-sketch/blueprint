@@ -123,3 +123,9 @@ config:
     depends_on:
       field: use_llm_extraction
       value: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

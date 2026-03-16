@@ -38,3 +38,9 @@ config:
     label: "Compress (tar.gz)"
     description: Create a compressed tar.gz archive
     default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

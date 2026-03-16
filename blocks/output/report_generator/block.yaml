@@ -56,3 +56,9 @@ config:
     label: Sections
     default: "summary,metrics,details"
     description: Comma-separated section names to include (summary, metrics, details, config)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -10,6 +10,10 @@ outputs:
   - id: model
     label: Model
     data_type: model
+  - id: llm
+    label: LLM Config
+    data_type: llm
+    description: "Model info wrapped as LLM config for direct agent connection"
 
 config:
   source:
@@ -52,3 +56,9 @@ config:
     label: HuggingFace ID Override
     default: ""
     description: "Explicit HuggingFace model ID to pass to training/merge blocks. Overrides auto-resolution. Example: meta-llama/Llama-3.2-1B"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

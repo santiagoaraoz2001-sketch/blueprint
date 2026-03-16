@@ -95,5 +95,5 @@ def run(ctx):
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, default=str)
 
-    ctx.save_output("telemetry", out_path)
+    ctx.save_output("output_telemetry", out_path)
     ctx.report_progress(2, 2)

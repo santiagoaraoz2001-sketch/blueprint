@@ -92,6 +92,16 @@ def run(ctx):
     ctx.log_message(f"Save Parquet starting (compression={compression})")
     ctx.report_progress(0, 3)
 
+    # ── Loop-aware file handling ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        file_mode = loop.get("file_mode", "overwrite")
+        iteration = loop.get("iteration", 0)
+        ctx.log_message(f"[Loop iter {iteration}] file_mode={file_mode}")
+    else:
+        file_mode = "overwrite"
+        iteration = 0
+
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_data("data")
@@ -131,9 +141,29 @@ def run(ctx):
         base = filename.rsplit(".", 1)[0]
         filename = f"{base}_{ts}.parquet"
 
+    # Loop versioned: create iteration-specific filename
+    if file_mode == "versioned":
+        base = filename.rsplit(".", 1)[0]
+        filename = f"{base}_iter{iteration}.parquet"
+
     out_filepath = os.path.join(out_dir, filename)
 
-    if os.path.exists(out_filepath) and not overwrite:
+    # Loop append: read existing parquet and concatenate rows
+    if file_mode == "append" and os.path.isfile(out_filepath):
+        try:
+            import pyarrow.parquet as pq
+            existing_table = pq.read_table(out_filepath)
+            existing_rows = existing_table.to_pylist()
+            new_count = len(rows)
+            rows = existing_rows + rows
+            headers = _collect_headers(rows)
+            ctx.log_message(f"Appending to existing parquet ({len(existing_rows)} + {new_count} rows)")
+        except ImportError:
+            ctx.log_message("WARNING: pyarrow not available for append read, overwriting")
+        except (OSError, ValueError) as e:
+            ctx.log_message(f"WARNING: Could not read existing parquet for append ({e}), overwriting")
+
+    if file_mode != "append" and os.path.exists(out_filepath) and not overwrite:
         raise BlockInputError(
             f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
             recoverable=True,

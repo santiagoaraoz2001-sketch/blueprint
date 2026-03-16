@@ -172,7 +172,7 @@ def run(ctx):
         json.dump({"metrics": metrics, "errors": errors}, f, indent=2)
     ctx.save_artifact("error_report", report_path)
 
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("checked_dataset", out_dir)
     for _mk, _mv in metrics.items():
         if isinstance(_mv, float):
             metrics[_mk] = round(_mv, decimal_precision)
