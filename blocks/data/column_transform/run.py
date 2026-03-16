@@ -43,7 +43,7 @@ def run(ctx):
         with open(os.path.join(out_dir, "data.json"), "w") as f:
             json.dump([], f)
         # Branch: empty dataset — return early
-        ctx.save_output("dataset", out_dir)
+        ctx.save_output("transformed_dataset", out_dir)
         ctx.report_progress(1, 1)
         return
 
@@ -147,7 +147,7 @@ def run(ctx):
     }
 
     # Branch: normal execution — transformed dataset
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("transformed_dataset", out_dir)
     ctx.save_output("stats", stats)
     ctx.log_metric("rows", len(rows))
     ctx.log_metric("columns_before", len(original_cols))

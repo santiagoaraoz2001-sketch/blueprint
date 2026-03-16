@@ -323,7 +323,7 @@ def run(ctx):
         out_path = os.path.join(out_dir, "data.json")
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(clustered, f, indent=2)
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("clustered_dataset", out_dir)
 
     ctx.report_progress(3, 4)
 
@@ -336,7 +336,7 @@ def run(ctx):
     emb_path = os.path.join(ctx.run_dir, "labeled_embeddings.json")
     with open(emb_path, "w", encoding="utf-8") as f:
         json.dump(labeled_embeddings, f)
-    ctx.save_output("embeddings", emb_path)
+    ctx.save_output("clustered_embeddings", emb_path)
 
     # ── Compute stats and quality metrics ────────────────────────
     cluster_counts = Counter(cluster_labels)

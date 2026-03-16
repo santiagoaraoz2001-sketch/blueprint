@@ -27,15 +27,18 @@ outputs:
     label: Merged
     data_type: dataset
     description: "JSON array of merged rows. concat: all rows stacked. join: matched rows combined (conflicting column names get join_suffix appended). interleave: rows alternated from each source. dedup: unique rows only."
-  - id: dataset_meta
+  - id: output_dataset_meta
     label: Dataset Info
     data_type: config
+    aliases: [dataset_meta]
     required: false
+
   - id: stats
     label: Merge Stats
     data_type: metrics
     description: "Object with rows_a, rows_b, rows_c, merged_rows, method"
 
+    aliases: [metrics]
 config:
   method:
     type: select
@@ -100,3 +103,9 @@ config:
     min: 1
     max: 50
     description: Repeat factor for Dataset C
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

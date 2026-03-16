@@ -304,7 +304,7 @@ def run(ctx):
     coords_path = os.path.join(ctx.run_dir, "coordinates.json")
     with open(coords_path, "w", encoding="utf-8") as f:
         json.dump(coords_dataset, f, indent=2)
-    ctx.save_output("dataset", coords_path)
+    ctx.save_output("viz_dataset", coords_path)
 
     ctx.log_metric("point_count", len(reduced))
     ctx.log_metric("dimensions", dim)

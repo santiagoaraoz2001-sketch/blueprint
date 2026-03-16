@@ -19,9 +19,11 @@ inputs:
     required: false
 
 outputs:
-  - id: model
+  - id: trained_model
     label: RLHF Model
+    aliases: [model]
     data_type: model
+
   - id: metrics
     label: PPO Metrics
     data_type: metrics
@@ -31,10 +33,12 @@ config:
     type: string
     label: Policy Model
     description: HuggingFace model name or local path for the policy model
+    mandatory: true
   reward_model:
     type: string
     label: Reward Model
     description: HuggingFace model name or path for the reward model (leave empty for heuristic reward)
+    mandatory: true
   lr:
     type: float
     label: Learning Rate
@@ -87,3 +91,9 @@ config:
     default: 0.7
     min: 0.1
     max: 2.0
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -72,3 +72,9 @@ config:
     label: Emit Iteration Index
     default: false
     description: "Add an '_index' field to each output item so downstream blocks know which iteration they are in"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

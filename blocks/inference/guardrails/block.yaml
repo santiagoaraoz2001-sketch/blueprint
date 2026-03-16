@@ -11,9 +11,10 @@ inputs:
     required: true
 
 outputs:
-  - id: text
+  - id: filtered_text
     label: Filtered Text
     data_type: text
+    aliases: [text, response, output]
     description: >
       When output_format is "text", a plain text file (filtered.txt) with the
       processed content. Depending on the action setting the text may be
@@ -27,6 +28,7 @@ outputs:
       evidence), action_taken (string, the action applied — or "none" if no
       flags), model (string, always "rule-based"), provider (string, always
       "built-in"), and timestamp (ISO-8601 string).
+
   - id: metrics
     label: Safety Scores
     data_type: metrics
@@ -84,3 +86,9 @@ config:
     description: "Format for text output — text returns raw result, json wraps with metadata"
     default: text
     options: [text, json]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

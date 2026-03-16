@@ -14,14 +14,13 @@ import {
   HelpCircle,
   FolderOpen,
   Wrench,
-  MessageSquare,
+  Terminal,
   Table2,
   LineChart,
   PanelLeftClose,
   PanelLeftOpen,
   Home,
   Activity,
-  Terminal,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -43,7 +42,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'data', label: 'Data', icon: Table2 },
   { id: 'marketplace', label: 'Blocks', icon: Blocks },
   { id: 'workshop', label: 'Workshop', icon: Wrench },
-  { id: 'inference', label: 'Inference', icon: MessageSquare },
   { id: 'monitor', label: 'Monitor', icon: Activity },
   { id: 'output', label: 'Output', icon: Terminal },
   { id: 'results', label: 'Results', icon: BarChart3 },

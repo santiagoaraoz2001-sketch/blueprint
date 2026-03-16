@@ -159,7 +159,7 @@ def run(ctx):
     ctx.report_progress(3, 4)
 
     # Save model output
-    ctx.save_output("model", output_model_path)
+    ctx.save_output("reward_model", output_model_path)
 
     # Save training metadata
     with open(os.path.join(output_model_path, "training_config.json"), "w") as f:

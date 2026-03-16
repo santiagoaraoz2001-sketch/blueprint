@@ -18,9 +18,12 @@ outputs:
   - id: text
     label: Extracted Text
     data_type: text
-  - id: dataset
+    aliases: [response, output]
+  - id: output_dataset
     label: Full Responses
+    aliases: [dataset]
     data_type: dataset
+
   - id: metrics
     label: Extraction Metrics
     data_type: metrics
@@ -54,3 +57,9 @@ config:
     options: [raw, markdown, json]
     default: raw
     description: "raw: text as-is, markdown: with metadata header, json: structured extraction result"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

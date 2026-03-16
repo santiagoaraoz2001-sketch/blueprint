@@ -37,3 +37,9 @@ config:
     depends_on:
       field: validate_schema
       value: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

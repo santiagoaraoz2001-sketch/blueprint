@@ -26,13 +26,13 @@ outputs:
       {method, dimensions, num_points, original_dimension,
       points: [{index, label, x, y, [z], [cluster]}]}.
       Full visualization payload for chart rendering.
-  - id: dataset
+  - id: viz_dataset
     label: Coordinates
     data_type: dataset
+    aliases: [dataset]
     description: >
       Array of rows: [{index, label, x, y, [z], [cluster], ...metadata_fields}].
       Enable include_metadata to carry through original source fields (text, title, etc.).
-
 config:
   embedding_column:
     type: string
@@ -89,3 +89,9 @@ config:
     default: 0.1
     min: 0.0
     max: 1.0
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

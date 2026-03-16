@@ -26,11 +26,11 @@ outputs:
     data_type: artifact
     description: 'benchmark_report.json: model, metrics, sample_predictions with input, target, prediction, score'
 
-  - id: dataset
+  - id: benchmark_dataset
     label: Predictions
     data_type: dataset
+    aliases: [dataset]
     description: "Per-sample predictions: input, target, prediction, score, correct"
-
 config:
   model_name:
     type: string
@@ -111,3 +111,9 @@ config:
     min: 1
     max: 6
     description: "Decimal places for all computed scores"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

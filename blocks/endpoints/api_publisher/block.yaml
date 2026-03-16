@@ -23,11 +23,13 @@ outputs:
     label: Publish Summary
     data_type: metrics
     description: "Object with keys: records_sent (int), records_failed (int), batches (int), url (string), method (string)"
+    aliases: [metrics]
   - id: results
     label: Response Data
     data_type: dataset
     description: "Array of per-batch results with keys: batch (int), status (int) or error (string), records (int)"
 
+    aliases: [dataset]
 config:
   url:
     type: string
@@ -108,3 +110,9 @@ config:
     options: [skip, fail]
     default: skip
     description: "skip = continue on error, fail = abort entire batch"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

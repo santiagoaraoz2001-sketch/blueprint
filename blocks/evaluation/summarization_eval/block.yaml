@@ -27,11 +27,11 @@ outputs:
     data_type: artifact
     description: 'summarization_report.json: metrics summary + per-sample rouge/compression/coverage/novelty scores'
 
-  - id: dataset
+  - id: eval_dataset
     label: Scored Summaries
     data_type: dataset
+    aliases: [dataset]
     description: "Per-summary scores: summary_preview, reference_preview, rouge1, rouge2, rougeL, compression_ratio"
-
 config:
   summary_column:
     type: string
@@ -72,3 +72,9 @@ config:
     min: 1
     max: 6
     description: "Decimal places for all computed scores"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

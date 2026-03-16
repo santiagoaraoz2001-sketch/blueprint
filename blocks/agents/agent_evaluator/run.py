@@ -126,7 +126,7 @@ def run(ctx):
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "data.json"), "w") as f:
         json.dump(results, f, indent=2)
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("evaluation_dataset", out_dir)
 
     metrics = {
         "avg_score": round(avg_score, 4),

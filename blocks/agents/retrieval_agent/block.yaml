@@ -7,9 +7,14 @@ version: "1.1.0"
 inputs:
   - id: llm
     label: LLM
-    data_type: config
-    required: true
-    description: "Connected LLM Inference block for model calls"
+    data_type: llm
+    required: false
+    description: "LLM config from llm_inference or model info from model_selector"
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Direct model connection (alternative to LLM port)"
   - id: store
     label: Vector Store Config
     data_type: config
@@ -27,9 +32,12 @@ outputs:
   - id: response
     label: Response Text
     data_type: text
-  - id: dataset
+    aliases: [text, output]
+  - id: retrieval_log
     label: Responses
+    aliases: [dataset]
     data_type: dataset
+
   - id: metrics
     label: RAG Metrics
     data_type: metrics
@@ -77,3 +85,9 @@ config:
     options: [plain, markdown, json]
     default: plain
     description: "Format for the response text output"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

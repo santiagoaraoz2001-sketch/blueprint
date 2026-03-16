@@ -63,7 +63,7 @@ def run(ctx):
         os.makedirs(out_dir, exist_ok=True)
         with open(os.path.join(out_dir, "data.json"), "w", encoding="utf-8") as f:
             json.dump([], f)
-        ctx.save_output("dataset", out_dir)
+        ctx.save_output("selected_dataset", out_dir)
         ctx.save_output("metrics", {"input_rows": 0, "selected_rows": 0})
         ctx.log_metric("input_rows", 0)
         ctx.log_metric("selected_rows", 0)
@@ -117,7 +117,7 @@ def run(ctx):
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "data.json"), "w", encoding="utf-8") as f:
         json.dump(selected, f, indent=2)
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("selected_dataset", out_dir)
 
     # Save first row's text column as text output
     if selected:
