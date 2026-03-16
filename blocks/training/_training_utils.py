@@ -39,6 +39,7 @@ class TrainingConfig:
     lora_alpha: int = 32
     lora_dropout: float = 0.05
     target_modules: list = field(default_factory=lambda: ["q_proj", "v_proj"])
+    lora_layers: int = 16  # Number of transformer layers to apply LoRA to (MLX)
 
     # Training type
     training_type: str = "lora"  # lora, qlora, full, dora
@@ -408,10 +409,8 @@ def _run_mlx_training(config: TrainingConfig) -> dict:
     # LoRA-specific arguments
     if config.training_type in ("lora", "qlora", "dora"):
         cmd.extend([
-            "--lora-layers", str(len(config.target_modules) or 16),
+            "--lora-layers", str(config.lora_layers),
         ])
-        # mlx_lm uses --lora-layers (number of layers), not target_modules
-        # The r parameter maps to default LoRA rank in mlx_lm
 
         if config.training_type == "dora":
             cmd.extend(["--fine-tune-type", "dora"])

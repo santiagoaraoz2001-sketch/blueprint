@@ -102,6 +102,19 @@ config:
     default: 0
     min: 0
     max: 100
+  mlx_lora_layers:
+    type: integer
+    label: MLX LoRA Layers
+    default: 16
+    min: 1
+    max: 64
+    description: "Number of transformer layers to fine-tune (MLX only). Lower = less memory."
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
 
 side_inputs:
   - id: _loop

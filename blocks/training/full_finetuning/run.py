@@ -73,6 +73,103 @@ def run(ctx):
 
     dataset_path = ctx.resolve_as_file_path("dataset")
 
+    # ── Framework detection (NEW) ──────────────────────────────────────
+    from blocks.training._training_utils import (
+        detect_training_framework, TrainingConfig, call_training,
+    )
+
+    preferred = ctx.config.get("prefer_framework", "auto")
+    if preferred != "auto":
+        framework = preferred
+    else:
+        framework = detect_training_framework(model_name)
+    ctx.log_message(f"Detected training framework: {framework}")
+
+    mlx_lora_layers = int(ctx.config.get("mlx_lora_layers", 16))
+
+    # ── Framework dispatch ─────────────────────────────────────────────
+    if framework == "mlx":
+        # Memory warning for full fine-tuning
+        model_lower = model_name.lower()
+        if any(size in model_lower for size in ["7b", "8b", "13b", "70b", "34b", "40b"]):
+            ctx.log_message(
+                "WARNING: Full fine-tuning requires significantly more memory than LoRA. "
+                "For large models, consider using LoRA/QLoRA instead."
+            )
+        _run_mlx_path(
+            ctx, model_name, dataset_path, lr, epochs, batch_size,
+            max_seq_length, warmup_steps, weight_decay, text_column,
+            training_format, eval_split, checkpoint_interval, mlx_lora_layers,
+        )
+        return
+
+    if framework == "pytorch":
+        _run_pytorch_path(
+            ctx, model_name, dataset_path, lr, epochs, batch_size,
+            warmup_steps, weight_decay, max_seq_length, gradient_checkpointing,
+            text_column, training_format, eval_split, checkpoint_interval,
+        )
+    else:
+        # No framework available — simulation/plan-only mode
+        _run_fallback(
+            ctx, model_name, dataset_path, lr, epochs, batch_size,
+            max_seq_length, warmup_steps, weight_decay,
+        )
+
+
+# ── MLX training path (NEW) ───────────────────────────────────────────
+
+def _run_mlx_path(
+    ctx, model_name, dataset_path, lr, epochs, batch_size,
+    max_seq_length, warmup_steps, weight_decay, text_column,
+    training_format, eval_split, checkpoint_interval, mlx_lora_layers,
+):
+    """MLX full fine-tuning path using _training_utils."""
+    from blocks.training._training_utils import TrainingConfig, call_training
+
+    output_dir = os.path.join(ctx.run_dir, "model")
+    os.makedirs(output_dir, exist_ok=True)
+
+    config = TrainingConfig(
+        model_name=model_name,
+        output_dir=output_dir,
+        data_path=dataset_path,
+        training_type="full",
+        framework="mlx",
+        epochs=epochs,
+        batch_size=batch_size,
+        learning_rate=lr,
+        max_seq_length=max_seq_length,
+        warmup_steps=warmup_steps,
+        weight_decay=weight_decay,
+        lora_layers=mlx_lora_layers,
+        save_merged=False,  # Full fine-tuning saves the whole model directly
+        text_column=text_column,
+        training_format=training_format,
+        eval_split=eval_split,
+        checkpoint_interval=checkpoint_interval,
+        log_fn=ctx.log_message,
+        progress_fn=ctx.report_progress,
+        metric_fn=lambda name, val, step: ctx.log_metric(name, val, step),
+    )
+
+    result = call_training(config)
+
+    ctx.save_output("trained_model", result["model_path"])
+    ctx.save_output("metrics", result["metrics"])
+    final_loss = result["metrics"].get("final_loss", "N/A")
+    ctx.log_message(f"Full fine-tuning complete (MLX). Final loss: {final_loss}")
+    ctx.report_progress(1, 1)
+
+
+# ── PyTorch training path (EXISTING — UNCHANGED) ──────────────────────
+
+def _run_pytorch_path(
+    ctx, model_name, dataset_path, lr, epochs, batch_size,
+    warmup_steps, weight_decay, max_seq_length, gradient_checkpointing,
+    text_column, training_format, eval_split, checkpoint_interval,
+):
+    """Full fine-tuning using PyTorch / HuggingFace Transformers."""
     try:
         import torch
         from transformers import (
@@ -85,7 +182,6 @@ def run(ctx):
         )
         from datasets import Dataset
     except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
         missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
         raise BlockDependencyError(
             missing,
@@ -260,4 +356,67 @@ def run(ctx):
         "total_params": total_params,
     })
     ctx.log_message(f"Training complete. Final loss: {final_loss}")
+    ctx.report_progress(1, 1)
+
+
+# ── Fallback / simulation path (NEW) ──────────────────────────────────
+
+def _run_fallback(
+    ctx, model_name, dataset_path, lr, epochs, batch_size,
+    max_seq_length, warmup_steps, weight_decay,
+):
+    """Config-only fallback when no training framework is installed."""
+    ctx.log_message("Running in config-only mode: generating full fine-tuning plan")
+
+    # Count samples
+    data_file = os.path.join(dataset_path, "data.json") if os.path.isdir(dataset_path) else dataset_path
+    num_samples = 0
+    if os.path.isfile(data_file):
+        with open(data_file, "r") as f:
+            raw_data = json.load(f)
+        if isinstance(raw_data, list):
+            num_samples = len(raw_data)
+
+    estimated_steps = (num_samples // batch_size) * epochs if num_samples else 0
+
+    output_dir = os.path.join(ctx.run_dir, "model")
+    os.makedirs(output_dir, exist_ok=True)
+
+    training_plan = {
+        "base_model": model_name,
+        "method": "full_finetuning",
+        "status": "plan_only",
+        "message": (
+            "Full fine-tuning could not run because required libraries are not installed. "
+            "Install them with: pip install torch transformers datasets"
+        ),
+        "training_config": {
+            "learning_rate": lr, "epochs": epochs, "batch_size": batch_size,
+            "max_seq_length": max_seq_length, "warmup_steps": warmup_steps,
+            "weight_decay": weight_decay,
+        },
+        "dataset_info": {"num_samples": num_samples},
+        "estimates": {"estimated_steps": estimated_steps},
+        "requirements": [
+            "pip install torch transformers datasets",
+            "pip install mlx-lm  # For Apple Silicon",
+            f"Model: {model_name}",
+            "WARNING: Full fine-tuning requires much more memory than LoRA",
+        ],
+    }
+
+    plan_path = os.path.join(output_dir, "full_training_plan.json")
+    with open(plan_path, "w") as f:
+        json.dump(training_plan, f, indent=2)
+
+    ctx.save_artifact("training_plan", plan_path)
+    ctx.log_message(f"Dataset: {num_samples} samples, {epochs} epochs")
+    ctx.log_message(f"Training plan saved to {plan_path}")
+    ctx.log_message("Install torch + transformers (or mlx-lm on Apple Silicon) to execute actual training")
+
+    ctx.save_output("trained_model", output_dir)
+    ctx.save_output("metrics", {
+        "status": "plan_only",
+        "estimated_steps": estimated_steps,
+    })
     ctx.report_progress(1, 1)
