@@ -17,8 +17,8 @@ if _TRAINING_PKG_DIR not in sys.path:
     sys.path.insert(0, _TRAINING_PKG_DIR)
 try:
     from _training_utils import (
-        detect_training_framework, prepare_dataset as _prepare_texts,
-        call_training, TrainingConfig, write_training_data,
+        detect_training_framework, prepare_texts as _prepare_texts,
+        call_mlx_subprocess, write_training_data,
     )
 except ImportError:
     detect_training_framework = None
@@ -39,6 +39,12 @@ except ImportError:
         def __init__(self, dep, message="", **kw): super().__init__(message or dep)
     class BlockExecutionError(RuntimeError):
         def __init__(self, message, **kw): super().__init__(message)
+
+try:
+    from blocks.training._validation import _validate_model_for_training
+except ImportError:
+    def _validate_model_for_training(model_name, model_info, ctx, field_name="model_name"):
+        return model_name
 
 
 def run(ctx):
@@ -65,6 +71,7 @@ def run(ctx):
     max_seq_length = int(ctx.config.get("max_seq_length", 512))
 
     # Try to get model from input
+    model_info = {}
     try:
         model_info = ctx.load_input("model")
         if isinstance(model_info, dict):
@@ -76,6 +83,9 @@ def run(ctx):
 
     if not model_name:
         raise BlockConfigError("model_name", "Model name is required")
+
+    # ── Validate model for training ──
+    model_name = _validate_model_for_training(model_name, model_info, ctx)
 
     ctx.log_message(f"Curriculum Training: {model_name}")
     ctx.log_message(f"Stages: {num_stages}, Epochs/stage: {epochs_per_stage}")
@@ -135,16 +145,12 @@ def run(ctx):
                 os.path.join(ctx.run_dir, f"mlx_data_stage_{stage_idx}"),
             )
             stage_output = os.path.join(output_dir, f"stage_{stage_idx + 1}")
-            mlx_config = TrainingConfig(
-                model_name=model_name,
-                output_dir=stage_output,
-                data_dir=data_dir,
-                epochs=epochs_per_stage,
-                learning_rate=lr,
-                batch_size=batch_size,
-                max_seq_length=max_seq_length,
+            mlx_result = call_mlx_subprocess(
+                model_name, data_dir, stage_output,
+                epochs=epochs_per_stage, learning_rate=lr,
+                batch_size=batch_size, max_seq_length=max_seq_length,
+                ctx=ctx,
             )
-            mlx_result = call_training(mlx_config, ctx=ctx)
             if not mlx_result["success"]:
                 ctx.log_message(
                     f"MLX stage {stage_idx + 1} failed: {mlx_result.get('error', '')}. "
@@ -322,7 +328,7 @@ def run(ctx):
             }, f, indent=2)
 
         # Branch: real training succeeded
-        ctx.save_output("model", output_dir)
+        ctx.save_output("trained_model", output_dir)
         # Branch: real training succeeded
         ctx.save_output("metrics", {
             "final_loss": final_loss,
@@ -394,7 +400,7 @@ def run(ctx):
         }, f, indent=2)
 
     # Branch: training failed — simulation fallback
-    ctx.save_output("model", model_path)
+    ctx.save_output("trained_model", model_path)
     # Branch: training failed — simulation fallback
     ctx.save_output("metrics", {
         "final_loss": final_loss,

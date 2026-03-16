@@ -59,3 +59,9 @@ config:
     label: Overwrite Existing
     description: Delete existing collection before indexing (false = append to existing data)
     default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

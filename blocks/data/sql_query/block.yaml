@@ -72,3 +72,9 @@ config:
     label: SSL Client Key
     default: ""
     description: "Path to client private key for mutual TLS authentication"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -32,6 +32,12 @@ except ImportError:
     class BlockExecutionError(RuntimeError):
         def __init__(self, message, **kw): super().__init__(message)
 
+try:
+    from blocks.training._validation import _validate_model_for_training
+except ImportError:
+    def _validate_model_for_training(model_name, model_info, ctx, field_name="model_name"):
+        return model_name
+
 
 def _load_data(ctx, input_name):
     data = ctx.load_input(input_name)
@@ -67,6 +73,11 @@ def run(ctx):
         raise BlockInputError("No base model provided", recoverable=False)
 
     model_path = model_data if isinstance(model_data, str) else str(model_data)
+
+    # ── Validate model for training ──
+    _model_info_dict = model_data if isinstance(model_data, dict) else {}
+    model_path = _validate_model_for_training(model_path, _model_info_dict, ctx)
+
     ctx.log_message(f"Base model: {model_path}")
 
     # Determine dataset size
@@ -180,7 +191,7 @@ def run(ctx):
     ctx.report_progress(3, 4)
 
     # Save model output
-    ctx.save_output("model", output_model_path)
+    ctx.save_output("reward_model", output_model_path)
 
     # Save training metadata
     with open(os.path.join(output_model_path, "training_config.json"), "w") as f:

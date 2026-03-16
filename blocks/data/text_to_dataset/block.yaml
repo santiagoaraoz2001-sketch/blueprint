@@ -40,3 +40,9 @@ config:
     default: "none"
     options: ["none", "newline", "paragraph", "sentence"]
     description: "How to split the text into multiple rows"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

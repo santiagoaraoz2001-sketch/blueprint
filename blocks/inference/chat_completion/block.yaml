@@ -1,0 +1,74 @@
+name: Chat Completion
+type: chat_completion
+category: inference
+description: Multi-turn chat completion — send a conversation history to an LLM and get a response
+version: "1.0.0"
+maturity: stable
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+  - id: prompt
+    label: User Message
+    data_type: text
+    required: true
+  - id: system_prompt
+    label: System Prompt
+    data_type: text
+    required: false
+  - id: history
+    label: Chat History
+    data_type: dataset
+    required: false
+    description: "Previous messages as [{role, content}] dataset"
+
+outputs:
+  - id: response
+    label: Response
+    data_type: text
+    aliases: [text]
+  - id: output_dataset
+    label: Conversation Log
+    data_type: dataset
+  - id: metadata
+    label: Metadata
+    data_type: metrics
+  - id: llm_config
+    label: LLM Config
+    data_type: config
+
+config:
+  model_name:
+    type: string
+    label: Model Name
+    default: ""
+    description: "Model to use (overridden by model input port)"
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.7
+    min: 0.0
+    max: 2.0
+  max_tokens:
+    type: integer
+    label: Max Tokens
+    default: 1024
+    min: 1
+    max: 32768
+  system_prompt:
+    type: text_area
+    label: Default System Prompt
+    default: "You are a helpful assistant."
+  backend:
+    type: select
+    label: Inference Backend
+    default: ""
+    options: ["", "ollama", "mlx", "pytorch"]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

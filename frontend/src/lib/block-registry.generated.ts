@@ -1,5 +1,5 @@
 // AUTO-GENERATED — DO NOT EDIT MANUALLY
-// Generated from 125 block.yaml files across 12 categories
+// Generated from 127 block.yaml files across 12 categories
 // Run: python scripts/generate_block_registry.py
 
 import type { BlockDefinition } from './block-registry'
@@ -25,7 +25,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'references', label: 'Reference Answers', dataType: 'dataset', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Evaluation Results', dataType: 'dataset', required: false },
+      { id: 'evaluation_dataset', label: 'Evaluation Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Eval Report', dataType: 'artifact', required: false },
       { id: 'metrics', label: 'Aggregate Scores', dataType: 'metrics', required: false },
     ],
@@ -81,6 +81,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Format for the evaluation report text output',
       },
       { name: 'seed', label: 'Random Seed', type: 'integer', default: 42 },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
   {
@@ -143,6 +146,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Maximum memory entries (0 = unlimited). Oldest entries evicted when limit reached.',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'agent_orchestrator',
@@ -155,15 +161,17 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Task / Prompt', dataType: 'text', required: true },
       { id: 'tools', label: 'Tool Registry', dataType: 'config', required: false },
       { id: 'memory', label: 'Agent Memory', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'response', label: 'Final Response', dataType: 'text', required: false },
+      { id: 'response', label: 'Final Response', dataType: 'text', required: false, aliases: ['text', 'output'] },
       { id: 'dataset', label: 'Step Log', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Run Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false, aliases: ['llm'] },
     ],
     defaultConfig: {
       task: '',
@@ -232,6 +240,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'plain: raw text, markdown: formatted with headers, json: structured JSON object',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'agent_text_bridge',
@@ -248,8 +259,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Task Context', dataType: 'dataset', required: false },
     ],
     outputs: [
-      { id: 'text', label: 'Extracted Text', dataType: 'text', required: false },
-      { id: 'dataset', label: 'Full Responses', dataType: 'dataset', required: false },
+      { id: 'text', label: 'Extracted Text', dataType: 'text', required: false, aliases: ['response', 'output'] },
+      { id: 'output_dataset', label: 'Full Responses', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Extraction Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -299,6 +310,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'raw: text as-is, markdown: with metadata header, json: structured extraction result',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'chain_of_thought',
@@ -311,13 +325,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Question / Prompt', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'response', label: 'Final Answer', dataType: 'text', required: false },
+      { id: 'response', label: 'Final Answer', dataType: 'text', required: false, aliases: ['text', 'output'] },
       { id: 'dataset', label: 'Reasoning Chain', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Reasoning Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false, aliases: ['llm'] },
     ],
     defaultConfig: {
       input_text: '',
@@ -381,6 +397,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'plain: raw text, markdown: headers per step, json: structured {steps, final_answer, metadata}',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'code_agent',
@@ -393,15 +412,17 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Task Description', dataType: 'text', required: true },
       { id: 'context', label: 'Code Context', dataType: 'text', required: false },
     ],
     outputs: [
-      { id: 'text', label: 'Generated Code', dataType: 'text', required: false },
+      { id: 'text', label: 'Generated Code', dataType: 'text', required: false, aliases: ['response', 'output'] },
       { id: 'artifact', label: 'Code File', dataType: 'artifact', required: false },
       { id: 'dataset', label: 'Full Results', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Code Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false, aliases: ['llm'] },
     ],
     defaultConfig: {
       task: '',
@@ -469,6 +490,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'raw: code only, markdown: fenced code block, json: structured object',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'debate_composite',
@@ -481,11 +505,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: false },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Debate Topic', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'consensus', label: 'Consensus', dataType: 'text', required: false },
+      { id: 'consensus', label: 'Consensus', dataType: 'text', required: false, aliases: ['response', 'text', 'output'] },
+      { id: 'dataset', label: 'Debate Log', dataType: 'dataset', required: false },
+      { id: 'metrics', label: 'Debate Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false, aliases: ['llm'] },
     ],
     defaultConfig: { topic: '', model_name: '', rounds: 3 },
     configFields: [
@@ -505,6 +533,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
       { name: 'rounds', label: 'Debate Rounds', type: 'integer', default: 3, min: 1, max: 10 },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'multi_agent_debate',
@@ -517,13 +548,15 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'input', label: 'Topic / Prompt', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'response', label: 'Debate Summary', dataType: 'text', required: false },
+      { id: 'response', label: 'Debate Summary', dataType: 'text', required: false, aliases: ['text', 'output'] },
       { id: 'dataset', label: 'Debate Log', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Consensus Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false, aliases: ['llm'] },
     ],
     defaultConfig: {
       topic: '',
@@ -587,6 +620,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Seed for reproducible demo outputs',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'retrieval_agent',
@@ -599,15 +635,17 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     accent: '#06b6d4',
     maturity: 'stable',
     inputs: [
-      { id: 'llm', label: 'LLM', dataType: 'config', required: true },
+      { id: 'llm', label: 'LLM', dataType: 'llm', required: false },
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'store', label: 'Vector Store Config', dataType: 'config', required: true },
       { id: 'dataset', label: 'Queries', dataType: 'dataset', required: false },
       { id: 'query', label: 'Single Query', dataType: 'text', required: false },
     ],
     outputs: [
-      { id: 'response', label: 'Response Text', dataType: 'text', required: false },
-      { id: 'dataset', label: 'Responses', dataType: 'dataset', required: false },
+      { id: 'response', label: 'Response Text', dataType: 'text', required: false, aliases: ['text', 'output'] },
+      { id: 'retrieval_log', label: 'Responses', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'RAG Metrics', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false, aliases: ['llm'] },
     ],
     defaultConfig: {
       top_k: 5,
@@ -676,6 +714,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Format for the response text output',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'tool_registry',
@@ -719,6 +760,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Format of generated function-calling schemas',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -760,7 +804,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       api_key_header: 'X-API-Key',
     },
     configFields: [
-      { name: 'url', label: 'API URL', type: 'string', description: 'REST API endpoint URL' },
+      {
+        name: 'url',
+        label: 'API URL',
+        type: 'string',
+        description: 'REST API endpoint URL',
+        mandatory: true,
+      },
       {
         name: 'method',
         label: 'Method',
@@ -855,6 +905,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         depends_on: { field: 'auth_type', value: 'api_key' },
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -875,8 +928,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'dataset', label: 'Transformed', dataType: 'dataset', required: false },
-      { id: 'stats', label: 'Transform Stats', dataType: 'metrics', required: false },
+      { id: 'transformed_dataset', label: 'Transformed', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'stats', label: 'Transform Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       operation: 'rename',
@@ -947,6 +1000,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Comma-separated columns to convert to lowercase',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -986,6 +1042,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         options: ['replace', 'deep_merge'],
         description: 'How to merge with base config input (replace = shallow overwrite, deep_merge = recursive merge)',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
   {
@@ -1035,6 +1094,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         depends_on: { field: 'validate_schema', value: true },
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -1059,8 +1121,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Augmented', dataType: 'dataset', required: false },
-      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
+      { id: 'augmented_dataset', label: 'Augmented', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'output_dataset_meta', label: 'Dataset Info', dataType: 'config', required: false, aliases: ['dataset_meta'] },
       { id: 'metrics', label: 'Augmentation Stats', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -1161,6 +1223,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Maximum tokens per augmented text',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'data_merger',
@@ -1180,8 +1245,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'dataset', label: 'Merged', dataType: 'dataset', required: false },
-      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
-      { id: 'stats', label: 'Merge Stats', dataType: 'metrics', required: false },
+      { id: 'output_dataset_meta', label: 'Dataset Info', dataType: 'config', required: false, aliases: ['dataset_meta'] },
+      { id: 'stats', label: 'Merge Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       method: 'concat',
@@ -1283,6 +1348,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Repeat factor for Dataset C',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'data_preview',
@@ -1298,9 +1366,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'stats', label: 'Stats', dataType: 'metrics', required: false },
-      { id: 'preview', label: 'Preview Rows', dataType: 'dataset', required: false },
-      { id: 'dataset', label: 'Dataset (passthrough)', dataType: 'dataset', required: false },
+      { id: 'stats', label: 'Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
+      { id: 'preview', label: 'Preview Rows', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'preview_dataset', label: 'Dataset (passthrough)', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       num_rows: 20,
@@ -1357,6 +1425,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Value to match in filter_column (blank = show non-empty rows)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'dataset_row_selector',
@@ -1372,8 +1443,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'dataset', label: 'Selected Rows', dataType: 'dataset', required: false },
-      { id: 'text', label: 'First Row as Text', dataType: 'text', required: false },
+      { id: 'selected_dataset', label: 'Selected Rows', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'text', label: 'First Row as Text', dataType: 'text', required: false, aliases: ['response', 'output'] },
       { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -1431,6 +1502,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Which column to output as text (auto-detects if not found)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'dataset_to_text',
@@ -1446,7 +1520,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'text', label: 'Extracted Text', dataType: 'text', required: false },
+      { id: 'text', label: 'Extracted Text', dataType: 'text', required: false, aliases: ['response', 'output'] },
       { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: { column: 'text', join_with: '\n', max_rows: 0, row_index: -1 },
@@ -1481,6 +1555,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: -1,
         description: 'Extract a single row by index (-1 = all rows)',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
 
@@ -1523,6 +1600,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Folder Path',
         type: 'file_path',
         description: 'Directory containing documents to ingest',
+        mandatory: true,
       },
       {
         name: 'glob_pattern',
@@ -1596,6 +1674,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Language hint for processing',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -1617,10 +1698,10 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Filtered', dataType: 'dataset', required: false },
-      { id: 'rejected', label: 'Rejected', dataType: 'dataset', required: false },
-      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
-      { id: 'stats', label: 'Stats', dataType: 'metrics', required: false },
+      { id: 'filtered_dataset', label: 'Filtered', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'rejected', label: 'Rejected', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'output_dataset_meta', label: 'Dataset Info', dataType: 'config', required: false, aliases: ['dataset_meta'] },
+      { id: 'stats', label: 'Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       method: 'length',
@@ -1732,6 +1813,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
       { name: 'seed', label: 'Random Seed', type: 'integer', default: 42 },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -1778,6 +1862,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Dataset Name',
         type: 'string',
         description: 'HuggingFace dataset identifier (e.g. \'imdb\', \'squad\', \'databricks/dolly-15k\')',
+        mandatory: true,
       },
       {
         name: 'subset',
@@ -1878,6 +1963,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'json = pipeline-compatible JSON array (recommended). native = HuggingFace Arrow format (faster for HF workflows).',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -1958,6 +2046,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         options: ['auto', 'float16', 'bfloat16', 'float32'],
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -1994,7 +2085,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       sheet_name: '',
     },
     configFields: [
-      { name: 'file_path', label: 'File Path', type: 'file_path', description: 'Path to the data file' },
+      {
+        name: 'file_path',
+        label: 'File Path',
+        type: 'file_path',
+        description: 'Path to the data file',
+        mandatory: true,
+      },
       {
         name: 'format',
         label: 'Format',
@@ -2057,6 +2154,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         depends_on: { field: 'format', value: 'xlsx' },
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'metrics_input',
@@ -2102,6 +2202,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         depends_on: { field: 'format', value: 'key_value' },
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -2124,7 +2227,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: false },
-      { id: 'metrics', label: 'Conversion Stats', dataType: 'metrics', required: false },
+      { id: 'output_metrics', label: 'Conversion Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: { format: 'rows', label: '' },
     configFields: [
@@ -2144,6 +2247,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Label to identify this metrics set (useful when merging)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'model_selector',
@@ -2158,6 +2264,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     inputs: [],
     outputs: [
       { id: 'model', label: 'Model', dataType: 'model', required: false },
+      { id: 'llm', label: 'LLM Config', dataType: 'llm', required: false },
     ],
     defaultConfig: {
       source: 'huggingface',
@@ -2218,6 +2325,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: true,
         description: 'Verify file integrity for local models',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
 
@@ -2313,6 +2423,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: '',
         description: 'Path to client private key for mutual TLS authentication',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
 
@@ -2418,6 +2531,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Randomly rotate seed examples per batch for more diverse outputs (requires seed_mode=in_context)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'text_chunker',
@@ -2434,9 +2550,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Chunked Data', dataType: 'dataset', required: false },
-      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
-      { id: 'stats', label: 'Chunking Stats', dataType: 'metrics', required: false },
+      { id: 'chunked_dataset', label: 'Chunked Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'output_dataset_meta', label: 'Dataset Info', dataType: 'config', required: false, aliases: ['dataset_meta'] },
+      { id: 'stats', label: 'Chunking Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       chunk_size: 1000,
@@ -2513,6 +2629,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Add doc_id, chunk_id, and chunk_index columns to output (disable for clean flat output)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'text_concatenator',
@@ -2530,7 +2649,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text_c', label: 'Text C', dataType: 'text', required: false },
     ],
     outputs: [
-      { id: 'text', label: 'Combined Text', dataType: 'text', required: false },
+      { id: 'text', label: 'Combined Text', dataType: 'text', required: false, aliases: ['response', 'output'] },
     ],
     defaultConfig: {
       separator: '\n\n',
@@ -2593,6 +2712,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Truncate output to this many characters (0 = unlimited). Useful as a prompt size guard.',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -2611,7 +2733,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     maturity: 'stable',
     inputs: [],
     outputs: [
-      { id: 'text', label: 'Text Output', dataType: 'text', required: false },
+      { id: 'text', label: 'Text Output', dataType: 'text', required: false, aliases: ['response', 'output'] },
     ],
     defaultConfig: { text_value: 'Enter your text here...', format: 'plain', encoding: 'utf-8' },
     configFields: [
@@ -2638,6 +2760,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         options: ['utf-8', 'ascii', 'latin-1'],
         description: 'Output text encoding',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
 
@@ -2682,6 +2807,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'How to split the text into multiple rows',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'train_val_test_split',
@@ -2698,11 +2826,11 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'train', label: 'Train', dataType: 'dataset', required: false },
-      { id: 'val', label: 'Validation', dataType: 'dataset', required: false },
-      { id: 'test', label: 'Test', dataType: 'dataset', required: false },
-      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
-      { id: 'stats', label: 'Split Stats', dataType: 'metrics', required: false },
+      { id: 'train', label: 'Train', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'val', label: 'Validation', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'test', label: 'Test', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'output_dataset_meta', label: 'Dataset Info', dataType: 'config', required: false, aliases: ['dataset_meta'] },
+      { id: 'stats', label: 'Split Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       train_ratio: 0.8,
@@ -2747,6 +2875,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: '',
         description: 'Sort rows by this column before splitting (for temporal/ordered splits — use with shuffle=false)',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
 
@@ -2819,6 +2950,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: true,
         description: 'Delete existing collection before indexing (false = append to existing data)',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
 
@@ -2972,6 +3106,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         depends_on: { field: 'use_llm_extraction', value: true },
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -2994,8 +3131,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'status', label: 'Response Status', dataType: 'text', required: false },
-      { id: 'summary', label: 'Publish Summary', dataType: 'metrics', required: false },
-      { id: 'results', label: 'Response Data', dataType: 'dataset', required: false },
+      { id: 'summary', label: 'Publish Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
+      { id: 'results', label: 'Response Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       url: '',
@@ -3098,6 +3235,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'skip = continue on error, fail = abort entire batch',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'database_writer',
@@ -3114,7 +3254,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'status', label: 'Write Status', dataType: 'text', required: false },
-      { id: 'summary', label: 'Write Summary', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Write Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       connection_string: '',
@@ -3186,6 +3326,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Auto-inject UTC timestamp column (e.g. inserted_at)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'hf_hub_push',
@@ -3202,7 +3345,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'repo_url', label: 'Repository URL', dataType: 'text', required: false },
-      { id: 'summary', label: 'Push Summary', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Push Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       repo_id: '',
@@ -3254,6 +3397,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Subdirectory within repo to upload to (e.g. models/v2)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'save_csv',
@@ -3269,8 +3415,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
-      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       output_path: './output',
@@ -3338,6 +3485,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'String to use for missing/null values',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'save_embeddings',
@@ -3353,8 +3503,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'embeddings', label: 'Embeddings', dataType: 'embedding', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
-      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       output_path: './output',
@@ -3400,6 +3551,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'float16 halves file size with minimal quality loss',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'save_json',
@@ -3415,8 +3569,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
-      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       output_path: './output',
@@ -3487,6 +3642,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Wrap data under a root key (e.g. "results" produces {"results": [...]})',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'save_local',
@@ -3502,8 +3660,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Input', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
-      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       output_directory: '',
@@ -3560,6 +3719,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Append timestamp to filename for versioning',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'save_model',
@@ -3575,8 +3737,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Model Data', dataType: 'model', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
-      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       output_path: './output',
@@ -3634,6 +3797,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
       { name: 'overwrite_existing', label: 'Overwrite Existing', type: 'boolean', default: true },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'save_parquet',
@@ -3649,8 +3815,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'dataset', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
-      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       output_path: './output',
@@ -3688,6 +3855,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Append timestamp to filename for versioning',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'save_pdf',
@@ -3704,8 +3874,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'config', label: 'Report Config', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
-      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       output_path: './output',
@@ -3792,6 +3963,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Maximum table rows to include in PDF',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'save_txt',
@@ -3807,8 +3981,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Data', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
-      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       output_path: './output',
@@ -3892,6 +4067,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Strip trailing whitespace from each line',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'save_yaml',
@@ -3907,8 +4085,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Data', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'file_path', label: 'File Path', dataType: 'text', required: false },
-      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false },
+      { id: 'file_path', label: 'Saved File Path', dataType: 'artifact', required: false },
+      { id: 'status', label: 'Save Status', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Export Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       output_path: './output',
@@ -3948,6 +4127,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Comment block prepended to YAML file (each line gets',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'webhook_trigger',
@@ -3965,8 +4147,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'status', label: 'Response Status', dataType: 'text', required: false },
-      { id: 'summary', label: 'Webhook Summary', dataType: 'metrics', required: false },
-      { id: 'response', label: 'Response Body', dataType: 'text', required: false },
+      { id: 'summary', label: 'Webhook Summary', dataType: 'metrics', required: false, aliases: ['metrics'] },
+      { id: 'response', label: 'Response Body', dataType: 'text', required: false, aliases: ['text', 'output'] },
     ],
     defaultConfig: {
       webhook_url: '',
@@ -4044,6 +4226,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Add pipeline run ID to webhook payload',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -4069,7 +4254,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Comparison Results', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Comparisons', dataType: 'dataset', required: false },
+      { id: 'comparison_dataset', label: 'Annotated Comparisons', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Comparison Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -4211,6 +4396,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'ab_significance',
@@ -4271,6 +4459,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Minimum samples per group for reliable results',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'bias_fairness_eval',
@@ -4289,7 +4480,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Fairness Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Results', dataType: 'dataset', required: false },
+      { id: 'annotated_dataset', label: 'Annotated Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Bias Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -4430,6 +4621,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'coherence_eval',
@@ -4448,7 +4642,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Quality Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Data', dataType: 'dataset', required: false },
+      { id: 'scored_dataset', label: 'Annotated Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Quality Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -4528,6 +4722,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'custom_benchmark',
@@ -4546,7 +4743,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'metrics', label: 'Scores', dataType: 'metrics', required: false },
       { id: 'report', label: 'Detailed Report', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Predictions', dataType: 'dataset', required: false },
+      { id: 'benchmark_dataset', label: 'Predictions', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       model_name: 'llama3.2',
@@ -4670,6 +4867,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'custom_eval',
@@ -4686,7 +4886,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'reference', label: 'Reference Data', dataType: 'dataset', required: false },
     ],
     outputs: [
-      { id: 'scores', label: 'Scores', dataType: 'metrics', required: false },
+      { id: 'scores', label: 'Scores', dataType: 'metrics', required: false, aliases: ['metrics'] },
       { id: 'report', label: 'Detailed Report', dataType: 'artifact', required: false },
       { id: 'dataset', label: 'Scored Samples', dataType: 'dataset', required: false },
     ],
@@ -4756,6 +4956,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'factuality_checker',
@@ -4773,7 +4976,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Factuality Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Results', dataType: 'dataset', required: false },
+      { id: 'checked_dataset', label: 'Annotated Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Error Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -4903,6 +5106,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 6,
         description: 'Decimal places for all computed scores',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
   {
@@ -5048,6 +5254,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'latency_profiler',
@@ -5066,7 +5275,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'metrics', label: 'Performance Metrics', dataType: 'metrics', required: false },
       { id: 'results', label: 'Detailed Profiles', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Timing Data', dataType: 'dataset', required: false },
+      { id: 'profiled_dataset', label: 'Timing Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       model_name: '',
@@ -5182,6 +5391,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'lm_eval_harness',
@@ -5292,6 +5504,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 6,
         description: 'Decimal places for all computed scores',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
   {
@@ -5404,6 +5619,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'model_diff',
@@ -5498,6 +5716,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 6,
         description: 'Decimal places for computed scores',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
   {
@@ -5606,6 +5827,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'rag_eval',
@@ -5623,7 +5847,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'RAG Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Results', dataType: 'dataset', required: false },
+      { id: 'eval_dataset', label: 'Annotated Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'RAG Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -5730,6 +5954,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'semantic_similarity',
@@ -5746,7 +5973,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Similarity Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Pairs', dataType: 'dataset', required: false },
+      { id: 'similarity_dataset', label: 'Annotated Pairs', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Similarity Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -5825,6 +6052,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'summarization_eval',
@@ -5843,7 +6073,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'metrics', label: 'Summarization Scores', dataType: 'metrics', required: false },
       { id: 'report', label: 'Detailed Report', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Scored Summaries', dataType: 'dataset', required: false },
+      { id: 'eval_dataset', label: 'Scored Summaries', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       summary_column: 'summary',
@@ -5909,6 +6139,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'toxicity_eval',
@@ -5927,7 +6160,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'metrics', label: 'Safety Scores', dataType: 'metrics', required: false },
-      { id: 'dataset', label: 'Annotated Data', dataType: 'dataset', required: false },
+      { id: 'scored_dataset', label: 'Annotated Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'report', label: 'Toxicity Report', dataType: 'artifact', required: false },
     ],
     defaultConfig: {
@@ -6059,6 +6292,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Decimal places for all computed scores',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -6081,7 +6317,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'path_a', label: 'Path A', dataType: 'any', required: false },
       { id: 'path_b', label: 'Path B', dataType: 'any', required: false },
-      { id: 'comparison', label: 'Comparison', dataType: 'metrics', required: false },
+      { id: 'comparison', label: 'Comparison', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       split_ratio: 0.5,
@@ -6139,6 +6375,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Column name for stratified splits — ensures proportional representation in each path (e.g., \'category\')',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'agentic_review_loop',
@@ -6156,7 +6395,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'refined_output', label: 'Refined Output', dataType: 'any', required: false },
-      { id: 'score_report', label: 'Score Report', dataType: 'metrics', required: false },
+      { id: 'score_report', label: 'Score Report', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       max_iterations: 3,
@@ -6284,10 +6523,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'text = raw LLM output string, json = attempt to parse refined output as JSON object',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -6308,7 +6550,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'in_5', label: 'Input 5', dataType: 'any', required: false },
     ],
     outputs: [
-      { id: 'output', label: 'Combined Output', dataType: 'dataset', required: false },
+      { id: 'output', label: 'Combined Output', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Aggregation Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -6365,6 +6607,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Maximum number of rows in the final output (0 = no limit). Applied after sort, so combine with sort_by for top-N queries.',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'artifact_viewer',
@@ -6380,7 +6625,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'artifact', label: 'Artifact', dataType: 'artifact', required: true },
     ],
     outputs: [
-      { id: 'summary', label: 'Artifact Manifest', dataType: 'metrics', required: false },
+      { id: 'summary', label: 'Artifact Manifest', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: { auto_open: true, display_mode: 'preview' },
     configFields: [
@@ -6399,6 +6644,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         options: ['preview', 'raw', 'download'],
         description: 'How to display the artifact',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
 
@@ -6423,7 +6671,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'passed', label: 'Passed', dataType: 'any', required: false },
       { id: 'rejected', label: 'Rejected', dataType: 'any', required: false },
-      { id: 'gate_metrics', label: 'Gate Report', dataType: 'metrics', required: false },
+      { id: 'gate_metrics', label: 'Gate Report', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       metric_name: 'accuracy',
@@ -6499,10 +6747,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'detailed = full check results + metrics, summary = pass/fail counts + failed metric names only',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -6520,7 +6771,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'config', label: 'Connection Details', dataType: 'config', required: false },
-      { id: 'dataset', label: 'Output Data', dataType: 'dataset', required: false },
+      { id: 'output_dataset', label: 'Output Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       provider: 'modal',
@@ -6594,6 +6845,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Docker image or environment slug (e.g. \'python:3.11-slim\'). Empty = provider default.',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'conditional_branch',
@@ -6612,7 +6866,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'true_branch', label: 'If True', dataType: 'any', required: false },
       { id: 'false_branch', label: 'If False', dataType: 'any', required: false },
-      { id: 'result', label: 'Result', dataType: 'metrics', required: false },
+      { id: 'result', label: 'Result', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       field: '',
@@ -6659,6 +6913,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'When enabled, evaluates the condition against the \'Condition Data\' input port instead of the main input',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'control_tower',
@@ -6674,7 +6931,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'telemetry', label: 'Data / Telemetry', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'telemetry', label: 'Telemetry Sent', dataType: 'any', required: false },
+      { id: 'output_telemetry', label: 'Telemetry Sent', dataType: 'any', required: false, aliases: ['telemetry'] },
     ],
     defaultConfig: { host: 'http://localhost', port: 4173 },
     configFields: [
@@ -6692,6 +6949,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 4173,
         description: 'Control Tower port number',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
 
@@ -6716,7 +6976,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'artifact', label: 'Visualization', dataType: 'artifact', required: false },
-      { id: 'dataset', label: 'Coordinates', dataType: 'dataset', required: false },
+      { id: 'viz_dataset', label: 'Coordinates', dataType: 'dataset', required: false, aliases: ['dataset'] },
     ],
     defaultConfig: {
       embedding_column: '_embedding',
@@ -6804,10 +7064,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Minimum distance between points in UMAP output (smaller = tighter clusters)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -6825,7 +7088,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'output', label: 'Output', dataType: 'any', required: false },
-      { id: 'error', label: 'Error Info', dataType: 'metrics', required: false },
+      { id: 'error', label: 'Error Info', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       max_retries: 0,
@@ -6901,6 +7164,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Regex pattern — only retry if the error message matches (e.g., \'ConnectionError|Timeout\'). Empty = retry on all errors.',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'experiment_logger',
@@ -6938,6 +7204,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
       { name: 'log_to_file', label: 'Log to File', type: 'boolean', default: true },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -6960,7 +7229,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'approved', label: 'Approved', dataType: 'any', required: false },
       { id: 'rejected', label: 'Rejected', dataType: 'any', required: false },
-      { id: 'review_notes', label: 'Review Notes', dataType: 'metrics', required: false },
+      { id: 'review_notes', label: 'Review Notes', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       review_prompt: 'Review the data and approve to continue',
@@ -7043,12 +7312,114 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Include a data preview in the review_notes output (disable to reduce output size)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
+  {
+    type: 'loop_controller',
+    name: 'Loop Controller',
+    description: 'Repeatedly executes a pipeline segment. Connect the \'body\' output to the first block in your loop, then connect the last block\'s output back to \'feedback\'. Configure iterations, file modes, context management, and early stopping.\n',
+    category: 'flow',
+    tags: ['loop', 'iteration', 'flow', 'synthetic_data', 'refinement'],
+    aliases: [],
+    icon: 'Workflow',
+    accent: '#6366f1',
+    maturity: 'stable',
+    inputs: [
+      { id: 'input', label: 'Seed Data', dataType: 'any', required: false },
+      { id: 'feedback', label: 'Feedback', dataType: 'any', required: false },
+    ],
+    outputs: [
+      { id: 'body', label: 'Loop Body', dataType: 'any', required: false },
+      { id: 'result', label: 'Final Result', dataType: 'dataset', required: false },
+      { id: 'metrics', label: 'Loop Metrics', dataType: 'metrics', required: false },
+    ],
+    defaultConfig: {
+      iterations: 10,
+      stop_metric: '',
+      stop_threshold: 0.0,
+      stop_direction: 'above',
+      context_management: 'clear',
+      file_mode: 'append',
+      seed_mode: 'increment',
+      base_seed: 42,
+      iteration_delay_ms: 0,
+      accumulate_results: true,
+      prompt_variation: '',
+    },
+    configFields: [
+      { name: 'iterations', label: 'Iterations', type: 'integer', default: 10, min: 1, max: 10000 },
+      {
+        name: 'stop_metric',
+        label: 'Stop Metric',
+        type: 'string',
+        default: '',
+        description: 'Metric name for early stopping (e.g., \'accuracy\'). Leave empty to run all iterations.',
+      },
+      { name: 'stop_threshold', label: 'Stop Threshold', type: 'float', default: 0.0 },
+      {
+        name: 'stop_direction',
+        label: 'Stop Direction',
+        type: 'select',
+        default: 'above',
+        options: ['above', 'below'],
+      },
+      {
+        name: 'context_management',
+        label: 'Context Management',
+        type: 'select',
+        default: 'clear',
+        options: ['clear', 'keep', 'summarize'],
+        description: 'clear: reset LLM context each iteration (best for diverse generation). keep: accumulate context (best for refinement). summarize: compress previous context.',
+      },
+      {
+        name: 'file_mode',
+        label: 'File Write Mode',
+        type: 'select',
+        default: 'append',
+        options: ['append', 'overwrite', 'versioned'],
+        description: 'append: grow files across iterations. overwrite: replace each time. versioned: create separate files per iteration.',
+      },
+      {
+        name: 'seed_mode',
+        label: 'Seed Behavior',
+        type: 'select',
+        default: 'increment',
+        options: ['fixed', 'increment', 'random'],
+      },
+      { name: 'base_seed', label: 'Base Seed', type: 'integer', default: 42 },
+      {
+        name: 'iteration_delay_ms',
+        label: 'Delay Between Iterations (ms)',
+        type: 'integer',
+        default: 0,
+        min: 0,
+      },
+      {
+        name: 'accumulate_results',
+        label: 'Accumulate All Results',
+        type: 'boolean',
+        default: true,
+        description: 'true: collect outputs from ALL iterations into final result. false: only keep last.',
+      },
+      {
+        name: 'prompt_variation',
+        label: 'Prompt Variation Template',
+        type: 'text_area',
+        default: '',
+        description: 'Template for varying prompts per iteration. Use {{iteration}}, {{total}}, {{seed}}, {{previous_output}}.',
+      },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
+  },
   {
     type: 'loop_iterator',
     name: 'Loop Iterator',
@@ -7141,6 +7512,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Add an \'_index\' field to each output item so downstream blocks know which iteration they are in',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -7163,7 +7537,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'approved', label: 'Approved', dataType: 'any', required: false },
       { id: 'rejected', label: 'Rejected', dataType: 'any', required: false },
-      { id: 'notes', label: 'Review Notes', dataType: 'metrics', required: false },
+      { id: 'notes', label: 'Review Notes', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       review_criteria: 'Check for accuracy and completeness',
@@ -7257,6 +7631,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Comma-separated custom labels for reviewers (e.g., \'safe, flagged, escalate, remove\'). Empty = standard approve/reject.',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'notification_hub',
@@ -7272,7 +7649,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'data', label: 'Trigger Data', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'status', label: 'Send Status', dataType: 'metrics', required: false },
+      { id: 'status', label: 'Send Status', dataType: 'metrics', required: false, aliases: ['metrics'] },
       { id: 'pass_through', label: 'Pass Through', dataType: 'any', required: false },
     ],
     defaultConfig: {
@@ -7390,6 +7767,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Only send if severity meets or exceeds this level (filters out noise)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'notification_sender',
@@ -7406,7 +7786,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'message_data', label: 'Message Data', dataType: 'text', required: false },
     ],
     outputs: [
-      { id: 'status', label: 'Send Status', dataType: 'metrics', required: false },
+      { id: 'status', label: 'Send Status', dataType: 'metrics', required: false, aliases: ['metrics'] },
       { id: 'pass_through', label: 'Pass Through', dataType: 'any', required: false },
     ],
     defaultConfig: {
@@ -7490,10 +7870,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Maximum time for webhook or desktop notification delivery',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
-  //  FLOW (10 blocks)
+  //  FLOW (11 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -7510,11 +7893,11 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'input', label: 'Input Data', dataType: 'any', required: true },
     ],
     outputs: [
-      { id: 'out_1', label: 'Branch 1', dataType: 'dataset', required: false },
-      { id: 'out_2', label: 'Branch 2', dataType: 'dataset', required: false },
-      { id: 'out_3', label: 'Branch 3', dataType: 'dataset', required: false },
-      { id: 'out_4', label: 'Branch 4', dataType: 'dataset', required: false },
-      { id: 'out_5', label: 'Branch 5', dataType: 'dataset', required: false },
+      { id: 'out_1', label: 'Branch 1', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'out_2', label: 'Branch 2', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'out_3', label: 'Branch 3', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'out_4', label: 'Branch 4', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'out_5', label: 'Branch 5', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Split Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -7564,6 +7947,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0,
         description: 'Seed for reproducible random splits (split_ratio mode). 0 = different each run.',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
   {
@@ -7647,6 +8033,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         depends_on: { field: 'trust_level', value: 'sandboxed' },
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -7670,7 +8059,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     outputs: [
       { id: 'passed', label: 'Passed', dataType: 'any', required: false },
       { id: 'rejected', label: 'Rejected', dataType: 'any', required: false },
-      { id: 'gate_metrics', label: 'Gate Report', dataType: 'metrics', required: false },
+      { id: 'gate_metrics', label: 'Gate Report', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       metric_name: 'accuracy',
@@ -7754,6 +8143,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'detailed = full check results + all metrics, summary = pass/fail counts + failed metric names only',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'rollback_point',
@@ -7770,7 +8162,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'output', label: 'Output', dataType: 'any', required: false },
-      { id: 'snapshot', label: 'Snapshot Info', dataType: 'metrics', required: false },
+      { id: 'snapshot', label: 'Snapshot Info', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       label: 'rollback-1',
@@ -7810,10 +8202,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Custom tags attached to each snapshot (one per line: key: value). E.g., \'stage: preprocessing\'',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
-  //  INFERENCE (17 blocks)
+  //  INFERENCE (18 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -7833,7 +8228,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Comparison Results', dataType: 'dataset', required: false },
+      { id: 'results_dataset', label: 'Comparison Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Quality Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -7935,6 +8330,63 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Output format for results — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
+  },
+  {
+    type: 'chat_completion',
+    name: 'Chat Completion',
+    description: 'Multi-turn chat completion — send a conversation history to an LLM and get a response',
+    category: 'inference',
+    tags: [],
+    aliases: [],
+    icon: 'Cpu',
+    accent: '#8b5cf6',
+    maturity: 'stable',
+    inputs: [
+      { id: 'model', label: 'Model', dataType: 'model', required: false },
+      { id: 'prompt', label: 'User Message', dataType: 'text', required: true },
+      { id: 'system_prompt', label: 'System Prompt', dataType: 'text', required: false },
+      { id: 'history', label: 'Chat History', dataType: 'dataset', required: false },
+    ],
+    outputs: [
+      { id: 'response', label: 'Response', dataType: 'text', required: false, aliases: ['text'] },
+      { id: 'output_dataset', label: 'Conversation Log', dataType: 'dataset', required: false },
+      { id: 'metadata', label: 'Metadata', dataType: 'metrics', required: false },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'config', required: false },
+    ],
+    defaultConfig: {
+      model_name: '',
+      temperature: 0.7,
+      max_tokens: 1024,
+      system_prompt: 'You are a helpful assistant.',
+      backend: '',
+    },
+    configFields: [
+      {
+        name: 'model_name',
+        label: 'Model Name',
+        type: 'string',
+        default: '',
+        description: 'Model to use (overridden by model input port)',
+      },
+      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.7, min: 0.0, max: 2.0 },
+      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 1024, min: 1, max: 32768 },
+      {
+        name: 'system_prompt',
+        label: 'Default System Prompt',
+        type: 'text_area',
+        default: 'You are a helpful assistant.',
+      },
+      {
+        name: 'backend',
+        label: 'Inference Backend',
+        type: 'select',
+        default: '',
+        options: ['', 'ollama', 'mlx', 'pytorch'],
+      },
+    ],
   },
   {
     type: 'embedding_clustering',
@@ -7952,8 +8404,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'labels', label: 'Labels', dataType: 'any', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Clustered Data', dataType: 'dataset', required: false },
-      { id: 'embeddings', label: 'Labeled Embeddings', dataType: 'embedding', required: false },
+      { id: 'clustered_dataset', label: 'Clustered Data', dataType: 'dataset', required: false, aliases: ['dataset'] },
+      { id: 'clustered_embeddings', label: 'Labeled Embeddings', dataType: 'embedding', required: false, aliases: ['embeddings'] },
       { id: 'metrics', label: 'Cluster Stats', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8060,6 +8512,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Output format for the dataset — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'embedding_generator',
@@ -8075,10 +8530,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Model', dataType: 'model', required: false },
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: true },
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
-      { id: 'model', label: 'Model', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Dataset with Embeddings', dataType: 'dataset', required: false },
+      { id: 'enriched_dataset', label: 'Dataset with Embeddings', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'embeddings', label: 'Embeddings', dataType: 'embedding', required: false },
       { id: 'metrics', label: 'Embedding Metrics', dataType: 'metrics', required: false },
     ],
@@ -8181,6 +8635,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Format for the embeddings artifact file in the run directory. The pipeline \'embeddings\' output port always uses JSON for downstream compatibility. Choose numpy for faster loading in external tools, or json for human-readable inspection.',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'embedding_similarity_search',
@@ -8199,7 +8656,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'metadata', label: 'Metadata', dataType: 'any', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Search Results', dataType: 'dataset', required: false },
+      { id: 'search_results', label: 'Search Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Search Stats', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8293,6 +8750,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Output format for the dataset — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'guardrails',
@@ -8308,7 +8768,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Text to Check', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'text', label: 'Filtered Text', dataType: 'text', required: false },
+      { id: 'filtered_text', label: 'Filtered Text', dataType: 'text', required: false, aliases: ['text', 'response', 'output'] },
       { id: 'metrics', label: 'Safety Scores', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8383,6 +8843,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Format for text output — text returns raw result, json wraps with metadata',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'llm_inference',
@@ -8401,9 +8864,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'context', label: 'Context', dataType: 'any', required: false },
     ],
     outputs: [
-      { id: 'response', label: 'Response', dataType: 'text', required: false },
-      { id: 'metadata', label: 'Metadata', dataType: 'metrics', required: false },
-      { id: 'llm_config', label: 'LLM Config', dataType: 'config', required: false },
+      { id: 'response', label: 'Response', dataType: 'text', required: false, aliases: ['text', 'output'] },
+      { id: 'metadata', label: 'Metadata', dataType: 'metrics', required: false, aliases: ['metrics'] },
+      { id: 'llm_config', label: 'LLM Config', dataType: 'llm', required: false, aliases: ['llm'] },
     ],
     defaultConfig: {
       prompt_template: '{input}',
@@ -8474,6 +8937,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'text = raw response, json = wrapped with metadata',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'model_benchmark',
@@ -8491,7 +8957,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Benchmark Results', dataType: 'dataset', required: false },
+      { id: 'benchmark_results', label: 'Benchmark Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Summary Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8566,6 +9032,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Output format for results — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'model_comparison',
@@ -8583,7 +9052,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Comparison Results', dataType: 'dataset', required: false },
+      { id: 'comparison_results', label: 'Comparison Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Comparison Summary', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8643,6 +9112,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Output format for results — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'model_router',
@@ -8659,7 +9131,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Prompt / Input', dataType: 'text', required: false },
     ],
     outputs: [
-      { id: 'response', label: 'Response', dataType: 'text', required: false },
+      { id: 'response', label: 'Response', dataType: 'text', required: false, aliases: ['text', 'output'] },
       { id: 'routing', label: 'Routing Decision', dataType: 'config', required: false },
       { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
     ],
@@ -8758,6 +9230,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Retry primary model N times before switching to fallback',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'prompt_chain',
@@ -8774,8 +9249,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Initial Input', dataType: 'text', required: false },
     ],
     outputs: [
-      { id: 'response', label: 'Final Output', dataType: 'text', required: false },
-      { id: 'steps', label: 'Intermediate Steps', dataType: 'dataset', required: false },
+      { id: 'response', label: 'Final Output', dataType: 'text', required: false, aliases: ['text', 'output'] },
+      { id: 'steps', label: 'Intermediate Steps', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8861,6 +9336,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Penalize tokens already present (positive = more diverse topics)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'prompt_template',
@@ -8879,7 +9357,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset', label: 'Dataset', dataType: 'dataset', required: false },
     ],
     outputs: [
-      { id: 'text', label: 'Rendered Prompt', dataType: 'text', required: false },
+      { id: 'rendered_text', label: 'Rendered Prompt', dataType: 'text', required: false, aliases: ['text', 'response', 'output'] },
       { id: 'metrics', label: 'Template Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: { template: '{input}', variables: '{}', output_format: 'text' },
@@ -8906,6 +9384,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         options: ['text', 'json'],
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'quantize_model',
@@ -8921,7 +9402,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Model', dataType: 'model', required: true },
     ],
     outputs: [
-      { id: 'model', label: 'Quantized Model', dataType: 'model', required: false },
+      { id: 'quantized_model', label: 'Quantized Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Quant Stats', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -8965,6 +9446,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Compute precision for BitsAndBytes quantization',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'rag_pipeline',
@@ -8982,8 +9466,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'text', label: 'Answer', dataType: 'text', required: false },
-      { id: 'dataset', label: 'Context Chunks', dataType: 'dataset', required: false },
+      { id: 'text', label: 'Answer', dataType: 'text', required: false, aliases: ['response', 'output'] },
+      { id: 'output_dataset', label: 'Context Chunks', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'RAG Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -9075,6 +9559,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Output format for context chunks — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'reranker',
@@ -9092,7 +9579,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'dataset', label: 'Reranked Results', dataType: 'dataset', required: false },
+      { id: 'reranked_dataset', label: 'Reranked Results', dataType: 'dataset', required: false, aliases: ['dataset'] },
       { id: 'metrics', label: 'Reranking Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -9170,6 +9657,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Output format for the dataset — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'response_parser',
@@ -9185,7 +9675,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Raw Response', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'text', label: 'Parsed Text', dataType: 'text', required: false },
+      { id: 'parsed_text', label: 'Parsed Text', dataType: 'text', required: false, aliases: ['text', 'response', 'output'] },
       { id: 'config', label: 'Extracted Fields', dataType: 'config', required: false },
       { id: 'dataset', label: 'Extracted Records', dataType: 'dataset', required: false },
     ],
@@ -9242,6 +9732,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Column delimiter for CSV mode (e.g. \',\', \'\\t\', \'|\')',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'token_counter',
@@ -9257,7 +9750,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Input Text', dataType: 'text', required: true },
     ],
     outputs: [
-      { id: 'text', label: 'Token Breakdown', dataType: 'text', required: false },
+      { id: 'token_text', label: 'Token Breakdown', dataType: 'text', required: false, aliases: ['text', 'response', 'output'] },
       { id: 'dataset', label: 'Token Analysis', dataType: 'dataset', required: false },
       { id: 'metrics', label: 'Token Counts', dataType: 'metrics', required: false },
     ],
@@ -9319,6 +9812,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Output format for token analysis — json (default), jsonl (one JSON object per line), csv (comma-separated values)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'vision_inference',
@@ -9336,7 +9832,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'text', label: 'Additional Context', dataType: 'text', required: false },
     ],
     outputs: [
-      { id: 'response', label: 'Description / Response', dataType: 'text', required: false },
+      { id: 'response', label: 'Description / Response', dataType: 'text', required: false, aliases: ['text', 'output'] },
       { id: 'metrics', label: 'Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -9426,6 +9922,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Resize if larger than this (pixels). 0 = no resize. Reduces token cost',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -9507,6 +10006,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Name for the merged model',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'frankenmerge',
@@ -9580,6 +10082,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 7200,
         description: 'Maximum execution time for the mergekit process',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
   {
@@ -9657,6 +10162,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Name for the merged model',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'slerp_merge',
@@ -9713,6 +10221,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'slerp-merged-model',
         description: 'Name for the merged model',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
   {
@@ -9781,6 +10292,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Name for the merged model',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -9823,6 +10337,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Create a compressed tar.gz archive',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'leaderboard_publisher',
@@ -9839,7 +10356,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'artifact', label: 'Submission', dataType: 'artifact', required: false },
-      { id: 'metrics', label: 'Stats', dataType: 'metrics', required: false },
+      { id: 'output_metrics', label: 'Stats', dataType: 'metrics', required: false, aliases: ['metrics'] },
     ],
     defaultConfig: {
       title: 'Model Leaderboard',
@@ -9878,6 +10395,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Format for the leaderboard output',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'model_card_writer',
@@ -9895,7 +10415,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
     outputs: [
       { id: 'artifact', label: 'Model Card', dataType: 'artifact', required: false },
-      { id: 'text', label: 'Card Text', dataType: 'text', required: false },
+      { id: 'text', label: 'Card Text', dataType: 'text', required: false, aliases: ['response', 'output'] },
     ],
     defaultConfig: {
       model_name: 'My Fine-Tuned Model',
@@ -9985,6 +10505,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Extra markdown appended before Citation. Use for Intended Use, Out-of-Scope, etc.',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'report_generator',
@@ -10041,6 +10564,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Comma-separated section names to include (summary, metrics, details, config)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'results_formatter',
@@ -10069,6 +10595,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
       { name: 'include_config', label: 'Include Config', type: 'boolean', default: true },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
 
   // ═══════════════════════════════════════════════
@@ -10091,7 +10620,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Trained Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'Trained Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Training Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10113,6 +10642,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'layer_depth',
@@ -10176,6 +10706,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'checkpoint_selector',
@@ -10191,7 +10724,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Training Output', dataType: 'model', required: true },
     ],
     outputs: [
-      { id: 'model', label: 'Best Checkpoint', dataType: 'model', required: false },
+      { id: 'selected_model', label: 'Best Checkpoint', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Checkpoint Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: { checkpoint_dir: '', metric: 'eval_loss', mode: 'min' },
@@ -10201,6 +10734,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Checkpoint Directory',
         type: 'string',
         description: 'Path to scan for checkpoints (overridden by model input port if connected)',
+        mandatory: true,
       },
       {
         name: 'metric',
@@ -10217,6 +10751,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         options: ['min', 'max'],
         description: 'Whether to pick the checkpoint with min or max metric value',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
   {
@@ -10235,7 +10772,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Pre-trained Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'Pre-trained Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Loss Curve', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10255,6 +10792,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       { name: 'lr', label: 'Learning Rate', type: 'float', default: 1e-05, min: 1e-07, max: 0.001 },
       { name: 'epochs', label: 'Epochs', type: 'integer', default: 1, min: 1, max: 50 },
@@ -10303,6 +10841,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'curriculum_training',
@@ -10320,7 +10861,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Trained Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'Trained Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Curriculum Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10341,6 +10882,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'num_stages',
@@ -10400,6 +10942,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Template for structuring training examples. Use {text}, {instruction}, {output} placeholders.',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'distillation',
@@ -10438,12 +10983,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Teacher Model',
         type: 'string',
         description: 'HuggingFace name or path for the teacher model (overridden by input port)',
+        mandatory: true,
       },
       {
         name: 'student_model',
         label: 'Student Model',
         type: 'string',
         description: 'HuggingFace name or path for the student model (overridden by input port)',
+        mandatory: true,
       },
       {
         name: 'temperature',
@@ -10483,6 +11030,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'JSON key containing training text (leave empty for auto-detect: \'text\' or first key)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'dpo_alignment',
@@ -10499,7 +11049,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Base Model', dataType: 'model', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Aligned Model', dataType: 'model', required: false },
+      { id: 'aligned_model', label: 'Aligned Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'DPO Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10521,6 +11071,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'beta',
@@ -10583,6 +11134,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'full_finetuning',
@@ -10600,7 +11154,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Fine-tuned Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'Fine-tuned Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Training Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10623,6 +11177,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       { name: 'lr', label: 'Learning Rate', type: 'float', default: 2e-05, min: 1e-07, max: 0.01 },
       { name: 'epochs', label: 'Epochs', type: 'integer', default: 3, min: 1, max: 100 },
@@ -10694,6 +11249,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'hyperparameter_sweep',
@@ -10710,7 +11268,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Base Model', dataType: 'model', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Best Model', dataType: 'model', required: false },
+      { id: 'best_model', label: 'Best Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Sweep Results', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10761,6 +11319,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Whether to minimize or maximize the target metric',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'lora_finetuning',
@@ -10778,7 +11339,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'Fine-tuned Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'Fine-tuned Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Training Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10803,6 +11364,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path (e.g. meta-llama/Llama-3-8B)',
+        mandatory: true,
       },
       {
         name: 'r',
@@ -10890,6 +11452,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'qlora_finetuning',
@@ -10907,7 +11472,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'QLoRA Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'QLoRA Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Training Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -10934,6 +11499,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Base Model',
         type: 'string',
         description: 'HuggingFace model name or local path',
+        mandatory: true,
       },
       {
         name: 'r',
@@ -11036,6 +11602,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Save checkpoint every N epochs (0 = final only)',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'reward_model_trainer',
@@ -11052,7 +11621,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'model', label: 'Base Model', dataType: 'model', required: true },
     ],
     outputs: [
-      { id: 'model', label: 'Reward Model', dataType: 'model', required: false },
+      { id: 'reward_model', label: 'Reward Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'RM Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -11124,6 +11693,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'Column name for rejected responses in preference data',
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'rlhf_ppo',
@@ -11141,7 +11713,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'reward_model', label: 'Reward Model', dataType: 'model', required: false },
     ],
     outputs: [
-      { id: 'model', label: 'RLHF Model', dataType: 'model', required: false },
+      { id: 'trained_model', label: 'RLHF Model', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'PPO Metrics', dataType: 'metrics', required: false },
     ],
     defaultConfig: {
@@ -11162,12 +11734,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         label: 'Policy Model',
         type: 'string',
         description: 'HuggingFace model name or local path for the policy model',
+        mandatory: true,
       },
       {
         name: 'reward_model',
         label: 'Reward Model',
         type: 'string',
         description: 'HuggingFace model name or path for the reward model (leave empty for heuristic reward)',
+        mandatory: true,
       },
       { name: 'lr', label: 'Learning Rate', type: 'float', default: 1.4e-05, min: 1e-07, max: 0.001 },
       {
@@ -11223,6 +11797,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 2.0,
         description: 'Sampling temperature for PPO rollout generation (higher = more diverse)',
       },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
   },
 ]

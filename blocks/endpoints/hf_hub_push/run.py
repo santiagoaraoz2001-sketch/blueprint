@@ -60,6 +60,23 @@ def run(ctx):
             recoverable=True,
         )
 
+    # ── Loop-aware metadata ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        iteration = loop.get("iteration", 0)
+        file_mode = loop.get("file_mode", "overwrite")
+        ctx.log_message(f"[Loop iter {iteration}] file_mode={file_mode}")
+        # Loop versioned: append iteration to commit message and modify path
+        if file_mode == "versioned":
+            commit_message = f"{commit_message} (iter {iteration})"
+            if path_in_repo:
+                path_in_repo = f"{path_in_repo}/iter_{iteration}"
+            else:
+                path_in_repo = f"iter_{iteration}"
+    else:
+        iteration = 0
+        file_mode = "overwrite"
+
     ctx.log_message(f"HF Hub Push starting (repo={repo_id}, type={repo_type})")
     ctx.report_progress(0, 4)
 

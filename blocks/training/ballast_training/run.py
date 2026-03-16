@@ -14,8 +14,8 @@ if _TRAINING_PKG_DIR not in sys.path:
     sys.path.insert(0, _TRAINING_PKG_DIR)
 try:
     from _training_utils import (
-        detect_training_framework, prepare_dataset as _prepare_texts,
-        call_training, TrainingConfig, write_training_data,
+        detect_training_framework, prepare_texts as _prepare_texts,
+        call_mlx_subprocess, write_training_data,
     )
 except ImportError:
     detect_training_framework = None
@@ -36,6 +36,12 @@ except ImportError:
         def __init__(self, dep, message="", **kw): super().__init__(message or dep)
     class BlockExecutionError(RuntimeError):
         def __init__(self, message, **kw): super().__init__(message)
+
+try:
+    from blocks.training._validation import _validate_model_for_training
+except ImportError:
+    def _validate_model_for_training(model_name, model_info, ctx, field_name="model_name"):
+        return model_name
 
 
 def run(ctx):
@@ -63,6 +69,7 @@ def run(ctx):
     checkpoint_interval = int(ctx.config.get("checkpoint_interval", 0))
 
     # Try to get model from input port
+    model_info = {}
     try:
         model_info = ctx.load_input("model")
         if isinstance(model_info, dict):
@@ -74,6 +81,9 @@ def run(ctx):
 
     if not model_name:
         raise BlockConfigError("model_name", "Model name is required (via config or model input port)")
+
+    # ── Validate model for training ──
+    model_name = _validate_model_for_training(model_name, model_info, ctx)
 
     ctx.log_message(f"BALLAST training: {model_name}")
     ctx.log_message(f"layer_depth={layer_depth}, balance_factor={balance_factor}, epochs={epochs}")
@@ -111,17 +121,12 @@ def run(ctx):
             f"(layer_depth={layer_depth})"
         )
         output_dir = os.path.join(ctx.run_dir, "model")
-        mlx_config = TrainingConfig(
-            model_name=model_name,
-            output_dir=output_dir,
-            data_dir=data_dir,
-            epochs=epochs,
-            learning_rate=lr,
-            batch_size=batch_size,
-            max_seq_length=max_seq_length,
-            lora_layers=lora_layers,
+        mlx_result = call_mlx_subprocess(
+            model_name, data_dir, output_dir,
+            epochs=epochs, learning_rate=lr, batch_size=batch_size,
+            max_seq_length=max_seq_length, lora_layers=lora_layers,
+            ctx=ctx,
         )
-        mlx_result = call_training(mlx_config, ctx=ctx)
         if mlx_result["success"]:
             with open(os.path.join(output_dir, "ballast_config.json"), "w") as f:
                 json.dump({
@@ -384,7 +389,7 @@ def _run_real_training(
     ctx.log_message(f"BALLAST training complete. Final loss: {final_loss}")
 
     # Branch: real training succeeded
-    ctx.save_output("model", output_dir)
+    ctx.save_output("trained_model", output_dir)
     # Branch: real training succeeded
     ctx.save_output("metrics", {
         "final_loss": final_loss,
@@ -480,7 +485,7 @@ def _run_fallback(ctx, model_name, raw_data, layer_depth, balance_factor, epochs
     ctx.log_message("Install torch + transformers to execute actual training")
 
     # Branch: fallback/plan-only mode (dead code — _run_fallback is never called)
-    ctx.save_output("model", output_dir)
+    ctx.save_output("trained_model", output_dir)
     # Branch: fallback/plan-only mode (dead code — _run_fallback is never called)
     ctx.save_output("metrics", {
         "status": "plan_only",

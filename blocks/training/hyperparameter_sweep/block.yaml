@@ -15,9 +15,11 @@ inputs:
     required: false
 
 outputs:
-  - id: model
+  - id: best_model
     label: Best Model
+    aliases: [model]
     data_type: model
+
   - id: metrics
     label: Sweep Results
     data_type: metrics
@@ -58,3 +60,9 @@ config:
     options: ["auto", "mlx", "pytorch"]
     default: "auto"
     description: "Force a specific training framework. 'auto' detects the best available."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

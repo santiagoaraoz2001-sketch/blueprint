@@ -32,6 +32,7 @@ config:
     type: string
     label: Dataset Name
     description: "HuggingFace dataset identifier (e.g. 'imdb', 'squad', 'databricks/dolly-15k')"
+    mandatory: true
   subset:
     type: string
     label: Subset
@@ -106,3 +107,9 @@ config:
     options: [json, native]
     default: json
     description: "json = pipeline-compatible JSON array (recommended). native = HuggingFace Arrow format (faster for HF workflows)."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

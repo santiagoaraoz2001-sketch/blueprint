@@ -29,3 +29,9 @@ config:
     options: [replace, deep_merge]
     default: replace
     description: "How to merge with base config input (replace = shallow overwrite, deep_merge = recursive merge)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

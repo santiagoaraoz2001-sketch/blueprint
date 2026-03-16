@@ -39,6 +39,16 @@ def run(ctx):
     ctx.log_message("Save Text starting")
     ctx.report_progress(0, 3)
 
+    # ── Loop-aware file handling ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        file_mode = loop.get("file_mode", "overwrite")
+        iteration = loop.get("iteration", 0)
+        ctx.log_message(f"[Loop iter {iteration}] file_mode={file_mode}")
+    else:
+        file_mode = "overwrite"
+        iteration = 0
+
     # ---- Step 1: Load and convert data ----
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_text("text")
@@ -81,21 +91,41 @@ def run(ctx):
 
     if not filename.endswith(".txt"):
         filename += ".txt"
+
+    # Loop versioned: create iteration-specific filename
+    if file_mode == "versioned":
+        base = filename.rsplit(".", 1)[0]
+        filename = f"{base}_iter{iteration}.txt"
+
     out_filepath = os.path.join(out_dir, filename)
 
-    if not append_mode and os.path.exists(out_filepath) and not overwrite:
+    # Loop append overrides the block's own append_mode
+    effective_append = append_mode or (file_mode == "append")
+
+    if not effective_append and os.path.exists(out_filepath) and not overwrite:
         raise BlockInputError(
             f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
             recoverable=True,
         )
 
     # ---- Step 3: Write file ----
-    mode = "a" if append_mode else "w"
     newline_char = "" if line_ending.upper() == "CRLF" else None
-    with open(out_filepath, mode, encoding=encoding, newline=newline_char) as f:
-        if append_mode:
-            f.write("\n")
-        f.write(content)
+
+    if effective_append and os.path.isfile(out_filepath):
+        # Check if existing file needs a trailing newline before we append
+        needs_separator = False
+        with open(out_filepath, "rb") as f:
+            f.seek(0, 2)
+            if f.tell() > 0:
+                f.seek(-1, 2)
+                needs_separator = f.read(1) != b"\n"
+        with open(out_filepath, "a", encoding=encoding, newline=newline_char) as f:
+            if needs_separator:
+                f.write("\n")
+            f.write(content)
+    else:
+        with open(out_filepath, "w", encoding=encoding, newline=newline_char) as f:
+            f.write(content)
 
     ctx.report_progress(3, 3)
     file_size = os.path.getsize(out_filepath)

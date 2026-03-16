@@ -19,9 +19,11 @@ inputs:
     required: false
 
 outputs:
-  - id: model
+  - id: trained_model
     label: QLoRA Model
+    aliases: [model]
     data_type: model
+
   - id: metrics
     label: Training Metrics
     data_type: metrics
@@ -31,6 +33,7 @@ config:
     type: string
     label: Base Model
     description: HuggingFace model name or local path
+    mandatory: true
   r:
     type: integer
     label: LoRA Rank (r)
@@ -122,3 +125,22 @@ config:
     default: 0
     min: 0
     max: 100
+  mlx_lora_layers:
+    type: integer
+    label: MLX LoRA Layers
+    default: 16
+    min: 1
+    max: 64
+    description: "Number of layers to apply LoRA to (MLX only). Lower = less memory, potentially less quality."
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

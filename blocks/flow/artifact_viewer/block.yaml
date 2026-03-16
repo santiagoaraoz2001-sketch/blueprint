@@ -16,6 +16,7 @@ outputs:
     data_type: metrics
     description: "JSON manifest with artifact type, size, preview, and path information"
 
+    aliases: [metrics]
 config:
   auto_open:
     type: boolean
@@ -28,3 +29,9 @@ config:
     description: How to display the artifact
     default: preview
     options: [preview, raw, download]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

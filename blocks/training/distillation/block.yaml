@@ -35,10 +35,12 @@ config:
     type: string
     label: Teacher Model
     description: HuggingFace name or path for the teacher model (overridden by input port)
+    mandatory: true
   student_model:
     type: string
     label: Student Model
     description: HuggingFace name or path for the student model (overridden by input port)
+    mandatory: true
   temperature:
     type: float
     label: Temperature
@@ -89,3 +91,9 @@ config:
     options: ["auto", "mlx", "pytorch"]
     default: "auto"
     description: "Force a specific training framework. 'auto' detects the best available."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

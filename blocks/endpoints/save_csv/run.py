@@ -70,6 +70,16 @@ def run(ctx):
     ctx.log_message("Save CSV starting")
     ctx.report_progress(0, 4)
 
+    # ── Loop-aware file handling ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        file_mode = loop.get("file_mode", "overwrite")
+        iteration = loop.get("iteration", 0)
+        ctx.log_message(f"[Loop iter {iteration}] file_mode={file_mode}")
+    else:
+        file_mode = "overwrite"
+        iteration = 0
+
     # ---- Step 1: Load and normalize data ----
     ctx.report_progress(1, 4)
     raw_data = ctx.resolve_as_data("data")
@@ -132,16 +142,55 @@ def run(ctx):
         base = filename.rsplit(".", 1)[0]
         filename = f"{base}_{ts}.csv"
 
+    # Loop versioned: create iteration-specific filename
+    if file_mode == "versioned":
+        base = filename.rsplit(".", 1)[0]
+        filename = f"{base}_iter{iteration}.csv"
+
     out_filepath = os.path.join(out_dir, filename)
 
-    if os.path.exists(out_filepath) and not overwrite:
+    if file_mode != "append" and os.path.exists(out_filepath) and not overwrite:
         raise BlockInputError(
             f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
             recoverable=True,
         )
 
-    with open(out_filepath, "w", encoding=encoding, newline="") as f:
-        f.write(content)
+    # Loop append: append rows without repeating header
+    if file_mode == "append" and os.path.isfile(out_filepath):
+        # Read existing headers to validate schema consistency
+        try:
+            with open(out_filepath, "r", encoding=encoding, newline="") as f:
+                reader = csv.reader(f, delimiter=delimiter)
+                existing_headers = next(reader, None)
+            if existing_headers and existing_headers != headers:
+                ctx.log_message(
+                    f"WARNING: Column mismatch on append. "
+                    f"Existing: {existing_headers}, Current: {headers}. "
+                    f"Using existing column order."
+                )
+                headers = existing_headers
+        except (OSError, StopIteration):
+            pass
+
+        buf = io.StringIO()
+        writer = csv.writer(buf, delimiter=delimiter, quoting=quoting)
+        for row in rows:
+            writer.writerow([na_value if row.get(h) is None else str(row.get(h, na_value)) for h in headers])
+        append_content = buf.getvalue()
+        # Ensure file ends with newline before appending
+        with open(out_filepath, "rb") as f:
+            f.seek(0, 2)
+            needs_newline = False
+            if f.tell() > 0:
+                f.seek(-1, 2)
+                needs_newline = f.read(1) != b"\n"
+        with open(out_filepath, "a", encoding=encoding, newline="") as f:
+            if needs_newline:
+                f.write("\n")
+            f.write(append_content)
+    else:
+        with open(out_filepath, "w", encoding=encoding, newline="") as f:
+            f.write(content)
 
     # ---- Step 4: Finalize ----
     ctx.report_progress(4, 4)

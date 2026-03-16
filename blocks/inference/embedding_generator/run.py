@@ -283,7 +283,7 @@ def run(ctx):
         json.dump(results, f)
 
 
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("enriched_dataset", out_dir)
 
     # ── Save format-specific artifact (for manual download/inspection) ──
     if output_format == "numpy":

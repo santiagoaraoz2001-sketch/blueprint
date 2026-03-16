@@ -12,14 +12,18 @@ inputs:
 
 outputs:
   - id: file_path
-    label: File Path
-    data_type: text
+    label: Saved File Path
+    data_type: artifact
     description: "Absolute path to the saved model directory"
+  - id: status
+    label: Save Status
+    data_type: metrics
   - id: summary
     label: Export Summary
     data_type: metrics
     description: "Object with keys: total_size_bytes (int), files_saved (int), format (string), quantize (string)"
 
+    aliases: [metrics]
 config:
   output_path:
     type: string
@@ -57,3 +61,9 @@ config:
     type: boolean
     label: Overwrite Existing
     default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -18,6 +18,7 @@ outputs:
   - id: response
     label: Response
     data_type: text
+    aliases: [text, output]
   - id: routing
     label: Routing Decision
     data_type: config
@@ -99,3 +100,9 @@ config:
     min: 0
     max: 5
     description: "Retry primary model N times before switching to fallback"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

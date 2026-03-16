@@ -133,6 +133,20 @@ dim: 768, normalized: true`}
                         </div>
                     </div>
                 )
+            case 'llm':
+                return (
+                    <div style={{ padding: 12 }}>
+                        <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>LLM Provider Config</div>
+                        <pre style={{ margin: 0, fontFamily: F, fontSize: 10, color: T.text, background: T.surface0, padding: 8, borderRadius: 4, border: `1px solid ${T.borderHi}`, overflowX: 'hidden' }}>
+                            {`{
+  "provider": "ollama",
+  "model": "llama3.2",
+  "temperature": 0.7,
+  "max_tokens": 2048
+}`}
+                        </pre>
+                    </div>
+                )
             case 'any':
                 return (
                     <div style={{ padding: 12 }}>

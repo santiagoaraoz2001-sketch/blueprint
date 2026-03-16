@@ -148,7 +148,7 @@ def run(ctx):
     # Pass through dataset metadata
     if _dataset_meta:
         _dataset_meta["num_rows"] = len(rows)
-        ctx.save_output("dataset_meta", _dataset_meta)
+        ctx.save_output("output_dataset_meta", _dataset_meta)
 
     stats = {k: len(v) for k, v in splits.items()}
     stats["total"] = len(rows)

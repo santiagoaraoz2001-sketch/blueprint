@@ -14,18 +14,23 @@ outputs:
   - id: out_1
     label: Branch 1
     data_type: dataset
+    aliases: [dataset]
   - id: out_2
     label: Branch 2
     data_type: dataset
+    aliases: [dataset]
   - id: out_3
     label: Branch 3
     data_type: dataset
+    aliases: [dataset]
   - id: out_4
     label: Branch 4
     data_type: dataset
+    aliases: [dataset]
   - id: out_5
     label: Branch 5
     data_type: dataset
+    aliases: [dataset]
   - id: metrics
     label: Split Metrics
     data_type: metrics
@@ -65,3 +70,9 @@ config:
     default: 0
     min: 0
     description: "Seed for reproducible random splits (split_ratio mode). 0 = different each run."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

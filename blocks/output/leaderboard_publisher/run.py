@@ -149,7 +149,7 @@ def run(ctx):
         f.write(content)
 
     ctx.save_output("artifact", out_dir)
-    ctx.save_output("metrics", {
+    ctx.save_output("output_metrics", {
         "num_entries": len(all_entries),
         "num_columns": len(columns),
         "sort_by": sort_by or "none",

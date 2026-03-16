@@ -6,7 +6,7 @@
 
 import type { Node, Edge } from '@xyflow/react'
 import type { BlockNodeData } from '@/stores/pipelineStore'
-import { getBlockDefinition, isPortCompatible, type ConfigField } from './block-registry'
+import { getBlockDefinition, isPortCompatible, resolvePort, type ConfigField } from './block-registry'
 import { estimatePipeline, formatTime, type HardwareSpec, type PipelineEstimate } from './pipeline-estimator'
 import { useHardwareStore } from '@/stores/hardwareStore'
 
@@ -393,8 +393,8 @@ export function validatePipelineClient(
     const targetDef = getBlockDefinition(targetNode.data.type)
 
     if (sourceDef && targetDef && edge.sourceHandle && edge.targetHandle) {
-      const sourcePort = sourceDef.outputs.find(p => p.id === edge.sourceHandle)
-      const targetPort = targetDef.inputs.find(p => p.id === edge.targetHandle)
+      const sourcePort = resolvePort(sourceDef.outputs, edge.sourceHandle)
+      const targetPort = resolvePort(targetDef.inputs, edge.targetHandle)
 
       if (sourcePort && targetPort && !isPortCompatible(sourcePort.dataType, targetPort.dataType)) {
         errors.push({

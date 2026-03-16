@@ -137,18 +137,18 @@ def run(ctx):
     if best:
         ctx.log_message(f"Best checkpoint: {best['name']} ({metric_name}={best_metric_val})")
         # Branch: best checkpoint found by metric
-        ctx.save_output("model", {"path": best["path"], "source": "checkpoint", **best})
+        ctx.save_output("selected_model", {"path": best["path"], "source": "checkpoint", **best})
     else:
         # Fall back to latest
         if checkpoints:
             best = max(checkpoints, key=lambda c: c["step"])
             ctx.log_message(f"No metric found. Selecting latest: {best['name']}")
             # Branch: checkpoints exist but no metric — use latest
-            ctx.save_output("model", {"path": best["path"], "source": "checkpoint", **best})
+            ctx.save_output("selected_model", {"path": best["path"], "source": "checkpoint", **best})
         else:
             ctx.log_message("No checkpoints found.")
             # Branch: no checkpoints found
-            ctx.save_output("model", {"path": "", "source": "checkpoint", "error": "no checkpoints found"})
+            ctx.save_output("selected_model", {"path": "", "source": "checkpoint", "error": "no checkpoints found"})
 
     ctx.save_output("metrics", {
         "total_checkpoints": len(checkpoints),

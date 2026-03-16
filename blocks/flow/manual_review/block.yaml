@@ -24,6 +24,7 @@ outputs:
     data_type: metrics
     description: "JSON: {review_id, approved, scores, avg_normalized_score, notes, reviewer, rubric, decision_label}"
 
+    aliases: [metrics]
 config:
   review_criteria:
     type: text_area
@@ -83,3 +84,9 @@ config:
     label: Custom Decision Labels
     default: ""
     description: "Comma-separated custom labels for reviewers (e.g., 'safe, flagged, escalate, remove'). Empty = standard approve/reject."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

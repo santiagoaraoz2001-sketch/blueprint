@@ -68,3 +68,9 @@ config:
     depends_on:
       field: trust_level
       value: sandboxed
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false
