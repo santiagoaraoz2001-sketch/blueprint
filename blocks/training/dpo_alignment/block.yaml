@@ -91,6 +91,12 @@ config:
     default: 0.0
     min: 0.0
     max: 0.3
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
 
 side_inputs:
   - id: _loop

@@ -2,6 +2,16 @@
 
 import json
 import os
+import sys
+
+# Import shared training utilities
+_TRAINING_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _TRAINING_PKG_DIR not in sys.path:
+    sys.path.insert(0, _TRAINING_PKG_DIR)
+try:
+    from _training_utils import detect_training_framework
+except ImportError:
+    detect_training_framework = None
 
 try:
     from backend.block_sdk.exceptions import (
@@ -60,6 +70,47 @@ def run(ctx):
 
     # Load dataset
     dataset_path = ctx.resolve_as_file_path("dataset")
+
+    # ── Framework detection ──────────────────────────────────────────────
+    prefer = ctx.config.get("prefer_framework", "auto")
+    framework = detect_training_framework(model_name, prefer) if detect_training_framework else "pytorch"
+
+    if framework == "mlx":
+        try:
+            import mlx_lm_lora  # noqa: F401
+            ctx.log_message("Using mlx_lm_lora for DPO training on MLX")
+            # mlx_lm_lora DPO: python -m mlx_lm_lora.train --train-mode dpo ...
+            import subprocess
+            output_dir = os.path.join(ctx.run_dir, "model")
+            os.makedirs(output_dir, exist_ok=True)
+            # Load data for mlx_lm_lora format
+            data_file = os.path.join(dataset_path, "data.json") if os.path.isdir(dataset_path) else dataset_path
+            cmd = [
+                "python", "-m", "mlx_lm_lora.train",
+                "--train-mode", "dpo",
+                "--model", model_name,
+                "--data", data_file,
+                "--adapter-path", output_dir,
+                "--iters", str(100 * epochs),
+                "--learning-rate", str(lr),
+                "--batch-size", str(batch_size),
+            ]
+            ctx.log_message(f"MLX DPO: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+            if result.returncode == 0:
+                ctx.log_message("DPO training complete (MLX via mlx_lm_lora)")
+                ctx.save_output("model", output_dir)
+                ctx.save_output("metrics", {"framework": "mlx", "epochs": epochs})
+                ctx.report_progress(1, 1)
+                return
+            ctx.log_message(f"mlx_lm_lora DPO failed: {result.stderr.strip() or result.stdout.strip()}. Falling back to PyTorch.")
+        except ImportError:
+            ctx.log_message(
+                "⚠️ DPO on MLX requires mlx_lm_lora package. "
+                "Install: pip install mlx-lm-lora\n"
+                "Falling back to PyTorch."
+            )
+        framework = "pytorch"
 
     # Import required libraries — raise on failure
     try:

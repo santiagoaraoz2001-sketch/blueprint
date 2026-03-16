@@ -69,6 +69,12 @@ config:
     label: Rejected Column
     description: Column name for rejected responses in preference data
     default: rejected
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
 
 side_inputs:
   - id: _loop

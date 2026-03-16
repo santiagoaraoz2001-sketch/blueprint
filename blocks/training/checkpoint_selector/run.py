@@ -3,6 +3,16 @@
 import json
 import os
 import re
+import sys
+
+# Import shared training utilities
+_TRAINING_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _TRAINING_PKG_DIR not in sys.path:
+    sys.path.insert(0, _TRAINING_PKG_DIR)
+try:
+    from _training_utils import detect_training_framework
+except ImportError:
+    detect_training_framework = None
 
 try:
     from backend.block_sdk.exceptions import (
@@ -36,6 +46,9 @@ def run(ctx):
             checkpoint_dir = checkpoint_dir or model_info
     except (ValueError, Exception):
         pass
+
+    # Framework preference (for consistency; checkpoint selection does no training)
+    _prefer = ctx.config.get("prefer_framework", "auto")
 
     ctx.log_message(f"Scanning for checkpoints in: {checkpoint_dir or '(not set)'}")
     ctx.log_message(f"Selection metric: {metric_name} (mode={mode})")

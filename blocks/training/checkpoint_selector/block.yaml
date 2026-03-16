@@ -37,6 +37,12 @@ config:
     description: Whether to pick the checkpoint with min or max metric value
     default: min
     options: [min, max]
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
 
 side_inputs:
   - id: _loop

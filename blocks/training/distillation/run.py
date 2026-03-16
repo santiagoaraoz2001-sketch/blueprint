@@ -8,7 +8,17 @@ to a realistic simulation when not available.
 import json
 import math
 import os
+import sys
 import time
+
+# Import shared training utilities
+_TRAINING_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _TRAINING_PKG_DIR not in sys.path:
+    sys.path.insert(0, _TRAINING_PKG_DIR)
+try:
+    from _training_utils import detect_training_framework
+except ImportError:
+    detect_training_framework = None
 
 try:
     from backend.block_sdk.exceptions import (
@@ -106,6 +116,17 @@ def run(ctx):
         num_rows = len(rows)
 
     ctx.log_message(f"Training data: {num_rows} samples")
+
+    # ── Framework detection ──────────────────────────────────────────────
+    prefer = ctx.config.get("prefer_framework", "auto")
+    framework = detect_training_framework(student_name, prefer) if detect_training_framework else "pytorch"
+    if framework == "mlx":
+        ctx.log_message(
+            "⚠️ Knowledge distillation is not supported on MLX. "
+            "It requires custom KL-divergence loss not available in mlx_lm. "
+            "Falling back to PyTorch. Install: pip install torch transformers"
+        )
+        framework = "pytorch"
 
     # ── Guard heavy imports ──
     try:

@@ -6,9 +6,22 @@ using the HuggingFace Trainer.  Falls back to simulated sweeps otherwise.
 
 import json
 import os
+import sys
 import time
 import itertools
 import random
+
+# Import shared training utilities
+_TRAINING_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _TRAINING_PKG_DIR not in sys.path:
+    sys.path.insert(0, _TRAINING_PKG_DIR)
+try:
+    from _training_utils import (
+        detect_training_framework, write_training_data,
+        call_mlx_subprocess,
+    )
+except ImportError:
+    detect_training_framework = None
 
 from backend.block_sdk.exceptions import BlockTimeoutError
 
@@ -74,6 +87,92 @@ def run(ctx):
         trials = [{"lr": 5e-5, "batch_size": 4}]
 
     ctx.log_message(f"Generated {len(trials)} trials for sweep.")
+
+    # ── Framework detection & MLX dispatch ───────────────────────────────
+    prefer = ctx.config.get("prefer_framework", "auto")
+    framework = detect_training_framework(model_name, prefer) if detect_training_framework else "pytorch"
+
+    if framework == "mlx":
+        ctx.log_message("Using MLX framework for hyperparameter sweep")
+        texts = _load_texts(dataset_path)
+        if not texts:
+            ctx.log_message("No training texts found; falling back to PyTorch")
+            framework = "pytorch"
+
+    if framework == "mlx":
+        best_value = float("inf") if mode == "min" else float("-inf")
+        best_trial = None
+        best_trial_idx = -1
+        best_output_dir = None
+
+        for i, trial_params in enumerate(trials):
+            ctx.log_message(f"--- Trial {i + 1}/{len(trials)}: {trial_params} ---")
+            trial_lr = float(trial_params.get("lr", trial_params.get("learning_rate", 5e-5)))
+            trial_bs = int(trial_params.get("batch_size", trial_params.get("per_device_train_batch_size", 4)))
+            trial_epochs = int(trial_params.get("epochs", trial_params.get("num_train_epochs", 1)))
+
+            trial_dir = os.path.join(ctx.run_dir, f"trial_{i}")
+            data_dir = write_training_data(texts, os.path.join(trial_dir, "data"), 0.1)
+            result = call_mlx_subprocess(
+                model_name, data_dir, os.path.join(trial_dir, "model"),
+                epochs=trial_epochs, learning_rate=trial_lr,
+                batch_size=trial_bs, ctx=ctx,
+            )
+            if not result["success"]:
+                ctx.log_message(f"Trial {i + 1} failed: {result.get('error', '')}")
+                continue
+
+            # MLX doesn't report eval metrics; use trial index as tiebreaker
+            trial_metric_val = float(i)  # placeholder
+            ctx.log_message(f"Trial {i + 1} completed (MLX)")
+            ctx.report_progress(i + 1, len(trials))
+
+            is_better = (
+                (mode == "min" and trial_metric_val < best_value)
+                or (mode == "max" and trial_metric_val > best_value)
+            )
+            if is_better or best_trial is None:
+                best_value = trial_metric_val
+                best_trial = trial_params
+                best_trial_idx = i
+                best_output_dir = os.path.join(trial_dir, "model")
+
+        if best_output_dir:
+            import shutil
+            out_model_path = os.path.join(ctx.run_dir, "best_model")
+            if os.path.exists(out_model_path):
+                shutil.rmtree(out_model_path)
+            shutil.copytree(best_output_dir, out_model_path)
+
+            with open(os.path.join(out_model_path, "sweep_config.json"), "w") as f:
+                json.dump({
+                    "base_model": model_name,
+                    "framework": "mlx",
+                    "best_hyperparameters": best_trial,
+                    "total_trials": len(trials),
+                    "demo_mode": False,
+                }, f, indent=2)
+
+            ctx.save_output("model", {
+                "path": out_model_path,
+                "model_name": model_name,
+                "source": "hyperparameter_sweep",
+                "framework": "mlx",
+                "demo_mode": False,
+            })
+            ctx.save_output("metrics", {
+                "best_trial_idx": best_trial_idx,
+                "best_hyperparameters": best_trial,
+                "optimize_metric": optimize_metric,
+                "mode": mode,
+                "total_trials": len(trials),
+                "framework": "mlx",
+            })
+            ctx.log_message(f"MLX sweep complete. Best trial: {best_trial_idx + 1}")
+            ctx.report_progress(1, 1)
+            return
+        else:
+            ctx.log_message("All MLX trials failed. Falling back to PyTorch.")
 
     # ── Try real training with transformers ───────────────────────────────
     try:

@@ -85,6 +85,12 @@ config:
     label: Text Column
     description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
     default: ""
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
 
 side_inputs:
   - id: _loop

@@ -65,10 +65,10 @@ class TrainingConfig:
 
 # ── Framework Detection ────────────────────────────────────────────────
 
-def detect_training_framework(model_name: str = "") -> str:
+def detect_training_framework(model_name: str = "", prefer: str = "auto") -> str:
     """Detect the best training framework for the current environment.
 
-    Priority:
+    Priority (when prefer="auto"):
     1. MLX on Apple Silicon (faster for local training, unified memory)
     2. PyTorch with CUDA (GPU training)
     3. PyTorch CPU (fallback)
@@ -76,10 +76,29 @@ def detect_training_framework(model_name: str = "") -> str:
 
     Args:
         model_name: Optional model name (MLX models prefer MLX framework)
+        prefer: One of "auto", "mlx", "pytorch". Forces a specific framework
+            when set to something other than "auto".
 
     Returns:
         "mlx", "pytorch", or "none"
     """
+    # Explicit framework preference
+    if prefer == "pytorch":
+        try:
+            import torch  # noqa: F401
+            return "pytorch"
+        except ImportError:
+            return "none"
+    if prefer == "mlx":
+        try:
+            import mlx  # noqa: F401
+            from mlx_lm import lora  # noqa: F401
+            return "mlx"
+        except ImportError:
+            return "none"
+
+    # Auto-detection below
+
     # Check if model name suggests MLX
     if model_name and ("mlx-community" in model_name or "mlx" in model_name.lower()):
         try:
@@ -579,3 +598,125 @@ def _run_pytorch_training(config: TrainingConfig) -> dict:
         "PyTorch training dispatch not yet migrated for this training type. "
         "The block will use its existing PyTorch implementation as fallback."
     )
+
+
+# ── Lightweight helpers for FW-8 training blocks ─────────────────────
+
+
+def prepare_texts(raw_data, text_column="", training_format=""):
+    """Extract a flat list of training texts from raw dataset rows.
+
+    Handles dicts with *text_column* / *training_format*, or plain strings.
+    Used by FW-8 blocks that load data before calling MLX training.
+    """
+    if not raw_data:
+        return []
+    if isinstance(raw_data[0], dict):
+        if training_format:
+            return [training_format.format(**row) for row in raw_data]
+        key = (
+            text_column
+            if text_column and text_column in raw_data[0]
+            else ("text" if "text" in raw_data[0] else list(raw_data[0].keys())[0])
+        )
+        return [str(row.get(key, "")) for row in raw_data]
+    return [str(item) for item in raw_data]
+
+
+def write_training_data(texts, output_dir, eval_split=0.0):
+    """Write training texts to JSONL files expected by ``mlx_lm``.
+
+    Creates ``train.jsonl`` and ``valid.jsonl`` in *output_dir*.
+    Returns *output_dir*.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    if eval_split > 0:
+        split_idx = max(1, int(len(texts) * (1.0 - eval_split)))
+        train_texts = texts[:split_idx]
+        valid_texts = texts[split_idx:]
+    else:
+        train_texts = texts
+        valid_texts = texts[: max(1, len(texts) // 10)]
+    with open(os.path.join(output_dir, "train.jsonl"), "w") as f:
+        for t in train_texts:
+            json.dump({"text": t}, f)
+            f.write("\n")
+    with open(os.path.join(output_dir, "valid.jsonl"), "w") as f:
+        for t in valid_texts:
+            json.dump({"text": t}, f)
+            f.write("\n")
+    return output_dir
+
+
+def call_mlx_subprocess(
+    model_name, data_dir, output_dir, *,
+    epochs=3, learning_rate=1e-4, batch_size=4, max_seq_length=512,
+    fine_tune_type="lora", lora_layers=None, lora_rank=16,
+    extra_args=None, ctx=None,
+):
+    """Run MLX training via the ``mlx_lm.lora`` CLI.
+
+    Returns a dict with ``success`` (bool), ``output_dir``, and optionally
+    ``error`` or ``adapter_config``.
+    """
+    train_jsonl = os.path.join(data_dir, "train.jsonl")
+    if os.path.isfile(train_jsonl):
+        with open(train_jsonl) as f:
+            n_samples = sum(1 for _ in f)
+        steps_per_epoch = max(1, n_samples // batch_size)
+        iters = steps_per_epoch * epochs
+    else:
+        iters = 100 * epochs
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    cmd = [
+        "python", "-m", "mlx_lm.lora",
+        "--model", model_name,
+        "--data", data_dir,
+        "--adapter-path", output_dir,
+        "--iters", str(iters),
+        "--learning-rate", str(learning_rate),
+        "--batch-size", str(batch_size),
+        "--max-seq-length", str(max_seq_length),
+    ]
+
+    if fine_tune_type == "full":
+        cmd.extend(["--fine-tune-type", "full"])
+    if lora_layers is not None:
+        cmd.extend(["--lora-layers", str(lora_layers)])
+    if lora_rank and fine_tune_type != "full":
+        cmd.extend(["--lora-rank", str(lora_rank)])
+    if extra_args:
+        cmd.extend(extra_args)
+
+    if ctx:
+        ctx.log_message(f"MLX training: {' '.join(cmd)}")
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+        if result.returncode != 0:
+            error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+            if ctx:
+                ctx.log_message(f"MLX training failed: {error_msg}")
+            return {"success": False, "error": error_msg}
+        if ctx:
+            ctx.log_message("MLX training completed successfully")
+        out = {"success": True, "output_dir": output_dir, "framework": "mlx"}
+        adapter_cfg = os.path.join(output_dir, "adapter_config.json")
+        if os.path.isfile(adapter_cfg):
+            with open(adapter_cfg) as f:
+                out["adapter_config"] = json.load(f)
+        return out
+    except subprocess.TimeoutExpired:
+        if ctx:
+            ctx.log_message("MLX training timed out after 2 hours")
+        return {"success": False, "error": "Training timed out"}
+    except FileNotFoundError:
+        if ctx:
+            ctx.log_message("mlx_lm CLI not found. Is mlx-lm installed?")
+        return {"success": False, "error": "mlx_lm not found"}
+    except Exception as e:
+        if ctx:
+            ctx.log_message(f"MLX training error: {e}")
+        return {"success": False, "error": str(e)}

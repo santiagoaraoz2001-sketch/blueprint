@@ -8,7 +8,20 @@ realistic simulation when not available.
 import json
 import math
 import os
+import sys
 import time
+
+# Import shared training utilities
+_TRAINING_PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _TRAINING_PKG_DIR not in sys.path:
+    sys.path.insert(0, _TRAINING_PKG_DIR)
+try:
+    from _training_utils import (
+        detect_training_framework, prepare_texts as _prepare_texts,
+        call_mlx_subprocess, write_training_data,
+    )
+except ImportError:
+    detect_training_framework = None
 
 try:
     from backend.block_sdk.exceptions import (
@@ -105,6 +118,77 @@ def run(ctx):
         start = 0
         end = min((s + 1) * stage_size, num_rows)
         stages.append(rows[start:end])
+
+    # ── Framework detection & MLX dispatch ───────────────────────────────
+    prefer = ctx.config.get("prefer_framework", "auto")
+    framework = detect_training_framework(model_name, prefer) if detect_training_framework else "pytorch"
+
+    if framework == "mlx":
+        ctx.log_message("Using MLX framework for curriculum training (multi-pass LoRA)")
+        output_dir = os.path.join(ctx.run_dir, "model")
+        stage_metrics = []
+        total_epochs = num_stages * epochs_per_stage
+        mlx_ok = True
+
+        for stage_idx in range(num_stages):
+            stage_data = stages[stage_idx]
+            difficulty_label = ["Easy", "Medium", "Hard", "Expert", "Master"][min(stage_idx, 4)]
+            ctx.log_message(
+                f"\n--- Stage {stage_idx + 1}/{num_stages}: {difficulty_label} "
+                f"({len(stage_data)} samples) ---"
+            )
+
+            # Prepare stage data
+            texts = _prepare_texts(stage_data, text_column, training_format)
+            data_dir = write_training_data(
+                texts,
+                os.path.join(ctx.run_dir, f"mlx_data_stage_{stage_idx}"),
+            )
+            stage_output = os.path.join(output_dir, f"stage_{stage_idx + 1}")
+            mlx_result = call_mlx_subprocess(
+                model_name, data_dir, stage_output,
+                epochs=epochs_per_stage, learning_rate=lr,
+                batch_size=batch_size, max_seq_length=max_seq_length,
+                ctx=ctx,
+            )
+            if not mlx_result["success"]:
+                ctx.log_message(
+                    f"MLX stage {stage_idx + 1} failed: {mlx_result.get('error', '')}. "
+                    "Falling back to PyTorch."
+                )
+                mlx_ok = False
+                break
+            stage_metrics.append({
+                "stage": stage_idx + 1,
+                "difficulty": difficulty_label,
+                "samples": len(stage_data),
+                "framework": "mlx",
+            })
+            ctx.report_progress(
+                (stage_idx + 1) * epochs_per_stage, total_epochs,
+            )
+
+        if mlx_ok:
+            with open(os.path.join(output_dir, "training_config.json"), "w") as f:
+                json.dump({
+                    "base_model": model_name,
+                    "method": "curriculum_training",
+                    "framework": "mlx",
+                    "num_stages": num_stages,
+                    "epochs_per_stage": epochs_per_stage,
+                    "stage_metrics": stage_metrics,
+                    "demo_mode": False,
+                }, f, indent=2)
+            ctx.save_output("model", output_dir)
+            ctx.save_output("metrics", {
+                "framework": "mlx",
+                "num_stages": num_stages,
+                "total_samples": num_rows,
+                "stage_metrics": stage_metrics,
+            })
+            ctx.log_message("Curriculum training complete (MLX)")
+            ctx.report_progress(1, 1)
+            return
 
     # ── Guard heavy imports ──
     try:
