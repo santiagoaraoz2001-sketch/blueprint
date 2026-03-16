@@ -66,3 +66,9 @@ config:
     label: Inference Backend
     default: ""
     options: ["", "ollama", "mlx", "pytorch"]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false
