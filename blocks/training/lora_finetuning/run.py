@@ -67,10 +67,34 @@ def run(ctx):
     if not model_name:
         raise BlockConfigError("model_name", "Model name is required — set it in config or connect a model to the input port")
 
-    # Load dataset
+    # Load dataset path
     dataset_path = ctx.resolve_as_file_path("dataset")
 
-    # Load dataset
+    # ── Framework detection (NEW) ──────────────────────────────────────
+    from blocks.training._training_utils import (
+        detect_training_framework, TrainingConfig, call_training,
+    )
+
+    preferred = ctx.config.get("prefer_framework", "auto")
+    if preferred != "auto":
+        framework = preferred
+    else:
+        framework = detect_training_framework(model_name)
+    ctx.log_message(f"Detected training framework: {framework}")
+
+    mlx_lora_layers = int(ctx.config.get("mlx_lora_layers", 16))
+
+    # ── Framework dispatch ─────────────────────────────────────────────
+    if framework == "mlx":
+        _run_mlx_path(
+            ctx, model_name, dataset_path, r, alpha, lora_dropout,
+            target_modules, lr, epochs, batch_size, max_seq_length,
+            text_column, training_format, eval_split, save_merged,
+            checkpoint_interval, mlx_lora_layers,
+        )
+        return
+
+    # For PyTorch and fallback, load raw data
     data_file = os.path.join(dataset_path, "data.json") if os.path.isdir(dataset_path) else dataset_path
     if os.path.isfile(data_file):
         with open(data_file, "r") as f:
@@ -81,39 +105,94 @@ def run(ctx):
     if not isinstance(raw_data, list) or len(raw_data) == 0:
         raise BlockDataError("Dataset must be a non-empty JSON list", details="Received empty or invalid dataset from upstream block")
 
-    # Guard heavy imports
-    try:
-        import torch
-        from transformers import (
-            AutoModelForCausalLM,
-            AutoTokenizer,
-            TrainingArguments,
-            Trainer,
-            TrainerCallback,
-            DataCollatorForLanguageModeling,
+    if framework == "pytorch":
+        # Guard heavy imports
+        try:
+            import torch
+            from transformers import (
+                AutoModelForCausalLM,
+                AutoTokenizer,
+                TrainingArguments,
+                Trainer,
+                TrainerCallback,
+                DataCollatorForLanguageModeling,
+            )
+            from peft import LoraConfig, get_peft_model, TaskType
+            from datasets import Dataset
+        except ImportError as e:
+            missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
+            raise BlockDependencyError(
+                missing,
+                f"Required library not installed: {e}",
+                install_hint="pip install datasets peft torch transformers",
+            )
+
+        _run_pytorch_path(
+            ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
+            lr, epochs, batch_size, max_seq_length, text_column, training_format,
+            eval_split, save_merged, checkpoint_interval,
+            torch, AutoModelForCausalLM, AutoTokenizer, TrainingArguments,
+            Trainer, TrainerCallback, DataCollatorForLanguageModeling,
+            LoraConfig, get_peft_model, TaskType, Dataset,
         )
-        from peft import LoraConfig, get_peft_model, TaskType
-        from datasets import Dataset
-    except ImportError as e:
-        from backend.block_sdk.exceptions import BlockDependencyError
-        missing = str(e).split("'")[-2] if "'" in str(e) else str(e)
-        raise BlockDependencyError(
-            missing,
-            f"Required library not installed: {e}",
-            install_hint="pip install datasets peft torch transformers",
+    else:
+        # No framework available — simulation/plan-only mode
+        _run_fallback(
+            ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
+            lr, epochs, batch_size, max_seq_length, save_merged,
         )
 
-    _run_real_training(
-        ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
-        lr, epochs, batch_size, max_seq_length, text_column, training_format,
-        eval_split, save_merged, checkpoint_interval,
-        torch, AutoModelForCausalLM, AutoTokenizer, TrainingArguments,
-        Trainer, TrainerCallback, DataCollatorForLanguageModeling,
-        LoraConfig, get_peft_model, TaskType, Dataset,
+
+# ── MLX training path (NEW) ───────────────────────────────────────────
+
+def _run_mlx_path(
+    ctx, model_name, dataset_path, r, alpha, lora_dropout, target_modules,
+    lr, epochs, batch_size, max_seq_length, text_column, training_format,
+    eval_split, save_merged, checkpoint_interval, mlx_lora_layers,
+):
+    """MLX training path using _training_utils."""
+    from blocks.training._training_utils import TrainingConfig, call_training
+
+    output_dir = os.path.join(ctx.run_dir, "model")
+    os.makedirs(output_dir, exist_ok=True)
+
+    config = TrainingConfig(
+        model_name=model_name,
+        output_dir=output_dir,
+        data_path=dataset_path,
+        training_type="lora",
+        framework="mlx",
+        epochs=epochs,
+        batch_size=batch_size,
+        learning_rate=lr,
+        max_seq_length=max_seq_length,
+        lora_r=r,
+        lora_alpha=alpha,
+        lora_dropout=lora_dropout,
+        target_modules=target_modules,
+        lora_layers=mlx_lora_layers,
+        save_merged=save_merged,
+        text_column=text_column,
+        training_format=training_format,
+        eval_split=eval_split,
+        checkpoint_interval=checkpoint_interval,
+        log_fn=ctx.log_message,
+        progress_fn=ctx.report_progress,
+        metric_fn=lambda name, val, step: ctx.log_metric(name, val, step),
     )
 
+    result = call_training(config)
 
-def _run_real_training(
+    ctx.save_output("model", result["model_path"])
+    ctx.save_output("metrics", result["metrics"])
+    final_loss = result["metrics"].get("final_loss", "N/A")
+    ctx.log_message(f"LoRA training complete (MLX). Final loss: {final_loss}")
+    ctx.report_progress(1, 1)
+
+
+# ── PyTorch training path (EXISTING — UNCHANGED) ──────────────────────
+
+def _run_pytorch_path(
     ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
     lr, epochs, batch_size, max_seq_length, text_column, training_format,
     eval_split, save_merged, checkpoint_interval,
@@ -289,9 +368,7 @@ def _run_real_training(
     ctx.log_metric("train/loss", final_loss)
     ctx.log_metric("epochs_completed", epochs)
     ctx.log_metric("trainable_params", trainable)
-    # Branch: real training succeeded
     ctx.save_output("model", output_dir)
-    # Branch: real training succeeded
     ctx.save_output("metrics", {
         "final_loss": final_loss,
         "total_steps": result.global_step,
@@ -305,6 +382,8 @@ def _run_real_training(
     ctx.log_message(f"LoRA training complete. Final loss: {final_loss}")
     ctx.report_progress(1, 1)
 
+
+# ── Fallback / simulation path (EXISTING — UNCHANGED) ─────────────────
 
 def _run_fallback(
     ctx, model_name, raw_data, r, alpha, lora_dropout, target_modules,
@@ -359,6 +438,7 @@ def _run_fallback(
         },
         "requirements": [
             "pip install torch transformers peft datasets",
+            "pip install mlx-lm  # For Apple Silicon",
             f"Model: {model_name}",
             "GPU recommended for efficient LoRA training",
         ],
@@ -373,11 +453,9 @@ def _run_fallback(
     ctx.log_message(f"Dataset: {len(raw_data)} samples, {epochs} epochs, batch_size={batch_size}")
     ctx.log_message(f"Estimated steps: {estimated_steps}")
     ctx.log_message(f"Training plan saved to {plan_path}")
-    ctx.log_message("Install torch + transformers + peft to execute actual training")
+    ctx.log_message("Install torch + transformers + peft (or mlx-lm on Apple Silicon) to execute actual training")
 
-    # Branch: fallback/plan-only mode (dead code — _run_fallback is never called)
     ctx.save_output("model", output_dir)
-    # Branch: fallback/plan-only mode (dead code — _run_fallback is never called)
     ctx.save_output("metrics", {
         "status": "plan_only",
         "estimated_steps": estimated_steps,
