@@ -26,6 +26,12 @@ def run(ctx):
     fmt = ctx.config.get("format", "plain")
     encoding = ctx.config.get("encoding", "utf-8")
 
+    # ── Loop-aware prompt variation ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict) and loop.get("prompt_variation"):
+        text_value = loop["prompt_variation"]
+        ctx.log_message(f"[Loop iter {loop.get('iteration', 0)}] Using varied prompt")
+
     ctx.log_message(f"Text input: {len(text_value)} chars (format={fmt}, encoding={encoding})")
 
     # Validate format-specific content

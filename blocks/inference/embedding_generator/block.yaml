@@ -18,19 +18,17 @@ inputs:
     label: Dataset Info
     data_type: config
     required: false
-  - id: model
-    label: Model
-    data_type: config
-    required: false
 
 outputs:
-  - id: dataset
+  - id: enriched_dataset
     label: Dataset with Embeddings
     data_type: dataset
+    aliases: [dataset]
     description: >
       JSON array of row objects. Each row: {...original_row_fields, <embedding_column>: [float, ...]}.
       The embedding vector is stored under the column name configured by embedding_column (default: "_embedding").
       Each embedding is an array of floats with length equal to the model's output dimension.
+
   - id: embeddings
     label: Embeddings
     data_type: embedding
@@ -114,3 +112,9 @@ config:
     description: "Format for the embeddings artifact file in the run directory. The pipeline 'embeddings' output port always uses JSON for downstream compatibility. Choose numpy for faster loading in external tools, or json for human-readable inspection."
     default: numpy
     options: [numpy, json]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

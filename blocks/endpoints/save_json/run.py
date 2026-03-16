@@ -36,6 +36,16 @@ def run(ctx):
     ctx.log_message(f"Save JSON starting (format={fmt})")
     ctx.report_progress(0, 3)
 
+    # ── Loop-aware file handling ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        file_mode = loop.get("file_mode", "overwrite")
+        iteration = loop.get("iteration", 0)
+        ctx.log_message(f"[Loop iter {iteration}] file_mode={file_mode}")
+    else:
+        file_mode = "overwrite"
+        iteration = 0
+
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 3)
     raw_data = ctx.resolve_as_data("data")
@@ -65,6 +75,8 @@ def run(ctx):
 
     # ---- Step 2: Serialize ----
     ctx.report_progress(2, 3)
+    json_indent = indent if pretty_print else None
+
     if fmt == "jsonl":
         # JSONL: one JSON object per line
         rows = data if isinstance(data, list) else [data]
@@ -75,7 +87,6 @@ def run(ctx):
         ext = ".jsonl"
     else:
         # Standard JSON
-        json_indent = indent if pretty_print else None
         content = json.dumps(data, indent=json_indent, default=str, ensure_ascii=ensure_ascii, sort_keys=sort_keys)
         ext = ".json"
 
@@ -98,16 +109,61 @@ def run(ctx):
         base, fext = os.path.splitext(filename)
         filename = f"{base}_{ts}{fext}"
 
+    # Loop versioned: create iteration-specific filename
+    if file_mode == "versioned":
+        base, fext = os.path.splitext(filename)
+        filename = f"{base}_iter{iteration}{fext}"
+
     out_filepath = os.path.join(out_dir, filename)
 
-    if os.path.exists(out_filepath) and not overwrite:
+    # Overwrite check: skip when append mode (file is expected to exist)
+    if file_mode != "append" and os.path.exists(out_filepath) and not overwrite:
         raise BlockInputError(
             f"File already exists: {out_filepath}. Enable 'Overwrite Existing'.",
             recoverable=True,
         )
 
-    with open(out_filepath, "w", encoding="utf-8") as f:
-        f.write(content)
+    # Loop append: merge with existing file
+    if file_mode == "append" and os.path.isfile(out_filepath):
+        if fmt == "jsonl":
+            # Ensure existing file ends with a newline before appending
+            with open(out_filepath, "rb") as f:
+                f.seek(0, 2)  # seek to end
+                if f.tell() > 0:
+                    f.seek(-1, 2)
+                    if f.read(1) != b"\n":
+                        with open(out_filepath, "a", encoding="utf-8") as af:
+                            af.write("\n")
+            with open(out_filepath, "a", encoding="utf-8") as f:
+                f.write(content)
+        else:
+            # Merge JSON: read existing, combine, rewrite
+            try:
+                with open(out_filepath, "r", encoding="utf-8") as f:
+                    existing = json.load(f)
+            except (json.JSONDecodeError, ValueError) as e:
+                ctx.log_message(f"WARNING: Existing JSON is corrupt ({e}), overwriting")
+                existing = None
+
+            if existing is not None:
+                if isinstance(existing, list) and isinstance(data, list):
+                    data = existing + data
+                elif isinstance(existing, list):
+                    existing.append(data)
+                    data = existing
+                elif isinstance(existing, dict) and isinstance(data, dict):
+                    # Wrap both into a list to avoid losing either document
+                    data = [existing, data]
+                else:
+                    # Incompatible types — wrap both into a list
+                    data = [existing, data]
+
+            content = json.dumps(data, indent=json_indent, default=str, ensure_ascii=ensure_ascii, sort_keys=sort_keys)
+            with open(out_filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+    else:
+        with open(out_filepath, "w", encoding="utf-8") as f:
+            f.write(content)
 
     ctx.report_progress(3, 3)
     file_size = os.path.getsize(out_filepath)

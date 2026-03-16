@@ -20,6 +20,12 @@ except ImportError:
     class BlockExecutionError(RuntimeError):
         def __init__(self, message, **kw): super().__init__(message)
 
+try:
+    from blocks.training._validation import _validate_model_for_training
+except ImportError:
+    def _validate_model_for_training(model_name, model_info, ctx, field_name="model_name"):
+        return model_name
+
 
 def run(ctx):
     # Read upstream dataset metadata
@@ -55,6 +61,7 @@ def run(ctx):
         target_modules = ["q_proj", "v_proj"]
 
     # Try to get model from input
+    model_info = {}
     try:
         model_info = ctx.load_input("model")
         if isinstance(model_info, dict):
@@ -66,6 +73,9 @@ def run(ctx):
 
     if not model_name:
         raise BlockConfigError("model_name", "Model name is required — set it in config or connect a model to the input port")
+
+    # ── Validate model for training ──
+    model_name = _validate_model_for_training(model_name, model_info, ctx)
 
     # Load dataset path
     dataset_path = ctx.resolve_as_file_path("dataset")
@@ -183,7 +193,7 @@ def _run_mlx_path(
 
     result = call_training(config)
 
-    ctx.save_output("model", result["model_path"])
+    ctx.save_output("trained_model", result["model_path"])
     ctx.save_output("metrics", result["metrics"])
     final_loss = result["metrics"].get("final_loss", "N/A")
     ctx.log_message(f"LoRA training complete (MLX). Final loss: {final_loss}")
@@ -368,7 +378,7 @@ def _run_pytorch_path(
     ctx.log_metric("train/loss", final_loss)
     ctx.log_metric("epochs_completed", epochs)
     ctx.log_metric("trainable_params", trainable)
-    ctx.save_output("model", output_dir)
+    ctx.save_output("trained_model", output_dir)
     ctx.save_output("metrics", {
         "final_loss": final_loss,
         "total_steps": result.global_step,
@@ -455,7 +465,7 @@ def _run_fallback(
     ctx.log_message(f"Training plan saved to {plan_path}")
     ctx.log_message("Install torch + transformers + peft (or mlx-lm on Apple Silicon) to execute actual training")
 
-    ctx.save_output("model", output_dir)
+    ctx.save_output("trained_model", output_dir)
     ctx.save_output("metrics", {
         "status": "plan_only",
         "estimated_steps": estimated_steps,

@@ -22,6 +22,7 @@ outputs:
   - id: response
     label: Description / Response
     data_type: text
+    aliases: [text, output]
   - id: metrics
     label: Metrics
     data_type: metrics
@@ -93,3 +94,9 @@ config:
     min: 0
     max: 4096
     description: "Resize if larger than this (pixels). 0 = no resize. Reduces token cost"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

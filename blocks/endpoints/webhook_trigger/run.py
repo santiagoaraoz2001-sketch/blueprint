@@ -45,6 +45,14 @@ def run(ctx):
             recoverable=True,
         )
 
+    # ── Loop-aware metadata ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        iteration = loop.get("iteration", 0)
+        ctx.log_message(f"[Loop iter {iteration}] Triggering webhook")
+    else:
+        iteration = 0
+
     ctx.log_message(f"Webhook Trigger starting ({method} {webhook_url})")
     ctx.report_progress(0, 3)
 
@@ -86,6 +94,8 @@ def run(ctx):
             payload["metrics"] = metrics_data
         if include_run_id:
             payload["run_id"] = os.path.basename(ctx.run_dir)
+        if iteration > 0:
+            payload["loop_iteration"] = iteration
 
     # ---- Step 2: Build request ----
     ctx.report_progress(2, 3)

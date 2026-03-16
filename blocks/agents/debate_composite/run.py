@@ -12,6 +12,9 @@ The parent block's inputs (llm config, topic) are injected into root
 child blocks by the composite executor.
 """
 
+import json
+import os
+
 try:
     from backend.block_sdk.exceptions import (
         BlockConfigError, BlockInputError, BlockDataError,
@@ -34,6 +37,42 @@ def run(ctx):
     topic = ctx.inputs.get("input", "") or ctx.config.get("topic", "")
     model = ctx.config.get("model_name", "")
     rounds = ctx.config.get("rounds", 3)
+
+    # ── Load LLM config — accept llm port OR model port ───────────────
+    llm_source = ""  # track where model came from for logging
+
+    # Try llm port first (preferred — contains framework + config)
+    try:
+        llm_data = ctx.load_input("llm")
+        if isinstance(llm_data, dict):
+            if "framework" in llm_data:
+                model = model or llm_data.get("model", "")
+                if model:
+                    llm_source = f"{llm_data.get('framework', 'unknown')} via llm port"
+            elif "model_name" in llm_data or "model_id" in llm_data:
+                model = model or llm_data.get("model_name", llm_data.get("model_id", ""))
+                if model:
+                    llm_source = f"{llm_data.get('source', 'unknown')} via llm port"
+    except (ValueError, Exception):
+        pass
+
+    # Try model port as fallback (direct model_selector connection)
+    if not model:
+        try:
+            model_data = ctx.load_input("model")
+            if isinstance(model_data, dict):
+                model = model_data.get("model_name", model_data.get("model_id", ""))
+                if model:
+                    llm_source = f"{model_data.get('source', 'unknown')} via model port"
+            elif isinstance(model_data, str):
+                model = model_data
+                if model:
+                    llm_source = "model port (string)"
+        except (ValueError, Exception):
+            pass
+
+    if not model and not llm_source:
+        llm_source = "config" if ctx.config.get("model_name") else "none"
 
     if not topic:
         raise BlockInputError(
@@ -107,13 +146,58 @@ def run(ctx):
         prev_judge_id = judge_id
 
     ctx.log_message(
-        f"Debate composite: {rounds} round(s) with model={model or 'default'}, "
-        f"sub-blocks={ctx.sub_block_count}"
+        f"Debate composite: {rounds} round(s) with model={model or 'default'} "
+        f"(source={llm_source}), sub-blocks={ctx.sub_block_count}"
     )
+    if not model:
+        ctx.log_message("No model connected. Sub-blocks will use auto-detection or demo mode. "
+                        "Connect a Model Selector or LLM Inference block for real output.")
     ctx.log_metric("rounds_completed", rounds)
     ctx.log_metric("sub_blocks_created", ctx.sub_block_count)
-    ctx.report_progress(1, 1)
 
     # Save a placeholder for consensus — the sub-pipeline's actual output
     # will overwrite this once execution completes.
     ctx.save_output("consensus", "")
+
+    # ── Save debate log as dataset ──
+    debate_entries = []
+    for r in range(rounds):
+        debate_entries.append({
+            "round": r + 1,
+            "pessimist": f"pessimist_r{r}",
+            "optimist": f"optimist_r{r}",
+            "judge": f"judge_r{r}",
+        })
+    log_path = os.path.join(ctx.run_dir, "debate_log")
+    os.makedirs(log_path, exist_ok=True)
+    with open(os.path.join(log_path, "data.json"), "w") as f:
+        json.dump(debate_entries, f, indent=2)
+    ctx.save_output("dataset", log_path)
+
+    # ── Save metrics ──
+    ctx.save_output("metrics", {
+        "rounds": rounds,
+        "agents": 3,  # pessimist + optimist + judge per round
+        "sub_blocks": ctx.sub_block_count,
+        "model": model or "default",
+        "demo_mode": not bool(model),
+    })
+
+    # ── Passthrough LLM config for agent chaining ──
+    llm_config = None
+    try:
+        llm_config = ctx.inputs.get("llm")
+    except (ValueError, Exception):
+        pass
+
+    if llm_config:
+        ctx.save_output("llm_config", llm_config)
+    else:
+        ctx.save_output("llm_config", {
+            "framework": "demo",
+            "model": model or "demo",
+            "config": {},
+            "demo_mode": not bool(model),
+        })
+
+    ctx.report_progress(1, 1)

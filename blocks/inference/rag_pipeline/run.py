@@ -173,7 +173,7 @@ def run(ctx):
         chunks_path = os.path.join(ctx.run_dir, "results.json")
         with open(chunks_path, "w", encoding="utf-8") as f:
             json.dump(context_chunks, f, indent=2)
-    ctx.save_output("dataset", chunks_path)
+    ctx.save_output("output_dataset", chunks_path)
 
     # Save metrics
     metrics = {

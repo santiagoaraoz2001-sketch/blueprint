@@ -88,3 +88,9 @@ config:
     label: Vary Prompt per Batch
     default: false
     description: Randomly rotate seed examples per batch for more diverse outputs (requires seed_mode=in_context)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

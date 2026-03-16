@@ -190,7 +190,7 @@ def run(ctx):
         else:
             with open(os.path.join(_ds_dir, "data.json"), "w", encoding="utf-8") as _f:
                 json.dump(sample_preds, _f, indent=2)
-        ctx.save_output("dataset", _ds_dir)
+        ctx.save_output("benchmark_dataset", _ds_dir)
 
     ctx.save_output("metrics", {**scores, "passed": passed, "num_samples": num_samples})
     ctx.save_output("report", report_path)

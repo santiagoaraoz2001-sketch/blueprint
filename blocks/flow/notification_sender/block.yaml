@@ -19,6 +19,7 @@ outputs:
     label: Send Status
     data_type: metrics
     description: "JSON: {channel, severity, message, delivered, timestamp, details}. If skipped: {skipped, reason, channel}."
+    aliases: [metrics]
   - id: pass_through
     label: Pass Through
     data_type: any
@@ -75,3 +76,9 @@ config:
     min: 10
     max: 300
     description: "Maximum time for webhook or desktop notification delivery"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

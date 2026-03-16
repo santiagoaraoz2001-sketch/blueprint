@@ -46,3 +46,9 @@ config:
     type: boolean
     label: Log to File
     default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

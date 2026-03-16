@@ -20,6 +20,7 @@ outputs:
     data_type: metrics
     description: "Object with keys: repo_id (string), repo_type (string), files_uploaded (int), private (bool), revision (string)"
 
+    aliases: [metrics]
 config:
   repo_id:
     type: string
@@ -58,3 +59,9 @@ config:
     label: Path in Repo
     default: ""
     description: Subdirectory within repo to upload to (e.g. models/v2)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -30,6 +30,8 @@ def publish_event(run_id: str, event_type: str, data: dict):
       node_failed    – block raised an error
       node_cached    – block skipped; outputs reused from a previous run
                        (emitted by partial executor)
+      node_iteration – emitted once per loop iteration (loop_controller)
+      node_retry     – block retry attempt in progress
       metric         – per-block metric value
       system_metric  – CPU/memory/GPU snapshot
       run_completed  – pipeline finished successfully

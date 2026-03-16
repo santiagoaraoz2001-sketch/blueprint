@@ -13,12 +13,15 @@ inputs:
     required: true
 
 outputs:
-  - id: dataset
+  - id: selected_dataset
     label: Selected Rows
+    aliases: [dataset]
     data_type: dataset
+
   - id: text
     label: First Row as Text
     data_type: text
+    aliases: [response, output]
   - id: metrics
     label: Metrics
     data_type: metrics
@@ -68,3 +71,9 @@ config:
     label: Text Column for Text Output
     default: "text"
     description: "Which column to output as text (auto-detects if not found)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

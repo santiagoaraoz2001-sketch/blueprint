@@ -30,6 +30,7 @@ outputs:
   - id: output
     label: Combined Output
     data_type: dataset
+    aliases: [dataset]
   - id: metrics
     label: Aggregation Metrics
     data_type: metrics
@@ -72,3 +73,9 @@ config:
     default: 0
     min: 0
     description: "Maximum number of rows in the final output (0 = no limit). Applied after sort, so combine with sort_by for top-N queries."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false
