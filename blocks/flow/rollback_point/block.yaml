@@ -20,6 +20,7 @@ outputs:
     data_type: metrics
     description: "JSON: {snapshot_id, label, snapshot_path, rolled_back, auto_rollback_on_failure, total_snapshots, created_at}"
 
+    aliases: [metrics]
 config:
   label:
     type: string
@@ -43,3 +44,9 @@ config:
     label: Snapshot Metadata
     default: ""
     description: "Custom tags attached to each snapshot (one per line: key: value). E.g., 'stage: preprocessing'"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

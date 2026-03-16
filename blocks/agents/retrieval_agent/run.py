@@ -44,23 +44,50 @@ def run(ctx):
     if isinstance(rerank, str):
         rerank = rerank.lower() in ("true", "1", "yes")
 
-    # ── Load LLM config from connected block ─────────────────────────
+    # ── Load LLM config — accept llm port OR model port ───────────────
     llm_config = None
+    model_name = ""
+    framework = ""
+    inf_config = {}
+
+    # Try llm port first (preferred — contains framework + config)
     try:
-        llm_config = ctx.load_input("llm")
+        llm_data = ctx.load_input("llm")
+        if isinstance(llm_data, dict):
+            if "framework" in llm_data:
+                framework = llm_data.get("framework", "ollama")
+                model_name = llm_data.get("model", "")
+                inf_config = dict(llm_data.get("config") or {})
+                llm_config = llm_data
+            elif "model_name" in llm_data or "model_id" in llm_data:
+                model_name = llm_data.get("model_name", llm_data.get("model_id", ""))
+                framework = llm_data.get("source", llm_data.get("backend", "ollama"))
+                inf_config = {"endpoint": llm_data.get("endpoint", "http://localhost:11434")}
+                llm_config = {"framework": framework, "model": model_name, "config": inf_config}
     except (ValueError, Exception):
         pass
 
-    if llm_config and isinstance(llm_config, dict):
-        framework = llm_config.get("framework", "ollama")
-        model_name = llm_config.get("model", "")
-        inf_config = llm_config.get("config", {})
-        inf_config["max_tokens"] = max_tokens
-        inf_config["temperature"] = temperature
-    else:
-        framework = ""
-        model_name = ""
-        inf_config = {}
+    # Try model port as fallback (direct model_selector connection)
+    if not model_name:
+        try:
+            model_data = ctx.load_input("model")
+            if isinstance(model_data, dict):
+                model_name = model_data.get("model_name", model_data.get("model_id", ""))
+                framework = model_data.get("source", model_data.get("backend", "ollama"))
+                inf_config = {"endpoint": model_data.get("endpoint", "http://localhost:11434")}
+                llm_config = {"framework": framework, "model": model_name, "config": inf_config}
+            elif isinstance(model_data, str):
+                model_name = model_data
+                framework = "ollama"
+                llm_config = {"framework": framework, "model": model_name, "config": {}}
+        except (ValueError, Exception):
+            pass
+
+    # Apply per-block config overrides
+    inf_config["max_tokens"] = max_tokens
+    inf_config["temperature"] = temperature
+
+    use_real = bool(llm_config and model_name)
 
     # ── Load vector store config ────────────────────────────────────────
     vstore = {}
@@ -110,6 +137,9 @@ def run(ctx):
         queries = [{"id": 0, "query": "What is ChromaDB used for?"}]
 
     ctx.log_message(f"RAG Agent: {len(queries)} queries, top_k={top_k}, rerank={rerank}")
+    if not use_real:
+        ctx.log_message("No model connected. Running in demo mode. "
+                        "Connect a Model Selector or LLM Inference block for real output.")
 
     # ── Process queries ─────────────────────────────────────────────────
     responses = []
@@ -141,7 +171,7 @@ def run(ctx):
         # ── Generate response ───────────────────────────────────────────
         prompt = prompt_template.replace("{context}", context_block).replace("{query}", query_text)
 
-        if llm_config and model_name:
+        if use_real:
             try:
                 final_text, _ = call_inference(
                     framework, model_name, prompt,
@@ -177,7 +207,7 @@ def run(ctx):
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "data.json"), "w") as f:
         json.dump(responses, f, indent=2)
-    ctx.save_output("dataset", out_dir)
+    ctx.save_output("retrieval_log", out_dir)
 
     output_format = ctx.config.get("output_format", "plain")
     if output_format == "json":

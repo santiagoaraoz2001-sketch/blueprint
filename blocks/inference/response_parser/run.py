@@ -172,7 +172,7 @@ def run(ctx):
     out_path = os.path.join(ctx.run_dir, "parsed.txt")
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(parsed_text)
-    ctx.save_output("text", out_path)
+    ctx.save_output("parsed_text", out_path)
 
     # Save extracted data
     if extracted_data:

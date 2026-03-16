@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useRunStore } from '@/stores/runStore'
+import { useOutputStore } from '@/stores/outputStore'
+import { useUIStore } from '@/stores/uiStore'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { validatePipelineClient } from '@/lib/pipeline-validator'
 import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Check, AlertTriangle, Gauge, FileDown } from 'lucide-react'
@@ -82,10 +84,18 @@ export default function RunControls() {
 
     reset()
     await startRun(pipelineId)
+
+    // Wire output view: subscribe to SSE and auto-switch
+    const runId = useRunStore.getState().activeRunId
+    if (runId) {
+      useOutputStore.getState().subscribeToRun(runId)
+      useUIStore.getState().setView('output')
+    }
   }
 
   const handleStop = async () => {
     await stopRun()
+    useOutputStore.getState().unsubscribeFromRun()
   }
 
   const handleEject = async () => {

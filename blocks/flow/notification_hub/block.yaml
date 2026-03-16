@@ -15,6 +15,7 @@ outputs:
     label: Send Status
     data_type: metrics
     description: "JSON: {channel, severity, message, delivered, attempts, timestamp, details}. If skipped: {skipped, reason, channel}."
+    aliases: [metrics]
   - id: pass_through
     label: Pass Through
     data_type: any
@@ -93,3 +94,9 @@ config:
     default: "info"
     options: ["info", "warning", "error", "critical"]
     description: "Only send if severity meets or exceeds this level (filters out noise)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

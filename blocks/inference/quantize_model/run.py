@@ -117,7 +117,7 @@ def run(ctx):
 
             elapsed = time.time() - start_time
             # Branch: GPTQ quantization succeeded
-            ctx.save_output("model", {
+            ctx.save_output("quantized_model", {
                 "source": "gptq", "path": out_path,
                 "model_name": model_name, "bits": bits,
             })
@@ -172,7 +172,7 @@ def run(ctx):
 
             elapsed = time.time() - start_time
             # Branch: BitsAndBytes quantization succeeded
-            ctx.save_output("model", {
+            ctx.save_output("quantized_model", {
                 "source": "bitsandbytes", "path": out_path,
                 "model_name": model_name, "bits": bits,
             })
@@ -218,7 +218,7 @@ def run(ctx):
 
             elapsed = time.time() - start_time
             # Branch: AWQ quantization succeeded
-            ctx.save_output("model", {
+            ctx.save_output("quantized_model", {
                 "source": "awq", "path": out_path,
                 "model_name": model_name, "bits": bits,
             })
@@ -279,7 +279,7 @@ def run(ctx):
 
     elapsed = time.time() - start_time
     # Branch: estimation fallback — no real quantization
-    ctx.save_output("model", {
+    ctx.save_output("quantized_model", {
         "source": method,
         "path": out_path,
         "model_name": model_name,

@@ -73,7 +73,7 @@ export const FS: FontSizeTokens = new Proxy(FS_BASE, {
 
 export const FD = "'Space Grotesk','Helvetica Neue',Arial,sans-serif"
 
-// Connector colors — 9 wire types that flow between blocks
+// Connector colors — 10 wire types that flow between blocks
 export const CONNECTOR_COLORS: Record<string, string> = {
   dataset:      '#22D3EE',   // cyan — structured tabular data
   text:         '#60A5FA',   // light blue — raw text, prompts, strings
@@ -83,6 +83,7 @@ export const CONNECTOR_COLORS: Record<string, string> = {
   embedding:    '#FB7185',   // rose — vector embeddings
   artifact:     '#38BDF8',   // sky blue — files, reports, packages
   agent:        '#F43F5E',   // crimson — autonomous agent instances
+  llm:          '#E8A030',   // warm gold — LLM provider config (distinct from violet model & orange config)
   any:          '#FBBF24',   // amber — generic pass-through
   // Backward compat aliases (old type names → new colors)
   data:         '#22D3EE',   // old catch-all → dataset color

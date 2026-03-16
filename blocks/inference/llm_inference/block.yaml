@@ -31,13 +31,16 @@ outputs:
     label: Response
     data_type: text
     description: "Model response text"
+    aliases: [text, output]
   - id: metadata
     label: Metadata
     data_type: metrics
     description: "Inference metadata: tokens, latency, model used, framework"
+    aliases: [metrics]
   - id: llm_config
     label: LLM Config
-    data_type: config
+    data_type: llm
+    aliases: [llm]
     description: "Framework + model + config for downstream blocks to make their own calls"
 
 config:
@@ -93,3 +96,9 @@ config:
     default: text
     options: [text, json]
     description: "text = raw response, json = wrapped with metadata"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

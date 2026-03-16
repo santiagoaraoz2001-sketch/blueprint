@@ -190,7 +190,7 @@ def run(ctx):
     out_path = os.path.join(ctx.run_dir, "breakdown.txt")
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(breakdown)
-    ctx.save_output("text", out_path)
+    ctx.save_output("token_text", out_path)
 
     ctx.log_metric("token_count", token_count)
     ctx.log_metric("char_count", len(text))

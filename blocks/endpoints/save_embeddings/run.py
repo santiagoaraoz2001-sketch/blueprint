@@ -70,6 +70,23 @@ def run(ctx):
     ctx.log_message(f"Save Embeddings starting (format={fmt})")
     ctx.report_progress(0, 4)
 
+    # ── Loop-aware file handling ──
+    loop = ctx.get_loop_metadata()
+    if isinstance(loop, dict):
+        file_mode = loop.get("file_mode", "overwrite")
+        iteration = loop.get("iteration", 0)
+        ctx.log_message(f"[Loop iter {iteration}] file_mode={file_mode}")
+        if file_mode == "append":
+            ctx.log_message("WARNING: Embeddings format does not support append mode, using overwrite")
+            file_mode = "overwrite"
+    else:
+        file_mode = "overwrite"
+        iteration = 0
+
+    # Loop versioned: create iteration-specific filename
+    if file_mode == "versioned":
+        filename = f"{filename}_iter{iteration}"
+
     # ---- Step 1: Load data ----
     ctx.report_progress(1, 4)
     # Use load_input directly — embeddings may be binary file paths (.npy, .faiss)

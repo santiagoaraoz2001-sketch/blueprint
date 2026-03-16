@@ -16,6 +16,7 @@ outputs:
   - id: text
     label: Extracted Text
     data_type: text
+    aliases: [response, output]
   - id: metrics
     label: Metrics
     data_type: metrics
@@ -43,3 +44,9 @@ config:
     default: -1
     min: -1
     description: "Extract a single row by index (-1 = all rows)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

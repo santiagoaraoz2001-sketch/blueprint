@@ -62,23 +62,50 @@ def run(ctx):
     if isinstance(execute, str):
         execute = execute.lower() in ("true", "1", "yes")
 
-    # ── Load LLM config from connected block ─────────────────────────
+    # ── Load LLM config — accept llm port OR model port ───────────────
     llm_config = None
+    model_name = ""
+    framework = ""
+    inf_config = {}
+
+    # Try llm port first (preferred — contains framework + config)
     try:
-        llm_config = ctx.load_input("llm")
+        llm_data = ctx.load_input("llm")
+        if isinstance(llm_data, dict):
+            if "framework" in llm_data:
+                framework = llm_data.get("framework", "ollama")
+                model_name = llm_data.get("model", "")
+                inf_config = dict(llm_data.get("config") or {})
+                llm_config = llm_data
+            elif "model_name" in llm_data or "model_id" in llm_data:
+                model_name = llm_data.get("model_name", llm_data.get("model_id", ""))
+                framework = llm_data.get("source", llm_data.get("backend", "ollama"))
+                inf_config = {"endpoint": llm_data.get("endpoint", "http://localhost:11434")}
+                llm_config = {"framework": framework, "model": model_name, "config": inf_config}
     except (ValueError, Exception):
         pass
 
-    if llm_config and isinstance(llm_config, dict):
-        framework = llm_config.get("framework", "ollama")
-        model_name = llm_config.get("model", "")
-        inf_config = llm_config.get("config", {})
-        inf_config["max_tokens"] = 2048
-        inf_config["temperature"] = 0.1
-    else:
-        framework = ""
-        model_name = ""
-        inf_config = {}
+    # Try model port as fallback (direct model_selector connection)
+    if not model_name:
+        try:
+            model_data = ctx.load_input("model")
+            if isinstance(model_data, dict):
+                model_name = model_data.get("model_name", model_data.get("model_id", ""))
+                framework = model_data.get("source", model_data.get("backend", "ollama"))
+                inf_config = {"endpoint": model_data.get("endpoint", "http://localhost:11434")}
+                llm_config = {"framework": framework, "model": model_name, "config": inf_config}
+            elif isinstance(model_data, str):
+                model_name = model_data
+                framework = "ollama"
+                llm_config = {"framework": framework, "model": model_name, "config": {}}
+        except (ValueError, Exception):
+            pass
+
+    # Apply per-block config overrides
+    inf_config["max_tokens"] = 2048
+    inf_config["temperature"] = 0.1
+
+    use_real = bool(llm_config and model_name)
 
     # ── Load task ───────────────────────────────────────────────────────
     task = ctx.config.get("task", "")
@@ -109,9 +136,9 @@ def run(ctx):
     ctx.log_message(f"Task: {task[:100]}...")
 
     # ── Check if real inference is available ──────────────────────────
-    use_real = bool(llm_config and model_name)
     if not use_real:
-        ctx.log_message("Demo mode: no LLM connected or no model specified.")
+        ctx.log_message("No model connected. Running in demo mode. "
+                        "Connect a Model Selector or LLM Inference block for real output.")
 
     # ── Generate (with optional retry loop) ─────────────────────────────
     generated_code = ""

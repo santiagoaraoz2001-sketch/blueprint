@@ -56,3 +56,9 @@ config:
     min: 60
     max: 7200
     description: "Maximum execution time for the mergekit process"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -15,9 +15,11 @@ inputs:
     required: true
 
 outputs:
-  - id: model
+  - id: reward_model
     label: Reward Model
+    aliases: [model]
     data_type: model
+
   - id: metrics
     label: RM Metrics
     data_type: metrics
@@ -67,3 +69,9 @@ config:
     label: Rejected Column
     description: Column name for rejected responses in preference data
     default: rejected
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

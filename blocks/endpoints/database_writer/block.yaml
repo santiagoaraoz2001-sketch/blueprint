@@ -20,6 +20,7 @@ outputs:
     data_type: metrics
     description: "Object with keys: rows_written (int), columns (int), table_name (string), if_exists (string), database_type (string)"
 
+    aliases: [metrics]
 config:
   connection_string:
     type: string
@@ -63,3 +64,9 @@ config:
     label: Timestamp Column
     default: ""
     description: Auto-inject UTC timestamp column (e.g. inserted_at)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false
