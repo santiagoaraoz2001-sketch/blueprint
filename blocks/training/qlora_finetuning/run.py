@@ -20,6 +20,12 @@ except ImportError:
     class BlockExecutionError(RuntimeError):
         def __init__(self, message, **kw): super().__init__(message)
 
+try:
+    from blocks.training._validation import _validate_model_for_training
+except ImportError:
+    def _validate_model_for_training(model_name, model_info, ctx, field_name="model_name"):
+        return model_name
+
 
 def run(ctx):
     # Read upstream dataset metadata
@@ -61,6 +67,7 @@ def run(ctx):
         target_modules = ["q_proj", "v_proj"]
 
     # Try to get model from input
+    model_info = {}
     try:
         model_info = ctx.load_input("model")
         if isinstance(model_info, dict):
@@ -72,6 +79,9 @@ def run(ctx):
 
     if not model_name:
         raise BlockConfigError("model_name", "Model name is required — set it in config or connect a model to the input port")
+
+    # ── Validate model for training ──
+    model_name = _validate_model_for_training(model_name, model_info, ctx)
 
     # Load dataset
     dataset_path = ctx.resolve_as_file_path("dataset")
