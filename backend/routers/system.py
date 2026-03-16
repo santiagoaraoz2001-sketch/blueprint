@@ -18,6 +18,12 @@ from ..config import BASE_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR
 
 SAFE_MODEL_ID = re.compile(r'^[a-zA-Z0-9_\-./]+$')
 
+try:
+    import psutil
+    _HAS_PSUTIL = True
+except ImportError:
+    _HAS_PSUTIL = False
+
 from ..utils.hardware import get_hardware_profile
 from ..utils.benchmarks import get_benchmarks, search_benchmarks, refresh_cache
 from ..engine.parallelizer import build_schedule, explain_schedule
@@ -59,6 +65,28 @@ def available_models():
 def hardware():
     """Return the full hardware profile of the host machine."""
     return get_hardware_profile()
+
+
+@router.get("/metrics")
+def system_metrics():
+    """Lightweight, non-blocking CPU/memory snapshot for output view polling."""
+    if _HAS_PSUTIL:
+        cpu = psutil.cpu_percent(interval=None)  # non-blocking (returns cached value)
+        mem = psutil.virtual_memory()
+        return {
+            "cpu_percent": cpu,
+            "memory_percent": mem.percent,
+            "memory_gb": round(mem.used / (1024 ** 3), 1),
+            "memory_total_gb": round(mem.total / (1024 ** 3), 1),
+            "gpu_percent": None,
+        }
+    return {
+        "cpu_percent": 0,
+        "memory_percent": 0,
+        "memory_gb": 0,
+        "memory_total_gb": 0,
+        "gpu_percent": None,
+    }
 
 
 @router.get("/capabilities")
