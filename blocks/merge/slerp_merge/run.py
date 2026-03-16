@@ -22,6 +22,14 @@ except ImportError:
     class BlockExecutionError(RuntimeError):
         def __init__(self, message, **kw): super().__init__(message)
 
+try:
+    from blocks.merge._merge_validation import _validate_model_for_merge, _load_model_info
+except ImportError:
+    def _validate_model_for_merge(name, info, ctx, label="model"):
+        return name
+    def _load_model_info(ctx, *ids):
+        return {}
+
 
 def run(ctx):
     try:
@@ -46,6 +54,10 @@ def run(ctx):
     model_b_name = _get_model_name(ctx, "model_b")
     model_a_name = model_a_name or ctx.config.get("model_a_name", "")
     model_b_name = model_b_name or ctx.config.get("model_b_name", "")
+
+    # Validate model identifiers are compatible with mergekit
+    model_a_name = _validate_model_for_merge(model_a_name, _load_model_info(ctx, "model_a"), ctx, "Model A")
+    model_b_name = _validate_model_for_merge(model_b_name, _load_model_info(ctx, "model_b"), ctx, "Model B")
 
     if not model_a_name or not model_b_name:
         raise BlockInputError("Both model_a and model_b are required", recoverable=False)
