@@ -25,7 +25,20 @@ outputs:
   - id: consensus
     label: Consensus
     data_type: text
+    aliases: [response, text, output]
     description: "Final judge synthesis after all debate rounds"
+  - id: dataset
+    label: Debate Log
+    data_type: dataset
+  - id: metrics
+    label: Debate Metrics
+    data_type: metrics
+  - id: llm_config
+    label: LLM Config
+    data_type: llm
+    aliases: [llm]
+    description: "Passthrough of the LLM configuration — enables agent chaining and downstream inference"
+
 config:
   topic:
     type: text_area

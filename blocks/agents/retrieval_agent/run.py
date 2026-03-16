@@ -248,6 +248,17 @@ def run(ctx):
         if isinstance(v, (int, float)):
             ctx.log_metric(k, v)
 
+    # ── Passthrough LLM config for agent chaining ──
+    if llm_config:
+        ctx.save_output("llm_config", llm_config)
+    else:
+        ctx.save_output("llm_config", {
+            "framework": framework or "demo",
+            "model": model_name or "demo",
+            "config": inf_config or {},
+            "demo_mode": not bool(llm_config and model_name),
+        })
+
     ctx.log_message(f"RAG complete: {len(responses)} queries processed")
     ctx.report_progress(1, 1)
 

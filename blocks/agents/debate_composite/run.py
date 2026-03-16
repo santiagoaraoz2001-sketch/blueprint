@@ -12,6 +12,9 @@ The parent block's inputs (llm config, topic) are injected into root
 child blocks by the composite executor.
 """
 
+import json
+import os
+
 try:
     from backend.block_sdk.exceptions import (
         BlockConfigError, BlockInputError, BlockDataError,
@@ -151,8 +154,50 @@ def run(ctx):
                         "Connect a Model Selector or LLM Inference block for real output.")
     ctx.log_metric("rounds_completed", rounds)
     ctx.log_metric("sub_blocks_created", ctx.sub_block_count)
-    ctx.report_progress(1, 1)
 
     # Save a placeholder for consensus — the sub-pipeline's actual output
     # will overwrite this once execution completes.
     ctx.save_output("consensus", "")
+
+    # ── Save debate log as dataset ──
+    debate_entries = []
+    for r in range(rounds):
+        debate_entries.append({
+            "round": r + 1,
+            "pessimist": f"pessimist_r{r}",
+            "optimist": f"optimist_r{r}",
+            "judge": f"judge_r{r}",
+        })
+    log_path = os.path.join(ctx.run_dir, "debate_log")
+    os.makedirs(log_path, exist_ok=True)
+    with open(os.path.join(log_path, "data.json"), "w") as f:
+        json.dump(debate_entries, f, indent=2)
+    ctx.save_output("dataset", log_path)
+
+    # ── Save metrics ──
+    ctx.save_output("metrics", {
+        "rounds": rounds,
+        "agents": 3,  # pessimist + optimist + judge per round
+        "sub_blocks": ctx.sub_block_count,
+        "model": model or "default",
+        "demo_mode": not bool(model),
+    })
+
+    # ── Passthrough LLM config for agent chaining ──
+    llm_config = None
+    try:
+        llm_config = ctx.inputs.get("llm")
+    except (ValueError, Exception):
+        pass
+
+    if llm_config:
+        ctx.save_output("llm_config", llm_config)
+    else:
+        ctx.save_output("llm_config", {
+            "framework": "demo",
+            "model": model or "demo",
+            "config": {},
+            "demo_mode": not bool(model),
+        })
+
+    ctx.report_progress(1, 1)
