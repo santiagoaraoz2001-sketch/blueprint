@@ -215,6 +215,11 @@ def get_frontend_path() -> str | None:
     """Resolve the frontend dist folder across all deployment modes."""
     candidates: list[tuple[str, str]] = []
 
+    # 0. Explicit path from Electron or env override (highest priority)
+    env_dist = os.environ.get("BLUEPRINT_FRONTEND_DIST")
+    if env_dist:
+        candidates.append(("env", env_dist))
+
     # 1. Dev: 'frontend/dist' relative to the backend package directory
     dev_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

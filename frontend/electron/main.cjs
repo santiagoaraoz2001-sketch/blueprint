@@ -170,7 +170,11 @@ app.whenReady().then(async () => {
       const backendPath = path.join(process.resourcesPath, "blueprint_backend");
       console.log("[Blueprint] Spawning PyInstaller backend at:", backendPath, "on port", serverPort);
       backendProcess = spawn(backendPath, [serverPort.toString()], {
-        stdio: "inherit"
+        stdio: "inherit",
+        env: {
+          ...process.env,
+          BLUEPRINT_FRONTEND_DIST: path.join(process.resourcesPath, "app", "dist"),
+        },
       });
       console.log("[Blueprint] Waiting for backend to start...");
       await waitForServer(`http://localhost:${serverPort}`);
