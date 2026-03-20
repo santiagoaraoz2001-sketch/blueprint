@@ -30,6 +30,13 @@ module.exports = {
         name: "Blueprint",
         icon: "./electron/icon.icns",
         format: "ULFO",
+        contents: [
+          { x: 180, y: 170, type: "file", path: "" },         // Blueprint.app (auto-filled by maker)
+          { x: 480, y: 170, type: "link", path: "/Applications" }, // Applications folder alias
+        ],
+        window: {
+          size: { width: 660, height: 400 },
+        },
       },
     },
     {
