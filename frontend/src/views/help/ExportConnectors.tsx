@@ -1,4 +1,4 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { T } from '@/lib/design-tokens'
 import SectionAnchor from '@/components/Help/SectionAnchor'
 import { Upload, BarChart3, Globe, FileText, Plug } from 'lucide-react'
 import { helpCard as card, helpBody as body, helpTip as tip, helpStepList as stepList, helpCode as code } from './styles'
@@ -9,12 +9,12 @@ export default function ExportConnectors() {
   return (
     <div>
       <SectionAnchor id="export-connectors" title="Export Connectors" level={1}>
-        <Upload size={22} color={T.accent} />
+        <Upload size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* 7.1 Overview */}
       <SectionAnchor id="export-connectors/overview" title="Overview" level={2}>
-        <Plug size={17} color={T.accent} />
+        <Plug size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -30,7 +30,7 @@ export default function ExportConnectors() {
 
       {/* 7.2 Weights & Biases */}
       <SectionAnchor id="export-connectors/wandb" title="Weights & Biases" level={2}>
-        <BarChart3 size={17} color={T.accent} />
+        <BarChart3 size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -50,7 +50,7 @@ export default function ExportConnectors() {
 
       {/* 7.3 HuggingFace Hub */}
       <SectionAnchor id="export-connectors/huggingface" title="HuggingFace Hub" level={2}>
-        <Globe size={17} color={T.accent} />
+        <Globe size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -75,7 +75,7 @@ export default function ExportConnectors() {
 
       {/* 7.4 Jupyter Notebook */}
       <SectionAnchor id="export-connectors/jupyter" title="Jupyter Notebook" level={2}>
-        <FileText size={17} color={T.accent} />
+        <FileText size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -100,7 +100,7 @@ export default function ExportConnectors() {
 
       {/* 7.5 API */}
       <SectionAnchor id="export-connectors/api" title="Connectors API" level={2}>
-        <Plug size={17} color={T.accent} />
+        <Plug size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <ul style={stepList}>

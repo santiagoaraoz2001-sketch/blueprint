@@ -1,21 +1,29 @@
+"""Blueprint API — ML Experiment Workbench server."""
+from __future__ import annotations
+
 import logging
 import os
+import sys
 import threading
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from .database import init_db, SessionLocal
-from .config import ensure_dirs, ENABLE_MARKETPLACE
-from .models.run import Run, LiveRun
-from .utils.structured_logger import (
-    init_structured_logging, log_recovery, log_event,
-)
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference, plugins, sweeps, connectors, block_generator, marketplace
+from sqlalchemy import text
+
+from .config import ENABLE_MARKETPLACE, ensure_dirs
+from .database import SessionLocal, init_db
+from .models.run import LiveRun, Run
+from .routers import (
+    block_generator, blocks, connectors, control_tower, custom_blocks,
+    datasets, events, execution, inference, marketplace, models, papers,
+    pipelines, plugins, projects, runs, secrets, sweeps, system,
+)
+from .utils.structured_logger import init_structured_logging, log_event, log_recovery
 
 _recovery_logger = logging.getLogger("blueprint.recovery")
 
@@ -189,9 +197,6 @@ if ENABLE_MARKETPLACE:
 
 @app.get("/api/health")
 def health():
-    from .database import SessionLocal
-    from sqlalchemy import text
-    from fastapi.responses import JSONResponse
     try:
         session = SessionLocal()
         session.execute(text("SELECT 1"))
@@ -205,74 +210,68 @@ def health():
 
 
 # ── Serve Frontend SPA ──────────────────────────────────────────────
-import sys
-import logging
 
 _spa_logger = logging.getLogger("blueprint.spa")
 
 
-def get_frontend_path() -> str | None:
+def get_frontend_path() -> Path | None:
     """Resolve the frontend dist folder across all deployment modes."""
-    candidates: list[tuple[str, str]] = []
+    candidates: list[tuple[str, Path]] = []
 
     # 0. Explicit path from Electron or env override (highest priority)
     env_dist = os.environ.get("BLUEPRINT_FRONTEND_DIST")
     if env_dist:
-        candidates.append(("env", env_dist))
+        candidates.append(("env", Path(env_dist)))
 
     # 1. Dev: 'frontend/dist' relative to the backend package directory
-    dev_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "frontend", "dist",
-    )
+    dev_path = Path(__file__).resolve().parent.parent / "frontend" / "dist"
     candidates.append(("dev", dev_path))
 
-    is_frozen = getattr(sys, "frozen", False)
-
-    if is_frozen:
-        meipass = getattr(sys, "_MEIPASS", "")
-        exe_dir = os.path.dirname(sys.executable)
+    if getattr(sys, "frozen", False):
+        meipass = Path(getattr(sys, "_MEIPASS", ""))
+        exe_dir = Path(sys.executable).parent
 
         # 2. PyInstaller bundle: frontend bundled inside _MEIPASS
-        candidates.append(("meipass", os.path.join(meipass, "frontend", "dist")))
+        candidates.append(("meipass", meipass / "frontend" / "dist"))
 
         # 3. Electron App Bundle: Contents/Resources/app/dist
-        candidates.append(("electron", os.path.join(exe_dir, "app", "dist")))
+        candidates.append(("electron", exe_dir / "app" / "dist"))
 
         # 4. Fallback: dist/ next to the executable (standalone test)
-        candidates.append(("sibling", os.path.join(exe_dir, "dist")))
+        candidates.append(("sibling", exe_dir / "dist"))
 
     for label, path in candidates:
-        index_html = os.path.join(path, "index.html")
-        _spa_logger.debug("SPA probe [%s]: %s  exists=%s", label, path, os.path.exists(index_html))
-        if os.path.isfile(index_html):
+        index_html = path / "index.html"
+        _spa_logger.debug("SPA probe [%s]: %s  exists=%s", label, path, index_html.exists())
+        if index_html.is_file():
             _spa_logger.info("SPA resolved via [%s]: %s", label, path)
             return path
 
-    _spa_logger.warning("SPA dist folder not found. Tried: %s", [c[1] for c in candidates])
+    _spa_logger.warning("SPA dist folder not found. Tried: %s", [str(c[1]) for c in candidates])
     return None
 
 
 frontend_path = get_frontend_path()
 
 if frontend_path:
-    # Mount static assets directory
-    assets_dir = os.path.join(frontend_path, "assets")
-    if os.path.isdir(assets_dir):
-        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+    assets_dir = frontend_path / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    _index_html = str(frontend_path / "index.html")
 
     @app.get("/")
     def serve_root():
-        """Serve index.html for the root path (/{path:path} doesn't match '/')."""
-        return FileResponse(os.path.join(frontend_path, "index.html"))
+        """Serve index.html for the root path."""
+        return FileResponse(_index_html)
 
     @app.get("/{catchall:path}")
     def serve_spa(catchall: str):
         """SPA catch-all: serve the requested file or fall back to index.html."""
-        file_path = os.path.join(frontend_path, catchall)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
-        return FileResponse(os.path.join(frontend_path, "index.html"))
+        requested = frontend_path / catchall
+        if requested.is_file():
+            return FileResponse(str(requested))
+        return FileResponse(_index_html)
 else:
     @app.get("/")
     def no_frontend():

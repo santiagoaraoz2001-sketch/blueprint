@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
-import { useAgentStore, type LLMProvider } from '@/stores/agentStore'
+import { useAgentStore } from '@/stores/agentStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { getAdapter, PROVIDERS } from '@/lib/llm-adapters'
 import { Sparkles, Send, Trash2, X, Loader, AlertCircle, Settings } from 'lucide-react'
@@ -147,8 +147,8 @@ export default function HelpAssistant({ contextText, contextTitle, onClose }: He
       <div style={panelStyle}>
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Sparkles size={16} color={T.accent} />
-            <span style={{ fontFamily: F, fontSize: FS.sm, fontWeight: 700, color: T.fg }}>
+            <Sparkles size={16} color={T.cyan} />
+            <span style={{ fontFamily: F, fontSize: FS.sm, fontWeight: 700, color: T.text }}>
               AI Assistant
             </span>
           </div>
@@ -186,7 +186,7 @@ export default function HelpAssistant({ contextText, contextTitle, onClose }: He
               gap: 6,
               fontFamily: F,
               fontSize: FS.xs,
-              color: T.accent,
+              color: T.cyan,
               cursor: 'pointer',
             }}
           >
@@ -218,8 +218,8 @@ export default function HelpAssistant({ contextText, contextTitle, onClose }: He
       {/* Header */}
       <div style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Sparkles size={16} color={T.accent} />
-          <span style={{ fontFamily: F, fontSize: FS.sm, fontWeight: 700, color: T.fg }}>
+          <Sparkles size={16} color={T.cyan} />
+          <span style={{ fontFamily: F, fontSize: FS.sm, fontWeight: 700, color: T.text }}>
             AI Assistant
           </span>
           <div
@@ -227,7 +227,7 @@ export default function HelpAssistant({ contextText, contextTitle, onClose }: He
               width: 7,
               height: 7,
               borderRadius: '50%',
-              background: T.accent,
+              background: T.cyan,
               marginLeft: 2,
             }}
           />
@@ -253,7 +253,7 @@ export default function HelpAssistant({ contextText, contextTitle, onClose }: He
               width: '100%',
               background: T.surface2,
               border: `1px solid ${T.border}`,
-              color: T.fg,
+              color: T.text,
               fontFamily: F,
               fontSize: FS.xs,
               padding: '5px 8px',
@@ -303,8 +303,8 @@ export default function HelpAssistant({ contextText, contextTitle, onClose }: He
               alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
               maxWidth: '85%',
               padding: '10px 14px',
-              background: msg.role === 'user' ? T.accent : T.surface2,
-              color: msg.role === 'user' ? '#fff' : T.fg,
+              background: msg.role === 'user' ? T.cyan : T.surface2,
+              color: msg.role === 'user' ? '#fff' : T.text,
               fontFamily: F,
               fontSize: FS.sm,
               lineHeight: 1.6,
@@ -372,7 +372,7 @@ export default function HelpAssistant({ contextText, contextTitle, onClose }: He
             flex: 1,
             background: T.surface2,
             border: `1px solid ${T.border}`,
-            color: T.fg,
+            color: T.text,
             fontFamily: F,
             fontSize: FS.sm,
             padding: '8px 12px',
@@ -385,7 +385,7 @@ export default function HelpAssistant({ contextText, contextTitle, onClose }: He
           onClick={sendMessage}
           disabled={loading || !input.trim()}
           style={{
-            background: T.accent,
+            background: T.cyan,
             border: 'none',
             padding: '8px 12px',
             cursor: loading || !input.trim() ? 'default' : 'pointer',

@@ -9,7 +9,6 @@ import {
   BookOpen,
   Sparkles,
   Menu,
-  X,
   Cpu,
 } from 'lucide-react'
 
@@ -21,6 +20,8 @@ import GettingStarted, { GETTING_STARTED_TEXT } from './help/GettingStarted'
 import ProjectsDashboard, { PROJECTS_DASHBOARD_TEXT } from './help/ProjectsDashboard'
 import PipelineEditor, { PIPELINE_EDITOR_TEXT } from './help/PipelineEditor'
 import BlocksReference, { BLOCKS_REFERENCE_TEXT } from './help/BlocksReference'
+import DatasetsData, { DATASETS_DATA_TEXT } from './help/DatasetsData'
+import BlockWorkshop, { BLOCK_WORKSHOP_TEXT } from './help/BlockWorkshop'
 import ExecutionMonitoring, { EXECUTION_MONITORING_TEXT } from './help/ExecutionMonitoring'
 import ResultsAnalysis, { RESULTS_ANALYSIS_TEXT } from './help/ResultsAnalysis'
 import ExportConnectors, { EXPORT_CONNECTORS_TEXT } from './help/ExportConnectors'
@@ -84,8 +85,29 @@ const TOC: TocSection[] = [
     ],
   },
   {
+    id: 'datasets-data',
+    title: '5. Datasets & Data',
+    children: [
+      { id: 'datasets-data/formats', title: 'Supported Formats' },
+      { id: 'datasets-data/preview', title: 'Registering & Preview' },
+      { id: 'datasets-data/scanner', title: 'File Scanner' },
+      { id: 'datasets-data/snapshots', title: 'Snapshots & Versioning' },
+      { id: 'datasets-data/templates', title: 'Re-Architecture Templates' },
+    ],
+  },
+  {
+    id: 'block-workshop',
+    title: '6. Block Workshop',
+    children: [
+      { id: 'block-workshop/creating', title: 'Creating a Block' },
+      { id: 'block-workshop/code', title: 'Writing Block Code' },
+      { id: 'block-workshop/testing', title: 'Testing & Validation' },
+      { id: 'block-workshop/deployment', title: 'Saving & Deployment' },
+    ],
+  },
+  {
     id: 'execution-monitoring',
-    title: '5. Execution & Monitoring',
+    title: '7. Execution & Monitoring',
     children: [
       { id: 'execution-monitoring/engine', title: 'Execution Engine' },
       { id: 'execution-monitoring/monitor', title: 'Monitor View' },
@@ -95,7 +117,7 @@ const TOC: TocSection[] = [
   },
   {
     id: 'results-analysis',
-    title: '6. Results & Analysis',
+    title: '8. Results & Analysis',
     children: [
       { id: 'results-analysis/results-view', title: 'Results View' },
       { id: 'results-analysis/checkpoints', title: 'Checkpoint Timeline' },
@@ -108,7 +130,7 @@ const TOC: TocSection[] = [
   },
   {
     id: 'export-connectors',
-    title: '7. Export Connectors',
+    title: '9. Export Connectors',
     children: [
       { id: 'export-connectors/overview', title: 'Overview' },
       { id: 'export-connectors/wandb', title: 'Weights & Biases' },
@@ -119,7 +141,7 @@ const TOC: TocSection[] = [
   },
   {
     id: 'plugin-system',
-    title: '8. Plugin System',
+    title: '10. Plugin System',
     children: [
       { id: 'plugin-system/overview', title: 'Overview' },
       { id: 'plugin-system/installing', title: 'Installing Plugins' },
@@ -129,10 +151,10 @@ const TOC: TocSection[] = [
       { id: 'plugin-system/wandb-plugin', title: 'W&B Monitor Plugin' },
     ],
   },
-  { id: 'keyboard-shortcuts', title: '9. Keyboard Shortcuts' },
+  { id: 'keyboard-shortcuts', title: '11. Keyboard Shortcuts' },
   {
     id: 'cli-tools',
-    title: '10. CLI Tools',
+    title: '12. CLI Tools',
     children: [
       { id: 'cli-tools/test-runner', title: 'Block Test Runner' },
       { id: 'cli-tools/scaffold', title: 'Block Scaffold' },
@@ -144,7 +166,7 @@ const TOC: TocSection[] = [
   },
   {
     id: 'settings-config',
-    title: '11. Settings & Configuration',
+    title: '13. Settings & Configuration',
     children: [
       { id: 'settings-config/appearance', title: 'Appearance' },
       { id: 'settings-config/llm-providers', title: 'LLM Providers' },
@@ -153,9 +175,9 @@ const TOC: TocSection[] = [
       { id: 'settings-config/data-location', title: 'Data Location' },
     ],
   },
-  { id: 'troubleshooting', title: '12. Troubleshooting' },
-  { id: 'faq', title: '13. FAQ' },
-  { id: 'machine-profile', title: '14. Machine Profile' },
+  { id: 'troubleshooting', title: '14. Troubleshooting' },
+  { id: 'faq', title: '15. FAQ' },
+  { id: 'machine-profile', title: '16. Machine Profile' },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -167,15 +189,18 @@ const SEARCH_SECTIONS: SearchableSection[] = [
   { id: 'projects-dashboard', title: '2. Projects & Dashboard', text: PROJECTS_DASHBOARD_TEXT },
   { id: 'pipeline-editor', title: '3. Pipeline Editor', text: PIPELINE_EDITOR_TEXT },
   { id: 'blocks-reference', title: '4. Blocks In Depth', text: BLOCKS_REFERENCE_TEXT },
-  { id: 'execution-monitoring', title: '5. Execution & Monitoring', text: EXECUTION_MONITORING_TEXT },
-  { id: 'results-analysis', title: '6. Results & Analysis', text: RESULTS_ANALYSIS_TEXT },
-  { id: 'export-connectors', title: '7. Export Connectors', text: EXPORT_CONNECTORS_TEXT },
-  { id: 'plugin-system', title: '8. Plugin System', text: PLUGIN_SYSTEM_TEXT },
-  { id: 'keyboard-shortcuts', title: '9. Keyboard Shortcuts', text: KEYBOARD_SHORTCUTS_TEXT },
-  { id: 'cli-tools', title: '10. CLI Tools', text: CLI_TOOLS_TEXT },
-  { id: 'settings-config', title: '11. Settings & Configuration', text: SETTINGS_CONFIG_TEXT },
-  { id: 'troubleshooting', title: '12. Troubleshooting', text: TROUBLESHOOTING_TEXT },
-  { id: 'faq', title: '13. FAQ', text: FAQ_TEXT },
+  { id: 'datasets-data', title: '5. Datasets & Data', text: DATASETS_DATA_TEXT },
+  { id: 'block-workshop', title: '6. Block Workshop', text: BLOCK_WORKSHOP_TEXT },
+  { id: 'execution-monitoring', title: '7. Execution & Monitoring', text: EXECUTION_MONITORING_TEXT },
+  { id: 'results-analysis', title: '8. Results & Analysis', text: RESULTS_ANALYSIS_TEXT },
+  { id: 'export-connectors', title: '9. Export Connectors', text: EXPORT_CONNECTORS_TEXT },
+  { id: 'plugin-system', title: '10. Plugin System', text: PLUGIN_SYSTEM_TEXT },
+  { id: 'keyboard-shortcuts', title: '11. Keyboard Shortcuts', text: KEYBOARD_SHORTCUTS_TEXT },
+  { id: 'cli-tools', title: '12. CLI Tools', text: CLI_TOOLS_TEXT },
+  { id: 'settings-config', title: '13. Settings & Configuration', text: SETTINGS_CONFIG_TEXT },
+  { id: 'troubleshooting', title: '14. Troubleshooting', text: TROUBLESHOOTING_TEXT },
+  { id: 'faq', title: '15. FAQ', text: FAQ_TEXT },
+  { id: 'machine-profile', title: '16. Machine Profile', text: 'Machine Profile. Shows your hardware profile including CPU, memory, GPU, and accelerators. Lists blocks that may not run on your current hardware based on estimated resource requirements.' },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -183,7 +208,7 @@ const SEARCH_SECTIONS: SearchableSection[] = [
 /* ------------------------------------------------------------------ */
 
 const MachineProfile = memo(function MachineProfile() {
-  const { profile, fetching, fetchHardware } = useHardwareStore()
+  const { profile, loading: fetching, fetchHardware } = useHardwareStore()
 
   useEffect(() => {
     if (!profile && !fetching) fetchHardware()
@@ -192,10 +217,10 @@ const MachineProfile = memo(function MachineProfile() {
   // Derive hardware spec (safe even when profile is null)
   const gpu0 = profile ? (Array.isArray(profile.gpu) ? profile.gpu[0] : profile.gpu) : null
   const hw: HardwareSpec = useMemo(() => ({
-    gpu: gpu0?.name ?? '',
-    vram_gb: gpu0 ? Math.round((gpu0 as any).vram_gb ?? (gpu0 as any).vram_mb / 1024 ?? 0) : 0,
-    ram_gb: profile ? Math.round(profile.ram.total_gb) : 0,
-    cpu_cores: profile?.cpu.cores ?? 0,
+    ramGB: profile ? Math.round(profile.ram.total_gb) : 0,
+    gpuVramGB: gpu0 ? Math.round(gpu0.vram_gb ?? 0) : 0,
+    gpuType: (gpu0?.type as HardwareSpec['gpuType']) ?? 'cpu',
+    cpuCores: profile?.cpu.cores ?? 0,
   }), [gpu0, profile])
 
   // Memoize expensive infeasible block computation — must be called before early returns
@@ -242,7 +267,7 @@ const MachineProfile = memo(function MachineProfile() {
   const val: React.CSSProperties = {
     fontFamily: F,
     fontSize: FS.sm,
-    color: T.fg,
+    color: T.text,
     fontWeight: 600,
     marginTop: 4,
   }
@@ -293,7 +318,7 @@ const MachineProfile = memo(function MachineProfile() {
           <div style={val}>{gpu0?.name ?? 'None detected'}</div>
           {gpu0 && (
             <div style={{ ...val, fontWeight: 400, fontSize: FS.xs, color: T.sec }}>
-              {((gpu0 as any).vram_gb ?? ((gpu0 as any).vram_mb / 1024) ?? 0).toFixed(1)} GB VRAM &middot; {gpu0.type}
+              {(gpu0.vram_gb ?? 0).toFixed(1)} GB VRAM &middot; {gpu0.type}
             </div>
           )}
         </div>
@@ -308,8 +333,8 @@ const MachineProfile = memo(function MachineProfile() {
                   fontSize: 10,
                   fontWeight: 700,
                   padding: '3px 8px',
-                  background: `${T.accent}20`,
-                  color: T.accent,
+                  background: `${T.cyan}20`,
+                  color: T.cyan,
                   textTransform: 'uppercase',
                   letterSpacing: '0.06em',
                 }}
@@ -469,16 +494,16 @@ export default function HelpView() {
               display: 'none', // visible only on small screens via media query workaround
             }}
           >
-            <Menu size={18} color={T.fg} />
+            <Menu size={18} color={T.text} />
           </button>
 
-          <BookOpen size={18} color={T.accent} />
+          <BookOpen size={18} color={T.cyan} />
           <span
             style={{
               fontFamily: FD,
               fontSize: FS.lg,
               fontWeight: 800,
-              color: T.fg,
+              color: T.text,
             }}
           >
             Blueprint Documentation
@@ -498,8 +523,8 @@ export default function HelpView() {
               alignItems: 'center',
               gap: 6,
               padding: '6px 14px',
-              background: showAssistant ? T.accent : T.surface2,
-              border: `1px solid ${showAssistant ? T.accent : T.border}`,
+              background: showAssistant ? T.cyan : T.surface2,
+              border: `1px solid ${showAssistant ? T.cyan : T.border}`,
               color: showAssistant ? '#fff' : T.sec,
               fontFamily: F,
               fontSize: FS.xs,
@@ -532,6 +557,8 @@ export default function HelpView() {
             <ProjectsDashboard />
             <PipelineEditor />
             <BlocksReference />
+            <DatasetsData />
+            <BlockWorkshop />
             <ExecutionMonitoring />
             <ResultsAnalysis />
 
@@ -556,7 +583,7 @@ export default function HelpView() {
                   fontFamily: FD,
                   fontSize: FS.xl,
                   fontWeight: 800,
-                  color: T.fg,
+                  color: T.text,
                   marginTop: 48,
                   marginBottom: 20,
                   lineHeight: 1.3,
@@ -565,7 +592,7 @@ export default function HelpView() {
                   gap: 8,
                 }}
               >
-                <Cpu size={22} color={T.accent} />
+                <Cpu size={22} color={T.cyan} />
                 Machine Profile
               </div>
               <MachineProfile />
@@ -588,7 +615,7 @@ export default function HelpView() {
               ML workbench
               <br />
               For issues and feedback:{' '}
-              <span style={{ color: T.accent }}>
+              <span style={{ color: T.cyan }}>
                 github.com/santiagoaraoz2001-sketch/blueprint
               </span>
             </div>

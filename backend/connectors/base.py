@@ -108,6 +108,19 @@ class BaseConnector(ABC):
         """
         ...
 
+    def test_connection(self, config: dict) -> tuple[bool, str]:
+        """Test connectivity to the external service.
+
+        Subclasses can override to perform a real connectivity check (e.g.,
+        list projects, verify token scope).  The default implementation
+        delegates to ``validate_config`` which only checks field presence
+        and package availability.
+
+        Returns:
+            A ``(reachable, message)`` tuple.
+        """
+        return self.validate_config(config)
+
     def to_dict(self) -> dict:
         """Serialize connector metadata for API responses."""
         return {

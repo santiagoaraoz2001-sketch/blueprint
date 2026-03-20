@@ -21,11 +21,8 @@ interface OllamaGenerateResponse {
   response?: string
 }
 
-function createTimeoutSignal(ms: number): AbortSignal {
-  const controller = new AbortController()
-  setTimeout(() => controller.abort(), ms)
-  return controller.signal
-}
+/** Abort signal with automatic timer cleanup via native API. */
+const createTimeoutSignal = (ms: number): AbortSignal => AbortSignal.timeout(ms)
 
 export const ollamaAdapter: LLMAdapter = {
   providerId: 'ollama',

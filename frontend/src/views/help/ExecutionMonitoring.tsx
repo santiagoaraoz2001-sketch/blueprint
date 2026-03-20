@@ -1,4 +1,4 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { T } from '@/lib/design-tokens'
 import SectionAnchor from '@/components/Help/SectionAnchor'
 import { Activity, Cpu, Wifi, FileText } from 'lucide-react'
 import { helpCard as card, helpBody as body, helpTip as tip, helpStepList as stepList, helpCode as code } from './styles'
@@ -9,12 +9,12 @@ export default function ExecutionMonitoring() {
   return (
     <div>
       <SectionAnchor id="execution-monitoring" title="Execution & Monitoring" level={1}>
-        <Activity size={22} color={T.accent} />
+        <Activity size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* 5.1 Execution Engine */}
       <SectionAnchor id="execution-monitoring/engine" title="Execution Engine" level={2}>
-        <Cpu size={17} color={T.accent} />
+        <Cpu size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -38,7 +38,7 @@ export default function ExecutionMonitoring() {
 
       {/* 5.2 Monitor View */}
       <SectionAnchor id="execution-monitoring/monitor" title="Monitor View" level={2}>
-        <Activity size={17} color={T.accent} />
+        <Activity size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -68,7 +68,7 @@ export default function ExecutionMonitoring() {
 
       {/* 5.3 SSE Connection */}
       <SectionAnchor id="execution-monitoring/sse" title="SSE Connection" level={2}>
-        <Wifi size={17} color={T.accent} />
+        <Wifi size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -98,7 +98,7 @@ export default function ExecutionMonitoring() {
 
       {/* 5.4 Structured Logging */}
       <SectionAnchor id="execution-monitoring/logging" title="Structured Logging" level={2}>
-        <FileText size={17} color={T.accent} />
+        <FileText size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>

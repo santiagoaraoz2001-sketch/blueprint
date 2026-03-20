@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from .block_registry import is_known_block, get_block_types, get_block_config_schema, resolve_output_handle
+from .block_registry import is_known_block, get_block_types, get_block_config_schema
 from ..block_sdk.config_validator import (
     validate_and_apply_defaults,
     _validate_type,
@@ -38,34 +38,49 @@ CATEGORY_RUNTIME = {
     "endpoints": 3,
 }
 
-# Port type compatibility matrix (mirrors frontend isPortCompatible)
-# SOURCE → CAN CONNECT TO (must match frontend block-registry-types.ts COMPAT)
+# Port type compatibility matrix (mirrors frontend isPortCompatible in block-registry-types.ts)
+# SOURCE → CAN CONNECT TO
+# Must be kept in sync with the frontend COMPAT map.
 COMPAT = {
-    ("any", "any"), ("dataset", "dataset"), ("text", "text"), ("model", "model"),
+    # Identity
+    ("dataset", "dataset"), ("text", "text"), ("model", "model"),
     ("config", "config"), ("metrics", "metrics"), ("embedding", "embedding"),
-    ("artifact", "artifact"), ("agent", "agent"), ("llm", "llm"),
-    # Cross-type coercions
-    ("dataset", "text"), ("text", "dataset"),
-    # REMOVED: ("text", "config"), ("config", "text") — no more text↔config
-    ("config", "text"),  # config→text still allowed (config can serialize to text)
-    ("config", "llm"), ("model", "llm"),  # config/model → llm (agent inputs)
-    ("llm", "model"), ("llm", "config"),  # llm → model/config (backward compat)
+    ("artifact", "artifact"), ("agent", "agent"), ("any", "any"),
+    # Cross-type coercions (from frontend COMPAT map)
+    ("dataset", "text"),
+    ("text", "dataset"), ("text", "config"),
+    ("config", "text"),
     ("metrics", "dataset"), ("metrics", "text"),
     ("embedding", "dataset"),
     ("artifact", "text"),
 }
 
-# Backward-compat aliases for old port type names
-_PORT_TYPE_ALIASES = {
-    "llm_config": "llm",
+# Backward-compat aliases for legacy port type names
+_PORT_TYPE_ALIASES: dict[str, str] = {
+    "data": "dataset",
+    "external": "dataset",
+    "training": "model",
+    "intervention": "any",
+    "checkpoint": "model",
+    "optimizer": "config",
+    "schedule": "config",
+    "api": "dataset",
+    "file": "dataset",
+    "cloud": "config",
 }
 
+
+def _resolve_port_type(port_type: str) -> str:
+    """Resolve legacy port type aliases."""
+    return _PORT_TYPE_ALIASES.get(port_type, port_type)
+
+
 def _port_compatible(src_type: str, tgt_type: str) -> bool:
-    src_type = _PORT_TYPE_ALIASES.get(src_type, src_type)
-    tgt_type = _PORT_TYPE_ALIASES.get(tgt_type, tgt_type)
-    if src_type == "any" or tgt_type == "any":
+    src = _resolve_port_type(src_type)
+    tgt = _resolve_port_type(tgt_type)
+    if src == "any" or tgt == "any":
         return True
-    return (src_type, tgt_type) in COMPAT
+    return (src, tgt) in COMPAT
 
 # Critical config fields that must be set for specific block types
 CRITICAL_CONFIG_FIELDS = {
@@ -75,33 +90,6 @@ CRITICAL_CONFIG_FIELDS = {
     "huggingface_model_loader": ["model_id"],
     "model_selector": ["model_id"],
 }
-
-
-# Map config field names to the input port that can satisfy them
-_CONFIG_TO_PORT = {
-    "model_name": "model",
-    "model_id": "model",
-    "dataset_name": "dataset",
-    "file_path": "dataset",
-    "directory_path": "dataset",
-    "teacher_model": "teacher",
-    "student_model": "student",
-    "reward_model": "reward_model",
-    "checkpoint_dir": "model",
-    "url": "config",
-}
-
-
-def _has_connected_input(node: dict, edges: list[dict], config_field_name: str) -> bool:
-    """Check if a config field has a corresponding connected input port."""
-    port_id = _CONFIG_TO_PORT.get(config_field_name)
-    if not port_id:
-        return False
-    node_id = node.get("id", "")
-    for edge in edges:
-        if edge.get("target") == node_id and edge.get("targetHandle") == port_id:
-            return True
-    return False
 
 
 def validate_pipeline(definition: dict) -> ValidationReport:
@@ -147,90 +135,47 @@ def validate_pipeline(definition: dict) -> ValidationReport:
             node_label = node.get("data", {}).get("label", node.get("id", "?"))
             report.warnings.append(f"Block '{node_label}' uses unknown type '{block_type}' — it may not have a run.py implementation")
 
-    # ── 2. Check for cycles (Kahn's + Kosaraju's SCC) ──
-    # Cycles through exactly one loop_controller node are allowed (loop subgraphs).
-    # All other cycles are rejected.
-    # Uses fully iterative algorithms (no recursion limit risk on large graphs).
-    adjacency: dict[str, list[str]] = {nid: [] for nid in node_map}
-    reverse_adj: dict[str, list[str]] = {nid: [] for nid in node_map}
-    in_deg: dict[str, int] = {nid: 0 for nid in node_map}
+    # ── 2. Check for cycles (DFS) ──
+    # Build adjacency only for executable nodes (skip groupNode, stickyNote)
+    visual_types = {"groupNode", "stickyNote"}
+    exec_node_ids = {nid for nid, n in node_map.items() if n.get("type") not in visual_types}
+
+    adjacency: dict[str, list[str]] = {nid: [] for nid in exec_node_ids}
     for edge in edges:
         src = edge.get("source", "")
         tgt = edge.get("target", "")
-        if src in adjacency and tgt in adjacency:
+        if src in adjacency and tgt in exec_node_ids:
             adjacency[src].append(tgt)
-            reverse_adj[tgt].append(src)
-            in_deg[tgt] += 1
 
-    def _is_loop_controller(nid: str) -> bool:
-        n = node_map.get(nid, {})
-        return n.get("data", {}).get("type", "") == "loop_controller"
+    # DFS cycle detection (iterative to avoid stack overflow on large pipelines)
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color = {nid: WHITE for nid in exec_node_ids}
+    has_cycle = False
 
-    # Step 1: Kahn's algorithm to find cyclic nodes
-    kahn_deg = dict(in_deg)
-    queue = [nid for nid, d in kahn_deg.items() if d == 0]
-    acyclic: set[str] = set()
-    while queue:
-        n = queue.pop(0)
-        acyclic.add(n)
-        for nb in adjacency.get(n, []):
-            kahn_deg[nb] -= 1
-            if kahn_deg[nb] == 0:
-                queue.append(nb)
+    for start in exec_node_ids:
+        if color[start] != WHITE:
+            continue
+        stack = [(start, iter(adjacency.get(start, [])))]
+        color[start] = GRAY
 
-    cyclic_nodes = set(node_map.keys()) - acyclic
+        while stack:
+            node_id, children = stack[-1]
+            try:
+                child = next(children)
+                if color.get(child) == GRAY:
+                    has_cycle = True
+                    break
+                if color.get(child) == WHITE:
+                    color[child] = GRAY
+                    stack.append((child, iter(adjacency.get(child, []))))
+            except StopIteration:
+                color[node_id] = BLACK
+                stack.pop()
 
-    if cyclic_nodes:
-        # Step 2: Kosaraju's SCC (iterative) among cyclic nodes
-        # Phase A: Forward DFS → finish order
-        visited: set[str] = set()
-        finish_order: list[str] = []
-        for start in sorted(cyclic_nodes):
-            if start in visited:
-                continue
-            stack: list[tuple[str, bool]] = [(start, False)]
-            while stack:
-                node, processed = stack.pop()
-                if processed:
-                    finish_order.append(node)
-                    continue
-                if node in visited:
-                    continue
-                visited.add(node)
-                stack.append((node, True))
-                for nb in adjacency.get(node, []):
-                    if nb in cyclic_nodes and nb not in visited:
-                        stack.append((nb, False))
-
-        # Phase B: Reverse DFS in reverse finish order → SCCs
-        visited = set()
-        sccs: list[list[str]] = []
-        for node in reversed(finish_order):
-            if node in visited:
-                continue
-            component: list[str] = []
-            stack_b: list[str] = [node]
-            while stack_b:
-                n = stack_b.pop()
-                if n in visited:
-                    continue
-                visited.add(n)
-                component.append(n)
-                for nb in reverse_adj.get(n, []):
-                    if nb in cyclic_nodes and nb not in visited:
-                        stack_b.append(nb)
-            sccs.append(component)
-
-        # Step 3: Validate each SCC has exactly 1 loop_controller
-        for scc in sccs:
-            controllers = [n for n in scc if _is_loop_controller(n)]
-            if len(controllers) != 1:
-                report.errors.append(
-                    "Pipeline contains a cycle that doesn't pass through "
-                    "a Loop Controller block."
-                )
-                report.valid = False
-                break  # One invalid cycle is enough to reject
+        if has_cycle:
+            report.errors.append("Pipeline contains a cycle — blocks cannot have circular dependencies")
+            report.valid = False
+            break
 
     # ── 3. Check disconnected nodes & required ports ──
     connected_target_handles = set()
@@ -253,12 +198,10 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         if node.get("type") in ("groupNode", "stickyNote"):
             continue
         nid = node.get("id", "")
-        node_data = node.get("data", {})
-        # Check both regular inputs and side inputs for required connections
-        all_target_ports = node_data.get("inputs", []) + node_data.get("side_inputs", [])
-        for in_port in all_target_ports:
+        inputs = node.get("data", {}).get("inputs", [])
+        for in_port in inputs:
             if in_port.get("required", False) and (nid, in_port.get("id")) not in connected_target_handles:
-                node_label = node_data.get("label", nid)
+                node_label = node.get("data", {}).get("label", nid)
                 report.errors.append(f"Block '{node_label}' is missing required input: {in_port.get('label', in_port.get('id'))}")
                 report.valid = False
 
@@ -287,14 +230,12 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         src_port_type = "any"
         tgt_port_type = "any"
         
-        # Resolve aliased output handle IDs (old port names from saved pipelines)
-        resolved_src_handle = resolve_output_handle(src_data.get("type", ""), src_handle) if src_handle else src_handle
         for out_port in src_data.get("outputs", []):
-            if out_port.get("id") == resolved_src_handle:
+            if out_port.get("id") == src_handle:
                 src_port_type = out_port.get("dataType", "any")
                 break
-
-        for in_port in tgt_data.get("inputs", []) + tgt_data.get("side_inputs", []):
+                
+        for in_port in tgt_data.get("inputs", []):
             if in_port.get("id") == tgt_handle:
                 tgt_port_type = in_port.get("dataType", "any")
                 break
@@ -328,37 +269,7 @@ def validate_pipeline(definition: dict) -> ValidationReport:
             if key in ("dataset_name", "model_path", "base_url") and not value:
                 report.warnings.append(f"Block '{node_label}': '{key}' is empty — may be required at runtime")
 
-    # ── 5a. Mandatory config field enforcement ──
-    for node in nodes:
-        if node.get("type") in ("groupNode", "stickyNote"):
-            continue
-        block_type = node.get("data", {}).get("type", node.get("data", {}).get("blockType", ""))
-        if not block_type:
-            continue
-
-        schema = get_block_config_schema(block_type)
-        if not schema:
-            continue
-
-        node_config = node.get("data", {}).get("config", {})
-        node_label = node.get("data", {}).get("label", node.get("id", "?"))
-
-        for field_name, field_def in schema.items():
-            if not isinstance(field_def, dict):
-                continue
-            if not field_def.get("mandatory"):
-                continue
-            raw = node_config.get(field_name)
-            is_empty = raw is None or (isinstance(raw, str) and raw.strip() == "")
-            if is_empty and not _has_connected_input(node, edges, field_name):
-                    label = field_def.get("label", field_name)
-                    report.errors.append(
-                        f"Block '{node_label}': '{label}' is required "
-                        f"(set in config or connect the input port)"
-                    )
-                    report.valid = False
-
-    # ── 5b. Deep config validation against block.yaml schemas ──
+    # ── 5a. Deep config validation against block.yaml schemas ──
     for node in nodes:
         if node.get("type") in ("groupNode", "stickyNote"):
             continue
@@ -405,7 +316,7 @@ def validate_pipeline(definition: dict) -> ValidationReport:
                 except BlockConfigError as exc:
                     report.warnings.append(f"Block '{node_label}': {exc}")
 
-    # ── 5c. Check port existence on edges ──
+    # ── 5b. Check port existence on edges ──
     for edge in edges:
         src = edge.get("source", "")
         tgt = edge.get("target", "")
@@ -413,20 +324,15 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         tgt_handle = edge.get("targetHandle", "")
 
         if src in node_map:
-            src_data_check = node_map[src].get("data", {})
-            src_outputs = [p.get("id") for p in src_data_check.get("outputs", [])]
-            resolved_handle = resolve_output_handle(src_data_check.get("type", ""), src_handle) if src_handle else src_handle
-            if src_handle and src_outputs and src_handle not in src_outputs and resolved_handle not in src_outputs:
-                src_label = src_data_check.get("label", src)
+            src_outputs = [p.get("id") for p in node_map[src].get("data", {}).get("outputs", [])]
+            if src_handle and src_outputs and src_handle not in src_outputs:
+                src_label = node_map[src].get("data", {}).get("label", src)
                 report.warnings.append(f"Edge from '{src_label}' references non-existent output port '{src_handle}'")
 
         if tgt in node_map:
-            tgt_data = node_map[tgt].get("data", {})
-            tgt_inputs = [p.get("id") for p in tgt_data.get("inputs", [])]
-            tgt_side_inputs = [p.get("id") for p in tgt_data.get("side_inputs", [])]
-            tgt_all_inputs = tgt_inputs + tgt_side_inputs
-            if tgt_handle and tgt_all_inputs and tgt_handle not in tgt_all_inputs:
-                tgt_label = tgt_data.get("label", tgt)
+            tgt_inputs = [p.get("id") for p in node_map[tgt].get("data", {}).get("inputs", [])]
+            if tgt_handle and tgt_inputs and tgt_handle not in tgt_inputs:
+                tgt_label = node_map[tgt].get("data", {}).get("label", tgt)
                 report.warnings.append(f"Edge to '{tgt_label}' references non-existent input port '{tgt_handle}'")
 
     # ── 6. Estimate runtime ──

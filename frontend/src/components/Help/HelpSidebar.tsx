@@ -69,15 +69,15 @@ export default function HelpSidebar({ sections, activeId, onNavigate }: HelpSide
                 fontFamily: F,
                 fontSize: FS.sm,
                 fontWeight: isActive(section.id) ? 700 : 500,
-                color: isActive(section.id) ? T.accent : T.sec,
+                color: isActive(section.id) ? T.cyan : T.sec,
                 background: isActive(section.id) ? T.surface2 : 'transparent',
-                borderLeft: isActive(section.id) ? `2px solid ${T.accent}` : '2px solid transparent',
+                borderLeft: isActive(section.id) ? `2px solid ${T.cyan}` : '2px solid transparent',
                 transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => {
                 if (!isActive(section.id)) {
                   e.currentTarget.style.background = T.surface2
-                  e.currentTarget.style.color = T.fg
+                  e.currentTarget.style.color = T.text
                 }
               }}
               onMouseLeave={(e) => {
@@ -107,9 +107,9 @@ export default function HelpSidebar({ sections, activeId, onNavigate }: HelpSide
                       fontFamily: F,
                       fontSize: FS.xs,
                       fontWeight: isActive(child.id) ? 600 : 400,
-                      color: isActive(child.id) ? T.accent : T.dim,
+                      color: isActive(child.id) ? T.cyan : T.dim,
                       background: isActive(child.id) ? T.surface2 : 'transparent',
-                      borderLeft: isActive(child.id) ? `2px solid ${T.accent}` : '2px solid transparent',
+                      borderLeft: isActive(child.id) ? `2px solid ${T.cyan}` : '2px solid transparent',
                       transition: 'all 0.15s ease',
                     }}
                     onMouseEnter={(e) => {

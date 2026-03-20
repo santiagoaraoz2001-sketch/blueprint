@@ -1,4 +1,4 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { T } from '@/lib/design-tokens'
 import SectionAnchor from '@/components/Help/SectionAnchor'
 import { Terminal } from 'lucide-react'
 import { helpCard as card, helpBody as body, helpStepList as stepList, helpCodeBlock as codeBlock } from './styles'
@@ -9,7 +9,7 @@ export default function CLITools() {
   return (
     <div>
       <SectionAnchor id="cli-tools" title="CLI Tools" level={1}>
-        <Terminal size={22} color={T.accent} />
+        <Terminal size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* 10.1 Block Test Runner */}

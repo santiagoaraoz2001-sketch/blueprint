@@ -45,11 +45,7 @@ const ANTHROPIC_MODELS: ModelInfo[] = [
 
 const ANTHROPIC_API_VERSION = '2023-06-01'
 
-function createTimeoutSignal(ms: number): AbortSignal {
-  const controller = new AbortController()
-  setTimeout(() => controller.abort(), ms)
-  return controller.signal
-}
+const createTimeoutSignal = (ms: number): AbortSignal => AbortSignal.timeout(ms)
 
 function buildHeaders(apiKey?: string): Record<string, string> {
   const headers: Record<string, string> = {
