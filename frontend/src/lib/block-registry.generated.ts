@@ -2274,6 +2274,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       quantization: 'none',
       auto_download: false,
       verify_checksum: true,
+      hf_override: '',
     },
     configFields: [
       {
@@ -2324,6 +2325,13 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'boolean',
         default: true,
         description: 'Verify file integrity for local models',
+      },
+      {
+        name: 'hf_override',
+        label: 'HuggingFace ID Override',
+        type: 'string',
+        default: '',
+        description: 'Explicit HuggingFace model ID to pass to training/merge blocks. Overrides auto-resolution. Example: meta-llama/Llama-3.2-1B',
       },
     ],
     side_inputs: [
@@ -8387,6 +8395,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         options: ['', 'ollama', 'mlx', 'pytorch'],
       },
     ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
   },
   {
     type: 'embedding_clustering',
@@ -10635,6 +10646,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       training_format: '',
       eval_split: 0.0,
       checkpoint_interval: 0,
+      prefer_framework: 'auto',
     },
     configFields: [
       {
@@ -10705,6 +10717,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 100,
         description: 'Save checkpoint every N epochs (0 = final only)',
       },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
+      },
     ],
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
@@ -10727,7 +10747,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { id: 'selected_model', label: 'Best Checkpoint', dataType: 'model', required: false, aliases: ['model'] },
       { id: 'metrics', label: 'Checkpoint Metrics', dataType: 'metrics', required: false },
     ],
-    defaultConfig: { checkpoint_dir: '', metric: 'eval_loss', mode: 'min' },
+    defaultConfig: {
+      checkpoint_dir: '',
+      metric: 'eval_loss',
+      mode: 'min',
+      prefer_framework: 'auto',
+    },
     configFields: [
       {
         name: 'checkpoint_dir',
@@ -10750,6 +10775,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'min',
         options: ['min', 'max'],
         description: 'Whether to pick the checkpoint with min or max metric value',
+      },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
       },
     ],
     side_inputs: [
@@ -10785,6 +10818,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       text_column: '',
       eval_split: 0.0,
       checkpoint_interval: 0,
+      prefer_framework: 'auto',
     },
     configFields: [
       {
@@ -10840,6 +10874,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 100,
         description: 'Save checkpoint every N epochs (0 = final only)',
       },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
+      },
     ],
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
@@ -10875,6 +10917,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       max_seq_length: 512,
       text_column: '',
       training_format: '',
+      prefer_framework: 'auto',
     },
     configFields: [
       {
@@ -10941,6 +10984,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: '',
         description: 'Template for structuring training examples. Use {text}, {instruction}, {output} placeholders.',
       },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
+      },
     ],
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
@@ -10976,6 +11027,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       batch_size: 8,
       max_seq_length: 512,
       text_column: '',
+      prefer_framework: 'auto',
     },
     configFields: [
       {
@@ -11029,6 +11081,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: '',
         description: 'JSON key containing training text (leave empty for auto-detect: \'text\' or first key)',
       },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
+      },
     ],
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
@@ -11064,6 +11124,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       chosen_column: 'chosen',
       rejected_column: 'rejected',
       eval_split: 0.0,
+      prefer_framework: 'auto',
     },
     configFields: [
       {
@@ -11133,6 +11194,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 0.3,
         description: 'Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)',
       },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
+      },
     ],
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
@@ -11170,6 +11239,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       training_format: '',
       eval_split: 0.0,
       checkpoint_interval: 0,
+      mlx_lora_layers: 16,
+      prefer_framework: 'auto',
     },
     configFields: [
       {
@@ -11248,6 +11319,23 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 100,
         description: 'Save checkpoint every N epochs (0 = final only)',
       },
+      {
+        name: 'mlx_lora_layers',
+        label: 'MLX LoRA Layers',
+        type: 'integer',
+        default: 16,
+        min: 1,
+        max: 64,
+        description: 'Number of transformer layers to fine-tune (MLX only). Lower = less memory.',
+      },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
+      },
     ],
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
@@ -11277,6 +11365,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       n_trials: 10,
       metric: 'eval_loss',
       mode: 'min',
+      prefer_framework: 'auto',
     },
     configFields: [
       {
@@ -11318,6 +11407,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         options: ['min', 'max'],
         description: 'Whether to minimize or maximize the target metric',
       },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
+      },
     ],
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
@@ -11357,6 +11454,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       eval_split: 0.0,
       save_merged: false,
       checkpoint_interval: 0,
+      mlx_lora_layers: 16,
+      prefer_framework: 'auto',
     },
     configFields: [
       {
@@ -11451,6 +11550,23 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 100,
         description: 'Save checkpoint every N epochs (0 = final only)',
       },
+      {
+        name: 'mlx_lora_layers',
+        label: 'MLX LoRA Layers',
+        type: 'integer',
+        default: 16,
+        min: 1,
+        max: 64,
+        description: 'Number of layers to apply LoRA to (MLX only). Lower = less memory, potentially less quality.',
+      },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
+      },
     ],
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
@@ -11492,6 +11608,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       eval_split: 0.0,
       save_merged: false,
       checkpoint_interval: 0,
+      mlx_lora_layers: 16,
+      prefer_framework: 'auto',
     },
     configFields: [
       {
@@ -11601,6 +11719,23 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 100,
         description: 'Save checkpoint every N epochs (0 = final only)',
       },
+      {
+        name: 'mlx_lora_layers',
+        label: 'MLX LoRA Layers',
+        type: 'integer',
+        default: 16,
+        min: 1,
+        max: 64,
+        description: 'Number of layers to apply LoRA to (MLX only). Lower = less memory, potentially less quality.',
+      },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
+      },
     ],
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
@@ -11632,6 +11767,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       loss: 'bce',
       chosen_column: 'chosen',
       rejected_column: 'rejected',
+      prefer_framework: 'auto',
     },
     configFields: [
       {
@@ -11692,6 +11828,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'rejected',
         description: 'Column name for rejected responses in preference data',
       },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
+      },
     ],
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
@@ -11727,6 +11871,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       prompt_column: '',
       max_new_tokens: 128,
       temperature: 0.7,
+      prefer_framework: 'auto',
     },
     configFields: [
       {
@@ -11796,6 +11941,14 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.1,
         max: 2.0,
         description: 'Sampling temperature for PPO rollout generation (higher = more diverse)',
+      },
+      {
+        name: 'prefer_framework',
+        label: 'Preferred Framework',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'mlx', 'pytorch'],
+        description: 'Force a specific training framework. \'auto\' detects the best available.',
       },
     ],
     side_inputs: [

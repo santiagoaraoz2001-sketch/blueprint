@@ -214,6 +214,29 @@ class HuggingFaceConnector(BaseConnector):
         return True, ""
 
     # ------------------------------------------------------------------
+    # Connectivity test
+    # ------------------------------------------------------------------
+
+    def test_connection(self, config: dict) -> tuple[bool, str]:
+        valid, err = self.validate_config(config)
+        if not valid:
+            return False, err
+
+        try:
+            from huggingface_hub import HfApi
+        except ImportError:
+            return False, "huggingface_hub package is not installed."
+
+        hf_token = config["hf_token"].strip()
+        try:
+            api = HfApi(token=hf_token)
+            info = api.whoami()
+            username = info.get("name", "unknown")
+            return True, f"Connected to Hugging Face Hub as '{username}'."
+        except Exception as exc:
+            return False, f"Failed to connect to HF Hub: {exc}"
+
+    # ------------------------------------------------------------------
     # Export
     # ------------------------------------------------------------------
 

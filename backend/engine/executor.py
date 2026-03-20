@@ -83,8 +83,8 @@ def request_cancel(run_id: str):
     """Signal a running pipeline to cancel. Called from the cancel endpoint."""
     with _cancel_lock:
         event = _cancel_events.get(run_id)
-    if event:
-        event.set()
+        if event:
+            event.set()
 
 
 def _topological_sort(nodes: list[dict], edges: list[dict]) -> list[str]:
@@ -819,9 +819,11 @@ async def _execute_loop(
                     value = outputs[src_id][src_handle]
                     _multi_counts[tgt_handle] = _multi_counts.get(tgt_handle, 0) + 1
                     if tgt_handle in node_inputs:
-                        if not isinstance(node_inputs[tgt_handle], list) or _multi_counts[tgt_handle] == 2:
+                        # Convert single value to list on second connection
+                        if _multi_counts[tgt_handle] == 2:
                             node_inputs[tgt_handle] = [node_inputs[tgt_handle], value]
                         else:
+                            # Already a list from 3rd connection onward
                             node_inputs[tgt_handle].append(value)
                     else:
                         node_inputs[tgt_handle] = value
@@ -1269,10 +1271,11 @@ async def execute_pipeline(
                         value = outputs[src_id][src_handle]
                         _multi_counts[tgt_handle] = _multi_counts.get(tgt_handle, 0) + 1
                         if tgt_handle in node_inputs:
-                            # Convert to list on second connection
-                            if not isinstance(node_inputs[tgt_handle], list) or _multi_counts[tgt_handle] == 2:
+                            # Convert single value to list on second connection
+                            if _multi_counts[tgt_handle] == 2:
                                 node_inputs[tgt_handle] = [node_inputs[tgt_handle], value]
                             else:
+                                # Already a list from 3rd connection onward
                                 node_inputs[tgt_handle].append(value)
                         else:
                             node_inputs[tgt_handle] = value
@@ -1550,6 +1553,8 @@ async def execute_pipeline(
         tb = traceback.format_exc()
         run.status = "failed"
         run.error_message = f"{str(e)}\n\n{tb}"
+        run.finished_at = datetime.now(timezone.utc)
+        run.duration_seconds = time.time() - start_time
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
         run.metrics_log = list(metrics_log_buffer)
         run.data_fingerprints = all_fingerprints

@@ -72,6 +72,66 @@ function defaultEndpointFor(provider: LLMProvider): string {
   return getAdapter(provider).defaultEndpoint
 }
 
+/**
+ * Robustly extract pipeline JSON from an LLM response.
+ *
+ * Handles:
+ *  - Clean JSON
+ *  - Markdown code blocks (```json ... ```)
+ *  - Preamble/trailing text around JSON
+ *  - Nested braces
+ */
+function extractPipelineJSON(raw: string): GeneratedWorkflow {
+  let text = raw.trim()
+
+  // Strip markdown code fences first
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (fenceMatch) {
+    text = fenceMatch[1].trim()
+  }
+
+  // Try direct parse first
+  try {
+    const parsed = JSON.parse(text)
+    if (parsed && (parsed.nodes || parsed.edges)) return parsed as GeneratedWorkflow
+  } catch {
+    // Fall through to bracket extraction
+  }
+
+  // Find the first '{' and last matching '}' — handles preamble/trailing text
+  const firstBrace = text.indexOf('{')
+  if (firstBrace === -1) {
+    throw new Error('No JSON object found in LLM response')
+  }
+
+  // Walk from the first '{' to find the matching '}'
+  let depth = 0
+  let lastBrace = -1
+  for (let i = firstBrace; i < text.length; i++) {
+    if (text[i] === '{') depth++
+    else if (text[i] === '}') {
+      depth--
+      if (depth === 0) {
+        lastBrace = i
+        break
+      }
+    }
+  }
+
+  if (lastBrace === -1) {
+    throw new Error('Unmatched braces in LLM response — JSON is incomplete')
+  }
+
+  const jsonStr = text.slice(firstBrace, lastBrace + 1)
+  const parsed = JSON.parse(jsonStr)
+
+  if (!parsed.nodes && !parsed.edges) {
+    throw new Error('Parsed JSON does not contain nodes or edges')
+  }
+
+  return parsed as GeneratedWorkflow
+}
+
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
@@ -192,14 +252,9 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         apiKey || undefined,
       )
 
-      // Parse JSON from response (handle potential markdown wrapping)
-      let jsonStr = responseText.trim()
-      if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7)
-      if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3)
-      if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3)
-      jsonStr = jsonStr.trim()
-
-      const pipeline = JSON.parse(jsonStr) as GeneratedWorkflow
+      // Parse JSON from response — robust extraction handles markdown,
+      // preamble text, and trailing commentary from LLMs.
+      const pipeline = extractPipelineJSON(responseText)
       set({ isGenerating: false })
       return pipeline
     } catch (err: unknown) {

@@ -81,7 +81,7 @@ export default function HelpSearch({ sections, onNavigate }: HelpSearchProps) {
           gap: 8,
           padding: '8px 12px',
           background: T.surface2,
-          border: `1px solid ${open ? T.accent : T.border}`,
+          border: `1px solid ${open ? T.cyan : T.border}`,
           transition: 'border-color 0.15s',
         }}
       >
@@ -102,7 +102,7 @@ export default function HelpSearch({ sections, onNavigate }: HelpSearchProps) {
             outline: 'none',
             fontFamily: F,
             fontSize: FS.sm,
-            color: T.fg,
+            color: T.text,
           }}
         />
         {query && (
@@ -156,7 +156,7 @@ export default function HelpSearch({ sections, onNavigate }: HelpSearchProps) {
                   fontFamily: F,
                   fontSize: FS.sm,
                   fontWeight: 600,
-                  color: T.fg,
+                  color: T.text,
                   marginBottom: 3,
                 }}
               >

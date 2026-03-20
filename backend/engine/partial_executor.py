@@ -138,6 +138,7 @@ async def execute_partial_pipeline(
 
     outputs: dict[str, dict[str, Any]] = {}
     all_metrics: dict[str, Any] = {}
+    all_fingerprints: dict[str, dict] = {}
 
     # --- Layer 1: JSONL file failsafe ---
     metrics_dir = ARTIFACTS_DIR / run_id
@@ -441,12 +442,14 @@ async def execute_partial_pipeline(
                 context_cls = CompositeBlockContext if is_composite else None
 
                 try:
-                    node_outputs, _fingerprints = _load_and_run_block(
+                    node_outputs, data_fingerprints = _load_and_run_block(
                         block_dir, config, node_inputs, run_dir,
                         run_id, node_id, progress_cb, message_cb, metric_cb,
                         context_cls=context_cls,
                     )
                     outputs[node_id] = node_outputs
+                    if data_fingerprints:
+                        all_fingerprints[node_id] = data_fingerprints
                 except InterruptedError:
                     run.status = "cancelled"
                     run.error_message = "Cancelled by user"
@@ -542,6 +545,7 @@ async def execute_partial_pipeline(
         run.metrics = all_metrics
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
         run.metrics_log = list(metrics_log_buffer)
+        run.data_fingerprints = all_fingerprints
         live.status = "complete"
         live.overall_progress = 1.0
         db.commit()
