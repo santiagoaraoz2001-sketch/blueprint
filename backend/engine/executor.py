@@ -5,15 +5,16 @@ Takes a pipeline graph (nodes + edges), topologically sorts blocks,
 and executes them sequentially, passing outputs between blocks.
 """
 
+import asyncio
+import collections
 import json
 import random
 import re
 import sys
+import threading
+import time
 import traceback
 import uuid
-import time
-import asyncio
-import threading
 import importlib.util
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -99,11 +100,11 @@ def _topological_sort(nodes: list[dict], edges: list[dict]) -> list[str]:
             adj[src].append(tgt)
             in_degree[tgt] += 1
 
-    queue = [nid for nid, deg in in_degree.items() if deg == 0]
-    order = []
+    queue = collections.deque(nid for nid, deg in in_degree.items() if deg == 0)
+    order: list[str] = []
 
     while queue:
-        nid = queue.pop(0)
+        nid = queue.popleft()
         order.append(nid)
         for neighbor in adj.get(nid, []):
             in_degree[neighbor] -= 1
@@ -160,10 +161,10 @@ def _detect_loops(
 
     # ── Step 1: Kahn's algorithm to find nodes involved in cycles ──
     kahn_deg = dict(in_degree)
-    queue = [nid for nid, d in kahn_deg.items() if d == 0]
+    queue = collections.deque(nid for nid, d in kahn_deg.items() if d == 0)
     acyclic: set[str] = set()
     while queue:
-        n = queue.pop(0)
+        n = queue.popleft()
         acyclic.add(n)
         for nb in adjacency.get(n, []):
             kahn_deg[nb] -= 1
@@ -241,10 +242,10 @@ def _detect_loops(
                 body_adj[src].append(tgt)
                 body_in_deg[tgt] += 1
 
-        queue = sorted(n for n, d in body_in_deg.items() if d == 0)
+        queue = collections.deque(sorted(n for n, d in body_in_deg.items() if d == 0))
         body_order: list[str] = []
         while queue:
-            n = queue.pop(0)
+            n = queue.popleft()
             body_order.append(n)
             for nb in body_adj.get(n, []):
                 body_in_deg[nb] -= 1
@@ -520,8 +521,8 @@ def _collect_system_metrics() -> dict | None:
     }
     # GPU memory via nvidia-smi (optional)
     try:
-        import subprocess
-        result = subprocess.run(
+        import subprocess  # noqa: S404 — lazy import; nvidia-smi may not exist
+        result = subprocess.run(  # noqa: S603, S607
             ["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=5,
         )
@@ -1000,6 +1001,21 @@ async def execute_pipeline(
     edges = definition.get("edges", [])
 
     if not nodes:
+        # Create a completed Run record so clients don't get a 404
+        empty_run = Run(
+            id=run_id,
+            pipeline_id=pipeline_id,
+            status="complete",
+            started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc),
+            duration_seconds=0,
+            config_snapshot=definition,
+            outputs_snapshot={},
+            metrics={},
+            metrics_log=[],
+        )
+        db.add(empty_run)
+        db.commit()
         return
 
     # Register cancel event for this run

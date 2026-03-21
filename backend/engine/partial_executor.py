@@ -441,6 +441,12 @@ async def execute_partial_pipeline(
                 is_composite = block_schema.get("composite", False) if block_schema else False
                 context_cls = CompositeBlockContext if is_composite else None
 
+                # Read timeout/retry from schema — parity with main executor
+                block_schema = load_block_schema(block_dir)
+                timeout_seconds = block_schema.get("timeout") if block_schema else None
+                is_composite = block_schema.get("composite", False) if block_schema else False
+                context_cls = CompositeBlockContext if is_composite else context_cls
+
                 try:
                     node_outputs, data_fingerprints = _load_and_run_block(
                         block_dir, config, node_inputs, run_dir,
@@ -550,6 +556,18 @@ async def execute_partial_pipeline(
         live.overall_progress = 1.0
         db.commit()
 
+        # Auto-generate run export JSON (parity with main executor)
+        try:
+            from .run_export import generate_run_export
+            from ..config import ARTIFACTS_DIR as _ARTIFACTS_DIR
+            export = generate_run_export(run, _ARTIFACTS_DIR)
+            export_path = _ARTIFACTS_DIR / run_id / "run-export.json"
+            export_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(export_path, "w") as f:
+                json.dump(export, f, indent=2)
+        except Exception:
+            pass
+
         try:
             from ..services.project_lifecycle import on_run_completed
             on_run_completed(run_id, db)
@@ -572,8 +590,11 @@ async def execute_partial_pipeline(
         tb = traceback.format_exc()
         run.status = "failed"
         run.error_message = f"{str(e)}\n\n{tb}"
+        run.finished_at = datetime.now(timezone.utc)
+        run.duration_seconds = time.time() - start_time
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
         run.metrics_log = list(metrics_log_buffer)
+        run.data_fingerprints = all_fingerprints
         live.status = "failed"
         db.commit()
         _write_error_log(run_id, tb)
