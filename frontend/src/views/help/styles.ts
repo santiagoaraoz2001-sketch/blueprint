@@ -17,7 +17,7 @@ export const helpBody: React.CSSProperties = {
 export const helpTip: React.CSSProperties = {
   padding: '10px 14px',
   background: T.surface1,
-  borderLeft: `3px solid ${T.accent}`,
+  borderLeft: `3px solid ${T.cyan}`,
   fontFamily: F,
   fontSize: FS.xs,
   color: T.sec,
@@ -39,13 +39,13 @@ export const helpCode: React.CSSProperties = {
   fontSize: FS.xs,
   background: T.surface1,
   padding: '2px 6px',
-  color: T.accent,
+  color: T.cyan,
 }
 
 export const helpCodeBlock: React.CSSProperties = {
   fontFamily: 'JetBrains Mono, monospace',
   fontSize: FS.xs,
-  color: T.accent,
+  color: T.cyan,
   background: T.surface1,
   padding: '10px 14px',
   lineHeight: 1.6,

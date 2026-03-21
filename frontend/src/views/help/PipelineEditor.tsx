@@ -1,4 +1,4 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { T } from '@/lib/design-tokens'
 import SectionAnchor from '@/components/Help/SectionAnchor'
 import {
   GitBranch,
@@ -21,12 +21,12 @@ export default function PipelineEditor() {
   return (
     <div>
       <SectionAnchor id="pipeline-editor" title="Pipeline Editor" level={1}>
-        <GitBranch size={22} color={T.accent} />
+        <GitBranch size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* 3.1 Canvas Basics */}
       <SectionAnchor id="pipeline-editor/canvas" title="Canvas Basics" level={2}>
-        <Move size={17} color={T.accent} />
+        <Move size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -58,7 +58,7 @@ export default function PipelineEditor() {
 
       {/* 3.2 Block Library */}
       <SectionAnchor id="pipeline-editor/block-library" title="Block Library" level={2}>
-        <Library size={17} color={T.accent} />
+        <Library size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -86,7 +86,7 @@ export default function PipelineEditor() {
 
       {/* 3.3 Block Configuration */}
       <SectionAnchor id="pipeline-editor/config" title="Block Configuration" level={2}>
-        <Sliders size={17} color={T.accent} />
+        <Sliders size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -124,7 +124,7 @@ export default function PipelineEditor() {
 
       {/* 3.4 Pipeline Templates */}
       <SectionAnchor id="pipeline-editor/templates" title="Pipeline Templates" level={2}>
-        <LayoutTemplate size={17} color={T.accent} />
+        <LayoutTemplate size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -151,7 +151,7 @@ export default function PipelineEditor() {
 
       {/* 3.5 Pipeline Validation */}
       <SectionAnchor id="pipeline-editor/validation" title="Pipeline Validation" level={2}>
-        <ShieldCheck size={17} color={T.accent} />
+        <ShieldCheck size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -172,7 +172,7 @@ export default function PipelineEditor() {
 
       {/* 3.6 Running Pipelines */}
       <SectionAnchor id="pipeline-editor/running" title="Running Pipelines" level={2}>
-        <Play size={17} color={T.accent} />
+        <Play size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -196,7 +196,7 @@ export default function PipelineEditor() {
         title="Re-Run from Node (Partial Re-Execution)"
         level={2}
       >
-        <RotateCcw size={17} color={T.accent} />
+        <RotateCcw size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -226,7 +226,7 @@ export default function PipelineEditor() {
 
       {/* 3.8 Parameter Sweeps */}
       <SectionAnchor id="pipeline-editor/sweeps" title="Parameter Sweeps" level={2}>
-        <Grid3x3 size={17} color={T.accent} />
+        <Grid3x3 size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -251,7 +251,7 @@ export default function PipelineEditor() {
 
       {/* 3.9 Sticky Notes & Groups */}
       <SectionAnchor id="pipeline-editor/annotations" title="Sticky Notes & Groups" level={2}>
-        <StickyNote size={17} color={T.accent} />
+        <StickyNote size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -262,7 +262,7 @@ export default function PipelineEditor() {
 
       {/* 3.10 Command Palette */}
       <SectionAnchor id="pipeline-editor/command-palette" title="Command Palette" level={2}>
-        <Command size={17} color={T.accent} />
+        <Command size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>

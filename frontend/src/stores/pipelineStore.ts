@@ -1228,11 +1228,13 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
       return
     }
     const idx = tabs.findIndex((t) => t.id === tabId)
+    if (idx === -1) return
     const newTabs = tabs.filter((t) => t.id !== tabId)
 
     if (tabId === activeTabId) {
       // Switch to adjacent tab and restore its undo/redo history
-      const nextTab = newTabs[Math.min(idx, newTabs.length - 1)]
+      const safeIdx = Math.max(0, Math.min(idx, newTabs.length - 1))
+      const nextTab = newTabs[safeIdx]
       set({
         tabs: newTabs,
         activeTabId: nextTab.id,

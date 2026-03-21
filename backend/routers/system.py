@@ -12,7 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Body, Query, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi.responses import PlainTextResponse
 
 from ..config import BASE_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR
 
@@ -97,6 +98,60 @@ def system_metrics():
         "memory_total_gb": 0,
         "gpu_percent": None,
     }
+
+
+@router.get("/metrics/prometheus")
+def prometheus_metrics():
+    """Expose system metrics in Prometheus text exposition format.
+
+    This endpoint returns metrics compatible with Prometheus scraping.
+    Configure your Prometheus instance to scrape /api/system/metrics/prometheus.
+    """
+    lines: list[str] = []
+
+    if _HAS_PSUTIL:
+        cpu = psutil.cpu_percent(interval=None)
+        mem = psutil.virtual_memory()
+        lines.append("# HELP blueprint_cpu_percent CPU usage percentage")
+        lines.append("# TYPE blueprint_cpu_percent gauge")
+        lines.append(f"blueprint_cpu_percent {cpu}")
+        lines.append("# HELP blueprint_memory_used_bytes Memory used in bytes")
+        lines.append("# TYPE blueprint_memory_used_bytes gauge")
+        lines.append(f"blueprint_memory_used_bytes {mem.used}")
+        lines.append("# HELP blueprint_memory_total_bytes Total memory in bytes")
+        lines.append("# TYPE blueprint_memory_total_bytes gauge")
+        lines.append(f"blueprint_memory_total_bytes {mem.total}")
+        lines.append("# HELP blueprint_memory_percent Memory usage percentage")
+        lines.append("# TYPE blueprint_memory_percent gauge")
+        lines.append(f"blueprint_memory_percent {mem.percent}")
+
+        # Disk
+        disk = psutil.disk_usage("/")
+        lines.append("# HELP blueprint_disk_used_bytes Disk used in bytes")
+        lines.append("# TYPE blueprint_disk_used_bytes gauge")
+        lines.append(f"blueprint_disk_used_bytes {disk.used}")
+        lines.append("# HELP blueprint_disk_total_bytes Total disk in bytes")
+        lines.append("# TYPE blueprint_disk_total_bytes gauge")
+        lines.append(f"blueprint_disk_total_bytes {disk.total}")
+
+        # Per-CPU
+        per_cpu = psutil.cpu_percent(interval=None, percpu=True)
+        lines.append("# HELP blueprint_cpu_core_percent Per-core CPU usage")
+        lines.append("# TYPE blueprint_cpu_core_percent gauge")
+        for i, pct in enumerate(per_cpu):
+            lines.append(f'blueprint_cpu_core_percent{{core="{i}"}} {pct}')
+
+    # Active runs count (if available)
+    try:
+        from ..routers.events import _run_queues
+        active_runs = len(_run_queues)
+        lines.append("# HELP blueprint_active_runs Number of runs with active SSE streams")
+        lines.append("# TYPE blueprint_active_runs gauge")
+        lines.append(f"blueprint_active_runs {active_runs}")
+    except Exception:
+        pass
+
+    return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
 
 
 @router.get("/capabilities", response_model=CapabilitiesResponse)

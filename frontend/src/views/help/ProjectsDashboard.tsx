@@ -1,4 +1,4 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { T, FS } from '@/lib/design-tokens'
 import SectionAnchor from '@/components/Help/SectionAnchor'
 import { Layout, FolderPlus, RefreshCw, FileQuestion } from 'lucide-react'
 import { helpCard as card, helpBody as body, helpTip as tip, helpStepList as stepList } from './styles'
@@ -9,12 +9,12 @@ export default function ProjectsDashboard() {
   return (
     <div>
       <SectionAnchor id="projects-dashboard" title="Projects & Dashboard" level={1}>
-        <Layout size={22} color={T.accent} />
+        <Layout size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* 2.1 Creating Projects */}
       <SectionAnchor id="projects-dashboard/creating" title="Creating Projects" level={2}>
-        <FolderPlus size={17} color={T.accent} />
+        <FolderPlus size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -35,7 +35,7 @@ export default function ProjectsDashboard() {
 
       {/* 2.2 Project Lifecycle */}
       <SectionAnchor id="projects-dashboard/lifecycle" title="Project Lifecycle" level={2}>
-        <RefreshCw size={17} color={T.accent} />
+        <RefreshCw size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -55,7 +55,7 @@ export default function ProjectsDashboard() {
 
       {/* 2.3 Unassigned Runs */}
       <SectionAnchor id="projects-dashboard/unassigned-runs" title="Unassigned Runs" level={2}>
-        <FileQuestion size={17} color={T.accent} />
+        <FileQuestion size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -71,7 +71,7 @@ export default function ProjectsDashboard() {
               fontSize: FS.xs,
               background: T.surface1,
               padding: '2px 6px',
-              color: T.accent,
+              color: T.cyan,
             }}
           >
             POST /runs/&#123;id&#125;/assign

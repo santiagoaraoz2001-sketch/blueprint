@@ -23,11 +23,7 @@ interface OpenAIChatResponse {
 /** Models that are relevant for chat/generation use cases. */
 const GPT_MODEL_PREFIXES = ['gpt-4', 'gpt-3.5', 'o1', 'o3', 'o4']
 
-function createTimeoutSignal(ms: number): AbortSignal {
-  const controller = new AbortController()
-  setTimeout(() => controller.abort(), ms)
-  return controller.signal
-}
+const createTimeoutSignal = (ms: number): AbortSignal => AbortSignal.timeout(ms)
 
 function buildHeaders(apiKey?: string): Record<string, string> {
   const headers: Record<string, string> = {

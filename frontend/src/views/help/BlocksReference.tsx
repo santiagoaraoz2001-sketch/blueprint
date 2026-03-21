@@ -17,7 +17,7 @@ import {
   FileOutput,
   AlertTriangle,
   Sparkles,
-  Terminal,
+
   Wand2,
   ChevronDown,
   ChevronRight,
@@ -41,7 +41,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 
 function BlockDoc({ block }: { block: BlockDefinition }) {
   const [open, setOpen] = useState(false)
-  const catColor = CATEGORY_COLORS[block.category] ?? T.accent
+  const catColor = CATEGORY_COLORS[block.category] ?? T.cyan
 
   return (
     <div
@@ -73,7 +73,7 @@ function BlockDoc({ block }: { block: BlockDefinition }) {
             fontFamily: F,
             fontSize: FS.sm,
             fontWeight: 600,
-            color: T.fg,
+            color: T.text,
             flex: 1,
           }}
         >
@@ -129,7 +129,7 @@ function BlockDoc({ block }: { block: BlockDefinition }) {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                 {block.inputs.map((p) => (
                   <span
-                    key={p.name}
+                    key={p.id}
                     style={{
                       fontFamily: F,
                       fontSize: 10,
@@ -139,7 +139,7 @@ function BlockDoc({ block }: { block: BlockDefinition }) {
                       color: T.sec,
                     }}
                   >
-                    {p.name} ({p.type})
+                    {p.label} ({p.dataType})
                   </span>
                 ))}
               </div>
@@ -163,7 +163,7 @@ function BlockDoc({ block }: { block: BlockDefinition }) {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                 {block.outputs.map((p) => (
                   <span
-                    key={p.name}
+                    key={p.id}
                     style={{
                       fontFamily: F,
                       fontSize: 10,
@@ -173,7 +173,7 @@ function BlockDoc({ block }: { block: BlockDefinition }) {
                       color: T.sec,
                     }}
                   >
-                    {p.name} ({p.type})
+                    {p.label} ({p.dataType})
                   </span>
                 ))}
               </div>
@@ -207,11 +207,8 @@ function BlockDoc({ block }: { block: BlockDefinition }) {
                       gap: 8,
                     }}
                   >
-                    <span style={{ fontWeight: 600, color: T.fg }}>{cf.name}</span>
+                    <span style={{ fontWeight: 600, color: T.text }}>{cf.name}</span>
                     <span style={{ color: T.dim }}>({cf.type})</span>
-                    {cf.required && (
-                      <span style={{ color: '#ef4444', fontSize: 10 }}>required</span>
-                    )}
                     {cf.description && (
                       <span style={{ color: T.dim, flex: 1 }}>— {cf.description}</span>
                     )}
@@ -259,12 +256,12 @@ export default function BlocksReference() {
   return (
     <div>
       <SectionAnchor id="blocks-reference" title="Blocks In Depth" level={1}>
-        <Blocks size={22} color={T.accent} />
+        <Blocks size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* 4.1 Block Anatomy */}
       <SectionAnchor id="blocks-reference/anatomy" title="Block Anatomy" level={2}>
-        <FileCode size={17} color={T.accent} />
+        <FileCode size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -286,7 +283,7 @@ export default function BlocksReference() {
 
       {/* 4.2 Block Categories Reference */}
       <SectionAnchor id="blocks-reference/categories" title="Block Categories Reference" level={2}>
-        <Layers size={17} color={T.accent} />
+        <Layers size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -319,7 +316,7 @@ export default function BlocksReference() {
                 outline: 'none',
                 fontFamily: F,
                 fontSize: FS.xs,
-                color: T.fg,
+                color: T.text,
               }}
             />
           </div>
@@ -335,9 +332,9 @@ export default function BlocksReference() {
               fontWeight: 600,
               padding: '3px 8px',
               cursor: 'pointer',
-              background: !selectedCategory ? T.accent : T.surface1,
+              background: !selectedCategory ? T.cyan : T.surface1,
               color: !selectedCategory ? '#fff' : T.sec,
-              border: `1px solid ${!selectedCategory ? T.accent : T.border}`,
+              border: `1px solid ${!selectedCategory ? T.cyan : T.border}`,
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
             }}
@@ -345,7 +342,7 @@ export default function BlocksReference() {
             All ({BLOCK_REGISTRY.length})
           </span>
           {categories.map(([cat, blocks]) => {
-            const catColor = CATEGORY_COLORS[cat] ?? T.accent
+            const catColor = CATEGORY_COLORS[cat] ?? T.cyan
             return (
               <span
                 key={cat}
@@ -387,7 +384,7 @@ export default function BlocksReference() {
 
       {/* 4.3 Special Blocks */}
       <SectionAnchor id="blocks-reference/special" title="Special Blocks" level={2}>
-        <Sparkles size={17} color={T.accent} />
+        <Sparkles size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <div style={{ marginBottom: 16 }}>
@@ -396,7 +393,7 @@ export default function BlocksReference() {
               fontFamily: F,
               fontSize: FS.sm,
               fontWeight: 700,
-              color: T.fg,
+              color: T.text,
               marginBottom: 6,
             }}
           >
@@ -416,7 +413,7 @@ export default function BlocksReference() {
               fontFamily: F,
               fontSize: FS.sm,
               fontWeight: 700,
-              color: T.fg,
+              color: T.text,
               marginBottom: 6,
             }}
           >
@@ -436,7 +433,7 @@ export default function BlocksReference() {
               fontFamily: F,
               fontSize: FS.sm,
               fontWeight: 700,
-              color: T.fg,
+              color: T.text,
               marginBottom: 6,
             }}
           >
@@ -463,7 +460,7 @@ export default function BlocksReference() {
               fontFamily: F,
               fontSize: FS.sm,
               fontWeight: 700,
-              color: T.fg,
+              color: T.text,
               marginBottom: 6,
             }}
           >
@@ -489,7 +486,7 @@ export default function BlocksReference() {
         title="Block Validation & Error Handling"
         level={2}
       >
-        <AlertTriangle size={17} color={T.accent} />
+        <AlertTriangle size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -529,7 +526,7 @@ export default function BlocksReference() {
 
       {/* 4.5 Creating Custom Blocks */}
       <SectionAnchor id="blocks-reference/custom" title="Creating Custom Blocks" level={2}>
-        <Wand2 size={17} color={T.accent} />
+        <Wand2 size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <div style={{ marginBottom: 16 }}>
@@ -538,7 +535,7 @@ export default function BlocksReference() {
               fontFamily: F,
               fontSize: FS.sm,
               fontWeight: 700,
-              color: T.fg,
+              color: T.text,
               marginBottom: 6,
             }}
           >
@@ -562,7 +559,7 @@ export default function BlocksReference() {
               fontFamily: F,
               fontSize: FS.sm,
               fontWeight: 700,
-              color: T.fg,
+              color: T.text,
               marginBottom: 6,
             }}
           >
@@ -594,7 +591,7 @@ export default function BlocksReference() {
               fontFamily: F,
               fontSize: FS.sm,
               fontWeight: 700,
-              color: T.fg,
+              color: T.text,
               marginBottom: 6,
             }}
           >

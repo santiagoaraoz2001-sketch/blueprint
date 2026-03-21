@@ -52,6 +52,27 @@ def validate_connector_config(connector_name: str, body: ConnectorConfigBody):
     return {"valid": valid, "error": error}
 
 
+# ───────── Connection Test ─────────
+
+
+@router.post("/{connector_name}/test")
+def test_connector(connector_name: str, body: ConnectorConfigBody):
+    """Test connectivity to an external service without performing an export.
+
+    This is a lightweight check that verifies credentials and reachability
+    before committing to a full export.
+    """
+    connector = connector_registry.get_connector(connector_name)
+    if not connector:
+        raise HTTPException(404, f"Connector '{connector_name}' not found")
+    try:
+        reachable, message = connector.test_connection(body.config)
+    except Exception as exc:
+        _logger.exception("Connector '%s' test_connection raised", connector_name)
+        return {"reachable": False, "message": f"Unexpected error: {exc}"}
+    return {"reachable": reachable, "message": message}
+
+
 # ───────── Export ─────────
 
 

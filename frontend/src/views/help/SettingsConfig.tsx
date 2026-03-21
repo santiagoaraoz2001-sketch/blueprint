@@ -1,4 +1,4 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { T } from '@/lib/design-tokens'
 import SectionAnchor from '@/components/Help/SectionAnchor'
 import { Settings, Palette, Brain, ToggleLeft, Flag, FolderOpen } from 'lucide-react'
 import { helpCard as card, helpBody as body, helpTip as tip, helpStepList as stepList, helpCode as code } from './styles'
@@ -9,12 +9,12 @@ export default function SettingsConfig() {
   return (
     <div>
       <SectionAnchor id="settings-config" title="Settings & Configuration" level={1}>
-        <Settings size={22} color={T.accent} />
+        <Settings size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* 11.1 Appearance */}
       <SectionAnchor id="settings-config/appearance" title="Appearance" level={2}>
-        <Palette size={17} color={T.accent} />
+        <Palette size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <ul style={stepList}>
@@ -35,7 +35,7 @@ export default function SettingsConfig() {
 
       {/* 11.2 LLM Providers */}
       <SectionAnchor id="settings-config/llm-providers" title="LLM Providers" level={2}>
-        <Brain size={17} color={T.accent} />
+        <Brain size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <ul style={stepList}>
@@ -61,7 +61,7 @@ export default function SettingsConfig() {
 
       {/* 11.3 UI Mode */}
       <SectionAnchor id="settings-config/ui-mode" title="UI Mode" level={2}>
-        <ToggleLeft size={17} color={T.accent} />
+        <ToggleLeft size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -73,7 +73,7 @@ export default function SettingsConfig() {
 
       {/* 11.4 Feature Flags */}
       <SectionAnchor id="settings-config/feature-flags" title="Feature Flags" level={2}>
-        <Flag size={17} color={T.accent} />
+        <Flag size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <ul style={stepList}>
@@ -102,7 +102,7 @@ export default function SettingsConfig() {
 
       {/* 11.5 Data Location */}
       <SectionAnchor id="settings-config/data-location" title="Data Location" level={2}>
-        <FolderOpen size={17} color={T.accent} />
+        <FolderOpen size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>

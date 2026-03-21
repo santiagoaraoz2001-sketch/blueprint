@@ -30,6 +30,29 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const SIMPLE_CATEGORIES = new Set(['external', 'data', 'model', 'inference', 'training', 'metrics'])
 
+// Shared badge styles for block status indicators
+const BADGE_BASE: React.CSSProperties = {
+  fontFamily: F, fontWeight: 700,
+  padding: '1px 4px', borderRadius: 3, marginLeft: 4,
+  letterSpacing: '0.06em', textTransform: 'uppercase',
+  display: 'inline-block', verticalAlign: 'middle',
+}
+
+const BADGE_STYLES = {
+  deprecated: { ...BADGE_BASE, color: '#F59E0B', background: '#F59E0B15', border: '1px solid #F59E0B30' },
+  recommended: { ...BADGE_BASE, color: '#2DD4BF', background: '#2DD4BF15', border: '1px solid #2DD4BF30' },
+  beta: { ...BADGE_BASE, color: '#F59E0B', background: '#F59E0B15', border: '1px solid #F59E0B30' },
+  experimental: { ...BADGE_BASE, color: '#8B5CF6', background: '#8B5CF615', border: '1px solid #8B5CF630' },
+} as const
+
+/** Get the maturity label for a block, or null if stable/absent. */
+function getMaturityLabel(block: BlockDefinition): 'BETA' | 'EXP' | null {
+  if (block.deprecated) return null
+  const maturity = (block as any).maturity
+  if (!maturity || maturity === 'stable') return null
+  return maturity === 'beta' ? 'BETA' : 'EXP'
+}
+
 export default function BlockLibrary() {
   const [search, setSearch] = useState('')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -509,40 +532,9 @@ function BlockItem({
           }}
         >
           {block.name}
-          {block.deprecated && (
-            <span style={{
-              fontFamily: F, fontSize: '7px', fontWeight: 700,
-              padding: '1px 4px', borderRadius: 3, marginLeft: 4,
-              letterSpacing: '0.06em', textTransform: 'uppercase' as const,
-              display: 'inline-block', verticalAlign: 'middle',
-              color: '#F59E0B', background: '#F59E0B15', border: '1px solid #F59E0B30',
-            }}>
-              DEPRECATED
-            </span>
-          )}
-          {block.recommended && (
-            <span style={{
-              fontFamily: F, fontSize: '7px', fontWeight: 700,
-              padding: '1px 4px', borderRadius: 3, marginLeft: 4,
-              letterSpacing: '0.06em', textTransform: 'uppercase' as const,
-              display: 'inline-block', verticalAlign: 'middle',
-              color: '#2DD4BF', background: '#2DD4BF15', border: '1px solid #2DD4BF30',
-            }}>
-              RECOMMENDED
-            </span>
-          )}
-          {!block.deprecated && ('maturity' in block) && (block as any).maturity && (block as any).maturity !== 'stable' && (
-            <span style={{
-              fontFamily: F, fontSize: '7px', fontWeight: 700,
-              padding: '1px 4px', borderRadius: 3, marginLeft: 4,
-              letterSpacing: '0.06em', textTransform: 'uppercase' as const,
-              display: 'inline-block', verticalAlign: 'middle',
-              ...((block as any).maturity === 'beta' ? { color: '#F59E0B', background: '#F59E0B15', border: '1px solid #F59E0B30' } :
-                 { color: '#8B5CF6', background: '#8B5CF615', border: '1px solid #8B5CF630' }),
-            }}>
-              {(block as any).maturity === 'beta' ? 'BETA' : 'EXP'}
-            </span>
-          )}
+          {block.deprecated && <span style={{ ...BADGE_STYLES.deprecated, fontSize: '7px' }}>DEPRECATED</span>}
+          {block.recommended && <span style={{ ...BADGE_STYLES.recommended, fontSize: '7px' }}>RECOMMENDED</span>}
+          {(() => { const m = getMaturityLabel(block); return m && <span style={{ ...BADGE_STYLES[m === 'BETA' ? 'beta' : 'experimental'], fontSize: '7px' }}>{m}</span> })()}
         </div>
         <div
           style={{
@@ -560,41 +552,63 @@ function BlockItem({
         </div>
       </div>
 
-      {/* Port type dots — always visible with required/optional */}
+      {/* Port type dots — two rows: inputs (top) and outputs (bottom) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, paddingLeft: 4 }}>
-        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          {block.inputs.map((p) => {
-            const pc = getPortColor(p.dataType)
-            return (
-              <span
-                key={`i-${p.id}`}
-                title={`${p.label} (${p.dataType}) — ${p.required ? 'required' : 'optional'}`}
-                style={{
-                  width: 7, height: 7, borderRadius: '50%',
-                  background: p.required ? pc : 'transparent',
-                  border: p.required ? 'none' : `1.5px solid ${pc}`,
-                  display: 'block',
-                  boxShadow: p.required ? `0 0 4px ${pc}` : 'none',
-                }}
-              />
-            )
-          })}
-          {block.outputs.map((p) => {
-            const pc = getPortColor(p.dataType)
-            return (
-              <span
-                key={`o-${p.id}`}
-                title={`${p.label} (${p.dataType}) — ${p.required ? 'required' : 'optional'}`}
-                style={{
-                  width: 7, height: 7, borderRadius: '50%',
-                  background: p.required ? pc : 'transparent',
-                  border: p.required ? 'none' : `1.5px solid ${pc}`,
-                  display: 'block',
-                  boxShadow: p.required ? `0 0 4px ${pc}` : 'none',
-                }}
-              />
-            )
-          })}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
+          {/* Input ports row */}
+          {block.inputs.length > 0 && (
+            <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <span style={{
+                fontFamily: F, fontSize: 6, color: T.dim, letterSpacing: '0.04em',
+                fontWeight: 600, textTransform: 'uppercase' as const, marginRight: 1,
+              }}>
+                IN
+              </span>
+              {block.inputs.map((p) => {
+                const pc = getPortColor(p.dataType)
+                return (
+                  <span
+                    key={`i-${p.id}`}
+                    title={`Input: ${p.label} (${p.dataType}) — ${p.required ? 'required' : 'optional'}`}
+                    style={{
+                      width: 7, height: 7, borderRadius: '50%',
+                      background: p.required ? pc : 'transparent',
+                      border: p.required ? 'none' : `1.5px solid ${pc}`,
+                      display: 'block',
+                      boxShadow: p.required ? `0 0 4px ${pc}` : 'none',
+                    }}
+                  />
+                )
+              })}
+            </div>
+          )}
+          {/* Output ports row */}
+          {block.outputs.length > 0 && (
+            <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <span style={{
+                fontFamily: F, fontSize: 6, color: T.dim, letterSpacing: '0.04em',
+                fontWeight: 600, textTransform: 'uppercase' as const, marginRight: 1,
+              }}>
+                OUT
+              </span>
+              {block.outputs.map((p) => {
+                const pc = getPortColor(p.dataType)
+                return (
+                  <span
+                    key={`o-${p.id}`}
+                    title={`Output: ${p.label} (${p.dataType}) — ${p.required ? 'required' : 'optional'}`}
+                    style={{
+                      width: 7, height: 7, borderRadius: '50%',
+                      background: p.required ? pc : 'transparent',
+                      border: p.required ? 'none' : `1.5px solid ${pc}`,
+                      display: 'block',
+                      boxShadow: p.required ? `0 0 4px ${pc}` : 'none',
+                    }}
+                  />
+                )
+              })}
+            </div>
+          )}
         </div>
         {hovered && onDuplicate && (
           <button
@@ -830,38 +844,9 @@ function CategoryDetailPopup({
                 <span style={{ fontFamily: F, fontSize: FS.xxs, color: b.deprecated ? T.dim : T.sec, fontWeight: 500, opacity: b.deprecated ? 0.6 : 1 }}>
                   {b.name}
                 </span>
-                {b.deprecated && (
-                  <span style={{
-                    fontFamily: F, fontSize: '6px', fontWeight: 700,
-                    padding: '0px 3px', borderRadius: 2, marginLeft: 'auto',
-                    letterSpacing: '0.06em', textTransform: 'uppercase' as const,
-                    color: '#F59E0B', background: '#F59E0B15', border: '1px solid #F59E0B30',
-                  }}>
-                    DEPRECATED
-                  </span>
-                )}
-                {b.recommended && (
-                  <span style={{
-                    fontFamily: F, fontSize: '6px', fontWeight: 700,
-                    padding: '0px 3px', borderRadius: 2, marginLeft: 'auto',
-                    letterSpacing: '0.06em', textTransform: 'uppercase' as const,
-                    color: '#2DD4BF', background: '#2DD4BF15', border: '1px solid #2DD4BF30',
-                  }}>
-                    RECOMMENDED
-                  </span>
-                )}
-                {!b.deprecated && ('maturity' in b) && (b as any).maturity && (b as any).maturity !== 'stable' && (
-                  <span style={{
-                    fontFamily: F, fontSize: '6px', fontWeight: 700,
-                    padding: '0px 3px', borderRadius: 2, marginLeft: 'auto',
-                    letterSpacing: '0.06em', textTransform: 'uppercase' as const,
-                    ...((b as any).maturity === 'beta'
-                      ? { color: '#F59E0B', background: '#F59E0B15', border: '1px solid #F59E0B30' }
-                      : { color: '#8B5CF6', background: '#8B5CF615', border: '1px solid #8B5CF630' }),
-                  }}>
-                    {(b as any).maturity === 'beta' ? 'BETA' : 'EXP'}
-                  </span>
-                )}
+                {b.deprecated && <span style={{ ...BADGE_STYLES.deprecated, fontSize: '6px', padding: '0px 3px', borderRadius: 2, marginLeft: 'auto' }}>DEPRECATED</span>}
+                {b.recommended && <span style={{ ...BADGE_STYLES.recommended, fontSize: '6px', padding: '0px 3px', borderRadius: 2, marginLeft: 'auto' }}>RECOMMENDED</span>}
+                {(() => { const m = getMaturityLabel(b); return m && <span style={{ ...BADGE_STYLES[m === 'BETA' ? 'beta' : 'experimental'], fontSize: '6px', padding: '0px 3px', borderRadius: 2, marginLeft: 'auto' }}>{m}</span> })()}
               </button>
             )
           })}

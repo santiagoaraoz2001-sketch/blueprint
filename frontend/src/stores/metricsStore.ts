@@ -558,7 +558,35 @@ function applyEventToRun(run: RunMonitorData, event: string, data: any): boolean
 
     case 'run_failed':
       run.status = 'failed'
+      run.eta = null
       return true
+
+    case 'run_cancelled':
+      run.status = 'failed' // RunMonitorData doesn't have 'cancelled', map to 'failed'
+      run.eta = null
+      run.duration = data.duration ?? run.duration
+      return true
+
+    case 'node_cached': {
+      const cachedId = data.node_id || ''
+      const cachedExisting = run.blocks[cachedId]
+      run.blocks[cachedId] = {
+        nodeId: cachedId,
+        blockType: cachedExisting?.blockType || data.block_type || '',
+        category: cachedExisting?.category || data.category || 'data',
+        label: cachedExisting?.label || cachedId,
+        status: 'complete',
+        progress: 1,
+        index: cachedExisting?.index ?? data.index ?? run.executionOrder.length,
+        metrics: cachedExisting?.metrics || {},
+        _stepCounters: cachedExisting?._stepCounters || {},
+      }
+      if (!run.executionOrder.includes(cachedId)) run.executionOrder.push(cachedId)
+      if (data.index != null && data.total) {
+        run.overallProgress = (data.index + 1) / data.total
+      }
+      return true
+    }
 
     case 'node_output': {
       const outputNodeId = data.node_id || ''
@@ -713,7 +741,9 @@ export const useMetricsStore = create<MetricsStoreState>()(immer((set, get) => (
         gpu: data.gpu_mem_pct,
       }
 
+      // Cap at 300 entries to prevent unbounded growth
       run.systemMetrics.push(metric)
+      if (run.systemMetrics.length > 300) run.systemMetrics.splice(0, run.systemMetrics.length - 300)
     })
   },
 
@@ -809,6 +839,7 @@ export const useMetricsStore = create<MetricsStoreState>()(immer((set, get) => (
             break
           }
           case 'system_metric': {
+            // Cap at 300 entries — parity with addSystemMetric/handleSystemMetric
             run.systemMetrics.push({
               timestamp: evt.timestamp ?? Date.now() / 1000,
               cpu: evt.cpu_pct ?? 0,
@@ -816,6 +847,7 @@ export const useMetricsStore = create<MetricsStoreState>()(immer((set, get) => (
               memoryTotal: evt.mem_gb ?? 0,
               gpu: evt.gpu_mem_pct,
             })
+            if (run.systemMetrics.length > 300) run.systemMetrics.splice(0, run.systemMetrics.length - 300)
             break
           }
         }
@@ -879,6 +911,8 @@ export const useMetricsStore = create<MetricsStoreState>()(immer((set, get) => (
       const run = state.runs[runId]
       for (const { event, data } of events) {
         applyEventToRun(run, event, data)
+          }
+        }
       }
     })
   },

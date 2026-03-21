@@ -14,9 +14,46 @@ interface UseRunMonitorResult {
   status: 'running' | 'complete' | 'failed' | null
 }
 
-/** Stub for dashboard SSE monitoring — real implementation TBD */
-export function useDashboardMonitor(_opts?: { enabled?: boolean }) {
-  // No-op: dashboard live updates will be wired in a future session
+/** Monitor all active runs for the dashboard overview. Subscribes to SSE events
+ *  for the currently active run and polls system metrics. */
+export function useDashboardMonitor(opts?: { enabled?: boolean }) {
+  const enabled = opts?.enabled !== false
+  const activeRunId = useRunStore((s) => s.activeRunId)
+
+  useEffect(() => {
+    if (!enabled || !activeRunId) return
+
+    const unsubscribe = sseManager.subscribe(activeRunId, (event, data) => {
+      if (event.startsWith('__sse_')) return
+      const store = useMetricsStore.getState()
+      if (!store.runs[activeRunId]) store.initRun(activeRunId)
+      store.handleEvent(activeRunId, event, data)
+    })
+
+    return () => unsubscribe()
+  }, [enabled, activeRunId])
+
+  // System metrics polling for dashboard
+  useEffect(() => {
+    if (!enabled || !activeRunId) return
+
+    const timer = setInterval(async () => {
+      try {
+        const hw = await api.get<any>('/system/metrics')
+        if (!hw) return
+        useMetricsStore.getState().addSystemMetric(activeRunId, {
+          timestamp: Date.now(),
+          cpu: hw.cpu_percent ?? 0,
+          memory: hw.memory_gb ?? 0,
+          memoryTotal: hw.memory_total_gb ?? 0,
+        })
+      } catch {
+        // Non-critical
+      }
+    }, SYSTEM_POLL_INTERVAL)
+
+    return () => clearInterval(timer)
+  }, [enabled, activeRunId])
 }
 
 export function useRunMonitor(runId: string | null): UseRunMonitorResult {
@@ -67,30 +104,24 @@ export function useRunMonitor(runId: string | null): UseRunMonitorResult {
     }
   }, [runId])
 
-  // Poll system hardware metrics while run is active
+  // Poll live system metrics while run is active
   useEffect(() => {
     if (!runId) return
 
     const pollSystem = async () => {
       try {
-        const hw = await api.get<any>('/system/hardware')
+        const hw = await api.get<any>('/system/metrics')
         if (!hw) return
-        const cpu = hw.cpu
-        const ram = hw.ram
-        const gpus = hw.gpus || []
-        const gpu = gpus[0]
 
         useMetricsStore.getState().addSystemMetric(runId, {
           timestamp: Date.now(),
-          cpu: cpu?.percent ?? 0,
-          memory: ram?.used_gb ?? 0,
-          memoryTotal: ram?.total_gb ?? 0,
-          gpu: gpu?.utilization ?? undefined,
-          gpuMemory: gpu?.memory_used_gb ?? undefined,
-          gpuMemoryTotal: gpu?.memory_total_gb ?? undefined,
+          cpu: hw.cpu_percent ?? 0,
+          memory: hw.memory_gb ?? 0,
+          memoryTotal: hw.memory_total_gb ?? 0,
+          gpu: hw.gpu_percent ?? undefined,
         })
       } catch {
-        // Silently fail — system metrics are non-critical
+        // Non-critical — polling will retry on next interval
       }
     }
 

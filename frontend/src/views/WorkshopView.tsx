@@ -112,6 +112,14 @@ def run(inputs: dict, config: dict) -> dict:
     setInputs(block.inputs.map(p => ({ id: p.id, label: p.label, dataType: p.dataType as ConnectorType })))
     setOutputs(block.outputs.map(p => ({ id: p.id, label: p.label, dataType: p.dataType as ConnectorType })))
     setConfigFields([...block.configFields])
+    setTestResult(null)
+
+    // Fetch code from backend if available
+    api.get<{ code?: string }>(`/custom-blocks/${block.type}`).then(result => {
+      if (result?.code) setCode(result.code)
+    }).catch(() => {
+      // No backend block — keep default code
+    })
   }, [])
 
   const handleNew = () => {
@@ -126,7 +134,7 @@ def run(inputs: dict, config: dict) -> dict:
     setCode(`import json\nimport sys\n\ndef run(inputs: dict, config: dict) -> dict:\n    return {"output": inputs.get("input", {})}`)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const typeId = selectedBlockType || `custom_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`
     const block: CustomBlock = {
       type: typeId,
@@ -146,6 +154,7 @@ def run(inputs: dict, config: dict) -> dict:
       baseType: '',
     }
 
+    // Save to localStorage (frontend registry)
     const existing = loadCustomBlocks()
     const idx = existing.findIndex(b => b.type === typeId)
     if (idx >= 0) {
@@ -156,15 +165,55 @@ def run(inputs: dict, config: dict) -> dict:
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing))
     refreshBlocks()
     setSelectedBlockType(typeId)
-    toast.success('Block saved')
+
+    // Sync to backend (filesystem) so block is executable
+    const payload = {
+      type: typeId,
+      name,
+      description,
+      category,
+      icon,
+      inputs: inputs.map(p => ({ id: p.id, label: p.label, dataType: p.dataType, required: true })),
+      outputs: outputs.map(p => ({ id: p.id, label: p.label, dataType: p.dataType, required: true })),
+      configFields: configFields.map(f => ({ name: f.name, label: f.label, type: f.type, default: f.default ?? null })),
+      defaultConfig: {},
+      code,
+    }
+    try {
+      if (selectedBlockType) {
+        await api.put(`/custom-blocks/${typeId}`, payload)
+      } else {
+        await api.post('/custom-blocks', payload)
+      }
+      toast.success('Block saved & synced to backend')
+    } catch (err: any) {
+      // If create fails with 409 (already exists), fall back to update
+      if (!selectedBlockType && err?.status === 409) {
+        try {
+          await api.put(`/custom-blocks/${typeId}`, payload)
+          toast.success('Block saved & synced to backend')
+        } catch {
+          toast('Block saved locally (backend sync failed)', { icon: '⚠️' })
+        }
+      } else {
+        toast('Block saved locally (backend sync failed)', { icon: '⚠️' })
+      }
+    }
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedBlockType) return
     const existing = loadCustomBlocks().filter(b => b.type !== selectedBlockType)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing))
     refreshBlocks()
     handleNew()
+
+    // Also delete from backend
+    try {
+      await api.delete(`/custom-blocks/${selectedBlockType}`)
+    } catch {
+      // Best-effort backend cleanup
+    }
     toast.success('Block deleted')
   }
 

@@ -32,7 +32,7 @@ export default function SectionAnchor({ id, title, level = 2, children }: Sectio
           fontFamily: level === 1 ? FD : F,
           fontSize,
           fontWeight: level === 1 ? 800 : 700,
-          color: T.fg,
+          color: T.text,
           marginTop,
           marginBottom,
           lineHeight: 1.3,

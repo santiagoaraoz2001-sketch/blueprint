@@ -391,6 +391,7 @@ class JupyterConnector(BaseConnector):
         # --- write atomically --------------------------------------
         # Write to a temp file first, then rename, to avoid leaving a
         # half-written notebook if the process is interrupted.
+        tmp_path: str | None = None
         try:
             fd, tmp_path = tempfile.mkstemp(
                 dir=str(output_dir), suffix=".ipynb.tmp",
@@ -399,11 +400,11 @@ class JupyterConnector(BaseConnector):
                 nbformat.write(nb, f)
             os.replace(tmp_path, str(output_path))
         except OSError as exc:
-            # Clean up temp file on failure
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
             _logger.exception("Failed to write notebook to %s", output_path)
             return ExportResult(
                 success=False,
