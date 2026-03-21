@@ -12,7 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Body, Query, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi.responses import PlainTextResponse
 
 from ..config import BASE_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR
 
@@ -27,6 +28,16 @@ except ImportError:
 from ..utils.hardware import get_hardware_profile
 from ..utils.benchmarks import get_benchmarks, search_benchmarks, refresh_cache
 from ..engine.parallelizer import build_schedule, explain_schedule
+from ..schemas.system import (
+    FeatureFlagsResponse,
+    SystemMetricsResponse,
+    CapabilitiesResponse,
+    BenchmarkRefreshResponse,
+    ScheduleResponse,
+    DependencyCheckResponse,
+    InstallResponse,
+    DiagnosticsResponse,
+)
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
@@ -36,7 +47,7 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 # ---------------------------------------------------------------------------
 
 
-@router.get("/features")
+@router.get("/features", response_model=FeatureFlagsResponse)
 def get_feature_flags():
     """Return which optional features are enabled."""
     from ..config import ENABLE_MARKETPLACE
@@ -67,7 +78,7 @@ def hardware():
     return get_hardware_profile()
 
 
-@router.get("/metrics")
+@router.get("/metrics", response_model=SystemMetricsResponse)
 def system_metrics():
     """Lightweight, non-blocking CPU/memory snapshot for output view polling."""
     if _HAS_PSUTIL:
@@ -89,7 +100,61 @@ def system_metrics():
     }
 
 
-@router.get("/capabilities")
+@router.get("/metrics/prometheus")
+def prometheus_metrics():
+    """Expose system metrics in Prometheus text exposition format.
+
+    This endpoint returns metrics compatible with Prometheus scraping.
+    Configure your Prometheus instance to scrape /api/system/metrics/prometheus.
+    """
+    lines: list[str] = []
+
+    if _HAS_PSUTIL:
+        cpu = psutil.cpu_percent(interval=None)
+        mem = psutil.virtual_memory()
+        lines.append("# HELP blueprint_cpu_percent CPU usage percentage")
+        lines.append("# TYPE blueprint_cpu_percent gauge")
+        lines.append(f"blueprint_cpu_percent {cpu}")
+        lines.append("# HELP blueprint_memory_used_bytes Memory used in bytes")
+        lines.append("# TYPE blueprint_memory_used_bytes gauge")
+        lines.append(f"blueprint_memory_used_bytes {mem.used}")
+        lines.append("# HELP blueprint_memory_total_bytes Total memory in bytes")
+        lines.append("# TYPE blueprint_memory_total_bytes gauge")
+        lines.append(f"blueprint_memory_total_bytes {mem.total}")
+        lines.append("# HELP blueprint_memory_percent Memory usage percentage")
+        lines.append("# TYPE blueprint_memory_percent gauge")
+        lines.append(f"blueprint_memory_percent {mem.percent}")
+
+        # Disk
+        disk = psutil.disk_usage("/")
+        lines.append("# HELP blueprint_disk_used_bytes Disk used in bytes")
+        lines.append("# TYPE blueprint_disk_used_bytes gauge")
+        lines.append(f"blueprint_disk_used_bytes {disk.used}")
+        lines.append("# HELP blueprint_disk_total_bytes Total disk in bytes")
+        lines.append("# TYPE blueprint_disk_total_bytes gauge")
+        lines.append(f"blueprint_disk_total_bytes {disk.total}")
+
+        # Per-CPU
+        per_cpu = psutil.cpu_percent(interval=None, percpu=True)
+        lines.append("# HELP blueprint_cpu_core_percent Per-core CPU usage")
+        lines.append("# TYPE blueprint_cpu_core_percent gauge")
+        for i, pct in enumerate(per_cpu):
+            lines.append(f'blueprint_cpu_core_percent{{core="{i}"}} {pct}')
+
+    # Active runs count (if available)
+    try:
+        from ..routers.events import _run_queues
+        active_runs = len(_run_queues)
+        lines.append("# HELP blueprint_active_runs Number of runs with active SSE streams")
+        lines.append("# TYPE blueprint_active_runs gauge")
+        lines.append(f"blueprint_active_runs {active_runs}")
+    except Exception:
+        pass
+
+    return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
+
+
+@router.get("/capabilities", response_model=CapabilitiesResponse)
 def capabilities():
     """Derive high-level ML capabilities from the hardware profile.
 
@@ -131,17 +196,17 @@ def capabilities():
     else:
         max_model_size = "1b"
 
-    return {
-        "gpu_available": has_gpu,
-        "gpu_backend": gpu_backend,
-        "max_vram_gb": max_vram,
-        "usable_memory_gb": round(usable_memory, 1),
-        "max_model_size": max_model_size,
-        "can_fine_tune": has_gpu and usable_memory >= 8,
-        "can_run_local_llm": usable_memory >= 4,
-        "disk_ok": disk_free >= 10,
-        "accelerators": accel,
-    }
+    return CapabilitiesResponse(
+        gpu_available=has_gpu,
+        gpu_backend=gpu_backend,
+        max_vram_gb=max_vram,
+        usable_memory_gb=round(usable_memory, 1),
+        max_model_size=max_model_size,
+        can_fine_tune=has_gpu and usable_memory >= 8,
+        can_run_local_llm=usable_memory >= 4,
+        disk_ok=disk_free >= 10,
+        accelerators=accel,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +235,7 @@ def benchmark_search(
     return [r.to_dict() for r in results]
 
 
-@router.post("/benchmarks/refresh")
+@router.post("/benchmarks/refresh", response_model=BenchmarkRefreshResponse)
 def benchmark_refresh():
     """Force-refresh the benchmark cache from the HuggingFace leaderboard."""
     count = refresh_cache(force=True)
@@ -182,7 +247,7 @@ def benchmark_refresh():
 # ---------------------------------------------------------------------------
 
 
-@router.post("/schedule")
+@router.post("/schedule", response_model=ScheduleResponse)
 def compute_schedule(
     payload: dict[str, Any] = Body(..., description="Pipeline definition with nodes and edges"),
 ):
@@ -278,7 +343,7 @@ def _check_package(package: str) -> dict:
         return {'package': package, 'installed': False, 'version': None}
 
 
-@router.get("/dependencies")
+@router.get("/dependencies", response_model=DependencyCheckResponse)
 def check_dependencies():
     """Return dependency status for all blocks."""
     block_deps = _scan_all_block_deps()
@@ -319,7 +384,7 @@ def check_dependencies():
     }
 
 
-@router.post("/install")
+@router.post("/install", response_model=InstallResponse)
 def install_packages(body: dict):
     """Install missing packages via pip. Only allows packages found in block dependencies."""
     packages = body.get('packages', [])
@@ -385,7 +450,7 @@ def _iter_log_files(log_dir: Path) -> list[Path]:
     return files
 
 
-@router.get("/diagnostics/{run_id}")
+@router.get("/diagnostics/{run_id}", response_model=DiagnosticsResponse)
 def get_run_diagnostics(run_id: str):
     """Parse structured logs for a specific run — shows timeline of events."""
     if not SAFE_RUN_ID.match(run_id):

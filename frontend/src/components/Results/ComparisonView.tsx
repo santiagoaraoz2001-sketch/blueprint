@@ -3,6 +3,9 @@ import { T, F, FS } from '@/lib/design-tokens'
 import type { RunRow } from './ResultsTable'
 import { Trophy, AlertTriangle } from 'lucide-react'
 
+/** Metrics matching this pattern are lower-is-better (loss, error, latency, etc.) */
+const LOWER_IS_BETTER = /loss|error|perplexity|latency|time|cost|miss|fail|cer|wer|mae|mse|rmse/i
+
 interface ComparisonViewProps {
   runs: RunRow[]
 }
@@ -57,16 +60,23 @@ export default function ComparisonView({ runs }: ComparisonViewProps) {
     return '--'
   }
 
-  /** For a metric row, determine best and worst index given numeric values */
-  const getBestWorst = (values: (number | null | undefined)[]): { bestIdx: number; worstIdx: number } => {
+  /** For a metric row, determine best and worst index given numeric values.
+   *  Metrics containing "loss", "error", "perplexity", "latency", "time", "cost"
+   *  are lower-is-better; all others are higher-is-better. */
+  const getBestWorst = (values: (number | null | undefined)[], metricName: string): { bestIdx: number; worstIdx: number } => {
+    const lowerBetter = LOWER_IS_BETTER.test(metricName)
+
     let bestIdx = -1
     let worstIdx = -1
-    let best = -Infinity
-    let worst = Infinity
+    let best = lowerBetter ? Infinity : -Infinity
+    let worst = lowerBetter ? -Infinity : Infinity
+
     values.forEach((v, i) => {
       if (typeof v === 'number') {
-        if (v > best) { best = v; bestIdx = i }
-        if (v < worst) { worst = v; worstIdx = i }
+        const isBetter = lowerBetter ? v < best : v > best
+        const isWorse = lowerBetter ? v > worst : v < worst
+        if (isBetter) { best = v; bestIdx = i }
+        if (isWorse) { worst = v; worstIdx = i }
       }
     })
     // If all same value, no highlighting
@@ -165,7 +175,7 @@ export default function ComparisonView({ runs }: ComparisonViewProps) {
           {metricKeys.map((key) => {
             const values = runs.map((r) => r.metrics?.[key])
             const numericValues = values.map((v) => (typeof v === 'number' ? v : null))
-            const { bestIdx, worstIdx } = getBestWorst(numericValues)
+            const { bestIdx, worstIdx } = getBestWorst(numericValues, key)
 
             return (
               <tr key={key}>

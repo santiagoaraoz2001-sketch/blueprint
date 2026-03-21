@@ -89,7 +89,7 @@ export default function Troubleshooting() {
   return (
     <div>
       <SectionAnchor id="troubleshooting" title="Troubleshooting" level={1}>
-        <AlertTriangle size={22} color={T.accent} />
+        <AlertTriangle size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* Search */}
@@ -116,7 +116,7 @@ export default function Troubleshooting() {
             outline: 'none',
             fontFamily: F,
             fontSize: FS.sm,
-            color: T.fg,
+            color: T.text,
           }}
         />
       </div>
@@ -156,7 +156,7 @@ export default function Troubleshooting() {
                   fontFamily: F,
                   fontSize: FS.sm,
                   fontWeight: 600,
-                  color: T.fg,
+                  color: T.text,
                 }}
               >
                 {t.issue}

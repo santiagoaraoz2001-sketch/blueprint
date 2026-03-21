@@ -32,7 +32,7 @@ const CATEGORY_BADGE_COLORS: Record<string, string> = {
 }
 
 export default function TemplateSelector({ onClose }: TemplateSelectorProps) {
-  const { newPipeline } = usePipelineStore()
+  const newPipeline = usePipelineStore((s) => s.newPipeline)
   const [customTemplates, setCustomTemplates] = useState<any[]>([])
 
   useEffect(() => {

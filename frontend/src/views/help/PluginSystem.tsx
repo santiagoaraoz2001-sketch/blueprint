@@ -1,4 +1,4 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { T, FS } from '@/lib/design-tokens'
 import SectionAnchor from '@/components/Help/SectionAnchor'
 import { Puzzle, Download, Shield, Settings, Wrench, BarChart3 } from 'lucide-react'
 import { helpCard as card, helpBody as body, helpTip as tip, helpStepList as stepList, helpCode as code } from './styles'
@@ -9,12 +9,12 @@ export default function PluginSystem() {
   return (
     <div>
       <SectionAnchor id="plugin-system" title="Plugin System" level={1}>
-        <Puzzle size={22} color={T.accent} />
+        <Puzzle size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* 8.1 Overview */}
       <SectionAnchor id="plugin-system/overview" title="Overview" level={2}>
-        <Puzzle size={17} color={T.accent} />
+        <Puzzle size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -25,7 +25,7 @@ export default function PluginSystem() {
 
       {/* 8.2 Installing Plugins */}
       <SectionAnchor id="plugin-system/installing" title="Installing Plugins" level={2}>
-        <Download size={17} color={T.accent} />
+        <Download size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -46,7 +46,7 @@ export default function PluginSystem() {
 
       {/* 8.3 Plugin Permissions */}
       <SectionAnchor id="plugin-system/permissions" title="Plugin Permissions" level={2}>
-        <Shield size={17} color={T.accent} />
+        <Shield size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -78,7 +78,7 @@ export default function PluginSystem() {
 
       {/* 8.4 Managing Plugins */}
       <SectionAnchor id="plugin-system/managing" title="Managing Plugins" level={2}>
-        <Settings size={17} color={T.accent} />
+        <Settings size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <ul style={stepList}>
@@ -109,7 +109,7 @@ export default function PluginSystem() {
 
       {/* 8.5 Creating Plugins */}
       <SectionAnchor id="plugin-system/creating" title="Creating Plugins" level={2}>
-        <Wrench size={17} color={T.accent} />
+        <Wrench size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>Plugin structure:</p>
@@ -139,7 +139,7 @@ export default function PluginSystem() {
 
       {/* 8.6 W&B Monitor Plugin */}
       <SectionAnchor id="plugin-system/wandb-plugin" title="W&B Monitor Plugin (Reference)" level={2}>
-        <BarChart3 size={17} color={T.accent} />
+        <BarChart3 size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <ul style={stepList}>

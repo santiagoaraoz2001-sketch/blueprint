@@ -9,7 +9,7 @@ export default function GettingStarted() {
   return (
     <div>
       <SectionAnchor id="getting-started" title="Getting Started" level={1}>
-        <Rocket size={22} color={T.accent} />
+        <Rocket size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* 1.1 What is Blueprint */}
@@ -29,7 +29,7 @@ export default function GettingStarted() {
 
       {/* 1.2 System Requirements */}
       <SectionAnchor id="getting-started/system-requirements" title="System Requirements" level={2}>
-        <Monitor size={17} color={T.accent} />
+        <Monitor size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <ul style={stepList}>
@@ -51,7 +51,7 @@ export default function GettingStarted() {
 
       {/* 1.3 Installation */}
       <SectionAnchor id="getting-started/installation" title="Installation" level={2}>
-        <Download size={17} color={T.accent} />
+        <Download size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <ol style={stepList}>
@@ -83,7 +83,7 @@ export default function GettingStarted() {
         title="Simple vs Professional Mode"
         level={2}
       >
-        <ToggleLeft size={17} color={T.accent} />
+        <ToggleLeft size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -96,7 +96,7 @@ export default function GettingStarted() {
                 fontFamily: F,
                 fontSize: FS.sm,
                 fontWeight: 700,
-                color: T.fg,
+                color: T.text,
                 marginBottom: 8,
               }}
             >
@@ -114,7 +114,7 @@ export default function GettingStarted() {
                 fontFamily: F,
                 fontSize: FS.sm,
                 fontWeight: 700,
-                color: T.fg,
+                color: T.text,
                 marginBottom: 8,
               }}
             >
@@ -138,7 +138,7 @@ export default function GettingStarted() {
         title="First Pipeline Walkthrough"
         level={2}
       >
-        <Play size={17} color={T.accent} />
+        <Play size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <ol style={stepList}>

@@ -17,6 +17,7 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BLOCKS_DIR = PROJECT_ROOT / "blocks"
 OUTPUT_FILE = PROJECT_ROOT / "frontend" / "src" / "lib" / "block-registry.generated.ts"
+CONFIGS_FILE = PROJECT_ROOT / "frontend" / "src" / "lib" / "block-configs.generated.ts"
 
 # Map block.yaml config types to TypeScript ConfigField types
 YAML_TYPE_TO_TS = {
@@ -399,6 +400,139 @@ def generate_typescript(blocks: list[dict]) -> str:
     return "\n".join(header) + "\n" + "\n".join(block_sections) + "\n" + "\n".join(footer)
 
 
+def _to_pascal_case(snake: str) -> str:
+    """Convert snake_case block type to PascalCase for TypeScript interface name."""
+    return "".join(word.capitalize() for word in snake.split("_"))
+
+
+def _yaml_type_to_ts_type(field_def: dict) -> str:
+    """Map a YAML config field type + default to a TypeScript type string."""
+    yaml_type = field_def.get("type", "string")
+    default = field_def.get("default")
+
+    if yaml_type == "boolean":
+        return "boolean"
+    if yaml_type in ("integer", "float"):
+        # If default is null/None, the field is nullable
+        if default is None:
+            return "number | null"
+        return "number"
+    if yaml_type == "select":
+        options = field_def.get("options", [])
+        if options:
+            return " | ".join(f"'{_esc(o)}'" for o in options)
+        return "string"
+    if yaml_type == "multiselect":
+        return "string[]"
+    # string, file_path, text_area → string
+    return "string"
+
+
+def _ts_default_literal(value: Any, ts_type: str) -> str:
+    """Convert a default value to its TypeScript literal, type-safe."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        if 0 < abs(value) < 0.001:
+            s = f"{value:.1e}".replace("+", "")
+            s = s.replace(".0e", "e")
+            return s
+        return repr(value)
+    if isinstance(value, list):
+        items = ", ".join(f"'{_esc(str(v))}'" for v in value)
+        return f"[{items}]"
+    return f"'{_esc(str(value))}'"
+
+
+def generate_block_configs(blocks: list[dict]) -> str:
+    """Generate block-configs.generated.ts with per-block config interfaces and defaults."""
+    lines = [
+        "// AUTO-GENERATED — DO NOT EDIT MANUALLY",
+        f"// Generated from {len(blocks)} block.yaml config schemas",
+        "// Run: python scripts/generate_block_registry.py",
+        "",
+    ]
+
+    interface_names: list[tuple[str, str]] = []  # (block_type, InterfaceName)
+    default_names: list[tuple[str, str]] = []  # (block_type, CONSTANT_NAME)
+
+    for block in blocks:
+        block_type = block["type"]
+        pascal = _to_pascal_case(block_type)
+        interface_name = f"{pascal}Config"
+        const_name = f"{block_type.upper()}_DEFAULTS"
+        config_fields = block.get("configFields", [])
+
+        if not config_fields:
+            # Blocks with no config get an empty interface
+            lines.append(f"/** Config for `{block_type}` block */")
+            lines.append(f"export interface {interface_name} {{")
+            lines.append(f"  [key: string]: unknown")
+            lines.append(f"}}")
+            lines.append("")
+            lines.append(f"export const {const_name}: {interface_name} = {{}}")
+            lines.append("")
+            interface_names.append((block_type, interface_name))
+            default_names.append((block_type, const_name))
+            continue
+
+        # Interface
+        lines.append(f"/** Config for `{block_type}` block */")
+        lines.append(f"export interface {interface_name} {{")
+        for field in config_fields:
+            fname = field["name"]
+            ts_type = _yaml_type_to_ts_type(field)
+            desc = field.get("description", "")
+            if desc:
+                lines.append(f"  /** {desc} */")
+            lines.append(f"  {fname}: {ts_type}")
+        lines.append("}")
+        lines.append("")
+
+        # Defaults constant
+        defaults = block.get("defaultConfig", {})
+        lines.append(f"export const {const_name}: {interface_name} = {{")
+        for field in config_fields:
+            fname = field["name"]
+            default_val = defaults.get(fname)
+            ts_type = _yaml_type_to_ts_type(field)
+            lit = _ts_default_literal(default_val, ts_type)
+            lines.append(f"  {fname}: {lit},")
+        lines.append("}")
+        lines.append("")
+
+        interface_names.append((block_type, interface_name))
+        default_names.append((block_type, const_name))
+
+    # Discriminated union: BlockType → Config type
+    lines.append("// ═══════════════════════════════════════════════")
+    lines.append("//  DISCRIMINATED UNION: block type → config type")
+    lines.append("// ═══════════════════════════════════════════════")
+    lines.append("")
+    lines.append("export interface BlockConfigMap {")
+    for block_type, iname in interface_names:
+        lines.append(f"  {block_type}: {iname}")
+    lines.append("}")
+    lines.append("")
+
+    # Type-safe accessor
+    lines.append("/** All known block type strings */")
+    lines.append("export type BlockType = keyof BlockConfigMap")
+    lines.append("")
+
+    # Defaults lookup
+    lines.append("/** Type-safe default config lookup by block type */")
+    lines.append("export const BLOCK_DEFAULTS: { [K in BlockType]: BlockConfigMap[K] } = {")
+    for block_type, cname in default_names:
+        lines.append(f"  {block_type}: {cname},")
+    lines.append("}")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
 def main():
     if not BLOCKS_DIR.is_dir():
         print(f"ERROR: Blocks directory not found: {BLOCKS_DIR}", file=sys.stderr)
@@ -411,11 +545,14 @@ def main():
         sys.exit(1)
 
     ts_content = generate_typescript(blocks)
+    configs_content = generate_block_configs(blocks)
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_FILE.write_text(ts_content)
+    CONFIGS_FILE.write_text(configs_content)
 
     print(f"Generated {OUTPUT_FILE} with {len(blocks)} blocks")
+    print(f"Generated {CONFIGS_FILE} with {len(blocks)} config interfaces")
 
     # Summary by category
     categories: dict[str, int] = {}

@@ -1,4 +1,4 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { T } from '@/lib/design-tokens'
 import SectionAnchor from '@/components/Help/SectionAnchor'
 import {
   BarChart3,
@@ -17,12 +17,12 @@ export default function ResultsAnalysis() {
   return (
     <div>
       <SectionAnchor id="results-analysis" title="Results & Analysis" level={1}>
-        <BarChart3 size={22} color={T.accent} />
+        <BarChart3 size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* 6.1 Results View */}
       <SectionAnchor id="results-analysis/results-view" title="Results View" level={2}>
-        <BarChart3 size={17} color={T.accent} />
+        <BarChart3 size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -39,7 +39,7 @@ export default function ResultsAnalysis() {
 
       {/* 6.2 Checkpoint Timeline */}
       <SectionAnchor id="results-analysis/checkpoints" title="Checkpoint Timeline" level={2}>
-        <Clock size={17} color={T.accent} />
+        <Clock size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -67,7 +67,7 @@ export default function ResultsAnalysis() {
 
       {/* 6.3 Sweep Heatmap */}
       <SectionAnchor id="results-analysis/sweep-heatmap" title="Sweep Heatmap" level={2}>
-        <Grid3x3 size={17} color={T.accent} />
+        <Grid3x3 size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -92,7 +92,7 @@ export default function ResultsAnalysis() {
 
       {/* 6.4 Model Diff Visualization */}
       <SectionAnchor id="results-analysis/model-diff" title="Model Diff Visualization" level={2}>
-        <GitCompare size={17} color={T.accent} />
+        <GitCompare size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -112,7 +112,7 @@ export default function ResultsAnalysis() {
 
       {/* 6.5 Significance Report */}
       <SectionAnchor id="results-analysis/significance" title="Significance Report" level={2}>
-        <TestTube size={17} color={T.accent} />
+        <TestTube size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -137,7 +137,7 @@ export default function ResultsAnalysis() {
         title="Run Comparison & Data Provenance"
         level={2}
       >
-        <History size={17} color={T.accent} />
+        <History size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
@@ -163,7 +163,7 @@ export default function ResultsAnalysis() {
 
       {/* 6.7 Structured Export */}
       <SectionAnchor id="results-analysis/structured-export" title="Structured Export" level={2}>
-        <FileJson size={17} color={T.accent} />
+        <FileJson size={17} color={T.cyan} />
       </SectionAnchor>
       <div style={card}>
         <p style={body}>

@@ -19,6 +19,15 @@ from ..block_sdk.config_validator import (
     _validate_select,
 )
 from ..block_sdk.exceptions import BlockConfigError
+from ..schemas.execution import (
+    ExecuteResponse,
+    PartialExecuteResponse,
+    CancelResponse,
+    RunOutputsResponse,
+    PipelineValidationResponse,
+    BlockConfigValidationResponse,
+    PipelineTestResponse,
+)
 
 router = APIRouter(prefix="/api", tags=["execution"])
 _logger = logging.getLogger("blueprint.execution")
@@ -38,13 +47,17 @@ class PartialExecuteRequest(BaseModel):
 
 
 def shutdown_executor():
-    """Gracefully shut down the pipeline executor pool. Called during app shutdown."""
+    """Gracefully shut down the pipeline executor pool. Called during app shutdown.
+
+    cancel_futures=True prevents queued-but-not-started pipelines from beginning
+    during shutdown, while still allowing currently-running ones to finish.
+    """
     _logger.info("Shutting down pipeline executor pool...")
-    _executor.shutdown(wait=True, cancel_futures=False)
+    _executor.shutdown(wait=True, cancel_futures=True)
     _logger.info("Pipeline executor pool shut down.")
 
 
-@router.post("/pipelines/{pipeline_id}/execute")
+@router.post("/pipelines/{pipeline_id}/execute", response_model=ExecuteResponse)
 def start_pipeline_run(pipeline_id: str, db: Session = Depends(get_db)):
     pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
     if not pipeline:
@@ -75,7 +88,7 @@ def start_pipeline_run(pipeline_id: str, db: Session = Depends(get_db)):
     return {"status": "started", "pipeline_id": pipeline_id, "run_id": run_id}
 
 
-@router.post("/pipelines/{pipeline_id}/execute-from")
+@router.post("/pipelines/{pipeline_id}/execute-from", response_model=PartialExecuteResponse)
 def execute_from_node(
     pipeline_id: str,
     body: PartialExecuteRequest,
@@ -152,7 +165,7 @@ def execute_from_node(
     }
 
 
-@router.post("/runs/{run_id}/stop")
+@router.post("/runs/{run_id}/stop", response_model=CancelResponse)
 def stop_run(run_id: str, db: Session = Depends(get_db)):
     """Legacy stop endpoint — delegates to cancel."""
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -162,7 +175,7 @@ def stop_run(run_id: str, db: Session = Depends(get_db)):
     return {"status": "cancelling"}
 
 
-@router.post("/runs/{run_id}/cancel")
+@router.post("/runs/{run_id}/cancel", response_model=CancelResponse)
 def cancel_run(run_id: str, db: Session = Depends(get_db)):
     """Signal a running pipeline to cancel. Returns immediately."""
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -174,7 +187,7 @@ def cancel_run(run_id: str, db: Session = Depends(get_db)):
     return {"status": "cancelling", "run_id": run_id}
 
 
-@router.get("/runs/{run_id}/outputs")
+@router.get("/runs/{run_id}/outputs", response_model=RunOutputsResponse)
 def get_run_outputs(run_id: str, db: Session = Depends(get_db)):
     """Get partial or complete outputs for a run."""
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -187,7 +200,7 @@ def get_run_outputs(run_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/pipelines/{pipeline_id}/validate")
+@router.post("/pipelines/{pipeline_id}/validate", response_model=PipelineValidationResponse)
 def validate_pipeline_endpoint(pipeline_id: str, db: Session = Depends(get_db)):
     """Validate a pipeline definition without running it."""
     pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
@@ -207,7 +220,7 @@ def validate_pipeline_endpoint(pipeline_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/blocks/{block_type}/validate-config")
+@router.post("/blocks/{block_type}/validate-config", response_model=BlockConfigValidationResponse)
 def validate_block_config(block_type: str, config: dict):
     """Validate a block's config against its block.yaml schema.
 
@@ -264,7 +277,7 @@ def validate_block_config(block_type: str, config: dict):
     }
 
 
-@router.post("/pipelines/{pipeline_id}/test")
+@router.post("/pipelines/{pipeline_id}/test", response_model=PipelineTestResponse)
 def test_pipeline_endpoint(pipeline_id: str, db: Session = Depends(get_db)):
     """Run pipeline in test mode with reduced data."""
     pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()

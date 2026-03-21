@@ -111,6 +111,29 @@ class WandbConnector(BaseConnector):
         return True, ""
 
     # ------------------------------------------------------------------
+    # Connectivity test
+    # ------------------------------------------------------------------
+
+    def test_connection(self, config: dict) -> tuple[bool, str]:
+        valid, err = self.validate_config(config)
+        if not valid:
+            return False, err
+
+        try:
+            import wandb
+        except ImportError:
+            return False, "wandb package is not installed."
+
+        api_key = config["api_key"].strip()
+        try:
+            api = wandb.Api(api_key=api_key)
+            # Attempt a lightweight operation to verify the key is valid
+            _ = api.viewer
+            return True, "Connected to Weights & Biases successfully."
+        except Exception as exc:
+            return False, f"Failed to connect to W&B: {exc}"
+
+    # ------------------------------------------------------------------
     # Export
     # ------------------------------------------------------------------
 

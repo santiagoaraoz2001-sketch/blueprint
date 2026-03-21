@@ -5,15 +5,17 @@ Takes a pipeline graph (nodes + edges), topologically sorts blocks,
 and executes them sequentially, passing outputs between blocks.
 """
 
+import asyncio
+import collections
 import json
+import os
 import random
 import re
 import sys
+import threading
+import time
 import traceback
 import uuid
-import time
-import asyncio
-import threading
 import importlib.util
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -84,8 +86,8 @@ def request_cancel(run_id: str):
     """Signal a running pipeline to cancel. Called from the cancel endpoint."""
     with _cancel_lock:
         event = _cancel_events.get(run_id)
-    if event:
-        event.set()
+        if event:
+            event.set()
 
 
 def _topological_sort(nodes: list[dict], edges: list[dict]) -> list[str]:
@@ -100,11 +102,11 @@ def _topological_sort(nodes: list[dict], edges: list[dict]) -> list[str]:
             adj[src].append(tgt)
             in_degree[tgt] += 1
 
-    queue = [nid for nid, deg in in_degree.items() if deg == 0]
-    order = []
+    queue = collections.deque(nid for nid, deg in in_degree.items() if deg == 0)
+    order: list[str] = []
 
     while queue:
-        nid = queue.pop(0)
+        nid = queue.popleft()
         order.append(nid)
         for neighbor in adj.get(nid, []):
             in_degree[neighbor] -= 1
@@ -161,10 +163,10 @@ def _detect_loops(
 
     # ── Step 1: Kahn's algorithm to find nodes involved in cycles ──
     kahn_deg = dict(in_degree)
-    queue = [nid for nid, d in kahn_deg.items() if d == 0]
+    queue = collections.deque(nid for nid, d in kahn_deg.items() if d == 0)
     acyclic: set[str] = set()
     while queue:
-        n = queue.pop(0)
+        n = queue.popleft()
         acyclic.add(n)
         for nb in adjacency.get(n, []):
             kahn_deg[nb] -= 1
@@ -242,10 +244,10 @@ def _detect_loops(
                 body_adj[src].append(tgt)
                 body_in_deg[tgt] += 1
 
-        queue = sorted(n for n, d in body_in_deg.items() if d == 0)
+        queue = collections.deque(sorted(n for n, d in body_in_deg.items() if d == 0))
         body_order: list[str] = []
         while queue:
-            n = queue.pop(0)
+            n = queue.popleft()
             body_order.append(n)
             for nb in body_adj.get(n, []):
                 body_in_deg[nb] -= 1
@@ -521,8 +523,8 @@ def _collect_system_metrics() -> dict | None:
     }
     # GPU memory via nvidia-smi (optional)
     try:
-        import subprocess
-        result = subprocess.run(
+        import subprocess  # noqa: S404 — lazy import; nvidia-smi may not exist
+        result = subprocess.run(  # noqa: S603, S607
             ["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=5,
         )
@@ -532,6 +534,26 @@ def _collect_system_metrics() -> dict | None:
     except Exception:
         pass
     return metrics
+
+
+# Memory pressure threshold — halt pipelines before OOM crash.
+# Apple Silicon unified memory means GPU + CPU share the same pool.
+# Default 90% — configurable via env var.
+MEMORY_PRESSURE_THRESHOLD = float(os.environ.get("BLUEPRINT_MEMORY_THRESHOLD", "90"))
+
+
+def _check_memory_pressure() -> tuple[bool, float]:
+    """Check if system memory usage exceeds the safe threshold.
+
+    Returns (is_critical, current_percent). Silently returns (False, 0.0)
+    if psutil is unavailable.
+    """
+    try:
+        import psutil
+        mem = psutil.virtual_memory()
+        return mem.percent >= MEMORY_PRESSURE_THRESHOLD, round(mem.percent, 1)
+    except ImportError:
+        return False, 0.0
 
 
 def _safe_commit(db: Session):
@@ -821,9 +843,11 @@ async def _execute_loop(
                     value = outputs[src_id][src_handle]
                     _multi_counts[tgt_handle] = _multi_counts.get(tgt_handle, 0) + 1
                     if tgt_handle in node_inputs:
-                        if not isinstance(node_inputs[tgt_handle], list) or _multi_counts[tgt_handle] == 2:
+                        # Convert single value to list on second connection
+                        if _multi_counts[tgt_handle] == 2:
                             node_inputs[tgt_handle] = [node_inputs[tgt_handle], value]
                         else:
+                            # Already a list from 3rd connection onward
                             node_inputs[tgt_handle].append(value)
                     else:
                         node_inputs[tgt_handle] = value
@@ -1015,6 +1039,21 @@ async def execute_pipeline(
     edges = definition.get("edges", [])
 
     if not nodes:
+        # Create a completed Run record so clients don't get a 404
+        empty_run = Run(
+            id=run_id,
+            pipeline_id=pipeline_id,
+            status="complete",
+            started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc),
+            duration_seconds=0,
+            config_snapshot=definition,
+            outputs_snapshot={},
+            metrics={},
+            metrics_log=[],
+        )
+        db.add(empty_run)
+        db.commit()
         return
 
     # Register cancel event for this run
@@ -1138,6 +1177,32 @@ async def execute_pipeline(
                         "run_id": run_id,
                         "duration": run.duration_seconds,
                         "completed_blocks": idx,
+                    })
+                except Exception:
+                    pass
+                return
+
+            # Check memory pressure before each block — halt cleanly to prevent OOM
+            is_critical, mem_pct = _check_memory_pressure()
+            if is_critical:
+                error_msg = (
+                    f"Memory pressure critical ({mem_pct}% used, "
+                    f"threshold {MEMORY_PRESSURE_THRESHOLD}%). "
+                    f"Halting pipeline to prevent OOM crash."
+                )
+                log_run_failed(run_id, pipeline_id, error_msg, block_count=idx)
+                run.status = "failed"
+                run.error_message = error_msg
+                run.finished_at = datetime.now(timezone.utc)
+                run.duration_seconds = time.time() - start_time
+                run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                run.data_fingerprints = all_fingerprints
+                live.status = "failed"
+                db.commit()
+                try:
+                    publish_event(run_id, "run_failed", {
+                        "run_id": run_id,
+                        "error": error_msg,
                     })
                 except Exception:
                     pass
@@ -1288,10 +1353,11 @@ async def execute_pipeline(
                         value = outputs[src_id][src_handle]
                         _multi_counts[tgt_handle] = _multi_counts.get(tgt_handle, 0) + 1
                         if tgt_handle in node_inputs:
-                            # Convert to list on second connection
-                            if not isinstance(node_inputs[tgt_handle], list) or _multi_counts[tgt_handle] == 2:
+                            # Convert single value to list on second connection
+                            if _multi_counts[tgt_handle] == 2:
                                 node_inputs[tgt_handle] = [node_inputs[tgt_handle], value]
                             else:
+                                # Already a list from 3rd connection onward
                                 node_inputs[tgt_handle].append(value)
                         else:
                             node_inputs[tgt_handle] = value
@@ -1582,6 +1648,8 @@ async def execute_pipeline(
         tb = traceback.format_exc()
         run.status = "failed"
         run.error_message = f"{str(e)}\n\n{tb}"
+        run.finished_at = datetime.now(timezone.utc)
+        run.duration_seconds = time.time() - start_time
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
         run.metrics_log = list(metrics_log_buffer)
         run.data_fingerprints = all_fingerprints

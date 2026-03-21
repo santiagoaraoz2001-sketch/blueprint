@@ -30,7 +30,8 @@ const STICKY_COLORS: Record<string, { bg: string; border: string }> = {
 function StickyNote({ id, data, selected }: any) {
   const [isEditing, setIsEditing] = useState(false)
   const [text, setText] = useState(data.text || '')
-  const { updateStickyNote, removeNode } = usePipelineStore()
+  const updateStickyNote = usePipelineStore((s) => s.updateStickyNote)
+  const removeNode = usePipelineStore((s) => s.removeNode)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const colorConfig = STICKY_COLORS[data.color] || STICKY_COLORS.yellow

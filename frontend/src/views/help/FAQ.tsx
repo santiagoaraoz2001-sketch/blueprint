@@ -95,7 +95,7 @@ export default function FAQ() {
   return (
     <div>
       <SectionAnchor id="faq" title="Frequently Asked Questions" level={1}>
-        <HelpCircle size={22} color={T.accent} />
+        <HelpCircle size={22} color={T.cyan} />
       </SectionAnchor>
 
       {/* Search */}
@@ -122,7 +122,7 @@ export default function FAQ() {
             outline: 'none',
             fontFamily: F,
             fontSize: FS.sm,
-            color: T.fg,
+            color: T.text,
           }}
         />
       </div>
@@ -156,13 +156,13 @@ export default function FAQ() {
               ) : (
                 <ChevronRight size={14} color={T.dim} />
               )}
-              <HelpCircle size={14} color={T.accent} />
+              <HelpCircle size={14} color={T.cyan} />
               <span
                 style={{
                   fontFamily: F,
                   fontSize: FS.sm,
                   fontWeight: 600,
-                  color: T.fg,
+                  color: T.text,
                 }}
               >
                 {f.q}

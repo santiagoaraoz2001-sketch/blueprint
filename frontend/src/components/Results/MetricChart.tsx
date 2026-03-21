@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { memo, useState, useMemo } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import {
   ScatterChart,
@@ -17,7 +17,7 @@ interface MetricChartProps {
   runs: RunRow[]
 }
 
-export default function MetricChart({ runs }: MetricChartProps) {
+export default memo(function MetricChart({ runs }: MetricChartProps) {
   // Collect all metric keys
   const metricKeys = useMemo(() => {
     const keys = new Set<string>()
@@ -154,6 +154,7 @@ export default function MetricChart({ runs }: MetricChartProps) {
                 contentStyle={{
                   background: T.surface2,
                   border: `1px solid ${T.border}`,
+                  borderRadius: 0,
                   fontFamily: F,
                   fontSize: 8,
                   color: T.sec,
@@ -178,6 +179,7 @@ export default function MetricChart({ runs }: MetricChartProps) {
                 contentStyle={{
                   background: T.surface2,
                   border: `1px solid ${T.border}`,
+                  borderRadius: 0,
                   fontFamily: F,
                   fontSize: 8,
                   color: T.sec,
@@ -190,4 +192,4 @@ export default function MetricChart({ runs }: MetricChartProps) {
       </div>
     </div>
   )
-}
+})

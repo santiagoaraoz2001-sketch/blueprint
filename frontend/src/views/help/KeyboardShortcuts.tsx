@@ -10,7 +10,7 @@ const badge: React.CSSProperties = {
   background: T.surface1,
   border: `1px solid ${T.border}`,
   padding: '3px 8px',
-  color: T.fg,
+  color: T.text,
   minWidth: 28,
   textAlign: 'center',
 }
@@ -39,7 +39,7 @@ export default function KeyboardShortcuts() {
   return (
     <div>
       <SectionAnchor id="keyboard-shortcuts" title="Keyboard Shortcuts" level={1}>
-        <Keyboard size={22} color={T.accent} />
+        <Keyboard size={22} color={T.cyan} />
       </SectionAnchor>
 
       <div
