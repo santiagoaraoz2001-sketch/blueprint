@@ -66,6 +66,9 @@ PLIST
 # ── Launcher script ──────────────────────────────────────────
 # The repo path is embedded at generation time so the .app works
 # from anywhere — /Applications, Dock, Desktop, etc.
+# Unlike the old design, this runs the repo's launch.sh directly
+# via `bash` so updates to launch.sh take effect immediately
+# without rebuilding the .app.
 
 cat > "$APP_DIR/Contents/MacOS/blueprint-launcher" << LAUNCHER
 #!/bin/bash
@@ -85,43 +88,59 @@ export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/
 
 # Absolute path to the Blueprint repo (embedded at generation time)
 REPO_ROOT="$SCRIPT_DIR"
+LAUNCH_SCRIPT="\$REPO_ROOT/launch.sh"
 
-# Path to launch.sh copy inside the bundle (bypasses Gatekeeper)
-BUNDLE_DIR="\$(cd "\$(dirname "\$0")" && pwd)"
-BUNDLE_LAUNCH="\$BUNDLE_DIR/launch.sh"
+# ── Check if Blueprint is already running ─────────────────────
+BACKEND_PORT=8000
+FRONTEND_PORT=4174
 
-if [ ! -f "\$BUNDLE_LAUNCH" ]; then
-    osascript -e 'display alert "Blueprint Error" message "Cannot find launch.sh in the app bundle. Please re-run make-dev-app.sh to rebuild." as critical' 2>/dev/null
+backend_up=false
+frontend_up=false
+
+if curl -s "http://127.0.0.1:\$BACKEND_PORT/api/health" >/dev/null 2>&1; then
+    backend_up=true
+fi
+if curl -s "http://127.0.0.1:\$FRONTEND_PORT" >/dev/null 2>&1; then
+    frontend_up=true
+fi
+
+if [ "\$backend_up" = true ] && [ "\$frontend_up" = true ]; then
+    osascript -e 'display notification "Blueprint is already running — opening browser." with title "Blueprint"' 2>/dev/null || true
+    open "http://localhost:\$FRONTEND_PORT"
+    exit 0
+fi
+
+# ── Validate launch.sh exists in repo ─────────────────────────
+if [ ! -f "\$LAUNCH_SCRIPT" ]; then
+    osascript -e "display alert \"Blueprint Error\" message \"Cannot find launch.sh at \$LAUNCH_SCRIPT. Is the repo still at this location?\" as critical" 2>/dev/null
     exit 1
 fi
 
-# Create log directory
+# ── Set up logging ────────────────────────────────────────────
 LOG_DIR="\$HOME/.blueprint"
 mkdir -p "\$LOG_DIR"
 LOG_FILE="\$LOG_DIR/launch.log"
 
-# Timestamp the log
 echo "" >> "\$LOG_FILE"
 echo "──── Blueprint launched at \$(date) ────" >> "\$LOG_FILE"
 
 # Show a notification that we're starting
 osascript -e 'display notification "Starting backend and frontend..." with title "Blueprint" sound name "default"' 2>/dev/null || true
 
-# Launch Blueprint
-# IMPORTANT: macOS Gatekeeper blocks .app bundles from executing scripts
-# outside the bundle. So we copy launch.sh INTO the bundle at build time
-# and execute that copy. The script uses SCRIPT_DIR to find the repo.
+# ── Launch Blueprint ──────────────────────────────────────────
+# Run the repo's launch.sh directly via bash — no bundled copy needed.
+# SCRIPT_DIR tells launch.sh where the repo root is.
 cd "\$REPO_ROOT"
-SCRIPT_DIR="\$REPO_ROOT" exec "\$BUNDLE_LAUNCH" >> "\$LOG_FILE" 2>&1
+SCRIPT_DIR="\$REPO_ROOT" bash "\$LAUNCH_SCRIPT" >> "\$LOG_FILE" 2>&1
+EXIT_CODE=\$?
+
+# ── Show error alert if launch failed ─────────────────────────
+if [ \$EXIT_CODE -ne 0 ]; then
+    osascript -e "display alert \"Blueprint Failed\" message \"Blueprint exited with an error. Check the log at ~/.blueprint/launch.log for details.\" as critical" 2>/dev/null
+fi
 LAUNCHER
 
 chmod +x "$APP_DIR/Contents/MacOS/blueprint-launcher"
-
-# ── Copy launch.sh into the bundle ───────────────────────────
-# macOS Gatekeeper blocks .app bundles from executing scripts that
-# live outside the bundle. Copying launch.sh inside bypasses this.
-cp "$SCRIPT_DIR/launch.sh" "$APP_DIR/Contents/MacOS/launch.sh"
-chmod +x "$APP_DIR/Contents/MacOS/launch.sh"
 
 # ── Copy icon ─────────────────────────────────────────────────
 

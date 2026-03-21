@@ -911,8 +911,6 @@ export const useMetricsStore = create<MetricsStoreState>()(immer((set, get) => (
       const run = state.runs[runId]
       for (const { event, data } of events) {
         applyEventToRun(run, event, data)
-          }
-        }
       }
     })
   },
@@ -1076,7 +1074,7 @@ export const useMetricsStore = create<MetricsStoreState>()(immer((set, get) => (
     if (isDemoMode()) {
       set((state) => {
         if (!state.dashboard) return
-        state.dashboard.unassigned_runs = state.dashboard.unassigned_runs.filter((r) => r.id !== runId)
+        state.dashboard.unassigned_runs = state.dashboard.unassigned_runs.filter((r: UnassignedRun) => r.id !== runId)
       })
       return
     }
@@ -1088,7 +1086,7 @@ export const useMetricsStore = create<MetricsStoreState>()(immer((set, get) => (
     if (isDemoMode()) {
       set((state) => {
         if (!state.dashboard) return
-        state.dashboard.running_runs = state.dashboard.running_runs.filter((r) => r.id !== runId)
+        state.dashboard.running_runs = state.dashboard.running_runs.filter((r: RunningRun) => r.id !== runId)
         state.dashboard.running_now = Math.max(0, state.dashboard.running_now - 1)
       })
       return
@@ -1139,7 +1137,7 @@ export const useMetricsStore = create<MetricsStoreState>()(immer((set, get) => (
 
   updateBlockStatus: (blockId, updates) =>
     set((state) => {
-      const block = state.monitorExecutionOrder.find((b) => b.id === blockId)
+      const block = state.monitorExecutionOrder.find((b: BlockStatus) => b.id === blockId)
       if (block) Object.assign(block, updates)
     }),
 

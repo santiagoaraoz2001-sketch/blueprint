@@ -448,7 +448,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
               type: 'smoothstep',
               animated: true,
               style: { stroke: edgeColor, strokeWidth: 1.5 },
-            },
+            } as Edge,
             state.edges
           )
           state.isDirty = true
@@ -520,7 +520,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
   updateStickyNote: (id, data) => {
     set((state) => {
       _pushHistory(state)
-      const node = state.nodes.find(n => n.id === id)
+      const node = state.nodes.find((n: Node<BlockNodeData>) => n.id === id)
       if (node) {
         Object.assign(node.data, data)
       }
@@ -537,8 +537,8 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
 
     set((state) => {
       _pushHistory(state)
-      state.nodes = state.nodes.filter((n) => !nodesToRemove.has(n.id))
-      state.edges = state.edges.filter((e) => !nodesToRemove.has(e.source) && !nodesToRemove.has(e.target))
+      state.nodes = state.nodes.filter((n: Node<BlockNodeData>) => !nodesToRemove.has(n.id))
+      state.edges = state.edges.filter((e: Edge) => !nodesToRemove.has(e.source) && !nodesToRemove.has(e.target))
       if (state.selectedNodeId && nodesToRemove.has(state.selectedNodeId)) state.selectedNodeId = null
       state.isDirty = true
     })
@@ -550,8 +550,8 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
     const ids = new Set(selected.map((n) => n.id))
     set((state) => {
       _pushHistory(state)
-      state.nodes = state.nodes.filter((n) => !ids.has(n.id))
-      state.edges = state.edges.filter((e) => !ids.has(e.source) && !ids.has(e.target))
+      state.nodes = state.nodes.filter((n: Node<BlockNodeData>) => !ids.has(n.id))
+      state.edges = state.edges.filter((e: Edge) => !ids.has(e.source) && !ids.has(e.target))
       state.selectedNodeId = null
       state.isDirty = true
     })
@@ -602,7 +602,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
   updateNodeConfig: (id, config) => {
     set((state) => {
       _pushHistory(state)
-      const node = state.nodes.find(n => n.id === id)
+      const node = state.nodes.find((n: Node<BlockNodeData>) => n.id === id)
       if (node) {
         for (const [key, value] of Object.entries(config)) {
           if (value === undefined || value === null) {
@@ -675,7 +675,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
     const idSet = new Set(selected.map((n) => n.id))
     set((state) => {
       _pushHistory(state)
-      state.nodes = [...state.nodes.filter((n) => !idSet.has(n.id)), groupNode, ...updatedSelected] as Node<BlockNodeData>[]
+      state.nodes = [...state.nodes.filter((n: Node<BlockNodeData>) => !idSet.has(n.id)), groupNode, ...updatedSelected] as Node<BlockNodeData>[]
       state.isDirty = true
       state.selectedNodeId = groupId
     })
@@ -830,7 +830,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
       state.inheritanceOverlay = null
       state.resolvedConfigs = {}
       state.propagationKeys = null
-      const tab = state.tabs.find(t => t.id === activeTabId)
+      const tab = state.tabs.find((t: PipelineTab) => t.id === activeTabId)
       if (tab) {
         tab.nodes = []
         tab.edges = []
@@ -879,7 +879,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
 
   deletePipeline: async (id) => {
     if (isDemoMode()) {
-      set((state) => { state.pipelines = state.pipelines.filter((p) => p.id !== id) })
+      set((state) => { state.pipelines = state.pipelines.filter((p: { id: string }) => p.id !== id) })
       if (get().id === id) get().newPipeline()
       toast.success('Pipeline deleted')
       return
@@ -888,7 +888,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
     // Optimistic removal: instantly update the UI, rollback on API failure
     const previousPipelines = [...get().pipelines]
     const wasActive = get().id === id
-    set((state) => { state.pipelines = state.pipelines.filter((p) => p.id !== id) })
+    set((state) => { state.pipelines = state.pipelines.filter((p: { id: string }) => p.id !== id) })
     if (wasActive) get().newPipeline()
 
     try {
@@ -1283,7 +1283,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
 
   renameTab: (tabId: string, newName: string) => {
     set((state) => {
-      const tab = state.tabs.find(t => t.id === tabId)
+      const tab = state.tabs.find((t: PipelineTab) => t.id === tabId)
       if (tab) tab.name = newName
       if (tabId === state.activeTabId) state.name = newName
     })
@@ -1328,7 +1328,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
 
   updateTabRunStatus: (tabId: string, status: PipelineTab['runStatus']) => {
     set((state) => {
-      const tab = state.tabs.find(t => t.id === tabId)
+      const tab = state.tabs.find((t: PipelineTab) => t.id === tabId)
       if (tab) tab.runStatus = status
     })
   },
