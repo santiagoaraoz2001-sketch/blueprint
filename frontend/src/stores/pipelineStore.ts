@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
+import { current } from 'immer'
 import {
   type Node,
   type Edge,
@@ -10,6 +12,7 @@ import {
   addEdge,
 } from '@xyflow/react'
 import { api } from '@/api/client'
+import type { PipelineResponse } from '@/api/types'
 import { getBlockDefinition, getPortColor, isPortCompatible, resolvePort, type PortDefinition } from '@/lib/block-registry'
 import { type ConnectionSuggestion, suggestConnections, findNearbyNodes } from '@/lib/auto-wiring'
 import { getLayoutedElements } from '@/lib/layout-utils'
@@ -18,13 +21,21 @@ import { DEMO_PIPELINE, DEMO_PIPELINES_LIST } from '@/lib/demo-data'
 import toast from 'react-hot-toast'
 import { useUIStore } from './uiStore'
 
+/** Shape of the pipeline definition JSON blob stored in the database */
+export interface PipelineDefinition {
+  nodes: Array<{ id: string; type: string; position: { x: number; y: number }; data: Record<string, unknown>; [key: string]: unknown }>
+  edges: Array<{ id: string; source: string; target: string; sourceHandle?: string; targetHandle?: string; [key: string]: unknown }>
+  [key: string]: unknown
+}
+
 export interface BlockNodeData {
   type: string
   label: string
   category: string
   icon: string
   accent: string
-  config: Record<string, any>
+  /** Block config — use BlockConfigMap[type] from block-configs.generated.ts for typed access */
+  config: Record<string, unknown>
   inputs?: PortDefinition[]
   outputs?: PortDefinition[]
   status: 'idle' | 'running' | 'complete' | 'failed'
@@ -56,8 +67,8 @@ export interface PipelineSnapshot {
   id: string
   timestamp: string
   name: string
-  nodes: any[]
-  edges: any[]
+  nodes: Node<BlockNodeData>[]
+  edges: Edge[]
 }
 
 export interface InheritanceOverlay {
@@ -97,8 +108,8 @@ export interface RerunMode {
   sourceRunId: string
   startNodeId: string
   nodeStates: Record<string, NodeExecutionState>
-  configOverrides: Record<string, Record<string, any>>
-  originalConfigs: Record<string, Record<string, any>>
+  configOverrides: Record<string, Record<string, unknown>>
+  originalConfigs: Record<string, Record<string, unknown>>
   downstreamNodes: string[]
   cachedNodes: string[]
 }
@@ -160,7 +171,7 @@ interface PipelineState {
   removeNode: (id: string) => void
   removeSelectedNodes: () => void
   duplicateNodes: (nodeIds: string[], offset?: { x: number; y: number }) => void
-  updateNodeConfig: (id: string, config: Record<string, any>) => void
+  updateNodeConfig: (id: string, config: Record<string, unknown>) => void
   selectNode: (id: string | null) => void
   focusErrorNode: (id: string | null) => void
   saveAsTemplate: (name: string, description: string, category: string) => void
@@ -175,7 +186,7 @@ interface PipelineState {
   // Multi-pipeline actions
   fetchPipelines: () => Promise<void>
   deletePipeline: (id: string) => Promise<void>
-  duplicatePipeline: (id: string) => Promise<void>
+  duplicatePipeline: (id: string) => Promise<PipelineResponse | undefined>
   exportPipeline: () => void
   importPipeline: (json: string) => void
 
@@ -195,7 +206,7 @@ interface PipelineState {
   applyGeneratedWorkflow: (nodes: Node<BlockNodeData>[], edges: Edge[]) => void
 
   // Template instantiation
-  instantiateTemplate: (template: import('@/lib/pipeline-templates').PipelineTemplate, variableValues: Record<string, any>) => void
+  instantiateTemplate: (template: import('@/lib/pipeline-templates').PipelineTemplate, variableValues: Record<string, unknown>) => void
 
   // Inheritance overlay
   inheritanceOverlay: InheritanceOverlay | null
@@ -206,7 +217,7 @@ interface PipelineState {
   rerunMode: RerunMode | null
   enterRerunMode: (startNodeId: string, sourceRunId: string) => void
   exitRerunMode: (restoreConfigs?: boolean) => void
-  updateRerunConfigOverride: (nodeId: string, config: Record<string, any>) => void
+  updateRerunConfigOverride: (nodeId: string, config: Record<string, unknown>) => void
   getDownstreamNodes: (startNodeId: string) => string[]
   getUpstreamNodes: (startNodeId: string) => string[]
 
@@ -307,17 +318,16 @@ function _migrateEdgeHandles(edges: Edge[], nodes: Node<BlockNodeData>[]): Edge[
 }
 
 /**
- * Helper: returns the history snapshot portion for a single set() call.
- * Call inside set() with the current state to push history + apply changes atomically.
+ * Helper: pushes a history snapshot onto the undo stack inside an Immer draft.
+ * Uses current() from immer to get plain copies of the draft nodes/edges.
  */
-function _histSnapshot(s: { nodes: Node<BlockNodeData>[]; edges: Edge[]; past: { nodes: Node<BlockNodeData>[]; edges: Edge[] }[] }) {
-  return {
-    past: [...s.past, { nodes: [...s.nodes], edges: [...s.edges] }].slice(-50),
-    future: [] as { nodes: Node<BlockNodeData>[]; edges: Edge[] }[],
-  }
+function _pushHistory(state: { nodes: Node<BlockNodeData>[]; edges: Edge[]; past: { nodes: Node<BlockNodeData>[]; edges: Edge[] }[]; future: { nodes: Node<BlockNodeData>[]; edges: Edge[] }[] }) {
+  state.past.push({ nodes: current(state.nodes), edges: current(state.edges) })
+  if (state.past.length > 50) state.past.splice(0, state.past.length - 50)
+  state.future = []
 }
 
-export const usePipelineStore = create<PipelineState>((set, get) => ({
+export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
   id: null,
   name: 'Untitled Pipeline',
   nodes: [],
@@ -336,43 +346,31 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   future: [],
   inheritanceOverlay: null,
 
-  pushHistory: () => {
-    const { nodes, edges, past } = get()
-    set({
-      past: [...past, { nodes: [...nodes], edges: [...edges] }].slice(-50),
-      future: [],
-    })
-  },
+  pushHistory: () => set((state) => {
+    state.past.push({ nodes: current(state.nodes), edges: current(state.edges) })
+    if (state.past.length > 50) state.past.splice(0, state.past.length - 50)
+    state.future = []
+  }),
 
-  undo: () => {
-    const { past, future, nodes, edges } = get()
-    if (past.length === 0) return
-    const previous = past[past.length - 1]
-    const newPast = past.slice(0, -1)
-    set({
-      past: newPast,
-      future: [{ nodes: [...nodes], edges: [...edges] }, ...future],
-      nodes: previous.nodes,
-      edges: previous.edges,
-      isDirty: true,
-      selectedNodeId: null,
-    })
-  },
+  undo: () => set((state) => {
+    if (state.past.length === 0) return
+    const previous = state.past.pop()!
+    state.future.unshift({ nodes: current(state.nodes), edges: current(state.edges) })
+    state.nodes = previous.nodes
+    state.edges = previous.edges
+    state.isDirty = true
+    state.selectedNodeId = null
+  }),
 
-  redo: () => {
-    const { past, future, nodes, edges } = get()
-    if (future.length === 0) return
-    const next = future[0]
-    const newFuture = future.slice(1)
-    set({
-      past: [...past, { nodes: [...nodes], edges: [...edges] }],
-      future: newFuture,
-      nodes: next.nodes,
-      edges: next.edges,
-      isDirty: true,
-      selectedNodeId: null,
-    })
-  },
+  redo: () => set((state) => {
+    if (state.future.length === 0) return
+    const next = state.future.shift()!
+    state.past.push({ nodes: current(state.nodes), edges: current(state.edges) })
+    state.nodes = next.nodes
+    state.edges = next.edges
+    state.isDirty = true
+    state.selectedNodeId = null
+  }),
 
   onNodesChange: (changes) => {
     // Determine if we should save undo history for this change batch.
@@ -404,22 +402,22 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     const isUserChange = changes.some(c => c.type !== 'dimensions' && c.type !== 'select')
 
     // SINGLE set() call — merges history snapshot + node changes atomically.
-    set((s) => ({
-      ...(shouldPushHistory ? _histSnapshot(s) : {}),
-      nodes: applyNodeChanges(finalChanges, s.nodes) as Node<BlockNodeData>[],
-      ...(isUserChange ? { isDirty: true } : {}),
-    }))
+    set((state) => {
+      if (shouldPushHistory) _pushHistory(state)
+      state.nodes = applyNodeChanges(finalChanges, state.nodes) as Node<BlockNodeData>[]
+      if (isUserChange) state.isDirty = true
+    })
   },
 
   onEdgesChange: (changes) => {
     const isSignificant = changes.some(c => c.type !== 'select')
 
     // SINGLE set() call — merges history snapshot + edge changes atomically.
-    set((s) => ({
-      ...(isSignificant ? _histSnapshot(s) : {}),
-      edges: applyEdgeChanges(changes, s.edges),
-      ...(isSignificant ? { isDirty: true } : {}),
-    }))
+    set((state) => {
+      if (isSignificant) _pushHistory(state)
+      state.edges = applyEdgeChanges(changes, state.edges)
+      if (isSignificant) state.isDirty = true
+    })
   },
 
   onConnect: (connection) => {
@@ -442,31 +440,31 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
 
         const edgeColor = sourcePort ? getPortColor(sourcePort.dataType) : '#222222'
 
-        set((s) => ({
-          ..._histSnapshot(s),
-          edges: addEdge(
+        set((state) => {
+          _pushHistory(state)
+          state.edges = addEdge(
             {
               ...connection,
               type: 'smoothstep',
               animated: true,
               style: { stroke: edgeColor, strokeWidth: 1.5 },
             },
-            s.edges
-          ),
-          isDirty: true,
-        }))
+            state.edges
+          )
+          state.isDirty = true
+        })
         return
       }
     }
 
-    set((s) => ({
-      ..._histSnapshot(s),
-      edges: addEdge(
+    set((state) => {
+      _pushHistory(state)
+      state.edges = addEdge(
         { ...connection, type: 'smoothstep', animated: true },
-        s.edges
-      ),
-      isDirty: true,
-    }))
+        state.edges
+      )
+      state.isDirty = true
+    })
   },
 
   addNode: (type, position) => {
@@ -490,12 +488,12 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         progress: 0,
       },
     }
-    set((s) => ({
-      ..._histSnapshot(s),
-      nodes: [...s.nodes, newNode],
-      isDirty: true,
-      selectedNodeId: id,
-    }))
+    set((state) => {
+      _pushHistory(state)
+      state.nodes.push(newNode)
+      state.isDirty = true
+      state.selectedNodeId = id
+    })
   },
 
   addStickyNote: (position) => {
@@ -511,22 +509,23 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         height: 120,
       },
     }
-    set((s) => ({
-      ..._histSnapshot(s),
-      nodes: [...s.nodes, newNode] as Node<BlockNodeData>[],
-      isDirty: true,
-      selectedNodeId: id,
-    }))
+    set((state) => {
+      _pushHistory(state)
+      state.nodes.push(newNode as Node<BlockNodeData>)
+      state.isDirty = true
+      state.selectedNodeId = id
+    })
   },
 
   updateStickyNote: (id, data) => {
-    set((s) => ({
-      ..._histSnapshot(s),
-      nodes: s.nodes.map((n) =>
-        n.id === id ? { ...n, data: { ...n.data, ...data } } : n
-      ) as Node<BlockNodeData>[],
-      isDirty: true,
-    }))
+    set((state) => {
+      _pushHistory(state)
+      const node = state.nodes.find(n => n.id === id)
+      if (node) {
+        Object.assign(node.data, data)
+      }
+      state.isDirty = true
+    })
   },
 
   removeNode: (id) => {
@@ -536,26 +535,26 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       if (n.parentId === id) nodesToRemove.add(n.id)
     })
 
-    set((s) => ({
-      ..._histSnapshot(s),
-      nodes: s.nodes.filter((n) => !nodesToRemove.has(n.id)),
-      edges: s.edges.filter((e) => !nodesToRemove.has(e.source) && !nodesToRemove.has(e.target)),
-      selectedNodeId: s.selectedNodeId && nodesToRemove.has(s.selectedNodeId) ? null : s.selectedNodeId,
-      isDirty: true,
-    }))
+    set((state) => {
+      _pushHistory(state)
+      state.nodes = state.nodes.filter((n) => !nodesToRemove.has(n.id))
+      state.edges = state.edges.filter((e) => !nodesToRemove.has(e.source) && !nodesToRemove.has(e.target))
+      if (state.selectedNodeId && nodesToRemove.has(state.selectedNodeId)) state.selectedNodeId = null
+      state.isDirty = true
+    })
   },
 
   removeSelectedNodes: () => {
     const selected = get().nodes.filter((n) => n.selected)
     if (selected.length === 0) return
     const ids = new Set(selected.map((n) => n.id))
-    set((s) => ({
-      ..._histSnapshot(s),
-      nodes: s.nodes.filter((n) => !ids.has(n.id)),
-      edges: s.edges.filter((e) => !ids.has(e.source) && !ids.has(e.target)),
-      selectedNodeId: null,
-      isDirty: true,
-    }))
+    set((state) => {
+      _pushHistory(state)
+      state.nodes = state.nodes.filter((n) => !ids.has(n.id))
+      state.edges = state.edges.filter((e) => !ids.has(e.source) && !ids.has(e.target))
+      state.selectedNodeId = null
+      state.isDirty = true
+    })
   },
 
   duplicateNodes: (nodeIds, offset = { x: 40, y: 40 }) => {
@@ -587,34 +586,34 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         target: idMap.get(e.target) || e.target,
       }))
 
-    // Deselect originals
-    const deselected = nodes.map((n) => ({ ...n, selected: false }))
-
-    set((s) => ({
-      ..._histSnapshot(s),
-      nodes: [...deselected, ...newNodes],
-      edges: [...edges, ...internalEdges],
-      isDirty: true,
-    }))
+    set((state) => {
+      _pushHistory(state)
+      // Deselect originals in-place
+      for (const node of state.nodes) {
+        node.selected = false
+      }
+      // Push new nodes and edges
+      state.nodes.push(...newNodes)
+      state.edges.push(...internalEdges)
+      state.isDirty = true
+    })
   },
 
   updateNodeConfig: (id, config) => {
-    set((s) => ({
-      ..._histSnapshot(s),
-      nodes: s.nodes.map((n) => {
-        if (n.id !== id) return n
-        const newConfig = { ...n.data.config }
+    set((state) => {
+      _pushHistory(state)
+      const node = state.nodes.find(n => n.id === id)
+      if (node) {
         for (const [key, value] of Object.entries(config)) {
           if (value === undefined || value === null) {
-            delete newConfig[key]  // Remove → reverts to inherited/default
+            delete node.data.config[key]  // Remove → reverts to inherited/default
           } else {
-            newConfig[key] = value
+            node.data.config[key] = value
           }
         }
-        return { ...n, data: { ...n.data, config: newConfig } }
-      }),
-      isDirty: true,
-    }))
+      }
+      state.isDirty = true
+    })
   },
 
   selectNode: (id) => set({ selectedNodeId: id }),
@@ -674,12 +673,12 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     }))
 
     const idSet = new Set(selected.map((n) => n.id))
-    set((s) => ({
-      ..._histSnapshot(s),
-      nodes: [...s.nodes.filter((n) => !idSet.has(n.id)), groupNode, ...updatedSelected] as Node<BlockNodeData>[],
-      isDirty: true,
-      selectedNodeId: groupId,
-    }))
+    set((state) => {
+      _pushHistory(state)
+      state.nodes = [...state.nodes.filter((n) => !idSet.has(n.id)), groupNode, ...updatedSelected] as Node<BlockNodeData>[]
+      state.isDirty = true
+      state.selectedNodeId = groupId
+    })
     toast.success('Nodes grouped')
   },
 
@@ -711,11 +710,11 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       return n
     })
 
-    set((s) => ({
-      ..._histSnapshot(s),
-      nodes: nextNodes as Node<BlockNodeData>[],
-      isDirty: true,
-    }))
+    set((state) => {
+      _pushHistory(state)
+      state.nodes = nextNodes as Node<BlockNodeData>[]
+      state.isDirty = true
+    })
     toast.success('Flow ungrouped')
   },
 
@@ -726,11 +725,11 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     // Calculate new layout
     const layoutedNodes = getLayoutedElements(nodes, edges, 'LR')
 
-    set((s) => ({
-      ..._histSnapshot(s),
-      nodes: layoutedNodes as Node<BlockNodeData>[],
-      isDirty: true,
-    }))
+    set((state) => {
+      _pushHistory(state)
+      state.nodes = layoutedNodes as Node<BlockNodeData>[]
+      state.isDirty = true
+    })
     toast.success('Pipeline organized')
   },
 
@@ -753,14 +752,14 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       return
     }
     try {
-      const pipeline = await api.get<any>(`/pipelines/${id}`)
-      const def = pipeline.definition || {}
-      const hydratedNodes = _hydrateNodePorts(def.nodes || [])
+      const pipeline = await api.get<PipelineResponse>(`/pipelines/${id}`)
+      const def = (pipeline.definition || {}) as PipelineDefinition
+      const hydratedNodes = _hydrateNodePorts((def.nodes || []) as any[])
       set({
         id: pipeline.id,
         name: pipeline.name,
         nodes: hydratedNodes,
-        edges: _migrateEdgeHandles(def.edges || [], hydratedNodes),
+        edges: _migrateEdgeHandles((def.edges || []) as any[], hydratedNodes),
         isDirty: false,
         selectedNodeId: null,
         inheritanceOverlay: null,
@@ -804,10 +803,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       await api.put(`/pipelines/${id}`, { name, definition })
     } else {
       const projectId = useUIStore.getState().selectedProjectId
-      const payload: any = { name, definition }
+      const payload: { name: string; definition: { nodes: Node<BlockNodeData>[]; edges: Edge[] }; project_id?: string } = { name, definition }
       if (projectId) payload.project_id = projectId
 
-      const created = await api.post<any>('/pipelines', payload)
+      const created = await api.post<PipelineResponse>('/pipelines', payload)
       set({ id: created.id })
     }
     set({ isDirty: false })
@@ -821,22 +820,25 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   newPipeline: () => {
     nodeIdCounter = 0
     const { activeTabId } = get()
-    set((s) => ({
-      id: null,
-      name: 'Untitled Pipeline',
-      nodes: [],
-      edges: [],
-      selectedNodeId: null,
-      isDirty: false,
-      inheritanceOverlay: null,
-      resolvedConfigs: {},
-      propagationKeys: null,
-      tabs: s.tabs.map((t) =>
-        t.id === activeTabId
-          ? { ...t, nodes: [], edges: [], pipelineId: null, isDirty: false, name: 'Untitled Pipeline' }
-          : t
-      ),
-    }))
+    set((state) => {
+      state.id = null
+      state.name = 'Untitled Pipeline'
+      state.nodes = []
+      state.edges = []
+      state.selectedNodeId = null
+      state.isDirty = false
+      state.inheritanceOverlay = null
+      state.resolvedConfigs = {}
+      state.propagationKeys = null
+      const tab = state.tabs.find(t => t.id === activeTabId)
+      if (tab) {
+        tab.nodes = []
+        tab.edges = []
+        tab.pipelineId = null
+        tab.isDirty = false
+        tab.name = 'Untitled Pipeline'
+      }
+    })
   },
 
   // Multi-pipeline management
@@ -859,12 +861,12 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     }
     try {
       const url = projectId ? `/pipelines?project_id=${projectId}` : '/pipelines'
-      const list = await api.get<any[]>(url)
+      const list = await api.get<PipelineResponse[]>(url)
       set({
-        pipelines: (list || []).map((p: any) => ({
+        pipelines: (list || []).map((p) => ({
           id: p.id,
           name: p.name || 'Untitled',
-          block_count: p.definition?.nodes?.length || 0,
+          block_count: ((p.definition as PipelineDefinition | null)?.nodes?.length) || 0,
           created_at: p.created_at || '',
           updated_at: p.updated_at || '',
         })),
@@ -877,7 +879,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
 
   deletePipeline: async (id) => {
     if (isDemoMode()) {
-      set((s) => ({ pipelines: s.pipelines.filter((p) => p.id !== id) }))
+      set((state) => { state.pipelines = state.pipelines.filter((p) => p.id !== id) })
       if (get().id === id) get().newPipeline()
       toast.success('Pipeline deleted')
       return
@@ -886,7 +888,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     // Optimistic removal: instantly update the UI, rollback on API failure
     const previousPipelines = [...get().pipelines]
     const wasActive = get().id === id
-    set((s) => ({ pipelines: s.pipelines.filter((p) => p.id !== id) }))
+    set((state) => { state.pipelines = state.pipelines.filter((p) => p.id !== id) })
     if (wasActive) get().newPipeline()
 
     try {
@@ -908,14 +910,14 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
           id: `demo-dup-${Date.now()}`,
           name: `${existing.name} (Copy)`,
         }
-        set((s) => ({ pipelines: [...s.pipelines, copy] }))
+        set((state) => { state.pipelines.push(copy) })
         toast.success('Pipeline duplicated')
       }
       return
     }
     try {
-      const pipeline = await api.get<any>(`/pipelines/${id}`)
-      const created = await api.post<any>('/pipelines', {
+      const pipeline = await api.get<PipelineResponse>(`/pipelines/${id}`)
+      const created = await api.post<PipelineResponse>('/pipelines', {
         name: `${pipeline.name} (Copy)`,
         definition: pipeline.definition,
       })
@@ -970,8 +972,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       id: `snap_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       timestamp: new Date().toISOString(),
       name,
-      nodes: JSON.parse(JSON.stringify(nodes)),
-      edges: JSON.parse(JSON.stringify(edges)),
+      nodes: structuredClone(nodes),
+      edges: structuredClone(edges),
     }
     const updated = [snapshot, ...versions].slice(0, 50)
     set({ versions: updated })
@@ -984,11 +986,11 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       toast.error('Version not found')
       return
     }
-    const hydratedNodes = _hydrateNodePorts(JSON.parse(JSON.stringify(snapshot.nodes)))
+    const hydratedNodes = _hydrateNodePorts(structuredClone(snapshot.nodes))
     set({
       name: snapshot.name,
       nodes: hydratedNodes,
-      edges: _migrateEdgeHandles(JSON.parse(JSON.stringify(snapshot.edges)), hydratedNodes),
+      edges: _migrateEdgeHandles(structuredClone(snapshot.edges), hydratedNodes),
       isDirty: true,
       selectedNodeId: null,
     })
@@ -996,19 +998,19 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   },
 
   applyGeneratedWorkflow: (newNodes, newEdges) => {
-    set((s) => ({
-      ..._histSnapshot(s),
-      nodes: [...s.nodes, ...newNodes] as Node<BlockNodeData>[],
-      edges: [...s.edges, ...newEdges],
-      isDirty: true,
-    }))
+    set((state) => {
+      _pushHistory(state)
+      state.nodes.push(...(newNodes as Node<BlockNodeData>[]))
+      state.edges.push(...newEdges)
+      state.isDirty = true
+    })
     toast.success(`Added ${newNodes.length} blocks to canvas`)
   },
 
   instantiateTemplate: (template, variableValues) => {
     // Deep clone nodes and edges
-    const clonedNodes = JSON.parse(JSON.stringify(template.nodes)) as Node<BlockNodeData>[]
-    const clonedEdges = JSON.parse(JSON.stringify(template.edges)) as Edge[]
+    const clonedNodes = structuredClone(template.nodes) as Node<BlockNodeData>[]
+    const clonedEdges = structuredClone(template.edges) as Edge[]
 
     // Apply variable bindings to node configs
     if (template.variables) {
@@ -1104,7 +1106,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     const upstream = store.getUpstreamNodes(startNodeId)
 
     const nodeStates: Record<string, NodeExecutionState> = {}
-    const originalConfigs: Record<string, Record<string, any>> = {}
+    const originalConfigs: Record<string, Record<string, unknown>> = {}
 
     for (const node of nodes) {
       if (node.type !== 'blockNode') continue
@@ -1113,7 +1115,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       } else if (node.id === startNodeId) {
         nodeStates[node.id] = 'will_rerun'
         // Deep copy original config so edits don't mutate the snapshot
-        originalConfigs[node.id] = JSON.parse(JSON.stringify(node.data.config || {}))
+        originalConfigs[node.id] = structuredClone(node.data.config || {})
       } else if (downstream.includes(node.id)) {
         nodeStates[node.id] = 'will_rerun_downstream'
       } else {
@@ -1149,7 +1151,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       const restoredNodes = nodes.map((n) => {
         const original = rerunMode.originalConfigs[n.id]
         if (original) {
-          return { ...n, data: { ...n.data, config: JSON.parse(JSON.stringify(original)) } }
+          return { ...n, data: { ...n.data, config: structuredClone(original) } }
         }
         return n
       })
@@ -1159,17 +1161,15 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     }
   },
 
-  updateRerunConfigOverride: (nodeId: string, config: Record<string, any>) => {
+  updateRerunConfigOverride: (nodeId: string, config: Record<string, unknown>) => {
     const { rerunMode } = get()
     if (!rerunMode) return
-    set({
-      rerunMode: {
-        ...rerunMode,
-        configOverrides: {
-          ...rerunMode.configOverrides,
-          [nodeId]: { ...(rerunMode.configOverrides[nodeId] || {}), ...config },
-        },
-      },
+    set((state) => {
+      if (!state.rerunMode) return
+      if (!state.rerunMode.configOverrides[nodeId]) {
+        state.rerunMode.configOverrides[nodeId] = {}
+      }
+      Object.assign(state.rerunMode.configOverrides[nodeId], config)
     })
   },
 
@@ -1282,10 +1282,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   },
 
   renameTab: (tabId: string, newName: string) => {
-    const { tabs, activeTabId } = get()
-    set({
-      tabs: tabs.map((t) => (t.id === tabId ? { ...t, name: newName } : t)),
-      ...(tabId === activeTabId ? { name: newName } : {}),
+    set((state) => {
+      const tab = state.tabs.find(t => t.id === tabId)
+      if (tab) tab.name = newName
+      if (tabId === state.activeTabId) state.name = newName
     })
   },
 
@@ -1302,8 +1302,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     const dupTab: PipelineTab = {
       id: newTabId,
       name: `${sourceTab.name} (Copy)`,
-      nodes: JSON.parse(JSON.stringify(sourceTab.nodes)),
-      edges: JSON.parse(JSON.stringify(sourceTab.edges)),
+      nodes: structuredClone(sourceTab.nodes),
+      edges: structuredClone(sourceTab.edges),
       pipelineId: null, // new tab = unsaved
       isDirty: true,
       runStatus: 'idle',
@@ -1327,9 +1327,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   },
 
   updateTabRunStatus: (tabId: string, status: PipelineTab['runStatus']) => {
-    set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, runStatus: status } : t)),
-    }))
+    set((state) => {
+      const tab = state.tabs.find(t => t.id === tabId)
+      if (tab) tab.runStatus = status
+    })
   },
 
   // ── Inheritance Overlay ──
@@ -1431,4 +1432,4 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     const suggestions = suggestConnections(nodeId, nearbyIds, nodes, edges)
     set({ connectionSuggestions: suggestions, autoWiringNodeId: suggestions.length > 0 ? nodeId : null })
   },
-}))
+})))

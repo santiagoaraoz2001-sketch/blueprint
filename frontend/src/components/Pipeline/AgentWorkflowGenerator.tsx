@@ -46,7 +46,7 @@ export default function AgentWorkflowGenerator({ onClose }: Props) {
     testConnection, fetchModels, generateWorkflow,
   } = useAgentStore()
 
-  const { applyGeneratedWorkflow } = usePipelineStore()
+  const applyGeneratedWorkflow = usePipelineStore((s) => s.applyGeneratedWorkflow)
 
   const [researchPlan, setResearchPlan] = useState('')
   const [generatedPipeline, setGeneratedPipeline] = useState<{ nodes: any[]; edges: any[] } | null>(null)

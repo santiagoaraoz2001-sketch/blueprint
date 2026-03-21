@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Editor from '@monaco-editor/react'
 import toast from 'react-hot-toast'
@@ -341,20 +341,22 @@ export default function BlockGeneratorModal({ visible, onClose, onInstalled }: P
 
               {/* Code preview */}
               <div style={{ padding: '8px 18px 12px', height: 320 }}>
-                <Editor
-                  language={activeTab === 'yaml' ? 'yaml' : 'python'}
-                  theme="vs-dark"
-                  value={activeTab === 'yaml' ? result.block_yaml : result.run_py}
-                  options={{
-                    readOnly: true,
-                    minimap: { enabled: false },
-                    fontSize: 12,
-                    lineNumbers: 'on',
-                    wordWrap: 'off',
-                    scrollBeyondLastLine: false,
-                    padding: { top: 8 },
-                  }}
-                />
+                {useMemo(() => (
+                  <Editor
+                    language={activeTab === 'yaml' ? 'yaml' : 'python'}
+                    theme="vs-dark"
+                    value={activeTab === 'yaml' ? result.block_yaml : result.run_py}
+                    options={{
+                      readOnly: true,
+                      minimap: { enabled: false },
+                      fontSize: 12,
+                      lineNumbers: 'on',
+                      wordWrap: 'off',
+                      scrollBeyondLastLine: false,
+                      padding: { top: 8 },
+                    }}
+                  />
+                ), [activeTab, result.block_yaml, result.run_py])}
               </div>
 
               {/* Test result */}

@@ -1,52 +1,12 @@
 import { create } from 'zustand'
 import { api } from '@/api/client'
+import type { ProjectResponse, ExperimentPhaseResponse } from '@/api/types'
 import { useSettingsStore } from './settingsStore'
 import { DEMO_PROJECTS } from '@/lib/demo-data'
 
-export interface Project {
-  id: string
-  name: string
-  paper_number: string | null
-  paper_title: string | null
-  paper_subtitle: string | null
-  target_venue: string | null
-  description: string
-  status: string
-  blocked_by: string | null
-  priority: number
-  github_repo: string | null
-  notes: string
-  hypothesis: string | null
-  key_result: string | null
-  tags: string[]
-  total_experiments: number
-  completed_experiments: number
-  current_phase: string | null
-  completion_criteria: string | null
-  estimated_compute_hours: number
-  estimated_cost_usd: number
-  actual_compute_hours: number
-  started_at: string | null
-  completed_at: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface ExperimentPhase {
-  id: string
-  project_id: string
-  phase_id: string
-  name: string
-  description: string | null
-  status: string
-  blocked_by_phase: string | null
-  total_runs: number
-  completed_runs: number
-  research_question: string | null
-  finding: string | null
-  sort_order: number
-  created_at: string
-}
+/** Re-export generated types for backward compatibility */
+export type Project = ProjectResponse
+export type ExperimentPhase = ExperimentPhaseResponse
 
 export interface DashboardStats {
   total_papers: number
@@ -56,7 +16,7 @@ export interface DashboardStats {
   total_compute_hours: number
   blocked_papers: { id: string; name: string; blocked_by: string | null }[]
   unassigned_runs: number
-  recent_unassigned: { run_id: string; pipeline_name: string; metrics: Record<string, any> }[]
+  recent_unassigned: { run_id: string; pipeline_name: string; metrics: Record<string, number | string> }[]
 }
 
 export interface ProjectStats {
@@ -65,7 +25,7 @@ export interface ProjectStats {
   failed_runs: number
   running_runs: number
   total_compute_hours: number
-  best_run: { run_id: string; metrics: Record<string, any> } | null
+  best_run: { run_id: string; metrics: Record<string, number | string> } | null
   latest_run: { run_id: string; status: string } | null
   phases: {
     id: string; phase_id: string; name: string
@@ -142,8 +102,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
     try {
       const projects = await api.get<Project[]>('/projects')
       set({ projects, loading: false })
-    } catch (e: any) {
-      set({ error: e.message, loading: false })
+    } catch (e: unknown) {
+      set({ error: e instanceof Error ? e.message : 'Failed to fetch projects', loading: false })
     }
   },
 

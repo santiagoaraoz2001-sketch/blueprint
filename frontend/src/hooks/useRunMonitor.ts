@@ -59,23 +59,49 @@ export function useDashboardMonitor(opts?: { enabled?: boolean }) {
 export function useRunMonitor(runId: string | null): UseRunMonitorResult {
   const systemTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Subscribe to SSE events via the shared manager (metrics-specific handling)
+  // Subscribe to SSE events via the shared manager (metrics-specific handling).
+  // Events are micro-batched via requestAnimationFrame so multiple SSE events
+  // arriving in the same frame are coalesced into a single store update.
   useEffect(() => {
     if (!runId) return
 
+    const buffer: Array<{ event: string; data: unknown }> = []
+    let rafId: number | null = null
+
+    const flush = () => {
+      rafId = null
+      if (buffer.length === 0) return
+      const events = buffer.splice(0)
+      const store = useMetricsStore.getState()
+      if (!store.runs[runId]) store.initRun(runId)
+      store.handleEventBatch(runId, events)
+    }
+
     const unsubscribe = sseManager.subscribe(runId, (event, data) => {
-      // Skip internal meta-events — runStore handles those
       if (event.startsWith('__sse_')) return
 
-      const store = useMetricsStore.getState()
-      if (!store.runs[runId]) {
-        store.initRun(runId)
+      // Terminal events flush immediately — no deferral
+      if (event === 'run_completed' || event === 'run_failed' || event === 'run_cancelled') {
+        if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+        buffer.push({ event, data })
+        flush()
+        return
       }
 
-      store.handleEvent(runId, event, data)
+      buffer.push({ event, data })
+      if (rafId === null) rafId = requestAnimationFrame(flush)
     })
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      // Flush any remaining buffered events on cleanup
+      if (buffer.length > 0) {
+        const store = useMetricsStore.getState()
+        if (!store.runs[runId]) store.initRun(runId)
+        store.handleEventBatch(runId, buffer.splice(0))
+      }
+    }
   }, [runId])
 
   // Poll live system metrics while run is active

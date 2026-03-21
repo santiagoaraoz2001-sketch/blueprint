@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { memo, useState, useMemo, useRef, useEffect } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import {
   LineChart,
@@ -37,7 +37,7 @@ const LINE_COLORS = [
   '#ff433d', // red
 ]
 
-export default function LiveMetricsChart({
+export default memo(function LiveMetricsChart({
   data,
   metricNames,
   title = 'Live Metrics',
@@ -258,4 +258,4 @@ export default function LiveMetricsChart({
       </div>
     </div>
   )
-}
+})

@@ -60,9 +60,12 @@ class CreateSweepRequest(BaseModel):
 # ── Lifecycle ───────────────────────────────────────────────────────
 
 def shutdown_sweep_executor():
-    """Gracefully shut down the sweep executor pool."""
+    """Gracefully shut down the sweep executor pool.
+
+    cancel_futures=True prevents queued sweeps from starting during shutdown.
+    """
     _logger.info("Shutting down sweep executor pool...")
-    _sweep_executor.shutdown(wait=True, cancel_futures=False)
+    _sweep_executor.shutdown(wait=True, cancel_futures=True)
     _logger.info("Sweep executor pool shut down.")
 
 

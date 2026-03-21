@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { memo, useState, useMemo } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useMetricsStore, type MetricPoint } from '@/stores/metricsStore'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
@@ -36,6 +36,7 @@ function CustomTooltip({ active, payload, label }: any) {
       style={{
         background: T.surface2,
         border: `1px solid ${T.border}`,
+        borderRadius: 0,
         padding: '6px 10px',
         fontFamily: F,
         fontSize: FS.xxs,
@@ -51,7 +52,7 @@ function CustomTooltip({ active, payload, label }: any) {
   )
 }
 
-export default function TrainingDashboard({ runId, blockId }: TrainingDashboardProps) {
+export default memo(function TrainingDashboard({ runId, blockId }: TrainingDashboardProps) {
   const [rawMode, setRawMode] = useState(false)
   const blockMetrics = useMetricsStore((s) => s.runs[runId]?.blocks[blockId]?.metrics)
   const block = useMetricsStore((s) => s.runs[runId]?.blocks[blockId])
@@ -363,4 +364,4 @@ export default function TrainingDashboard({ runId, blockId }: TrainingDashboardP
       )}
     </div>
   )
-}
+})

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { usePaperStore } from '@/stores/paperStore'
 import { BarChart3, ChevronDown } from 'lucide-react'
@@ -49,7 +49,7 @@ interface ChartBlockProps {
     chartId: string  // The selected chart's ID stored in block.content
 }
 
-export default function ChartBlock({ sectionId, blockId, chartId }: ChartBlockProps) {
+export default memo(function ChartBlock({ sectionId, blockId, chartId }: ChartBlockProps) {
     const { charts, updateBlock } = usePaperStore()
     const [dropdownOpen, setDropdownOpen] = useState(false)
 
@@ -124,10 +124,10 @@ export default function ChartBlock({ sectionId, blockId, chartId }: ChartBlockPr
 
             {/* Chart Render */}
             {selectedChart && (
-                <div style={{ background: T.surface0, border: `1px solid ${T.border}`, borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ background: T.surface0, border: `1px solid ${T.border}`, borderRadius: 0, overflow: 'hidden' }}>
                     <MiniBarChart data={selectedChart.data} xField={selectedChart.xField} yField={selectedChart.yField} />
                 </div>
             )}
         </div>
     )
-}
+})

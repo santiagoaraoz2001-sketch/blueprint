@@ -8,6 +8,7 @@ and executes them sequentially, passing outputs between blocks.
 import asyncio
 import collections
 import json
+import os
 import random
 import re
 import sys
@@ -532,6 +533,26 @@ def _collect_system_metrics() -> dict | None:
     except Exception:
         pass
     return metrics
+
+
+# Memory pressure threshold — halt pipelines before OOM crash.
+# Apple Silicon unified memory means GPU + CPU share the same pool.
+# Default 90% — configurable via env var.
+MEMORY_PRESSURE_THRESHOLD = float(os.environ.get("BLUEPRINT_MEMORY_THRESHOLD", "90"))
+
+
+def _check_memory_pressure() -> tuple[bool, float]:
+    """Check if system memory usage exceeds the safe threshold.
+
+    Returns (is_critical, current_percent). Silently returns (False, 0.0)
+    if psutil is unavailable.
+    """
+    try:
+        import psutil
+        mem = psutil.virtual_memory()
+        return mem.percent >= MEMORY_PRESSURE_THRESHOLD, round(mem.percent, 1)
+    except ImportError:
+        return False, 0.0
 
 
 def _safe_commit(db: Session):
@@ -1138,6 +1159,32 @@ async def execute_pipeline(
                         "run_id": run_id,
                         "duration": run.duration_seconds,
                         "completed_blocks": idx,
+                    })
+                except Exception:
+                    pass
+                return
+
+            # Check memory pressure before each block — halt cleanly to prevent OOM
+            is_critical, mem_pct = _check_memory_pressure()
+            if is_critical:
+                error_msg = (
+                    f"Memory pressure critical ({mem_pct}% used, "
+                    f"threshold {MEMORY_PRESSURE_THRESHOLD}%). "
+                    f"Halting pipeline to prevent OOM crash."
+                )
+                log_run_failed(run_id, pipeline_id, error_msg, block_count=idx)
+                run.status = "failed"
+                run.error_message = error_msg
+                run.finished_at = datetime.now(timezone.utc)
+                run.duration_seconds = time.time() - start_time
+                run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                run.data_fingerprints = all_fingerprints
+                live.status = "failed"
+                db.commit()
+                try:
+                    publish_event(run_id, "run_failed", {
+                        "run_id": run_id,
+                        "error": error_msg,
                     })
                 except Exception:
                     pass

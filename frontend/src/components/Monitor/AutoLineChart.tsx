@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useMetricsStore, EMPTY_BLOCK_METRICS, type MetricSeries } from '@/stores/metricsStore'
 import {
@@ -47,7 +47,7 @@ function segmentWithGaps(series: MetricSeries[]): { data: any[]; gapIndices: num
   return { data, gapIndices }
 }
 
-export default function AutoLineChart({
+export default memo(function AutoLineChart({
   metricName, blockId, color = '#00BFA5', height = 200,
   title, showGaps = true, overlayMetric, overlayColor = '#F59E0B',
 }: AutoLineChartProps) {
@@ -112,6 +112,7 @@ export default function AutoLineChart({
             contentStyle={{
               background: T.surface2,
               border: `1px solid ${T.borderHi}`,
+              borderRadius: 0,
               fontFamily: F, fontSize: 7, color: T.sec,
               padding: '4px 8px',
             }}
@@ -146,4 +147,4 @@ export default function AutoLineChart({
       </ResponsiveContainer>
     </div>
   )
-}
+})
