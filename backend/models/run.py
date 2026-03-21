@@ -8,6 +8,7 @@ class Run(Base):
 
     id = Column(String, primary_key=True)
     pipeline_id = Column(String, ForeignKey("blueprint_pipelines.id"), nullable=False)
+    project_id = Column(String, ForeignKey("blueprint_projects.id"), nullable=True, index=True)
     mlflow_run_id = Column(String, nullable=True)
     status = Column(String, default="pending")  # pending | running | paused | complete | failed | cancelled
     started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

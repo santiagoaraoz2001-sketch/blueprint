@@ -53,10 +53,6 @@ export default function RunControls() {
   }, [status])
 
   const handleRun = async () => {
-    if (!pipelineId) {
-      toast.error('Save pipeline first')
-      return
-    }
     if (nodes.length === 0) {
       toast.error('Add blocks to the pipeline first')
       return
@@ -82,8 +78,26 @@ export default function RunControls() {
       toast(warn.message, { icon: '⚠️' })
     }
 
+    // Auto-save if the pipeline hasn't been persisted yet.
+    // This guarantees every execution gets a unique pipeline ID,
+    // which is required for artifact tracking and the output dashboard.
+    let resolvedPipelineId = pipelineId
+    if (!resolvedPipelineId) {
+      try {
+        await usePipelineStore.getState().savePipeline()
+        resolvedPipelineId = usePipelineStore.getState().id
+      } catch {
+        toast.error('Failed to save pipeline before execution')
+        return
+      }
+      if (!resolvedPipelineId) {
+        toast.error('Failed to save pipeline before execution')
+        return
+      }
+    }
+
     reset()
-    await startRun(pipelineId)
+    await startRun(resolvedPipelineId)
 
     // Wire output view: subscribe to SSE and auto-switch
     const runId = useRunStore.getState().activeRunId

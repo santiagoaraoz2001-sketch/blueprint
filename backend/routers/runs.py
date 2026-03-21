@@ -36,6 +36,7 @@ def _flatten_dict(d: dict, prefix: str = '') -> dict:
 @router.get("", response_model=list[RunResponse])
 def list_runs(
     pipeline_id: str | None = None,
+    project_id: str | None = None,
     status: str | None = None,
     limit: int = 50,
     db: Session = Depends(get_db),
@@ -43,6 +44,8 @@ def list_runs(
     q = db.query(Run)
     if pipeline_id:
         q = q.filter(Run.pipeline_id == pipeline_id)
+    if project_id:
+        q = q.filter(Run.project_id == project_id)
     if status:
         q = q.filter(Run.status == status)
     return q.order_by(Run.started_at.desc()).limit(limit).all()

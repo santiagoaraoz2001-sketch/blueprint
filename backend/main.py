@@ -15,7 +15,7 @@ from .utils.structured_logger import (
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference, plugins, sweeps, connectors, block_generator, marketplace
+from .routers import projects, pipelines, runs, datasets, blocks, events, execution, control_tower, system, models, papers, secrets, custom_blocks, inference, plugins, sweeps, connectors, block_generator, marketplace, outputs
 
 _recovery_logger = logging.getLogger("blueprint.recovery")
 
@@ -183,6 +183,7 @@ app.include_router(plugins.router)
 app.include_router(sweeps.router)
 app.include_router(connectors.router)
 app.include_router(block_generator.router)
+app.include_router(outputs.router)
 if ENABLE_MARKETPLACE:
     app.include_router(marketplace.router)
 
