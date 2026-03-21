@@ -6,7 +6,8 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Allow SCRIPT_DIR to be set externally (e.g. by Blueprint.app launcher)
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 cd "$SCRIPT_DIR"
 
 # Colors
