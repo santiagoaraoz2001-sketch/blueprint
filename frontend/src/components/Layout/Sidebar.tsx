@@ -43,7 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'marketplace', label: 'Blocks', icon: Blocks },
   { id: 'workshop', label: 'Workshop', icon: Wrench },
   { id: 'monitor', label: 'Monitor', icon: Activity },
-  { id: 'output', label: 'Output', icon: Terminal },
+  { id: 'output', label: 'Outputs', icon: Terminal },
   { id: 'results', label: 'Results', icon: BarChart3 },
   { id: 'visualization', label: 'Charts', icon: LineChart },
   { id: 'paper', label: 'Paper', icon: FileText },

@@ -6,6 +6,7 @@ from typing import Any
 class RunResponse(BaseModel):
     id: str
     pipeline_id: str
+    project_id: str | None = None
     mlflow_run_id: str | None
     status: str
     started_at: datetime

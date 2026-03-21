@@ -68,6 +68,7 @@ def start_pipeline_run(pipeline_id: str, db: Session = Depends(get_db)):
         raise HTTPException(400, "Pipeline has no blocks")
 
     run_id = str(uuid.uuid4())
+    project_id = pipeline.project_id  # May be None if pipeline has no project
 
     # Run in background thread with its own DB session
     def run_in_thread():
@@ -75,7 +76,7 @@ def start_pipeline_run(pipeline_id: str, db: Session = Depends(get_db)):
         try:
             import asyncio
             loop = asyncio.new_event_loop()
-            loop.run_until_complete(execute_pipeline(pipeline_id, run_id, definition, session))
+            loop.run_until_complete(execute_pipeline(pipeline_id, run_id, definition, session, project_id=project_id))
         finally:
             session.close()
 
@@ -133,6 +134,7 @@ def execute_from_node(
             )
 
     run_id = str(uuid.uuid4())
+    project_id = pipeline.project_id
 
     def run_in_thread():
         session = SessionLocal()
@@ -142,7 +144,7 @@ def execute_from_node(
             loop.run_until_complete(
                 execute_partial_pipeline(
                     pipeline_id, run_id, body.source_run_id, body.start_node_id,
-                    definition, body.config_overrides, session,
+                    definition, body.config_overrides, session, project_id=project_id,
                 )
             )
         finally:

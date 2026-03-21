@@ -95,6 +95,8 @@ async def execute_partial_pipeline(
     definition: dict,
     config_overrides: dict[str, dict],
     db: Session,
+    *,
+    project_id: str | None = None,
 ):
     """
     Execute a pipeline starting from a specific node.
@@ -122,6 +124,7 @@ async def execute_partial_pipeline(
     run = Run(
         id=run_id,
         pipeline_id=pipeline_id,
+        project_id=project_id,
         status="running",
         started_at=datetime.now(timezone.utc),
         last_heartbeat=datetime.now(timezone.utc),

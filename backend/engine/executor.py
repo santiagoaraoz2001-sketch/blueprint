@@ -67,6 +67,7 @@ from ..utils.structured_logger import (
 )
 from .config_resolver import resolve_configs
 from .metrics_schema import create_metric
+from .artifact_registry import register_block_artifacts
 
 # Ensure the repo root is on sys.path so blocks can do cross-block imports
 # like `from blocks.inference._inference_utils import ...`.
@@ -657,6 +658,7 @@ async def _execute_loop(
     all_metrics: dict[str, Any],
     all_fingerprints: dict[str, dict],
     run_id: str,
+    pipeline_id: str,
     resolved_configs: dict,
     metrics_file,
     metrics_log_buffer: list[dict],
@@ -901,6 +903,19 @@ async def _execute_loop(
             if data_fingerprints:
                 all_fingerprints[_nid] = data_fingerprints
 
+            # Register artifacts produced by this loop body block (best-effort)
+            try:
+                register_block_artifacts(
+                    pipeline_id=pipeline_id,
+                    run_id=run_id,
+                    node_id=_nid,
+                    block_type=_block_type,
+                    outputs=node_outputs,
+                    run_dir=info.run_dir,
+                )
+            except Exception:
+                pass
+
             # Emit node_output for body block
             safe_outputs = {}
             for k, v in node_outputs.items():
@@ -1016,6 +1031,8 @@ async def execute_pipeline(
     run_id: str,
     definition: dict,
     db: Session,
+    *,
+    project_id: str | None = None,
 ):
     """Execute a full pipeline. Called in a background thread."""
     nodes = definition.get("nodes", [])
@@ -1046,6 +1063,7 @@ async def execute_pipeline(
     run = Run(
         id=run_id,
         pipeline_id=pipeline_id,
+        project_id=project_id,
         status="running",
         started_at=datetime.now(timezone.utc),
         last_heartbeat=datetime.now(timezone.utc),
@@ -1237,6 +1255,7 @@ async def execute_pipeline(
                         all_metrics=all_metrics,
                         all_fingerprints=all_fingerprints,
                         run_id=run_id,
+                        pipeline_id=pipeline_id,
                         resolved_configs=resolved_configs,
                         metrics_file=metrics_file,
                         metrics_log_buffer=metrics_log_buffer,
@@ -1533,6 +1552,19 @@ async def execute_pipeline(
                 db.commit()
                 log_run_failed(run_id, error_msg, node_id)
                 return
+
+            # Register artifacts produced by this block (best-effort, never crashes)
+            try:
+                register_block_artifacts(
+                    pipeline_id=pipeline_id,
+                    run_id=run_id,
+                    node_id=node_id,
+                    block_type=block_type,
+                    outputs=node_outputs,
+                    run_dir=run_dir,
+                )
+            except Exception:
+                pass
 
             # Heartbeat after each block completes
             run.last_heartbeat = datetime.now(timezone.utc)
