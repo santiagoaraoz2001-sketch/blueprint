@@ -257,22 +257,25 @@ def _read_parquet_preview(
         raise RuntimeError("pyarrow is required to read Parquet files (pip install pyarrow)")
 
     pf = pq.ParquetFile(file_path)
-    total = pf.metadata.num_rows
-    columns = [field.name for field in pf.schema_arrow]
+    try:
+        total = pf.metadata.num_rows
+        columns = [field.name for field in pf.schema_arrow]
 
-    # Read only the needed row group(s) for efficiency
-    table = pf.read()
-    sliced = table.slice(offset, max_rows)
-    rows = sliced.to_pydict()
+        # Read only the needed row group(s) for efficiency
+        table = pf.read()
+        sliced = table.slice(offset, max_rows)
+        rows = sliced.to_pydict()
 
-    # Convert from columnar to row format
-    n = sliced.num_rows
-    result = []
-    for i in range(n):
-        row = {col: rows[col][i] for col in columns}
-        result.append(row)
+        # Convert from columnar to row format
+        n = sliced.num_rows
+        result = []
+        for i in range(n):
+            row = {col: rows[col][i] for col in columns}
+            result.append(row)
 
-    return result, columns, total
+        return result, columns, total
+    finally:
+        pf.close()
 
 
 def _read_sqlite_preview(

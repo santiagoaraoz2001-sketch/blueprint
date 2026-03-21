@@ -618,7 +618,8 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
         gpu: data.gpu_mem_pct,
       }
 
-      run.systemMetrics = [...run.systemMetrics, metric]
+      // Cap at 300 entries to prevent unbounded growth
+      run.systemMetrics = [...run.systemMetrics.slice(-299), metric]
       return { runs: { ...runs, [runId]: run } }
     })
   },
@@ -731,8 +732,9 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
             break
           }
           case 'system_metric': {
+            // Cap at 300 entries — parity with addSystemMetric/handleSystemMetric
             run.systemMetrics = [
-              ...run.systemMetrics,
+              ...run.systemMetrics.slice(-299),
               {
                 timestamp: evt.timestamp ?? Date.now() / 1000,
                 cpu: evt.cpu_pct ?? 0,
@@ -952,6 +954,7 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
                 ...run,
                 status: 'complete',
                 overallProgress: 1,
+                eta: null,
                 duration: data.duration ?? run.duration,
                 finalMetrics: data.metrics ?? run.finalMetrics,
               },
@@ -966,9 +969,56 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
                 ...run,
                 status: 'failed',
                 overallProgress: run.overallProgress,
+                eta: null,
               },
             },
           }
+
+        case 'run_cancelled':
+          return {
+            runs: {
+              ...s.runs,
+              [runId]: {
+                ...run,
+                status: 'failed',
+                overallProgress: run.overallProgress,
+                eta: null,
+                duration: data.duration ?? run.duration,
+              },
+            },
+          }
+
+        case 'node_cached': {
+          const cachedId = data.node_id || ''
+          const existing = run.blocks[cachedId]
+          const block: BlockState = {
+            nodeId: cachedId,
+            blockType: existing?.blockType || data.block_type || '',
+            category: existing?.category || data.category || 'data',
+            label: existing?.label || cachedId,
+            status: 'complete',
+            progress: 1,
+            index: existing?.index ?? data.index ?? run.executionOrder.length,
+            metrics: existing?.metrics || {},
+            _stepCounters: existing?._stepCounters || {},
+          }
+          const cachedOrder = run.executionOrder.includes(cachedId)
+            ? run.executionOrder
+            : [...run.executionOrder, cachedId]
+          return {
+            runs: {
+              ...s.runs,
+              [runId]: {
+                ...run,
+                blocks: { ...run.blocks, [cachedId]: block },
+                executionOrder: cachedOrder,
+                overallProgress: data.index != null && data.total
+                  ? (data.index + 1) / data.total
+                  : run.overallProgress,
+              },
+            },
+          }
+        }
 
         case 'node_output': {
           const outputNodeId = data.node_id || ''
