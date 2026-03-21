@@ -1,6 +1,7 @@
 """Blueprint API — ML Experiment Workbench server."""
 from __future__ import annotations
 
+import atexit
 import logging
 import os
 import sys
@@ -90,6 +91,63 @@ def _periodic_recovery_loop():
             _recovery_logger.warning("Periodic recovery check failed: %s", e)
 
 
+_shutdown_once = threading.Event()
+
+
+def _full_shutdown():
+    """Centralized shutdown sequence. Idempotent — safe to call multiple times.
+
+    Runs from:
+      1. FastAPI lifespan exit (normal shutdown via SIGTERM/SIGINT)
+      2. atexit handler (fallback for hard crashes, SIGKILL of parent, etc.)
+    """
+    if _shutdown_once.is_set():
+        return  # Already ran
+    _shutdown_once.set()
+
+    _shutdown_logger = logging.getLogger("blueprint.shutdown")
+    _shutdown_logger.info("Beginning full shutdown sequence...")
+
+    log_event("server_stop", message="Blueprint server shutting down")
+    _recovery_stop.set()
+
+    # 1. Pipeline executor (bounded timeout)
+    try:
+        from .routers.execution import shutdown_executor
+        shutdown_executor()
+    except Exception:
+        pass
+
+    # 2. Sweep executor
+    try:
+        from .routers.sweeps import shutdown_sweep_executor
+        shutdown_sweep_executor()
+    except Exception:
+        pass
+
+    # 3. Kill spawned inference servers (Ollama, mlx_lm.server)
+    try:
+        from .routers.inference import shutdown_spawned_servers
+        shutdown_spawned_servers()
+    except Exception:
+        pass
+
+    # 4. Model watcher
+    try:
+        from .utils.model_watcher import stop_watcher
+        stop_watcher()
+    except Exception:
+        pass
+
+    _shutdown_logger.info("Shutdown sequence complete.")
+
+
+# Register atexit fallback so _full_shutdown runs even if the lifespan
+# context is never properly exited (e.g. the process is killed, uvicorn
+# crashes, or the Python interpreter is tearing down).
+atexit.register(_full_shutdown)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -134,29 +192,7 @@ async def lifespan(app: FastAPI):
         pass  # Non-critical — watcher is a convenience feature
     yield
     # Shutdown
-    log_event("server_stop", message="Blueprint server shutting down")
-    _recovery_stop.set()
-    # Reap any inference servers we spawned (ollama, mlx) before they orphan
-    try:
-        from .routers.inference import reap_spawned_processes
-        reap_spawned_processes()
-    except Exception:
-        pass
-    try:
-        from .routers.execution import shutdown_executor
-        shutdown_executor()
-    except Exception:
-        pass
-    try:
-        from .routers.sweeps import shutdown_sweep_executor
-        shutdown_sweep_executor()
-    except Exception:
-        pass
-    try:
-        from .utils.model_watcher import stop_watcher
-        stop_watcher()
-    except Exception:
-        pass
+    _full_shutdown()
 
 
 app = FastAPI(

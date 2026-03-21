@@ -503,6 +503,62 @@ def _resolve_secrets(config: dict) -> dict:
     return resolved
 
 
+# ── Memory Pressure Circuit Breaker ──────────────────────────────────
+# Default 90%. Applies to BOTH psutil system RAM and MLX Metal footprint.
+MEMORY_PRESSURE_THRESHOLD = float(
+    os.environ.get("BLUEPRINT_MEMORY_THRESHOLD", "90")
+)
+
+
+def _check_memory_pressure() -> tuple[bool, float]:
+    """Check memory pressure from two independent sources.
+
+    1. psutil: standard OS-level virtual memory percentage.
+    2. mlx.core.metal: active + cache allocations as a percentage of
+       total system RAM.  On Apple Silicon, Metal allocates from the
+       same unified pool but psutil doesn't reflect GPU-side pressure
+       until the kernel is already paging to swap.  Querying the Metal
+       allocator directly catches sudden multi-GB spikes (e.g. large
+       batch inference) before the OS enters a death spiral.
+
+    Triggers if EITHER source exceeds MEMORY_PRESSURE_THRESHOLD.
+    Returns (is_critical, worst_percent).  Fail-open: returns (False, 0.0)
+    if neither psutil nor mlx is available.
+    """
+    system_pct = 0.0
+    mlx_pct = 0.0
+    has_any = False
+
+    # Source 1: OS-level memory pressure
+    try:
+        import psutil
+        system_pct = psutil.virtual_memory().percent
+        has_any = True
+    except ImportError:
+        pass
+
+    # Source 2: MLX Metal allocator (Apple Silicon GPU-side)
+    try:
+        import mlx.core.metal as metal
+        active = metal.get_active_memory()   # bytes currently held by tensors
+        cache = metal.get_cache_memory()     # bytes in allocator cache (reserved)
+        metal_bytes = active + cache
+        # Denominator: total physical RAM — the unified pool ceiling.
+        import psutil as _ps
+        total_ram = _ps.virtual_memory().total
+        mlx_pct = round(metal_bytes / total_ram * 100, 1) if total_ram > 0 else 0.0
+        has_any = True
+    except (ImportError, AttributeError):
+        # mlx not installed, or running on non-Apple-Silicon hardware
+        pass
+
+    if not has_any:
+        return False, 0.0
+
+    worst = round(max(system_pct, mlx_pct), 1)
+    return worst >= MEMORY_PRESSURE_THRESHOLD, worst
+
+
 def _check_cancelled(run_id: str) -> bool:
     """Check if a run has been cancelled."""
     with _cancel_lock:
@@ -534,26 +590,6 @@ def _collect_system_metrics() -> dict | None:
     except Exception:
         pass
     return metrics
-
-
-# Memory pressure threshold — halt pipelines before OOM crash.
-# Apple Silicon unified memory means GPU + CPU share the same pool.
-# Default 90% — configurable via env var.
-MEMORY_PRESSURE_THRESHOLD = float(os.environ.get("BLUEPRINT_MEMORY_THRESHOLD", "90"))
-
-
-def _check_memory_pressure() -> tuple[bool, float]:
-    """Check if system memory usage exceeds the safe threshold.
-
-    Returns (is_critical, current_percent). Silently returns (False, 0.0)
-    if psutil is unavailable.
-    """
-    try:
-        import psutil
-        mem = psutil.virtual_memory()
-        return mem.percent >= MEMORY_PRESSURE_THRESHOLD, round(mem.percent, 1)
-    except ImportError:
-        return False, 0.0
 
 
 def _safe_commit(db: Session):
@@ -772,6 +808,16 @@ async def _execute_loop(
         if _check_cancelled(run_id):
             break
 
+        # Memory pressure circuit breaker (inside loop)
+        is_critical, mem_pct = _check_memory_pressure()
+        if is_critical:
+            raise BlockError(
+                f"Execution halted: Out of Memory Protection triggered. "
+                f"{mem_pct}% of unified memory in use "
+                f"(threshold: {MEMORY_PRESSURE_THRESHOLD}%).",
+                recoverable=False,
+            )
+
         # Compute iteration seed
         if seed_mode == "fixed":
             seed = base_seed
@@ -810,6 +856,16 @@ async def _execute_loop(
         for info in body_block_infos:
             if _check_cancelled(run_id):
                 break
+
+            # Memory pressure circuit breaker (loop body)
+            is_critical, mem_pct = _check_memory_pressure()
+            if is_critical:
+                raise BlockError(
+                    f"Execution halted: Out of Memory Protection triggered. "
+                    f"{mem_pct}% of unified memory in use "
+                    f"(threshold: {MEMORY_PRESSURE_THRESHOLD}%).",
+                    recoverable=False,
+                )
 
             _nid = info.node_id
             _block_type = info.block_type
@@ -1182,15 +1238,14 @@ async def execute_pipeline(
                     pass
                 return
 
-            # Check memory pressure before each block — halt cleanly to prevent OOM
+            # Memory pressure circuit breaker
             is_critical, mem_pct = _check_memory_pressure()
             if is_critical:
                 error_msg = (
-                    f"Memory pressure critical ({mem_pct}% used, "
-                    f"threshold {MEMORY_PRESSURE_THRESHOLD}%). "
-                    f"Halting pipeline to prevent OOM crash."
+                    f"Execution halted: Out of Memory Protection triggered. "
+                    f"{mem_pct}% of unified memory in use "
+                    f"(threshold: {MEMORY_PRESSURE_THRESHOLD}%)."
                 )
-                log_run_failed(run_id, pipeline_id, error_msg, block_count=idx)
                 run.status = "failed"
                 run.error_message = error_msg
                 run.finished_at = datetime.now(timezone.utc)
@@ -1203,9 +1258,12 @@ async def execute_pipeline(
                     publish_event(run_id, "run_failed", {
                         "run_id": run_id,
                         "error": error_msg,
+                        "memory_percent": mem_pct,
+                        "threshold": MEMORY_PRESSURE_THRESHOLD,
                     })
                 except Exception:
                     pass
+                log_run_failed(run_id, error_msg, node_id)
                 return
 
             node_data = node.get("data", {})

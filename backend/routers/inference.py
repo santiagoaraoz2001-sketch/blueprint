@@ -14,33 +14,42 @@ from pydantic import BaseModel
 
 from ..config import OLLAMA_URL, MLX_URL
 
-# ── Subprocess tracking ──────────────────────────────────────────────────────
-# Inference servers started via the API are tracked here so they can be
-# cleanly terminated when the app shuts down (prevents orphaned processes).
-
-_spawned_processes: dict[str, subprocess.Popen] = {}
-
-
-def reap_spawned_processes():
-    """Terminate any inference servers we started. Called at shutdown."""
-    for name, proc in list(_spawned_processes.items()):
-        if proc.poll() is None:  # still running
-            logging.getLogger("blueprint.inference").info(
-                "Reaping spawned %s server (pid %d)", name, proc.pid
-            )
-            proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-    _spawned_processes.clear()
-
-
-atexit.register(reap_spawned_processes)
-
 logger = logging.getLogger("blueprint.inference")
 
 router = APIRouter(prefix="/api/inference", tags=["inference"])
+
+# ── Tracked spawned server processes ─────────────────────────────────
+# Popen objects keyed by server name so they can be killed on shutdown.
+_spawned_processes: dict[str, subprocess.Popen] = {}
+
+
+def shutdown_spawned_servers():
+    """Kill all inference servers spawned by this process.
+
+    Called during FastAPI lifespan shutdown and via atexit fallback.
+    Uses SIGTERM → SIGKILL escalation to handle stuck Metal/GPU processes.
+    """
+    for name, proc in list(_spawned_processes.items()):
+        if proc.poll() is not None:
+            continue  # already dead
+        try:
+            logger.info("Stopping spawned %s server (PID %d)...", name, proc.pid)
+            proc.terminate()  # SIGTERM
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                logger.warning("%s PID %d did not stop, sending SIGKILL...", name, proc.pid)
+                proc.kill()  # SIGKILL
+                proc.wait(timeout=2)
+        except Exception as e:
+            logger.warning("Failed to stop %s PID %d: %s", name, proc.pid, e)
+    _spawned_processes.clear()
+
+
+# Alias for backward compatibility with upstream code
+reap_spawned_processes = shutdown_spawned_servers
+
+atexit.register(shutdown_spawned_servers)
 
 
 # ── Models ──
@@ -224,7 +233,7 @@ async def start_server(name: str):
                 stderr=subprocess.DEVNULL,
             )
             _spawned_processes["ollama"] = proc
-            return {"status": "starting", "name": "ollama"}
+            return {"status": "starting", "name": "ollama", "pid": proc.pid}
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="ollama not found. Install from https://ollama.com")
     elif name == "mlx":
@@ -235,7 +244,7 @@ async def start_server(name: str):
                 stderr=subprocess.DEVNULL,
             )
             _spawned_processes["mlx"] = proc
-            return {"status": "starting", "name": "mlx"}
+            return {"status": "starting", "name": "mlx", "pid": proc.pid}
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="mlx_lm not found. Install with: pip install mlx-lm")
     else:

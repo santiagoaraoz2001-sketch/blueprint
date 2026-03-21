@@ -24,16 +24,16 @@ from .executor import (
     _load_and_run_block,
     _resolve_secrets,
     _check_cancelled,
+    _check_memory_pressure,
     _safe_outputs_snapshot,
     _safe_commit,
     _write_error_log,
     _collect_system_metrics,
-    _check_memory_pressure,
-    MEMORY_PRESSURE_THRESHOLD,
     _cancel_events,
     _cancel_lock,
     BLOCK_ALIASES,
     SAFE_BLOCK_TYPE,
+    MEMORY_PRESSURE_THRESHOLD,
 )
 from .block_registry import resolve_output_handle
 from .composite import CompositeBlockContext
@@ -267,13 +267,13 @@ async def execute_partial_pipeline(
                     pass
                 return
 
-            # Check memory pressure before each block
+            # Memory pressure circuit breaker
             is_critical, mem_pct = _check_memory_pressure()
             if is_critical:
                 error_msg = (
-                    f"Memory pressure critical ({mem_pct}% used, "
-                    f"threshold {MEMORY_PRESSURE_THRESHOLD}%). "
-                    f"Halting pipeline to prevent OOM crash."
+                    f"Execution halted: Out of Memory Protection triggered. "
+                    f"{mem_pct}% of unified memory in use "
+                    f"(threshold: {MEMORY_PRESSURE_THRESHOLD}%)."
                 )
                 run.status = "failed"
                 run.error_message = error_msg
@@ -286,6 +286,8 @@ async def execute_partial_pipeline(
                     publish_event(run_id, "run_failed", {
                         "run_id": run_id,
                         "error": error_msg,
+                        "memory_percent": mem_pct,
+                        "threshold": MEMORY_PRESSURE_THRESHOLD,
                     })
                 except Exception:
                     pass
