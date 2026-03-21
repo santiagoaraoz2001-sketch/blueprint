@@ -76,7 +76,7 @@ export default function PaperSidebar({ projects, onSelect, onAdd, onImport }: Pa
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <PaperBadge paperNumber={project.paper_number} status={project.status} />
+                <PaperBadge paperNumber={project.paper_number ?? null} status={project.status} />
                 <span
                   style={{
                     fontFamily: F,

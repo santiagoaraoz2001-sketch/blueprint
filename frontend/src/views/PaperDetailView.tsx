@@ -153,7 +153,7 @@ export default function PaperDetailView() {
       {/* Top: Badge + Editable fields */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
         <div style={{ flexShrink: 0 }}>
-          <PaperBadge paperNumber={project.paper_number} status={project.status} size="lg" />
+          <PaperBadge paperNumber={project.paper_number ?? null} status={project.status} size="lg" />
         </div>
         <div style={{ flex: 1, minWidth: 300, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <EditableField
