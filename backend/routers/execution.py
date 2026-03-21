@@ -1,5 +1,6 @@
 import uuid
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -47,14 +48,41 @@ class PartialExecuteRequest(BaseModel):
 
 
 def shutdown_executor():
-    """Gracefully shut down the pipeline executor pool. Called during app shutdown.
+    """Shut down the pipeline executor pool with a bounded timeout.
 
-    cancel_futures=True prevents queued-but-not-started pipelines from beginning
-    during shutdown, while still allowing currently-running ones to finish.
+    Waits up to 10 seconds for running pipelines to finish gracefully.
+    If threads are stuck (e.g. in a long MLX computation), cancels pending
+    futures and proceeds — the daemon threads will be killed on process exit.
     """
     _logger.info("Shutting down pipeline executor pool...")
-    _executor.shutdown(wait=True, cancel_futures=True)
-    _logger.info("Pipeline executor pool shut down.")
+
+    # First, signal all active runs to cancel so threads can exit their loops
+    try:
+        from ..engine.executor import _cancel_events, _cancel_lock
+        with _cancel_lock:
+            for event in _cancel_events.values():
+                event.set()
+    except Exception:
+        pass
+
+    # Attempt graceful shutdown with a timeout via a helper thread
+    done = threading.Event()
+
+    def _do_shutdown():
+        _executor.shutdown(wait=True, cancel_futures=True)
+        done.set()
+
+    shutdown_thread = threading.Thread(target=_do_shutdown, daemon=True)
+    shutdown_thread.start()
+    shutdown_thread.join(timeout=10)
+
+    if done.is_set():
+        _logger.info("Pipeline executor pool shut down gracefully.")
+    else:
+        _logger.warning(
+            "Pipeline executor pool did not shut down within 10s. "
+            "Daemon threads will be killed on process exit."
+        )
 
 
 @router.post("/pipelines/{pipeline_id}/execute", response_model=ExecuteResponse)

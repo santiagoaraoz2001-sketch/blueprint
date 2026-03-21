@@ -11,10 +11,11 @@
  */
 
 const { app, BrowserWindow, shell, Menu } = require("electron");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const { createServer } = require("net");
 const path = require("path");
 const http = require("http");
+const { pid: electronPid } = process;
 
 /* ── Globals ───────────────────────────────────────────────────────── */
 
@@ -98,6 +99,15 @@ function createWindow(port) {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+
+  // If the renderer crashes or is killed, clean up backend processes
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    console.error(`[Blueprint] Renderer process gone: ${details.reason}`);
+    if (details.reason === "crashed" || details.reason === "killed") {
+      cleanup();
+      app.quit();
+    }
+  });
 }
 
 /* ── App Menu ──────────────────────────────────────────────────────── */
@@ -176,6 +186,18 @@ app.whenReady().then(async () => {
           BLUEPRINT_FRONTEND_DIST: path.join(process.resourcesPath, "app", "dist"),
         },
       });
+
+      // If the backend process dies unexpectedly, quit the app cleanly
+      backendProcess.on("exit", (code, signal) => {
+        console.log(`[Blueprint] Backend exited (code=${code}, signal=${signal})`);
+        // Avoid triggering cleanup for a process that already exited
+        backendProcess = null;
+        if (code !== 0 && code !== null) {
+          console.error("[Blueprint] Backend crashed — quitting app.");
+          app.quit();
+        }
+      });
+
       console.log("[Blueprint] Waiting for backend to start...");
       await waitForServer(`http://localhost:${serverPort}`);
       console.log("[Blueprint] Backend ready!");
@@ -206,24 +228,86 @@ app.on("before-quit", () => {
   cleanup();
 });
 
-function cleanup() {
-  if (backendProcess) {
-    console.log("[Blueprint] Stopping backend server...");
-    const proc = backendProcess;
-    backendProcess = null;
+/* ── Zombie Process Annihilation ──────────────────────────────────── */
 
-    proc.kill("SIGTERM");
-
-    // If backend doesn't exit within 8 seconds, force kill to prevent hang
-    const killTimer = setTimeout(() => {
-      try {
-        if (!proc.killed) {
-          console.log("[Blueprint] Backend did not exit gracefully, sending SIGKILL");
-          proc.kill("SIGKILL");
-        }
-      } catch (e) { /* already dead */ }
-    }, 8000);
-
-    proc.on("exit", () => clearTimeout(killTimer));
+/**
+ * Kill the entire process tree rooted at `pid`.
+ * Uses `pkill -P` to find children first, then kills the parent.
+ * Falls back to plain SIGKILL if pkill is unavailable.
+ */
+function killTree(pid, signal = "SIGTERM") {
+  try {
+    // Kill children first (descendants of our backend)
+    execSync(`pkill -${signal === "SIGTERM" ? "TERM" : "KILL"} -P ${pid} 2>/dev/null || true`);
+  } catch (_) {
+    // pkill may not exist or no children found — fine
   }
+  try {
+    process.kill(pid, signal);
+  } catch (_) {
+    // Already dead — fine
+  }
+}
+
+/**
+ * Aggressive cleanup with SIGTERM → SIGKILL escalation.
+ *
+ * 1. Send SIGTERM to the backend process tree.
+ * 2. Wait up to 3 seconds for graceful exit.
+ * 3. If still alive, send SIGKILL (cannot be caught or ignored).
+ * 4. Kill any orphaned child processes listening on our server port.
+ */
+function cleanup() {
+  if (!backendProcess) return;
+
+  const backendPid = backendProcess.pid;
+  console.log(`[Blueprint] Stopping backend (PID ${backendPid})...`);
+
+  // Phase 1: Graceful SIGTERM to the process tree
+  killTree(backendPid, "SIGTERM");
+
+  // Phase 2: Wait up to 3s, then escalate to SIGKILL
+  const deadline = Date.now() + 3000;
+  const escalate = () => {
+    try {
+      // process.kill(pid, 0) throws if PID is gone — use as alive check
+      process.kill(backendPid, 0);
+      if (Date.now() < deadline) {
+        setTimeout(escalate, 200);
+      } else {
+        console.log(`[Blueprint] Backend PID ${backendPid} did not exit in time, sending SIGKILL...`);
+        killTree(backendPid, "SIGKILL");
+      }
+    } catch (_) {
+      // Process is gone — success
+      console.log("[Blueprint] Backend stopped.");
+    }
+  };
+  escalate();
+
+  // Phase 3: Port-based sweep — kill anything still bound to our server port.
+  // Catches orphaned children (e.g. Ollama, mlx_lm.server) that the tree-kill
+  // may have missed because they double-forked / detached.
+  if (serverPort) {
+    try {
+      const lsofOutput = execSync(
+        `lsof -ti tcp:${serverPort} 2>/dev/null || true`,
+        { encoding: "utf-8", timeout: 3000 }
+      ).trim();
+      if (lsofOutput) {
+        const pids = lsofOutput.split("\n").filter(Boolean);
+        for (const orphanPid of pids) {
+          const p = parseInt(orphanPid, 10);
+          if (p && p !== electronPid) {
+            try {
+              process.kill(p, "SIGKILL");
+              console.log(`[Blueprint] Killed orphaned process on port ${serverPort}: PID ${p}`);
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  backendProcess = null;
 }
