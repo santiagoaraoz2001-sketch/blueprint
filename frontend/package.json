@@ -10,8 +10,10 @@
   "scripts": {
     "codegen": "cd .. && python3 scripts/generate_block_registry.py",
     "codegen:watch": "cd .. && python3 scripts/watch_block_registry.py",
-    "prebuild": "npm run codegen",
-    "dev": "npm run codegen && concurrently \"npm run codegen:watch\" \"vite\"",
+    "generate:api": "cd .. && python3 scripts/generate_api_types.py && cd frontend && npx openapi-typescript src/api/schema.json -o src/api/generated-types.ts",
+    "prebuild": "npm run codegen && npm run generate:api",
+    "dev": "npm run codegen && npm run generate:api && concurrently \"npm run codegen:watch\" \"vite\"",
+    "lint": "eslint src/",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
@@ -24,6 +26,7 @@
     "@xyflow/react": "^12.6.0",
     "dagre": "^0.8.5",
     "framer-motion": "^12.6.0",
+    "immer": "^11.1.4",
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -44,9 +47,11 @@
     "electron": "^34.2.0",
     "eslint": "^9.39.3",
     "eslint-plugin-react": "^7.37.5",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
+    "typescript-eslint": "^8.57.1",
     "vite": "^6.1.1",
     "wait-on": "^8.0.3"
   }

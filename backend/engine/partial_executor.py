@@ -28,6 +28,8 @@ from .executor import (
     _safe_commit,
     _write_error_log,
     _collect_system_metrics,
+    _check_memory_pressure,
+    MEMORY_PRESSURE_THRESHOLD,
     _cancel_events,
     _cancel_lock,
     BLOCK_ALIASES,
@@ -256,6 +258,30 @@ async def execute_partial_pipeline(
                         "run_id": run_id,
                         "duration": run.duration_seconds,
                         "completed_blocks": idx,
+                    })
+                except Exception:
+                    pass
+                return
+
+            # Check memory pressure before each block
+            is_critical, mem_pct = _check_memory_pressure()
+            if is_critical:
+                error_msg = (
+                    f"Memory pressure critical ({mem_pct}% used, "
+                    f"threshold {MEMORY_PRESSURE_THRESHOLD}%). "
+                    f"Halting pipeline to prevent OOM crash."
+                )
+                run.status = "failed"
+                run.error_message = error_msg
+                run.finished_at = datetime.now(timezone.utc)
+                run.duration_seconds = time.time() - start_time
+                run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                live.status = "failed"
+                db.commit()
+                try:
+                    publish_event(run_id, "run_failed", {
+                        "run_id": run_id,
+                        "error": error_msg,
                     })
                 except Exception:
                     pass

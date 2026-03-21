@@ -27,6 +27,16 @@ except ImportError:
 from ..utils.hardware import get_hardware_profile
 from ..utils.benchmarks import get_benchmarks, search_benchmarks, refresh_cache
 from ..engine.parallelizer import build_schedule, explain_schedule
+from ..schemas.system import (
+    FeatureFlagsResponse,
+    SystemMetricsResponse,
+    CapabilitiesResponse,
+    BenchmarkRefreshResponse,
+    ScheduleResponse,
+    DependencyCheckResponse,
+    InstallResponse,
+    DiagnosticsResponse,
+)
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
@@ -36,7 +46,7 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 # ---------------------------------------------------------------------------
 
 
-@router.get("/features")
+@router.get("/features", response_model=FeatureFlagsResponse)
 def get_feature_flags():
     """Return which optional features are enabled."""
     from ..config import ENABLE_MARKETPLACE
@@ -67,7 +77,7 @@ def hardware():
     return get_hardware_profile()
 
 
-@router.get("/metrics")
+@router.get("/metrics", response_model=SystemMetricsResponse)
 def system_metrics():
     """Lightweight, non-blocking CPU/memory snapshot for output view polling."""
     if _HAS_PSUTIL:
@@ -89,7 +99,7 @@ def system_metrics():
     }
 
 
-@router.get("/capabilities")
+@router.get("/capabilities", response_model=CapabilitiesResponse)
 def capabilities():
     """Derive high-level ML capabilities from the hardware profile.
 
@@ -131,17 +141,17 @@ def capabilities():
     else:
         max_model_size = "1b"
 
-    return {
-        "gpu_available": has_gpu,
-        "gpu_backend": gpu_backend,
-        "max_vram_gb": max_vram,
-        "usable_memory_gb": round(usable_memory, 1),
-        "max_model_size": max_model_size,
-        "can_fine_tune": has_gpu and usable_memory >= 8,
-        "can_run_local_llm": usable_memory >= 4,
-        "disk_ok": disk_free >= 10,
-        "accelerators": accel,
-    }
+    return CapabilitiesResponse(
+        gpu_available=has_gpu,
+        gpu_backend=gpu_backend,
+        max_vram_gb=max_vram,
+        usable_memory_gb=round(usable_memory, 1),
+        max_model_size=max_model_size,
+        can_fine_tune=has_gpu and usable_memory >= 8,
+        can_run_local_llm=usable_memory >= 4,
+        disk_ok=disk_free >= 10,
+        accelerators=accel,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +180,7 @@ def benchmark_search(
     return [r.to_dict() for r in results]
 
 
-@router.post("/benchmarks/refresh")
+@router.post("/benchmarks/refresh", response_model=BenchmarkRefreshResponse)
 def benchmark_refresh():
     """Force-refresh the benchmark cache from the HuggingFace leaderboard."""
     count = refresh_cache(force=True)
@@ -182,7 +192,7 @@ def benchmark_refresh():
 # ---------------------------------------------------------------------------
 
 
-@router.post("/schedule")
+@router.post("/schedule", response_model=ScheduleResponse)
 def compute_schedule(
     payload: dict[str, Any] = Body(..., description="Pipeline definition with nodes and edges"),
 ):
@@ -278,7 +288,7 @@ def _check_package(package: str) -> dict:
         return {'package': package, 'installed': False, 'version': None}
 
 
-@router.get("/dependencies")
+@router.get("/dependencies", response_model=DependencyCheckResponse)
 def check_dependencies():
     """Return dependency status for all blocks."""
     block_deps = _scan_all_block_deps()
@@ -319,7 +329,7 @@ def check_dependencies():
     }
 
 
-@router.post("/install")
+@router.post("/install", response_model=InstallResponse)
 def install_packages(body: dict):
     """Install missing packages via pip. Only allows packages found in block dependencies."""
     packages = body.get('packages', [])
@@ -385,7 +395,7 @@ def _iter_log_files(log_dir: Path) -> list[Path]:
     return files
 
 
-@router.get("/diagnostics/{run_id}")
+@router.get("/diagnostics/{run_id}", response_model=DiagnosticsResponse)
 def get_run_diagnostics(run_id: str):
     """Parse structured logs for a specific run — shows timeline of events."""
     if not SAFE_RUN_ID.match(run_id):

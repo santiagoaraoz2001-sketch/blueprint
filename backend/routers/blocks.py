@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from ..config import BUILTIN_BLOCKS_DIR, BLOCKS_DIR
+from ..schemas.blocks import BlockSourceResponse
 
 SAFE_BLOCK_NAME = re.compile(r'^[a-zA-Z0-9_]+$')
 
@@ -75,7 +76,7 @@ def get_block(block_name: str):
     return {"error": "Block not found"}
 
 
-@router.get("/{block_name}/source")
+@router.get("/{block_name}/source", response_model=BlockSourceResponse)
 def get_block_source(block_name: str):
     """Get the run.py source code for a block."""
     if not SAFE_BLOCK_NAME.match(block_name):

@@ -128,6 +128,12 @@ async def lifespan(app: FastAPI):
     # Shutdown
     log_event("server_stop", message="Blueprint server shutting down")
     _recovery_stop.set()
+    # Reap any inference servers we spawned (ollama, mlx) before they orphan
+    try:
+        from .routers.inference import reap_spawned_processes
+        reap_spawned_processes()
+    except Exception:
+        pass
     try:
         from .routers.execution import shutdown_executor
         shutdown_executor()

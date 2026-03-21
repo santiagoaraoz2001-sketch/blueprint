@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { T, F, FS } from '@/lib/design-tokens'
 import { BLOCK_REGISTRY, type BlockDefinition, isPortCompatible, getPortNames } from '@/lib/block-registry'
 import { usePipelineStore } from '@/stores/pipelineStore'
@@ -108,7 +109,9 @@ function RecommendationCard({ rec, onAdd }: { rec: Recommendation; onAdd: () => 
 }
 
 export default function RecommendedBlocks() {
-  const { nodes, edges, addNode } = usePipelineStore()
+  const { nodes, edges, addNode } = usePipelineStore(useShallow((s) => ({
+    nodes: s.nodes, edges: s.edges, addNode: s.addNode,
+  })))
 
   const { inputBlocks, outputBlocks } = useMemo<SplitRecommendations>(() => {
     if (nodes.length === 0) {

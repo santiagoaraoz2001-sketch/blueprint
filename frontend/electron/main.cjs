@@ -209,7 +209,21 @@ app.on("before-quit", () => {
 function cleanup() {
   if (backendProcess) {
     console.log("[Blueprint] Stopping backend server...");
-    backendProcess.kill("SIGTERM");
+    const proc = backendProcess;
     backendProcess = null;
+
+    proc.kill("SIGTERM");
+
+    // If backend doesn't exit within 8 seconds, force kill to prevent hang
+    const killTimer = setTimeout(() => {
+      try {
+        if (!proc.killed) {
+          console.log("[Blueprint] Backend did not exit gracefully, sending SIGKILL");
+          proc.kill("SIGKILL");
+        }
+      } catch (e) { /* already dead */ }
+    }, 8000);
+
+    proc.on("exit", () => clearTimeout(killTimer));
   }
 }

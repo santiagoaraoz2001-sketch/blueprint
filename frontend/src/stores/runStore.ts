@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api } from '@/api/client'
+import type { ExecuteResponse, PartialExecuteResponse } from '@/api/types'
 import { useSettingsStore } from './settingsStore'
 import { playSound } from '@/lib/audio'
 import { sseManager } from '@/services/sseManager'
@@ -15,7 +16,7 @@ export interface PartialRunMeta {
   sourceRunId: string
   startNodeId: string
   reusedNodes: string[]
-  configOverrides: Record<string, Record<string, any>>
+  configOverrides: Record<string, Record<string, unknown>>
 }
 
 /** Typed SSE event data from the pipeline executor */
@@ -34,7 +35,7 @@ interface RunState {
   pipelineId: string | null
   status: 'idle' | 'running' | 'complete' | 'failed' | 'cancelled'
   nodeStatuses: Record<string, NodeStatus>
-  nodeOutputs: Record<string, Record<string, any>>
+  nodeOutputs: Record<string, Record<string, unknown>>
   overallProgress: number
   eta: number | null
   elapsed: number
@@ -48,7 +49,7 @@ interface RunState {
 
   // Actions
   startRun: (pipelineId: string) => Promise<void>
-  startPartialRun: (pipelineId: string, sourceRunId: string, startNodeId: string, configOverrides: Record<string, Record<string, any>>, reusedNodes: string[]) => Promise<void>
+  startPartialRun: (pipelineId: string, sourceRunId: string, startNodeId: string, configOverrides: Record<string, Record<string, unknown>>, reusedNodes: string[]) => Promise<void>
   stopRun: () => Promise<void>
   connectSSE: (runId: string) => void
   disconnectSSE: () => void
@@ -121,7 +122,7 @@ export const useRunStore = create<RunState>((set, get) => ({
     }
     try {
       _clearElapsedTimer(get)
-      const res = await api.post<{ status: string; pipeline_id: string; run_id: string }>(
+      const res = await api.post<ExecuteResponse>(
         `/pipelines/${pipelineId}/execute`
       )
       const elapsedTimer = _startElapsedTimer(set)
@@ -144,7 +145,7 @@ export const useRunStore = create<RunState>((set, get) => ({
     }
   },
 
-  startPartialRun: async (pipelineId: string, sourceRunId: string, startNodeId: string, configOverrides: Record<string, Record<string, any>>, reusedNodes: string[]) => {
+  startPartialRun: async (pipelineId: string, sourceRunId: string, startNodeId: string, configOverrides: Record<string, Record<string, unknown>>, reusedNodes: string[]) => {
     if (isDemoMode()) {
       // Simulate partial run in demo mode
       const meta: PartialRunMeta = { sourceRunId, startNodeId, reusedNodes, configOverrides }
@@ -187,7 +188,7 @@ export const useRunStore = create<RunState>((set, get) => ({
       for (const nid of reusedNodes) {
         cachedStatuses[nid] = { nodeId: nid, status: 'cached', progress: 1 }
       }
-      const res = await api.post<{ status: string; pipeline_id: string; run_id: string }>(
+      const res = await api.post<PartialExecuteResponse>(
         `/pipelines/${pipelineId}/execute-from`,
         { source_run_id: sourceRunId, start_node_id: startNodeId, config_overrides: configOverrides }
       )

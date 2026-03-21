@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useRunStore } from '@/stores/runStore'
 import { useOutputStore } from '@/stores/outputStore'
@@ -13,7 +13,9 @@ import { generateRequirements } from '@/lib/block-dependencies'
 import Editor from '@monaco-editor/react'
 
 export default function RunControls() {
-  const { id: pipelineId, nodes, saveAsTemplate } = usePipelineStore()
+  const pipelineId = usePipelineStore((s) => s.id)
+  const nodes = usePipelineStore((s) => s.nodes)
+  const saveAsTemplate = usePipelineStore((s) => s.saveAsTemplate)
   const { status, activeRunId, overallProgress, startRun, stopRun, connectSSE, disconnectSSE, reset } =
     useRunStore()
   const [showTemplateModal, setShowTemplateModal] = useState(false)
@@ -476,26 +478,28 @@ export default function RunControls() {
               </span>
             </div>
 
-            {/* Code area — Monaco Editor */}
+            {/* Code area — Monaco Editor (memoized to prevent re-initialization) */}
             <div style={{ flex: 1, overflow: 'hidden' }}>
-              <Editor
-                language="python"
-                theme="vs-dark"
-                value={generatedCode}
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: false },
-                  fontSize: 12,
-                  lineHeight: 20,
-                  scrollBeyondLastLine: false,
-                  wordWrap: 'off',
-                  folding: true,
-                  lineNumbers: 'on',
-                  renderLineHighlight: 'line',
-                  scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
-                  padding: { top: 8, bottom: 8 },
-                }}
-              />
+              {useMemo(() => (
+                <Editor
+                  language="python"
+                  theme="vs-dark"
+                  value={generatedCode}
+                  options={{
+                    readOnly: true,
+                    minimap: { enabled: false },
+                    fontSize: 12,
+                    lineHeight: 20,
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'off',
+                    folding: true,
+                    lineNumbers: 'on',
+                    renderLineHighlight: 'line',
+                    scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
+                    padding: { top: 8, bottom: 8 },
+                  }}
+                />
+              ), [generatedCode])}
             </div>
 
             {/* Footer actions */}

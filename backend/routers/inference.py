@@ -1,5 +1,6 @@
 """Inference router — streaming chat, server status, server management."""
 
+import atexit
 import json
 import logging
 import subprocess
@@ -12,6 +13,30 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ..config import OLLAMA_URL, MLX_URL
+
+# ── Subprocess tracking ──────────────────────────────────────────────────────
+# Inference servers started via the API are tracked here so they can be
+# cleanly terminated when the app shuts down (prevents orphaned processes).
+
+_spawned_processes: dict[str, subprocess.Popen] = {}
+
+
+def reap_spawned_processes():
+    """Terminate any inference servers we started. Called at shutdown."""
+    for name, proc in list(_spawned_processes.items()):
+        if proc.poll() is None:  # still running
+            logging.getLogger("blueprint.inference").info(
+                "Reaping spawned %s server (pid %d)", name, proc.pid
+            )
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+    _spawned_processes.clear()
+
+
+atexit.register(reap_spawned_processes)
 
 logger = logging.getLogger("blueprint.inference")
 
@@ -193,21 +218,23 @@ async def start_server(name: str):
     """Attempt to start a local inference server."""
     if name == "ollama":
         try:
-            subprocess.Popen(
+            proc = subprocess.Popen(
                 ["ollama", "serve"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+            _spawned_processes["ollama"] = proc
             return {"status": "starting", "name": "ollama"}
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="ollama not found. Install from https://ollama.com")
     elif name == "mlx":
         try:
-            subprocess.Popen(
+            proc = subprocess.Popen(
                 ["mlx_lm.server", "--port", "8080"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+            _spawned_processes["mlx"] = proc
             return {"status": "starting", "name": "mlx"}
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="mlx_lm not found. Install with: pip install mlx-lm")

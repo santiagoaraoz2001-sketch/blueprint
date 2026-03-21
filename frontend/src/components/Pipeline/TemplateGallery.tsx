@@ -16,7 +16,8 @@ const DIFFICULTY_COLORS: Record<TemplateDifficulty, string> = {
 }
 
 export default function TemplateGallery({ onClose }: TemplateGalleryProps) {
-  const { instantiateTemplate, newPipeline } = usePipelineStore()
+  const instantiateTemplate = usePipelineStore((s) => s.instantiateTemplate)
+  const newPipeline = usePipelineStore((s) => s.newPipeline)
   const [selectedTemplate, setSelectedTemplate] = useState<PipelineTemplate | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [customTemplates, setCustomTemplates] = useState<PipelineTemplate[]>([])

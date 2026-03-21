@@ -191,7 +191,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
     .map(f => {
       // Auto-populate model_id field with discovered models for the selected source
       if (def.type === 'model_selector' && f.name === 'model_id') {
-        const source = node.data.config.source || 'huggingface'
+        const source = (node.data.config.source as string) || 'huggingface'
         const sourceToFramework: Record<string, string> = { ollama: 'ollama', mlx: 'mlx', huggingface: 'pytorch', local_path: '' }
         const fwId = sourceToFramework[source] || ''
         const fwEntry = frameworkData.find((d: any) => d.id === fwId)

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
 import { api } from '@/api/client'
 import { useSettingsStore } from './settingsStore'
 
@@ -393,6 +394,7 @@ interface MetricsStoreState {
   // Monitor component methods (unified event handler API)
   initRun: (runId: string, opts?: { pipelineName?: string; configSnapshot?: Record<string, any>; blockMeta?: Record<string, { category: string; label: string }> }) => void
   handleEvent: (runId: string, event: string, data: any) => void
+  handleEventBatch: (runId: string, events: Array<{event: string, data: any}>) => void
   addSystemMetric: (runId: string, metric: SystemMetricPoint) => void
   loadHistoricalRun: (runId: string, run: any) => void
   removeRun: (runId: string) => void
@@ -451,23 +453,144 @@ interface MetricsStoreState {
   resetMonitor: () => void
 }
 
-// ── Helper: ensure a run exists in state ────────────────────────────────────
+// ── Helper: apply a single event to a run draft (shared by handleEvent and handleEventBatch) ──
 
-function ensureRun(runs: Record<string, RunMonitorData>, runId: string): Record<string, RunMonitorData> {
-  if (runs[runId]) return runs
-  return { ...runs, [runId]: createEmptyRun() }
+function applyEventToRun(run: RunMonitorData, event: string, data: any): boolean {
+  const now = Date.now()
+
+  switch (event) {
+    case 'node_started': {
+      const nodeId = data.node_id || ''
+      const existing = run.blocks[nodeId]
+      run.blocks[nodeId] = {
+        nodeId,
+        blockType: data.block_type || existing?.blockType || '',
+        category: existing?.category || 'data',
+        label: existing?.label || data.block_type || nodeId,
+        status: 'running',
+        progress: 0,
+        index: data.index ?? existing?.index ?? run.executionOrder.length,
+        metrics: existing?.metrics || {},
+        _stepCounters: existing?._stepCounters || {},
+      }
+      if (!run.executionOrder.includes(nodeId)) {
+        run.executionOrder.push(nodeId)
+      }
+      run.activeBlockId = nodeId
+      run.totalBlocks = data.total ?? run.totalBlocks
+      return true
+    }
+
+    case 'node_progress': {
+      const nodeId = data.node_id || ''
+      const block = run.blocks[nodeId]
+      if (!block) return false
+      block.progress = data.progress ?? block.progress
+      run.overallProgress = data.overall ?? run.overallProgress
+      run.eta = data.eta ?? run.eta
+      return true
+    }
+
+    case 'node_log': {
+      const entry: LogEntry = {
+        timestamp: now,
+        nodeId: data.node_id || '',
+        message: data.message || '',
+        level: 'info',
+      }
+      const msg = entry.message.toLowerCase()
+      if (msg.includes('error') || msg.includes('exception')) entry.level = 'error'
+      else if (msg.includes('warn')) entry.level = 'warn'
+      if (run.logs.length > 999) run.logs.splice(0, run.logs.length - 999)
+      run.logs.push(entry)
+      return true
+    }
+
+    case 'metric': {
+      const nodeId = data.node_id || ''
+      const name: string = data.name || ''
+      const value: number = data.value ?? 0
+      const block = run.blocks[nodeId]
+      if (!block) return false
+      if (!block.metrics[name]) block.metrics[name] = []
+      if (!block._stepCounters[name]) block._stepCounters[name] = 0
+      block._stepCounters[name] += 1
+      const stepCounter = block._stepCounters[name]
+      const point: MetricPoint = {
+        step: data.step ?? stepCounter,
+        value,
+        timestamp: now,
+      }
+      // Cap metric series to 10k points to prevent unbounded memory growth
+      const maxPoints = 10000
+      const series = block.metrics[name]
+      if (series.length >= maxPoints) {
+        series.splice(0, series.length - maxPoints + 1)
+      }
+      series.push(point)
+      return true
+    }
+
+    case 'node_completed': {
+      const nodeId = data.node_id || ''
+      const block = run.blocks[nodeId]
+      if (!block) return false
+      block.status = 'complete'
+      block.progress = 1
+      return true
+    }
+
+    case 'node_failed': {
+      const nodeId = data.node_id || ''
+      const block = run.blocks[nodeId]
+      if (!block) return false
+      block.status = 'failed'
+      block.error = data.error
+      return true
+    }
+
+    case 'run_completed':
+      run.status = 'complete'
+      run.overallProgress = 1
+      run.duration = data.duration ?? run.duration
+      run.finalMetrics = data.metrics ?? run.finalMetrics
+      return true
+
+    case 'run_failed':
+      run.status = 'failed'
+      return true
+
+    case 'node_output': {
+      const outputNodeId = data.node_id || ''
+      const outputKeys = Object.keys(data.outputs || {}).join(', ')
+      const entry: LogEntry = {
+        timestamp: now,
+        nodeId: outputNodeId,
+        message: `[output] ${outputKeys}`,
+        level: 'info',
+      }
+      if (run.logs.length > 999) run.logs.splice(0, run.logs.length - 999)
+      run.logs.push(entry)
+      return true
+    }
+
+    default:
+      return false
+  }
 }
 
 // ── Store ───────────────────────────────────────────────────────────────────
 
-export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
+export const useMetricsStore = create<MetricsStoreState>()(immer((set, get) => ({
   // ── Per-run monitoring state ────────────────────────────────────────
   runs: {},
 
   ensureRun: (runId: string) => {
     const { runs } = get()
     if (!runs[runId]) {
-      set({ runs: { ...runs, [runId]: createEmptyRun() } })
+      set((state) => {
+        state.runs[runId] = createEmptyRun()
+      })
     }
   },
 
@@ -475,141 +598,113 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
 
   handleNodeStarted: (runId, data) => {
     set((state) => {
-      const runs = ensureRun(state.runs, runId)
-      const run = { ...runs[runId] }
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
+      const run = state.runs[runId]
       const nodeId = data.node_id as string
 
       run.status = 'running'
       run.activeBlockId = nodeId
 
       if (!run.executionOrder.includes(nodeId)) {
-        run.executionOrder = [...run.executionOrder, nodeId]
+        run.executionOrder.push(nodeId)
       }
 
       const existingBlock = run.blocks[nodeId]
-      run.blocks = {
-        ...run.blocks,
-        [nodeId]: {
-          nodeId,
-          blockType: existingBlock?.blockType ?? '',
-          category: data.category ?? existingBlock?.category ?? 'flow',
-          label: existingBlock?.label ?? nodeId,
-          status: 'running',
-          progress: 0,
-          index: existingBlock?.index ?? run.executionOrder.length - 1,
-          metrics: existingBlock?.metrics ?? {},
-          _stepCounters: existingBlock?._stepCounters ?? {},
-        },
+      run.blocks[nodeId] = {
+        nodeId,
+        blockType: existingBlock?.blockType ?? '',
+        category: data.category ?? existingBlock?.category ?? 'flow',
+        label: existingBlock?.label ?? nodeId,
+        status: 'running',
+        progress: 0,
+        index: existingBlock?.index ?? run.executionOrder.length - 1,
+        metrics: existingBlock?.metrics ?? {},
+        _stepCounters: existingBlock?._stepCounters ?? {},
       }
-
-      return { runs: { ...runs, [runId]: run } }
     })
   },
 
   handleNodeProgress: (runId, data) => {
     set((state) => {
-      const runs = ensureRun(state.runs, runId)
-      const run = { ...runs[runId] }
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
+      const run = state.runs[runId]
       const nodeId = data.node_id as string
       const existing = run.blocks[nodeId]
 
       if (existing) {
-        run.blocks = {
-          ...run.blocks,
-          [nodeId]: { ...existing, progress: data.progress ?? existing.progress },
-        }
+        existing.progress = data.progress ?? existing.progress
       }
       run.overallProgress = data.overall ?? run.overallProgress
       run.eta = data.eta ?? run.eta
-
-      return { runs: { ...runs, [runId]: run } }
     })
   },
 
   handleNodeCompleted: (runId, data) => {
     set((state) => {
-      const runs = ensureRun(state.runs, runId)
-      const run = { ...runs[runId] }
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
+      const run = state.runs[runId]
       const nodeId = data.node_id as string
       const existing = run.blocks[nodeId]
 
       if (existing) {
-        run.blocks = {
-          ...run.blocks,
-          [nodeId]: { ...existing, status: 'complete', progress: 1 },
-        }
+        existing.status = 'complete'
+        existing.progress = 1
       }
-
-      return { runs: { ...runs, [runId]: run } }
     })
   },
 
   handleNodeFailed: (runId, data) => {
     set((state) => {
-      const runs = ensureRun(state.runs, runId)
-      const run = { ...runs[runId] }
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
+      const run = state.runs[runId]
       const nodeId = data.node_id as string
       const existing = run.blocks[nodeId]
 
       if (existing) {
-        run.blocks = {
-          ...run.blocks,
-          [nodeId]: { ...existing, status: 'failed', progress: 0, error: data.error },
-        }
+        existing.status = 'failed'
+        existing.progress = 0
+        existing.error = data.error
       }
-
-      return { runs: { ...runs, [runId]: run } }
     })
   },
 
   handleMetric: (runId, data) => {
     set((state) => {
-      const runs = ensureRun(state.runs, runId)
-      const run = { ...runs[runId] }
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
+      const run = state.runs[runId]
       const nodeId = data.node_id as string
       const name = data.name as string
       const value = data.value as number
       const timestamp = (data.timestamp as number) ?? Date.now() / 1000
 
-      const existing: BlockState = run.blocks[nodeId] ?? {
-        nodeId,
-        blockType: '',
-        category: data.category ?? 'flow',
-        label: nodeId,
-        status: 'running',
-        progress: 0,
-        index: run.executionOrder.length,
-        metrics: {},
-        _stepCounters: {},
+      if (!run.blocks[nodeId]) {
+        run.blocks[nodeId] = {
+          nodeId,
+          blockType: '',
+          category: data.category ?? 'flow',
+          label: nodeId,
+          status: 'running',
+          progress: 0,
+          index: run.executionOrder.length,
+          metrics: {},
+          _stepCounters: {},
+        }
       }
 
-      const series = existing.metrics[name] ?? []
-      const stepCounter = (existing._stepCounters[name] || 0) + 1
+      const existing = run.blocks[nodeId]
+      if (!existing.metrics[name]) existing.metrics[name] = []
+      if (!existing._stepCounters[name]) existing._stepCounters[name] = 0
+      existing._stepCounters[name] += 1
+      const stepCounter = existing._stepCounters[name]
       const point: MetricPoint = { step: data.step ?? stepCounter, value, timestamp }
-
-      run.blocks = {
-        ...run.blocks,
-        [nodeId]: {
-          ...existing,
-          metrics: {
-            ...existing.metrics,
-            [name]: [...series, point],
-          },
-          _stepCounters: {
-            ...existing._stepCounters,
-            [name]: stepCounter,
-          },
-        },
-      }
-
-      return { runs: { ...runs, [runId]: run } }
+      existing.metrics[name].push(point)
     })
   },
 
   handleSystemMetric: (runId, data) => {
     set((state) => {
-      const runs = ensureRun(state.runs, runId)
-      const run = { ...runs[runId] }
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
+      const run = state.runs[runId]
       const metric: SystemMetricPoint = {
         timestamp: data.timestamp ?? Date.now() / 1000,
         cpu: data.cpu_pct ?? 0,
@@ -618,45 +713,41 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
         gpu: data.gpu_mem_pct,
       }
 
-      run.systemMetrics = [...run.systemMetrics, metric]
-      return { runs: { ...runs, [runId]: run } }
+      run.systemMetrics.push(metric)
     })
   },
 
   handleRunCompleted: (runId, _data) => {
     set((state) => {
-      const runs = ensureRun(state.runs, runId)
-      const run = { ...runs[runId] }
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
+      const run = state.runs[runId]
       run.status = 'complete'
       run.overallProgress = 1
       run.activeBlockId = null
-      return { runs: { ...runs, [runId]: run } }
     })
   },
 
   handleRunFailed: (runId, _data) => {
     set((state) => {
-      const runs = ensureRun(state.runs, runId)
-      const run = { ...runs[runId] }
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
+      const run = state.runs[runId]
       run.status = 'failed'
       run.activeBlockId = null
-      return { runs: { ...runs, [runId]: run } }
     })
   },
 
   handleRunCancelled: (runId) => {
     set((state) => {
-      const runs = ensureRun(state.runs, runId)
-      const run = { ...runs[runId] }
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
+      const run = state.runs[runId]
       run.status = 'failed' // RunMonitorData doesn't have 'cancelled', map to 'failed'
       run.activeBlockId = null
-      return { runs: { ...runs, [runId]: run } }
     })
   },
 
   loadMetricsLog: (runId, events) => {
     set((state) => {
-      const runs = ensureRun(state.runs, runId)
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
       const run = createEmptyRun()
 
       for (const evt of events) {
@@ -665,22 +756,19 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
           case 'node_started': {
             const nodeId = evt.node_id
             if (!run.executionOrder.includes(nodeId)) {
-              run.executionOrder = [...run.executionOrder, nodeId]
+              run.executionOrder.push(nodeId)
             }
             const existingBlock = run.blocks[nodeId]
-            run.blocks = {
-              ...run.blocks,
-              [nodeId]: {
-                nodeId,
-                blockType: existingBlock?.blockType ?? '',
-                category: evt.category ?? existingBlock?.category ?? 'flow',
-                label: existingBlock?.label ?? nodeId,
-                status: 'running',
-                progress: 0,
-                index: existingBlock?.index ?? run.executionOrder.length - 1,
-                metrics: existingBlock?.metrics ?? {},
-                _stepCounters: existingBlock?._stepCounters ?? {},
-              },
+            run.blocks[nodeId] = {
+              nodeId,
+              blockType: existingBlock?.blockType ?? '',
+              category: evt.category ?? existingBlock?.category ?? 'flow',
+              label: existingBlock?.label ?? nodeId,
+              status: 'running',
+              progress: 0,
+              index: existingBlock?.index ?? run.executionOrder.length - 1,
+              metrics: existingBlock?.metrics ?? {},
+              _stepCounters: existingBlock?._stepCounters ?? {},
             }
             run.activeBlockId = nodeId
             break
@@ -689,10 +777,8 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
             const nodeId = evt.node_id
             const existing = run.blocks[nodeId]
             if (existing) {
-              run.blocks = {
-                ...run.blocks,
-                [nodeId]: { ...existing, status: 'complete', progress: 1 },
-              }
+              existing.status = 'complete'
+              existing.progress = 1
             }
             break
           }
@@ -701,46 +787,35 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
             const name = evt.name as string
             const value = evt.value as number
             const timestamp = evt.timestamp ?? Date.now() / 1000
-            const existing: BlockState = run.blocks[nodeId] ?? {
-              nodeId,
-              blockType: '',
-              category: evt.category ?? 'flow',
-              label: nodeId,
-              status: 'running',
-              progress: 0,
-              index: run.executionOrder.length,
-              metrics: {},
-              _stepCounters: {},
+            if (!run.blocks[nodeId]) {
+              run.blocks[nodeId] = {
+                nodeId,
+                blockType: '',
+                category: evt.category ?? 'flow',
+                label: nodeId,
+                status: 'running',
+                progress: 0,
+                index: run.executionOrder.length,
+                metrics: {},
+                _stepCounters: {},
+              }
             }
-            const series = existing.metrics[name] ?? []
-            const stepCounter = (existing._stepCounters[name] || 0) + 1
-            run.blocks = {
-              ...run.blocks,
-              [nodeId]: {
-                ...existing,
-                metrics: {
-                  ...existing.metrics,
-                  [name]: [...series, { step: evt.step ?? stepCounter, value, timestamp }],
-                },
-                _stepCounters: {
-                  ...existing._stepCounters,
-                  [name]: stepCounter,
-                },
-              },
-            }
+            const existing = run.blocks[nodeId]
+            if (!existing.metrics[name]) existing.metrics[name] = []
+            if (!existing._stepCounters[name]) existing._stepCounters[name] = 0
+            existing._stepCounters[name] += 1
+            const stepCounter = existing._stepCounters[name]
+            existing.metrics[name].push({ step: evt.step ?? stepCounter, value, timestamp })
             break
           }
           case 'system_metric': {
-            run.systemMetrics = [
-              ...run.systemMetrics,
-              {
-                timestamp: evt.timestamp ?? Date.now() / 1000,
-                cpu: evt.cpu_pct ?? 0,
-                memory: evt.mem_pct ?? 0,
-                memoryTotal: evt.mem_gb ?? 0,
-                gpu: evt.gpu_mem_pct,
-              },
-            ]
+            run.systemMetrics.push({
+              timestamp: evt.timestamp ?? Date.now() / 1000,
+              cpu: evt.cpu_pct ?? 0,
+              memory: evt.mem_pct ?? 0,
+              memoryTotal: evt.mem_gb ?? 0,
+              gpu: evt.gpu_mem_pct,
+            })
             break
           }
         }
@@ -757,268 +832,75 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
         run.status = 'running'
       }
 
-      return { runs: { ...runs, [runId]: run } }
+      state.runs[runId] = run
     })
   },
 
   // ── Monitor component methods (unified event handler API) ──────────
 
   initRun: (runId, opts) => {
-    set((s) => ({
-      runs: {
-        ...s.runs,
-        [runId]: {
-          ...createEmptyRun(),
-          pipelineName: opts?.pipelineName || '',
-          configSnapshot: opts?.configSnapshot || null,
-          blocks: opts?.blockMeta
-            ? Object.fromEntries(
-                Object.entries(opts.blockMeta).map(([nodeId, meta]) => [
+    set((state) => {
+      state.runs[runId] = {
+        ...createEmptyRun(),
+        pipelineName: opts?.pipelineName || '',
+        configSnapshot: opts?.configSnapshot || null,
+        blocks: opts?.blockMeta
+          ? Object.fromEntries(
+              Object.entries(opts.blockMeta).map(([nodeId, meta]) => [
+                nodeId,
+                {
                   nodeId,
-                  {
-                    nodeId,
-                    blockType: '',
-                    category: meta.category,
-                    label: meta.label,
-                    status: 'queued' as const,
-                    progress: 0,
-                    index: 0,
-                    metrics: {},
-                    _stepCounters: {},
-                  },
-                ])
-              )
-            : {},
-        },
-      },
-    }))
+                  blockType: '',
+                  category: meta.category,
+                  label: meta.label,
+                  status: 'queued' as const,
+                  progress: 0,
+                  index: 0,
+                  metrics: {},
+                  _stepCounters: {},
+                },
+              ])
+            )
+          : {},
+      }
+    })
   },
 
   handleEvent: (runId, event, data) => {
-    set((s) => {
-      const run = s.runs[runId] || createEmptyRun()
-      const now = Date.now()
+    set((state) => {
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
+      applyEventToRun(state.runs[runId], event, data)
+    })
+  },
 
-      switch (event) {
-        case 'node_started': {
-          const nodeId = data.node_id || ''
-          const existing = run.blocks[nodeId]
-          const block: BlockState = {
-            nodeId,
-            blockType: data.block_type || existing?.blockType || '',
-            category: existing?.category || 'data',
-            label: existing?.label || data.block_type || nodeId,
-            status: 'running',
-            progress: 0,
-            index: data.index ?? existing?.index ?? run.executionOrder.length,
-            metrics: existing?.metrics || {},
-            _stepCounters: existing?._stepCounters || {},
-          }
-          const order = run.executionOrder.includes(nodeId)
-            ? run.executionOrder
-            : [...run.executionOrder, nodeId]
-          return {
-            runs: {
-              ...s.runs,
-              [runId]: {
-                ...run,
-                blocks: { ...run.blocks, [nodeId]: block },
-                executionOrder: order,
-                activeBlockId: nodeId,
-                totalBlocks: data.total ?? run.totalBlocks,
-              },
-            },
-          }
-        }
-
-        case 'node_progress': {
-          const nodeId = data.node_id || ''
-          const block = run.blocks[nodeId]
-          if (!block) return s
-          return {
-            runs: {
-              ...s.runs,
-              [runId]: {
-                ...run,
-                blocks: {
-                  ...run.blocks,
-                  [nodeId]: { ...block, progress: data.progress ?? block.progress },
-                },
-                overallProgress: data.overall ?? run.overallProgress,
-                eta: data.eta ?? run.eta,
-              },
-            },
-          }
-        }
-
-        case 'node_log': {
-          const entry: LogEntry = {
-            timestamp: now,
-            nodeId: data.node_id || '',
-            message: data.message || '',
-            level: 'info',
-          }
-          const msg = entry.message.toLowerCase()
-          if (msg.includes('error') || msg.includes('exception')) entry.level = 'error'
-          else if (msg.includes('warn')) entry.level = 'warn'
-          return {
-            runs: {
-              ...s.runs,
-              [runId]: {
-                ...run,
-                logs: [...run.logs.slice(-999), entry],
-              },
-            },
-          }
-        }
-
-        case 'metric': {
-          const nodeId = data.node_id || ''
-          const name: string = data.name || ''
-          const value: number = data.value ?? 0
-          const block = run.blocks[nodeId]
-          if (!block) return s
-          const series = block.metrics[name] || []
-          const stepCounter = (block._stepCounters[name] || 0) + 1
-          const point: MetricPoint = {
-            step: data.step ?? stepCounter,
-            value,
-            timestamp: now,
-          }
-          // Cap metric series to 10k points to prevent unbounded memory growth
-          const maxPoints = 10000
-          const updatedSeries = series.length >= maxPoints
-            ? [...series.slice(-maxPoints + 1), point]
-            : [...series, point]
-          return {
-            runs: {
-              ...s.runs,
-              [runId]: {
-                ...run,
-                blocks: {
-                  ...run.blocks,
-                  [nodeId]: {
-                    ...block,
-                    metrics: { ...block.metrics, [name]: updatedSeries },
-                    _stepCounters: { ...block._stepCounters, [name]: stepCounter },
-                  },
-                },
-              },
-            },
-          }
-        }
-
-        case 'node_completed': {
-          const nodeId = data.node_id || ''
-          const block = run.blocks[nodeId]
-          if (!block) return s
-          return {
-            runs: {
-              ...s.runs,
-              [runId]: {
-                ...run,
-                blocks: {
-                  ...run.blocks,
-                  [nodeId]: { ...block, status: 'complete', progress: 1 },
-                },
-              },
-            },
-          }
-        }
-
-        case 'node_failed': {
-          const nodeId = data.node_id || ''
-          const block = run.blocks[nodeId]
-          if (!block) return s
-          return {
-            runs: {
-              ...s.runs,
-              [runId]: {
-                ...run,
-                blocks: {
-                  ...run.blocks,
-                  [nodeId]: { ...block, status: 'failed', error: data.error },
-                },
-              },
-            },
-          }
-        }
-
-        case 'run_completed':
-          return {
-            runs: {
-              ...s.runs,
-              [runId]: {
-                ...run,
-                status: 'complete',
-                overallProgress: 1,
-                duration: data.duration ?? run.duration,
-                finalMetrics: data.metrics ?? run.finalMetrics,
-              },
-            },
-          }
-
-        case 'run_failed':
-          return {
-            runs: {
-              ...s.runs,
-              [runId]: {
-                ...run,
-                status: 'failed',
-                overallProgress: run.overallProgress,
-              },
-            },
-          }
-
-        case 'node_output': {
-          const outputNodeId = data.node_id || ''
-          const outputKeys = Object.keys(data.outputs || {}).join(', ')
-          const entry: LogEntry = {
-            timestamp: now,
-            nodeId: outputNodeId,
-            message: `[output] ${outputKeys}`,
-            level: 'info',
-          }
-          return {
-            runs: {
-              ...s.runs,
-              [runId]: {
-                ...run,
-                logs: [...run.logs.slice(-999), entry],
-              },
-            },
-          }
-        }
-
-        default:
-          return s
+  handleEventBatch: (runId, events) => {
+    set((state) => {
+      if (!state.runs[runId]) state.runs[runId] = createEmptyRun()
+      const run = state.runs[runId]
+      for (const { event, data } of events) {
+        applyEventToRun(run, event, data)
       }
     })
   },
 
   addSystemMetric: (runId, metric) => {
-    set((s) => {
-      const run = s.runs[runId]
-      if (!run) return s
-      return {
-        runs: {
-          ...s.runs,
-          [runId]: {
-            ...run,
-            systemMetrics: [...run.systemMetrics.slice(-299), metric],
-          },
-        },
+    set((state) => {
+      const run = state.runs[runId]
+      if (!run) return
+      if (run.systemMetrics.length > 299) {
+        run.systemMetrics.splice(0, run.systemMetrics.length - 299)
       }
+      run.systemMetrics.push(metric)
     })
   },
 
   loadHistoricalRun: (runId, runData) => {
-    set((s) => {
-      const existing = s.runs[runId]
+    set((state) => {
+      const existing = state.runs[runId]
       // Don't overwrite a run that has active live metric data
       if (existing && existing.status === 'running' && Object.keys(existing.blocks).some(
         (id) => Object.keys(existing.blocks[id].metrics).length > 0
-      )) return s
+      )) return
 
       const configSnapshot = runData.config_snapshot || {}
       const nodes: any[] = configSnapshot.nodes || []
@@ -1056,33 +938,27 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
         }
       }
 
-      return {
-        runs: {
-          ...s.runs,
-          [runId]: {
-            status: runData.status === 'complete' ? 'complete' : runData.status === 'failed' ? 'failed' : 'running',
-            blocks,
-            executionOrder,
-            activeBlockId: null,
-            systemMetrics: [],
-            logs: [],
-            overallProgress: runData.status === 'complete' ? 1 : 0,
-            eta: null,
-            duration: runData.duration_seconds ?? null,
-            totalBlocks: nodes.length,
-            pipelineName: configSnapshot.name || '',
-            configSnapshot,
-            finalMetrics: Object.keys(finalMetrics).length > 0 ? finalMetrics as Record<string, number> : null,
-          },
-        },
+      state.runs[runId] = {
+        status: runData.status === 'complete' ? 'complete' : runData.status === 'failed' ? 'failed' : 'running',
+        blocks,
+        executionOrder,
+        activeBlockId: null,
+        systemMetrics: [],
+        logs: [],
+        overallProgress: runData.status === 'complete' ? 1 : 0,
+        eta: null,
+        duration: runData.duration_seconds ?? null,
+        totalBlocks: nodes.length,
+        pipelineName: configSnapshot.name || '',
+        configSnapshot,
+        finalMetrics: Object.keys(finalMetrics).length > 0 ? finalMetrics as Record<string, number> : null,
       }
     })
   },
 
   removeRun: (runId) => {
-    set((s) => {
-      const { [runId]: _, ...rest } = s.runs
-      return { runs: rest }
+    set((state) => {
+      delete state.runs[runId]
     })
   },
 
@@ -1146,40 +1022,27 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
   },
 
   updateRunMetrics: (runId, data) => {
-    set((s) => ({
-      liveMetrics: {
-        ...s.liveMetrics,
-        [runId]: { ...s.liveMetrics[runId], ...data } as RunMetrics,
-      },
-    }))
+    set((state) => {
+      state.liveMetrics[runId] = { ...state.liveMetrics[runId], ...data } as RunMetrics
+    })
   },
 
   appendLossPoint: (runId, point) => {
-    set((s) => {
-      const existing = s.liveMetrics[runId]
-      if (!existing) return s
-      return {
-        liveMetrics: {
-          ...s.liveMetrics,
-          [runId]: {
-            ...existing,
-            loss: [...existing.loss.slice(-99), point],
-          },
-        },
+    set((state) => {
+      const existing = state.liveMetrics[runId]
+      if (!existing) return
+      if (existing.loss.length > 99) {
+        existing.loss.splice(0, existing.loss.length - 99)
       }
+      existing.loss.push(point)
     })
   },
 
   assignRunToProject: async (runId, projectId) => {
     if (isDemoMode()) {
-      set((s) => {
-        if (!s.dashboard) return s
-        return {
-          dashboard: {
-            ...s.dashboard,
-            unassigned_runs: s.dashboard.unassigned_runs.filter((r) => r.id !== runId),
-          },
-        }
+      set((state) => {
+        if (!state.dashboard) return
+        state.dashboard.unassigned_runs = state.dashboard.unassigned_runs.filter((r) => r.id !== runId)
       })
       return
     }
@@ -1189,15 +1052,10 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
 
   cancelRun: async (runId) => {
     if (isDemoMode()) {
-      set((s) => {
-        if (!s.dashboard) return s
-        return {
-          dashboard: {
-            ...s.dashboard,
-            running_runs: s.dashboard.running_runs.filter((r) => r.id !== runId),
-            running_now: Math.max(0, s.dashboard.running_now - 1),
-          },
-        }
+      set((state) => {
+        if (!state.dashboard) return
+        state.dashboard.running_runs = state.dashboard.running_runs.filter((r) => r.id !== runId)
+        state.dashboard.running_now = Math.max(0, state.dashboard.running_now - 1)
       })
       return
     }
@@ -1246,52 +1104,51 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
   setExecutionOrder: (blocks) => set({ monitorExecutionOrder: blocks }),
 
   updateBlockStatus: (blockId, updates) =>
-    set((s) => ({
-      monitorExecutionOrder: s.monitorExecutionOrder.map((b) =>
-        b.id === blockId ? { ...b, ...updates } : b
-      ),
-    })),
+    set((state) => {
+      const block = state.monitorExecutionOrder.find((b) => b.id === blockId)
+      if (block) Object.assign(block, updates)
+    }),
 
   setActiveBlock: (blockId) =>
-    set((s) => ({
-      monitorActiveBlockId: blockId,
-      viewedBlockId: s.viewedBlockId === s.monitorActiveBlockId || s.viewedBlockId === null ? blockId : s.viewedBlockId,
-    })),
+    set((state) => {
+      state.monitorActiveBlockId = blockId
+      if (state.viewedBlockId === state.monitorActiveBlockId || state.viewedBlockId === null) {
+        state.viewedBlockId = blockId
+      }
+    }),
 
   setViewedBlock: (blockId) => set({ viewedBlockId: blockId }),
 
   pushMetric: (event) =>
-    set((s) => {
-      const blockMetrics = s.metrics[event.blockId] || {}
-      const series = blockMetrics[event.name] || []
+    set((state) => {
+      if (!state.metrics[event.blockId]) state.metrics[event.blockId] = {}
+      const blockMetrics = state.metrics[event.blockId]
+      if (!blockMetrics[event.name]) blockMetrics[event.name] = []
+      const series = blockMetrics[event.name]
       const step = event.step ?? series.length
-      const newSeries = [...series, { step, value: event.value, timestamp: event.timestamp }]
-
-      return {
-        metrics: {
-          ...s.metrics,
-          [event.blockId]: {
-            ...blockMetrics,
-            [event.name]: newSeries,
-          },
-        },
-        metricEvents: [...s.metricEvents, event],
-      }
+      series.push({ step, value: event.value, timestamp: event.timestamp })
+      state.metricEvents.push(event)
     }),
 
   pushLog: (log) =>
-    set((s) => ({
-      logs: [...s.logs.slice(-999), log],
-    })),
+    set((state) => {
+      if (state.logs.length > 999) state.logs.splice(0, state.logs.length - 999)
+      state.logs.push(log)
+    }),
 
   updateSystem: (metrics) =>
-    set((s) => ({
-      system: metrics,
-      systemHistory: [
-        ...s.systemHistory.slice(-119),
-        { timestamp: new Date().toISOString(), cpu: metrics.cpu, memory: metrics.memory, gpuMemory: metrics.gpuMemory },
-      ],
-    })),
+    set((state) => {
+      state.system = metrics
+      if (state.systemHistory.length > 119) {
+        state.systemHistory.splice(0, state.systemHistory.length - 119)
+      }
+      state.systemHistory.push({
+        timestamp: new Date().toISOString(),
+        cpu: metrics.cpu,
+        memory: metrics.memory,
+        gpuMemory: metrics.gpuMemory,
+      })
+    }),
 
   setConfigSnapshot: (config) => set({ configSnapshot: config }),
 
@@ -1341,4 +1198,4 @@ export const useMetricsStore = create<MetricsStoreState>((set, get) => ({
       configSnapshot: {},
       logs: [],
     }),
-}))
+})))
