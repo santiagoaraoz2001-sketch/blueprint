@@ -155,26 +155,19 @@ const BASE_ESTIMATES: Record<string, BaseEst> = {
   artifact_viewer:       { seconds: 2,    memoryGB: 0.1,  gpuRequired: false },
 
   // ── Interventions ──
-  manual_review:         { seconds: 60,   memoryGB: 0.1,  gpuRequired: false },
+  human_review_gate:     { seconds: 30,   memoryGB: 0.1,  gpuRequired: false },
   notification_hub:      { seconds: 3,    memoryGB: 0.05, gpuRequired: false },
   agentic_review_loop:   { seconds: 45,   memoryGB: 6,    gpuRequired: true  },
   ab_split_test:         { seconds: 5,    memoryGB: 0.2,  gpuRequired: false },
   quality_gate:          { seconds: 3,    memoryGB: 0.1,  gpuRequired: false },
   rollback_point:        { seconds: 2,    memoryGB: 0.5,  gpuRequired: false },
-  human_review_gate:     { seconds: 30,   memoryGB: 0.1,  gpuRequired: false },
-  notification_sender:   { seconds: 3,    memoryGB: 0.05, gpuRequired: false },
   error_handler:         { seconds: 1,    memoryGB: 0.01, gpuRequired: false },
-  checkpoint_gate:       { seconds: 2,    memoryGB: 0.3,  gpuRequired: false },
 
   // ── Save ──
-  save_csv:              { seconds: 3,    memoryGB: 0.2,  gpuRequired: false },
-  save_txt:              { seconds: 2,    memoryGB: 0.1,  gpuRequired: false },
-  save_json:             { seconds: 3,    memoryGB: 0.2,  gpuRequired: false },
-  save_parquet:          { seconds: 5,    memoryGB: 0.3,  gpuRequired: false },
+  data_export:           { seconds: 5,    memoryGB: 0.3,  gpuRequired: false },
   save_pdf:              { seconds: 8,    memoryGB: 0.5,  gpuRequired: false },
   save_model:            { seconds: 15,   memoryGB: 2,    gpuRequired: false },
   save_embeddings:       { seconds: 10,   memoryGB: 1,    gpuRequired: false },
-  save_yaml:             { seconds: 2,    memoryGB: 0.05, gpuRequired: false },
 }
 
 /* ------------------------------------------------------------------ */

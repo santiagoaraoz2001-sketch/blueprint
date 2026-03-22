@@ -2,7 +2,8 @@ name: Multi-Agent Debate
 type: multi_agent_debate
 category: agents
 description: Multiple agents with distinct personas debate a topic to reach consensus
-version: "1.1.0"
+version: "1.2.0"
+aliases: [debate_composite]
 
 inputs:
   - id: llm
@@ -24,7 +25,7 @@ outputs:
   - id: response
     label: Debate Summary
     data_type: text
-    aliases: [text, output]
+    aliases: [text, output, consensus]
   - id: dataset
     label: Debate Log
     data_type: dataset

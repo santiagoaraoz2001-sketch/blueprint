@@ -121,9 +121,7 @@ const CRITICAL_CONFIG: Record<string, { field: string; label: string }[]> = {
   huggingface_loader: [{ field: 'dataset_name', label: 'Dataset Name' }],
   huggingface_model_loader: [{ field: 'model_id', label: 'Model ID' }],
   model_selector: [{ field: 'model_id', label: 'Model ID' }],
-  save_csv: [{ field: 'file_path', label: 'File Path' }],
-  save_json: [{ field: 'file_path', label: 'File Path' }],
-  save_txt: [{ field: 'file_path', label: 'File Path' }],
+  data_export: [{ field: 'output_path', label: 'Output Path' }],
 }
 
 // ─── Config Field Validator ────────────────────────────────────────

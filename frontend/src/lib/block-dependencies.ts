@@ -107,7 +107,7 @@ export const BLOCK_DEPENDENCIES: Record<string, string[]> = {
   artifact_viewer: [],
 
   // ─── Interventions ───────────────────────────────────────────────────
-  manual_review: [],
+  human_review_gate: [],
   notification_hub: ["requests"],
   ab_split_test: [],
   quality_gate: [],
@@ -115,14 +115,10 @@ export const BLOCK_DEPENDENCIES: Record<string, string[]> = {
   agentic_review_loop: ["transformers", "torch"],
 
   // ─── Save ────────────────────────────────────────────────────────────
-  save_csv: ["pandas"],
-  save_txt: [],
-  save_json: [],
-  save_parquet: ["pandas", "pyarrow"],
+  data_export: ["pandas", "pyarrow", "pyyaml"],
   save_pdf: ["reportlab"],
   save_model: ["safetensors", "torch"],
   save_embeddings: ["numpy", "faiss-cpu"],
-  save_yaml: ["pyyaml"],
 };
 
 /** Packages always included in every generated requirements file. */
