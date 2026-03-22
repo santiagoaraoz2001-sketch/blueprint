@@ -1,10 +1,10 @@
 import { T, F, FS } from '@/lib/design-tokens'
-import { usePipelineStore, type BlockNodeData, INHERITABLE_KEYS, CONFIG_PROPAGATION_HANDLES } from '@/stores/pipelineStore'
+import { usePipelineStore, type BlockNodeData, INHERITABLE_KEYS, CONFIG_PROPAGATION_HANDLES, INHERITANCE_DENY_LIST } from '@/stores/pipelineStore'
 import { getBlockDefinition, getFileFormatWarning, type ConfigField, type ConnectorType } from '@/lib/block-registry'
 import { usePresetStore } from '@/stores/presetStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getIcon } from '@/lib/icon-utils'
-import { Trash2, X, Save, ChevronDown, AlertTriangle, GitBranch, FolderOpen } from 'lucide-react'
+import { Trash2, X, Save, ChevronDown, ChevronRight, AlertTriangle, GitBranch, FolderOpen, Search, Copy, ClipboardPaste, RotateCcw, Info } from 'lucide-react'
 import type { Node } from '@xyflow/react'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { api } from '@/api/client'
@@ -59,10 +59,15 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
   // Compute inherited config — merge edge-based (existing) + resolve-config API data
   const incomingEdges = useMemo(() => edges.filter(e => e.target === node.id), [edges, node.id])
 
+  // Build set of this block's config field names for dynamic edge inheritance
+  const targetFieldNames = useMemo(() => {
+    return new Set(def?.configFields.map(f => f.name) || [])
+  }, [def])
+
   const inheritedConfig = useMemo(() => {
     const inherited: Record<string, { value: any; sourceName: string; sourceId: string }> = {}
 
-    // 1. Edge-based inheritance (model/llm connections)
+    // 1. Edge-based inheritance (model/llm connections) — dynamic schema intersection
     for (const edge of incomingEdges) {
       if (!CONFIG_PROPAGATION_HANDLES.has(edge.targetHandle || '')) {
         continue
@@ -74,7 +79,17 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
       const sourceConfig = sourceNode.data.config || {}
       const sourceName = sourceNode.data.label || sourceNode.data.type
 
-      for (const key of INHERITABLE_KEYS) {
+      // Dynamic: inherit any key that exists in BOTH source config and target schema,
+      // unless it's on the deny list. Falls back to INHERITABLE_KEYS for robustness.
+      const keysToCheck = new Set(INHERITABLE_KEYS as string[])
+      for (const key of Object.keys(sourceConfig)) {
+        if (targetFieldNames.has(key) && !INHERITANCE_DENY_LIST.has(key)) {
+          keysToCheck.add(key)
+        }
+      }
+
+      for (const key of keysToCheck) {
+        if (inherited[key]) continue // first edge wins
         const value = sourceConfig[key]
         if (value !== undefined && value !== null && value !== '') {
           inherited[key] = { value, sourceName, sourceId: edge.source }
@@ -122,8 +137,13 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
     for (const catKeys of Object.values(propagationKeys.by_category)) {
       catKeys.forEach(k => keys.add(k))
     }
+    // Include block-declared propagation keys for this node
+    const blockKeys = (propagationKeys as any).by_block?.[node.id]
+    if (Array.isArray(blockKeys)) {
+      blockKeys.forEach((k: string) => keys.add(k))
+    }
     return keys
-  }, [propagationKeys])
+  }, [propagationKeys, node.id])
 
   // Find downstream blocks that would be affected by a propagatable field change
   const getDownstreamBlocks = useCallback((fromNodeId: string): string[] => {
@@ -212,6 +232,85 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
 
   // Config Inheritance summary section state
   const [showInheritanceSummary, setShowInheritanceSummary] = useState(false)
+
+  // Config search
+  const [searchQuery, setSearchQuery] = useState('')
+  const showSearch = (displayFields?.length || 0) >= 6
+
+  // Filter fields by search
+  const filteredFields = useMemo(() => {
+    if (!displayFields) return []
+    if (!searchQuery.trim()) return displayFields
+    const q = searchQuery.toLowerCase()
+    return displayFields.filter(f =>
+      f.name.toLowerCase().includes(q) ||
+      f.label.toLowerCase().includes(q) ||
+      (f.description || '').toLowerCase().includes(q)
+    )
+  }, [displayFields, searchQuery])
+
+  // Group fields by section
+  const groupedFields = useMemo(() => {
+    const groups: { section: string; fields: typeof filteredFields }[] = []
+    const sectionMap = new Map<string, typeof filteredFields>()
+
+    for (const field of filteredFields) {
+      const section = field.section || ''
+      if (!sectionMap.has(section)) {
+        sectionMap.set(section, [])
+      }
+      sectionMap.get(section)!.push(field)
+    }
+
+    // Default/no-section group first, then named sections
+    const defaultFields = sectionMap.get('')
+    if (defaultFields?.length) {
+      groups.push({ section: '', fields: defaultFields })
+    }
+    for (const [section, fields] of sectionMap) {
+      if (section !== '') {
+        groups.push({ section, fields })
+      }
+    }
+    return groups
+  }, [filteredFields])
+
+  // Copy/paste config
+  const handleCopyConfig = useCallback(() => {
+    const config = { ...node.data.config }
+    delete config._inherited
+    navigator.clipboard.writeText(JSON.stringify(config, null, 2))
+    toast.success('Config copied to clipboard')
+  }, [node.data.config])
+
+  const handlePasteConfig = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      const parsed = JSON.parse(text)
+      if (typeof parsed !== 'object' || parsed === null) {
+        toast.error('Clipboard does not contain a valid config object')
+        return
+      }
+      // Only paste keys that exist in target block's schema
+      const validKeys = new Set(def?.configFields.map(f => f.name) || [])
+      const filtered: Record<string, any> = {}
+      let count = 0
+      for (const [key, value] of Object.entries(parsed)) {
+        if (validKeys.has(key)) {
+          filtered[key] = value
+          count++
+        }
+      }
+      if (count === 0) {
+        toast.error('No matching config fields found')
+        return
+      }
+      updateNodeConfig(node.id, filtered)
+      toast.success(`Pasted ${count} config field${count > 1 ? 's' : ''}`)
+    } catch {
+      toast.error('Failed to paste — invalid JSON in clipboard')
+    }
+  }, [def, node.id, updateNodeConfig])
 
   return (
     <motion.div
@@ -458,55 +557,136 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
 
       {/* Config fields */}
       <div style={{ flex: 1, overflow: 'auto', padding: '20px', scrollbarWidth: 'thin' }}>
-        <span
+        <div
           style={{
-            fontFamily: F,
-            fontSize: FS.xs,
-            color: T.dim,
-            letterSpacing: '0.16em',
-            fontWeight: 900,
-            textTransform: 'uppercase',
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            marginBottom: 16,
+            marginBottom: 12,
           }}
         >
-          CONFIGURATION
+          <span
+            style={{
+              fontFamily: F,
+              fontSize: FS.xs,
+              color: T.dim,
+              letterSpacing: '0.16em',
+              fontWeight: 900,
+              textTransform: 'uppercase',
+            }}
+          >
+            CONFIGURATION
+          </span>
           <div style={{ flex: 1, height: 1, background: T.border }} />
-        </span>
+          {/* Copy/Paste buttons */}
+          <button
+            onClick={handleCopyConfig}
+            title="Copy config to clipboard"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: T.dim,
+              cursor: 'pointer',
+              padding: 2,
+              display: 'flex',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = T.text}
+            onMouseLeave={e => e.currentTarget.style.color = T.dim}
+          >
+            <Copy size={11} />
+          </button>
+          <button
+            onClick={handlePasteConfig}
+            title="Paste config from clipboard"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: T.dim,
+              cursor: 'pointer',
+              padding: 2,
+              display: 'flex',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = T.text}
+            onMouseLeave={e => e.currentTarget.style.color = T.dim}
+          >
+            <ClipboardPaste size={11} />
+          </button>
+        </div>
+
+        {/* Search */}
+        {showSearch && (
+          <div style={{ position: 'relative', marginBottom: 12 }}>
+            <Search size={11} color={T.dim} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search fields..."
+              style={{
+                width: '100%',
+                padding: '6px 10px 6px 28px',
+                background: T.surface3,
+                border: `1px solid ${T.border}`,
+                borderRadius: 6,
+                color: T.text,
+                fontFamily: F,
+                fontSize: FS.xs,
+                outline: 'none',
+                transition: 'border-color 0.2s',
+              }}
+              onFocus={e => e.currentTarget.style.borderColor = T.blue}
+              onBlur={e => e.currentTarget.style.borderColor = T.border}
+            />
+          </div>
+        )}
 
         {/* Preset selector */}
         {def && <PresetSelector blockType={def.type} nodeId={node.id} currentConfig={node.data.config} />}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {displayFields?.map((field) => {
-            const fieldInfo = getFieldState(field.name, node.data.config[field.name], field.default)
-            const inherited = inheritedConfig[field.name]
-            const isPropagatable = INHERITABLE_KEYS.includes(field.name)
-            return (
-              <ConfigFieldInput
-                key={field.name}
-                field={field}
-                value={node.data.config[field.name] ?? field.default ?? ''}
-                onChange={(v) => handleConfigChange(field.name, v)}
-                onRevert={inherited ? () => handleConfigChange(field.name, undefined) : undefined}
-                onOverride={inherited ? () => {
-                  // Set the inherited value as a local override so the field becomes editable
-                  handleConfigChange(field.name, inherited.value)
-                } : undefined}
-                expectedOutputType={def?.outputs[0]?.dataType as ConnectorType | undefined}
-                fieldInfo={fieldInfo}
-                inherited={inherited}
-                hideInheritance={isSimple}
-                onShowInheritance={isPropagatable ? () => {
-                  // Origin is upstream source if inherited, otherwise this node
-                  const originId = inherited ? inherited.sourceId : node.id
-                  activateInheritanceOverlay(field.name, originId)
-                } : undefined}
-              />
-            )
-          })}
+        {/* Grouped config fields */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {groupedFields.map(({ section, fields }) => (
+            <ConfigSection
+              key={section || '__default'}
+              title={section}
+              fieldCount={fields.length}
+              forceExpanded={!!searchQuery.trim()}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {fields.map((field) => {
+                  const fieldInfo = getFieldState(field.name, node.data.config[field.name], field.default)
+                  const inherited = inheritedConfig[field.name]
+                  const isPropagatable = allPropagationKeys.has(field.name) || INHERITABLE_KEYS.includes(field.name) || field.propagate
+                  return (
+                    <ConfigFieldInput
+                      key={field.name}
+                      field={field}
+                      value={node.data.config[field.name] ?? field.default ?? ''}
+                      onChange={(v) => handleConfigChange(field.name, v)}
+                      onRevert={inherited ? () => handleConfigChange(field.name, undefined) : undefined}
+                      onOverride={inherited ? () => {
+                        handleConfigChange(field.name, inherited.value)
+                      } : undefined}
+                      onResetToDefault={
+                        fieldInfo.state === 'local' && field.default !== undefined
+                          ? () => handleConfigChange(field.name, field.default)
+                          : undefined
+                      }
+                      expectedOutputType={def?.outputs[0]?.dataType as ConnectorType | undefined}
+                      fieldInfo={fieldInfo}
+                      inherited={inherited}
+                      hideInheritance={isSimple}
+                      onShowInheritance={isPropagatable ? () => {
+                        const originId = inherited ? inherited.sourceId : node.id
+                        activateInheritanceOverlay(field.name, originId)
+                      } : undefined}
+                    />
+                  )
+                })}
+              </div>
+            </ConfigSection>
+          ))}
         </div>
 
         {/* Inputs/Outputs info */}
@@ -591,6 +771,70 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
   )
 }
 
+/* ── Collapsible Config Section ── */
+function ConfigSection({ title, fieldCount, forceExpanded, children }: {
+  title: string
+  fieldCount: number
+  forceExpanded?: boolean
+  children: React.ReactNode
+}) {
+  // "advanced" sections start collapsed, others start expanded
+  const [collapsed, setCollapsed] = useState(title.toLowerCase() === 'advanced')
+
+  // No header for the default (empty title) section
+  if (!title) {
+    return <div style={{ marginBottom: 8 }}>{children}</div>
+  }
+
+  const isExpanded = forceExpanded || !collapsed
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          width: '100%',
+          padding: '6px 0',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          color: T.dim,
+          fontFamily: F,
+          fontSize: FS.xxs,
+          fontWeight: 700,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          textAlign: 'left',
+        }}
+      >
+        {isExpanded
+          ? <ChevronDown size={10} style={{ transition: 'transform 0.2s' }} />
+          : <ChevronRight size={10} style={{ transition: 'transform 0.2s' }} />
+        }
+        {title}
+        <span style={{ opacity: 0.5, fontWeight: 400 }}>({fieldCount})</span>
+        <div style={{ flex: 1, height: 1, background: T.border, marginLeft: 4 }} />
+      </button>
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{ paddingTop: 8 }}>{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 type ConfigValue = string | number | boolean
 
 function ConfigFieldInput({
@@ -599,6 +843,7 @@ function ConfigFieldInput({
   onChange,
   onRevert,
   onOverride,
+  onResetToDefault,
   expectedOutputType,
   fieldInfo: rawFieldInfo,
   inherited: rawInherited,
@@ -610,12 +855,16 @@ function ConfigFieldInput({
   onChange: (v: ConfigValue) => void
   onRevert?: () => void
   onOverride?: () => void
+  onResetToDefault?: () => void
   expectedOutputType?: ConnectorType
   fieldInfo: FieldInfo
   inherited?: { value: any; sourceName: string; sourceId: string }
   hideInheritance?: boolean
   onShowInheritance?: () => void
 }) {
+  const [hovered, setHovered] = useState(false)
+  const [tooltipVisible, setTooltipVisible] = useState(false)
+
   // In simple mode, suppress inheritance visuals
   const fieldInfo: FieldInfo = hideInheritance
     ? { state: 'local', effectiveValue: rawFieldInfo.effectiveValue }
@@ -624,14 +873,28 @@ function ConfigFieldInput({
   const isInherited = fieldInfo.state === 'inherited'
   const isOverriddenInherited = fieldInfo.state === 'local' && !!inherited
 
-  // Left border accent: blue for inherited, orange for overridden inherited
-  const leftBorderColor = isInherited ? T.blue : isOverriddenInherited ? T.orange : 'transparent'
+  // Inline validation
+  const validationError = useMemo(() => {
+    if (isInherited) return null
+    const isEmpty = value === '' || value === undefined || value === null
+    if (field.mandatory && isEmpty) return 'Required'
+    if (!isEmpty && (field.type === 'integer' || field.type === 'float') && typeof value === 'number') {
+      if (field.min !== undefined && value < field.min) return `Min: ${field.min}`
+      if (field.max !== undefined && value > field.max) return `Max: ${field.max}`
+    }
+    return null
+  }, [field, value, isInherited])
+
+  const hasError = !!validationError
+
+  // Left border accent: red for error, blue for inherited, orange for overridden inherited
+  const leftBorderColor = hasError ? T.red : isInherited ? T.blue : isOverriddenInherited ? T.orange : 'transparent'
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '8px 12px',
     background: T.surface3,
-    border: `1px solid ${isInherited ? `${T.blue}40` : isOverriddenInherited ? `${T.orange}40` : T.borderHi}`,
+    border: `1px solid ${hasError ? `${T.red}60` : isInherited ? `${T.blue}40` : isOverriddenInherited ? `${T.orange}40` : T.borderHi}`,
     borderRadius: 6,
     color: isInherited ? T.dim : fieldInfo.state === 'default' ? T.dim : T.text,
     fontFamily: F,
@@ -647,22 +910,27 @@ function ConfigFieldInput({
     : String(field.default ?? '')
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 6,
-      borderLeft: `2px solid ${leftBorderColor}`,
-      paddingLeft: leftBorderColor !== 'transparent' ? 10 : 0,
-      transition: 'border-color 0.2s, padding-left 0.2s',
-    }}>
-      {/* Label with state indicator + InheritedFieldBadge */}
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        borderLeft: `2px solid ${leftBorderColor}`,
+        paddingLeft: leftBorderColor !== 'transparent' ? 10 : 0,
+        transition: 'border-color 0.2s, padding-left 0.2s',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Label row */}
       <label
         onClick={onShowInheritance}
         title={onShowInheritance ? `Show inheritance flow for "${field.name}"` : undefined}
         style={{
           fontFamily: F,
           fontSize: FS.xs,
-          color: isInherited ? T.blue
+          color: hasError ? T.red
+               : isInherited ? T.blue
                : fieldInfo.state === 'default' ? T.dim
                : T.sec,
           fontWeight: 600,
@@ -676,6 +944,43 @@ function ConfigFieldInput({
         {field.label}
         {field.mandatory && (
           <span style={{ color: T.red, fontWeight: 900, marginLeft: 2 }}>*</span>
+        )}
+        {/* Description tooltip icon */}
+        {field.description && (
+          <span
+            style={{ position: 'relative', display: 'inline-flex' }}
+            onMouseEnter={() => setTooltipVisible(true)}
+            onMouseLeave={() => setTooltipVisible(false)}
+          >
+            <Info size={10} color={T.dim} style={{ cursor: 'help', opacity: 0.6 }} />
+            {tooltipVisible && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                marginBottom: 6,
+                padding: '6px 10px',
+                background: T.surface2,
+                border: `1px solid ${T.borderHi}`,
+                borderRadius: 6,
+                boxShadow: `0 4px 16px ${T.shadow}`,
+                fontFamily: F,
+                fontSize: FS.xxs,
+                color: T.sec,
+                lineHeight: 1.4,
+                fontWeight: 400,
+                fontStyle: 'normal',
+                whiteSpace: 'normal',
+                width: 220,
+                maxWidth: 260,
+                zIndex: 50,
+                pointerEvents: 'none',
+              }}>
+                {field.description}
+              </div>
+            )}
+          </span>
         )}
         {onShowInheritance && (
           <span style={{ fontSize: FS.xxs, color: T.blue, opacity: 0.6 }} title="Click to visualize inheritance">
@@ -691,6 +996,31 @@ function ConfigFieldInput({
           }}>
             (default)
           </span>
+        )}
+        {/* Reset to default button — shown on hover when locally changed */}
+        {hovered && onResetToDefault && !inherited && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onResetToDefault()
+            }}
+            title="Reset to default"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: T.dim,
+              cursor: 'pointer',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              marginLeft: 'auto',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = T.text}
+            onMouseLeave={e => e.currentTarget.style.color = T.dim}
+          >
+            <RotateCcw size={9} />
+          </button>
         )}
         {/* InheritedFieldBadge for inherited or overridden-inherited fields */}
         {inherited && (
@@ -790,6 +1120,21 @@ function ConfigFieldInput({
         />
       )}
 
+      {/* Validation error */}
+      {validationError && (
+        <div style={{
+          fontFamily: F,
+          fontSize: FS.xxs,
+          color: T.red,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+        }}>
+          <AlertTriangle size={9} />
+          {validationError}
+        </div>
+      )}
+
       {/* File format compatibility warning */}
       {field.type === 'file_path' && expectedOutputType && typeof value === 'string' && value.length > 2 && (() => {
         const warning = getFileFormatWarning(value, expectedOutputType)
@@ -811,24 +1156,6 @@ function ConfigFieldInput({
           </div>
         )
       })()}
-
-      {field.mandatory && (value === '' || value === undefined || value === null) && (
-        <div style={{
-          fontFamily: F,
-          fontSize: FS.xxs,
-          color: T.dim,
-          marginTop: 2,
-          fontStyle: 'italic',
-        }}>
-          Required — set a value or connect the input port
-        </div>
-      )}
-
-      {field.description && (
-        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, lineHeight: 1.4 }}>
-          {field.description}
-        </span>
-      )}
     </div>
   )
 }
@@ -938,8 +1265,8 @@ function FilePathInput({
           alignItems: 'center',
           justifyContent: 'center',
           padding: '0 8px',
-          background: `${T.white}08`,
-          border: `1px solid ${T.white}15`,
+          background: `${T.text}08`,
+          border: `1px solid ${T.text}15`,
           borderRadius: 4,
           color: browsing ? T.dim : T.cyan,
           cursor: browsing ? 'wait' : 'pointer',
@@ -953,8 +1280,8 @@ function FilePathInput({
           }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = `${T.white}08`
-          e.currentTarget.style.borderColor = `${T.white}15`
+          e.currentTarget.style.background = `${T.text}08`
+          e.currentTarget.style.borderColor = `${T.text}15`
         }}
       >
         <FolderOpen size={13} />

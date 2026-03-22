@@ -66,6 +66,7 @@ config:
     default: 0
     min: 0
     description: "Limit to N samples (0 = all)"
+    propagate: true
   repetition_ngram_size:
     type: integer
     label: Repetition N-gram Size
@@ -79,6 +80,7 @@ config:
     options: [json, csv]
     default: json
     description: "Format for dataset and report outputs (json or csv)"
+    section: advanced
   decimal_precision:
     type: integer
     label: Decimal Precision
@@ -86,6 +88,7 @@ config:
     min: 1
     max: 6
     description: "Decimal places for all computed scores"
+    propagate: true
 
 side_inputs:
   - id: _loop

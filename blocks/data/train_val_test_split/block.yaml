@@ -65,6 +65,7 @@ config:
     type: integer
     label: Random Seed
     default: 42
+    propagate: true
   stratify_column:
     type: string
     label: Stratify Column

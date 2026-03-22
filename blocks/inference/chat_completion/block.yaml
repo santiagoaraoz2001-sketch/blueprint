@@ -51,12 +51,16 @@ config:
     default: 0.7
     min: 0.0
     max: 2.0
+    propagate: true
+    section: sampling
   max_tokens:
     type: integer
     label: Max Tokens
     default: 1024
     min: 1
     max: 32768
+    propagate: true
+    section: sampling
   system_prompt:
     type: text_area
     label: Default System Prompt

@@ -66,6 +66,8 @@ config:
     min: 0.0
     max: 2.0
     description: LLM generation temperature (lower = more factual, higher = more creative)
+    propagate: true
+    section: sampling
   include_sources:
     type: boolean
     label: Include Sources
@@ -78,6 +80,8 @@ config:
     min: 64
     max: 8192
     description: Maximum tokens for generated response
+    propagate: true
+    section: sampling
   prompt_template:
     type: text_area
     label: Prompt Template
@@ -89,6 +93,7 @@ config:
     options: [plain, markdown, json]
     default: plain
     description: "Format for the response text output"
+    section: advanced
 
 side_inputs:
   - id: _loop

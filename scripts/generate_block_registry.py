@@ -194,6 +194,10 @@ def _convert_config_fields(config_schema: dict | None) -> list[dict]:
             field["path_mode"] = field_def["path_mode"]
         if "file_extensions" in field_def:
             field["file_extensions"] = field_def["file_extensions"]
+        if field_def.get("propagate"):
+            field["propagate"] = True
+        if "section" in field_def:
+            field["section"] = field_def["section"]
         fields.append(field)
     return fields
 
@@ -285,6 +289,11 @@ def _format_config_field(field: dict, indent: str) -> str:
     if "file_extensions" in field:
         exts = ", ".join(f"'{_esc(e)}'" for e in field["file_extensions"])
         parts.append(f"file_extensions: [{exts}]")
+    if field.get("propagate"):
+        parts.append("propagate: true")
+    if "section" in field:
+        parts.append(f"section: '{_esc(field['section'])}'")
+
 
     joined = ", ".join(parts)
     if len(joined) < 100:

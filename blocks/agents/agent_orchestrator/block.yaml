@@ -75,12 +75,16 @@ config:
     default: 0.3
     min: 0.0
     max: 2.0
+    propagate: true
+    section: sampling
   max_tokens:
     type: integer
     label: Max Tokens per Step
     default: 1024
     min: 64
     max: 8192
+    propagate: true
+    section: sampling
   stop_phrase:
     type: string
     label: Completion Signal
@@ -92,6 +96,7 @@ config:
     options: [plain, markdown, json]
     default: plain
     description: "plain: raw text, markdown: formatted with headers, json: structured JSON object"
+    section: advanced
 
 side_inputs:
   - id: _loop

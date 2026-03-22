@@ -54,24 +54,28 @@ config:
     options: [sandboxed, trusted]
     default: trusted
     description: "Sandboxed: restricted builtins (safe). Trusted: full Python access."
+    section: advanced
   error_handling:
     type: select
     label: Error Handling
     options: [skip_errors, fail_fast]
     default: skip_errors
     description: "skip_errors: log and continue. fail_fast: stop on first error."
+    section: advanced
   max_samples:
     type: integer
     label: Max Samples
     default: 0
     min: 0
     description: "Limit to N samples (0 = all)"
+    propagate: true
   output_format:
     type: select
     label: Output Format
     options: [json, csv]
     default: json
     description: "Format for dataset and report outputs (json or csv)"
+    section: advanced
   decimal_precision:
     type: integer
     label: Decimal Precision
@@ -79,6 +83,7 @@ config:
     min: 1
     max: 6
     description: "Decimal places for all computed scores"
+    propagate: true
 
 side_inputs:
   - id: _loop

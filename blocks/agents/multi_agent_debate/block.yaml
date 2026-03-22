@@ -62,12 +62,16 @@ config:
     default: 0.7
     min: 0.0
     max: 2.0
+    propagate: true
+    section: sampling
   max_tokens:
     type: integer
     label: Max Tokens per Turn
     default: 256
     min: 64
     max: 2048
+    propagate: true
+    section: sampling
   format:
     type: select
     label: Debate Format
@@ -79,17 +83,20 @@ config:
     label: Custom Personas
     default: ""
     description: "One per line: 'Name: style description'. Leave empty for defaults (Analyst, Advocate, Critic, etc.)"
+    section: advanced
   output_format:
     type: select
     label: Output Format
     options: [markdown, plain, json]
     default: markdown
     description: "markdown: formatted summary, plain: text only, json: structured debate object"
+    section: advanced
   moderator_prompt:
     type: text_area
     label: Moderator Prompt
     default: ""
     description: "Custom summary template. Use {topic}, {agents}, {rounds}, {consensus} placeholders. Leave empty for default."
+    section: advanced
   seed:
     type: integer
     label: Random Seed

@@ -79,8 +79,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'markdown',
         options: ['markdown', 'plain', 'json'],
         description: 'Format for the evaluation report text output',
+        section: 'advanced',
       },
-      { name: 'seed', label: 'Random Seed', type: 'integer', default: 42 },
+      { name: 'seed', label: 'Random Seed', type: 'integer', default: 42, propagate: true },
     ],
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
@@ -215,7 +216,16 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         options: ['sequential', 'react', 'plan_and_execute'],
         description: 'sequential: step-by-step, react: reason-act-observe loops, plan_and_execute: plan first then execute',
       },
-      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.3, min: 0.0, max: 2.0 },
+      {
+        name: 'temperature',
+        label: 'Temperature',
+        type: 'float',
+        default: 0.3,
+        min: 0.0,
+        max: 2.0,
+        propagate: true,
+        section: 'sampling',
+      },
       {
         name: 'max_tokens',
         label: 'Max Tokens per Step',
@@ -223,6 +233,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 1024,
         min: 64,
         max: 8192,
+        propagate: true,
+        section: 'sampling',
       },
       {
         name: 'stop_phrase',
@@ -238,6 +250,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'plain',
         options: ['plain', 'markdown', 'json'],
         description: 'plain: raw text, markdown: formatted with headers, json: structured JSON object',
+        section: 'advanced',
       },
     ],
     side_inputs: [
@@ -308,6 +321,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'raw',
         options: ['raw', 'markdown', 'json'],
         description: 'raw: text as-is, markdown: with metadata header, json: structured extraction result',
+        section: 'advanced',
       },
     ],
     side_inputs: [
@@ -362,8 +376,26 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         max: 10,
         description: 'Number of reasoning steps in the chain',
       },
-      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.3, min: 0.0, max: 2.0 },
-      { name: 'max_tokens', label: 'Max Tokens per Step', type: 'integer', default: 512, min: 64, max: 8192 },
+      {
+        name: 'temperature',
+        label: 'Temperature',
+        type: 'float',
+        default: 0.3,
+        min: 0.0,
+        max: 2.0,
+        propagate: true,
+        section: 'sampling',
+      },
+      {
+        name: 'max_tokens',
+        label: 'Max Tokens per Step',
+        type: 'integer',
+        default: 512,
+        min: 64,
+        max: 8192,
+        propagate: true,
+        section: 'sampling',
+      },
       {
         name: 'self_consistency',
         label: 'Self-Consistency Samples',
@@ -395,6 +427,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'markdown',
         options: ['plain', 'markdown', 'json'],
         description: 'plain: raw text, markdown: headers per step, json: structured {steps, final_answer, metadata}',
+        section: 'advanced',
       },
     ],
     side_inputs: [
@@ -488,6 +521,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'raw',
         options: ['raw', 'markdown', 'json'],
         description: 'raw: code only, markdown: fenced code block, json: structured object',
+        section: 'advanced',
       },
     ],
     side_inputs: [
@@ -537,8 +571,26 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       },
       { name: 'num_agents', label: 'Number of Agents', type: 'integer', default: 3, min: 2, max: 10 },
       { name: 'num_rounds', label: 'Debate Rounds', type: 'integer', default: 3, min: 1, max: 10 },
-      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.7, min: 0.0, max: 2.0 },
-      { name: 'max_tokens', label: 'Max Tokens per Turn', type: 'integer', default: 256, min: 64, max: 2048 },
+      {
+        name: 'temperature',
+        label: 'Temperature',
+        type: 'float',
+        default: 0.7,
+        min: 0.0,
+        max: 2.0,
+        propagate: true,
+        section: 'sampling',
+      },
+      {
+        name: 'max_tokens',
+        label: 'Max Tokens per Turn',
+        type: 'integer',
+        default: 256,
+        min: 64,
+        max: 2048,
+        propagate: true,
+        section: 'sampling',
+      },
       {
         name: 'format',
         label: 'Debate Format',
@@ -553,6 +605,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'text_area',
         default: '',
         description: 'One per line: \'Name: style description\'. Leave empty for defaults (Analyst, Advocate, Critic, etc.)',
+        section: 'advanced',
       },
       {
         name: 'output_format',
@@ -561,6 +614,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'markdown',
         options: ['markdown', 'plain', 'json'],
         description: 'markdown: formatted summary, plain: text only, json: structured debate object',
+        section: 'advanced',
       },
       {
         name: 'moderator_prompt',
@@ -568,6 +622,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'text_area',
         default: '',
         description: 'Custom summary template. Use {topic}, {agents}, {rounds}, {consensus} placeholders. Leave empty for default.',
+        section: 'advanced',
       },
       {
         name: 'seed',
@@ -638,6 +693,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 2.0,
         description: 'LLM generation temperature (lower = more factual, higher = more creative)',
+        propagate: true,
+        section: 'sampling',
       },
       {
         name: 'include_sources',
@@ -654,6 +711,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 64,
         max: 8192,
         description: 'Maximum tokens for generated response',
+        propagate: true,
+        section: 'sampling',
       },
       {
         name: 'prompt_template',
@@ -669,6 +728,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'plain',
         options: ['plain', 'markdown', 'json'],
         description: 'Format for the response text output',
+        section: 'advanced',
       },
     ],
     side_inputs: [
@@ -715,6 +775,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'openai',
         options: ['openai', 'anthropic', 'generic'],
         description: 'Format of generated function-calling schemas',
+        section: 'advanced',
       },
     ],
     side_inputs: [
@@ -1559,6 +1620,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'none',
         options: ['none', 'instruction', 'chat', 'completion', 'preference_pairs', 'rlhf_prompts'],
         description: 'Format output for a specific training task. \'none\' passes data through as-is. Other formats restructure columns to match what training blocks expect.',
+        propagate: true,
       },
       {
         name: 'instruction_template',
@@ -1616,6 +1678,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'boolean',
         default: false,
         description: 'Remove duplicate rows using content hashing (MD5 of all column values). Applied after transforms and format conversion.',
+        section: 'filtering',
       },
       {
         name: 'min_length',
@@ -1625,6 +1688,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0,
         max: 1000000,
         description: 'Drop rows where the primary text column has fewer characters than this threshold. 0 = disabled. Primary column is auto-detected (text > query > chosen > first column).',
+        section: 'filtering',
       },
       {
         name: 'max_length',
@@ -1634,6 +1698,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0,
         max: 10000000,
         description: 'Drop rows where the primary text column exceeds this character count. 0 = disabled.',
+        section: 'filtering',
       },
       {
         name: 'filter_expression',
@@ -1641,6 +1706,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'text_area',
         default: '',
         description: 'Python expression that returns True to keep a row, False to drop it. Has access to \'row\' (dict) and the \'re\' module. Example: len(row.get(\'text\', \'\')) > 10 and \'error\' not in row.get(\'text\', \'\')',
+        section: 'filtering',
       },
       {
         name: 'sample_size',
@@ -1650,6 +1716,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0,
         max: 10000000,
         description: 'Randomly sample this many rows after all transforms and filters. 0 = keep all rows. Applied before eval split.',
+        section: 'filtering',
       },
       {
         name: 'eval_split',
@@ -1659,6 +1726,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.5,
         description: 'Fraction of data reserved for the eval output (0 = no split, 0.1 = 10% eval). Data is shuffled before splitting unless shuffle is disabled. Max 0.5 to ensure training set is always the majority.',
+        section: 'advanced',
       },
       {
         name: 'validate_schema',
@@ -1666,6 +1734,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'boolean',
         default: true,
         description: 'Check that output columns match what the target training block expects. Logs warnings for missing optional columns and fails on missing required columns.',
+        section: 'advanced',
       },
       {
         name: 'target_block',
@@ -1674,6 +1743,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'auto',
         options: ['auto', 'lora_finetuning', 'qlora_finetuning', 'full_finetuning', 'dpo_alignment', 'reward_model_trainer', 'rlhf_ppo', 'distillation', 'continued_pretraining'],
         description: 'Which downstream training block this dataset feeds. \'auto\' infers from training_format (instruction/chat/completion → LoRA, preference_pairs → DPO, rlhf_prompts → RLHF PPO).',
+        section: 'advanced',
       },
       {
         name: 'shuffle',
@@ -1690,6 +1760,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0,
         max: 2147483647,
         description: 'Seed for reproducible shuffling, sampling, and splitting',
+        propagate: true,
       },
     ],
     side_inputs: [
@@ -3127,7 +3198,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       { name: 'train_ratio', label: 'Train Ratio', type: 'float', default: 0.8, min: 0.0, max: 1.0 },
       { name: 'val_ratio', label: 'Val Ratio', type: 'float', default: 0.1, min: 0.0, max: 1.0 },
       { name: 'test_ratio', label: 'Test Ratio', type: 'float', default: 0.1, min: 0.0, max: 1.0 },
-      { name: 'seed', label: 'Random Seed', type: 'integer', default: 42 },
+      { name: 'seed', label: 'Random Seed', type: 'integer', default: 42, propagate: true },
       {
         name: 'stratify_column',
         label: 'Stratify Column',
@@ -4780,6 +4851,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 0,
         min: 0,
         description: 'Limit to N samples (0 = all)',
+        propagate: true,
       },
       {
         name: 'repetition_ngram_size',
@@ -4797,6 +4869,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'json',
         options: ['json', 'csv'],
         description: 'Format for dataset and report outputs (json or csv)',
+        section: 'advanced',
       },
       {
         name: 'decimal_precision',
@@ -4806,6 +4879,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 6,
         description: 'Decimal places for all computed scores',
+        propagate: true,
       },
     ],
     side_inputs: [
@@ -5007,6 +5081,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'trusted',
         options: ['sandboxed', 'trusted'],
         description: 'Sandboxed: restricted builtins (safe). Trusted: full Python access.',
+        section: 'advanced',
       },
       {
         name: 'error_handling',
@@ -5015,6 +5090,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'skip_errors',
         options: ['skip_errors', 'fail_fast'],
         description: 'skip_errors: log and continue. fail_fast: stop on first error.',
+        section: 'advanced',
       },
       {
         name: 'max_samples',
@@ -5023,6 +5099,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 0,
         min: 0,
         description: 'Limit to N samples (0 = all)',
+        propagate: true,
       },
       {
         name: 'output_format',
@@ -5031,6 +5108,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'json',
         options: ['json', 'csv'],
         description: 'Format for dataset and report outputs (json or csv)',
+        section: 'advanced',
       },
       {
         name: 'decimal_precision',
@@ -5040,6 +5118,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 6,
         description: 'Decimal places for all computed scores',
+        propagate: true,
       },
     ],
     side_inputs: [
@@ -5158,6 +5237,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 0,
         min: 0,
         description: 'Limit evaluation to N samples (0 = all)',
+        propagate: true,
       },
       {
         name: 'embedding_model',
@@ -5182,6 +5262,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'json',
         options: ['json', 'csv'],
         description: 'Format for dataset and report outputs (json or csv)',
+        section: 'advanced',
       },
       {
         name: 'decimal_precision',
@@ -5191,6 +5272,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 6,
         description: 'Decimal places for all computed scores',
+        propagate: true,
       },
     ],
     side_inputs: [
@@ -6012,6 +6094,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 0,
         min: 0,
         description: 'Limit evaluation to N samples (0 = all)',
+        propagate: true,
       },
       {
         name: 'judge_timeout',
@@ -6029,6 +6112,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'json',
         options: ['json', 'csv'],
         description: 'Format for dataset and report outputs (json or csv)',
+        section: 'advanced',
       },
       {
         name: 'decimal_precision',
@@ -6038,6 +6122,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 6,
         description: 'Decimal places for all computed scores',
+        propagate: true,
       },
     ],
     side_inputs: [
@@ -6206,6 +6291,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 0,
         min: 0,
         description: 'Limit to N samples (0 = all)',
+        propagate: true,
       },
       {
         name: 'output_format',
@@ -6214,6 +6300,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'json',
         options: ['json', 'csv'],
         description: 'Format for dataset and report outputs (json or csv)',
+        section: 'advanced',
       },
       {
         name: 'decimal_precision',
@@ -6223,6 +6310,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 6,
         description: 'Decimal places for all computed scores',
+        propagate: true,
       },
     ],
     side_inputs: [
@@ -6332,6 +6420,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 0,
         min: 0,
         description: 'Limit evaluation to N samples (0 = all)',
+        propagate: true,
       },
       {
         name: 'generation_temperature',
@@ -6367,6 +6456,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'json',
         options: ['json', 'csv'],
         description: 'Format for dataset and report outputs (json or csv)',
+        section: 'advanced',
       },
       {
         name: 'decimal_precision',
@@ -6376,6 +6466,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 6,
         description: 'Decimal places for all computed scores',
+        propagate: true,
       },
     ],
     side_inputs: [
@@ -8257,8 +8348,26 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: '',
         description: 'Model to use (overridden by model input port)',
       },
-      { name: 'temperature', label: 'Temperature', type: 'float', default: 0.7, min: 0.0, max: 2.0 },
-      { name: 'max_tokens', label: 'Max Tokens', type: 'integer', default: 1024, min: 1, max: 32768 },
+      {
+        name: 'temperature',
+        label: 'Temperature',
+        type: 'float',
+        default: 0.7,
+        min: 0.0,
+        max: 2.0,
+        propagate: true,
+        section: 'sampling',
+      },
+      {
+        name: 'max_tokens',
+        label: 'Max Tokens',
+        type: 'integer',
+        default: 1024,
+        min: 1,
+        max: 32768,
+        propagate: true,
+        section: 'sampling',
+      },
       {
         name: 'system_prompt',
         label: 'Default System Prompt',
@@ -8775,6 +8884,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'text_area',
         default: '{input}',
         description: 'Use {context} for upstream context, {input} for user_input',
+        propagate: true,
       },
       {
         name: 'user_input',
@@ -8791,6 +8901,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 32768,
         description: 'null = use framework default',
+        propagate: true,
+        section: 'sampling',
       },
       {
         name: 'temperature',
@@ -8800,6 +8912,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 2.0,
         description: 'null = use framework default',
+        propagate: true,
+        section: 'sampling',
       },
       {
         name: 'system_prompt',
@@ -8814,9 +8928,28 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'string',
         default: '',
         description: 'Comma-separated stop strings',
+        section: 'advanced',
       },
-      { name: 'top_p', label: 'Top P', type: 'float', default: null, min: 0.0, max: 1.0 },
-      { name: 'repeat_penalty', label: 'Repeat Penalty', type: 'float', default: null, min: 0.0, max: 3.0 },
+      {
+        name: 'top_p',
+        label: 'Top P',
+        type: 'float',
+        default: null,
+        min: 0.0,
+        max: 1.0,
+        propagate: true,
+        section: 'sampling',
+      },
+      {
+        name: 'repeat_penalty',
+        label: 'Repeat Penalty',
+        type: 'float',
+        default: null,
+        min: 0.0,
+        max: 3.0,
+        propagate: true,
+        section: 'sampling',
+      },
       {
         name: 'output_format',
         label: 'Output Format',
@@ -8824,6 +8957,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'text',
         options: ['text', 'json'],
         description: 'text = raw response, json = wrapped with metadata',
+        section: 'advanced',
       },
     ],
     side_inputs: [
@@ -11129,9 +11263,25 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         description: 'HuggingFace model name or local path',
         mandatory: true,
       },
-      { name: 'lr', label: 'Learning Rate', type: 'float', default: 2e-05, min: 1e-07, max: 0.01 },
-      { name: 'epochs', label: 'Epochs', type: 'integer', default: 3, min: 1, max: 100 },
-      { name: 'batch_size', label: 'Batch Size', type: 'integer', default: 4, min: 1, max: 128 },
+      {
+        name: 'lr',
+        label: 'Learning Rate',
+        type: 'float',
+        default: 2e-05,
+        min: 1e-07,
+        max: 0.01,
+        section: 'training',
+      },
+      { name: 'epochs', label: 'Epochs', type: 'integer', default: 3, min: 1, max: 100, section: 'training' },
+      {
+        name: 'batch_size',
+        label: 'Batch Size',
+        type: 'integer',
+        default: 4,
+        min: 1,
+        max: 128,
+        section: 'training',
+      },
       {
         name: 'warmup_steps',
         label: 'Warmup Steps',
@@ -11158,6 +11308,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 64,
         max: 32768,
         description: 'Maximum token length for training samples',
+        propagate: true,
+        section: 'training',
       },
       {
         name: 'gradient_checkpointing',
@@ -11172,6 +11324,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'string',
         default: '',
         description: 'JSON key containing training text (leave empty for auto-detect: \'text\' or first key)',
+        propagate: true,
       },
       {
         name: 'training_format',
@@ -11179,6 +11332,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'text_area',
         default: '',
         description: 'Template for structuring training examples. Use {text}, {instruction}, {output} placeholders.',
+        propagate: true,
       },
       {
         name: 'eval_split',
@@ -11188,6 +11342,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.3,
         description: 'Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)',
+        section: 'advanced',
       },
       {
         name: 'checkpoint_interval',
@@ -11197,6 +11352,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0,
         max: 100,
         description: 'Save checkpoint every N epochs (0 = final only)',
+        section: 'advanced',
       },
       {
         name: 'mlx_lora_layers',
@@ -11206,6 +11362,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 64,
         description: 'Number of transformer layers to fine-tune (MLX only). Lower = less memory.',
+        section: 'advanced',
       },
       {
         name: 'prefer_framework',
@@ -11214,6 +11371,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'auto',
         options: ['auto', 'mlx', 'pytorch'],
         description: 'Force a specific training framework. \'auto\' detects the best available.',
+        section: 'advanced',
       },
     ],
     side_inputs: [
@@ -11352,6 +11510,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 256,
         description: 'Rank of the low-rank adaptation matrices',
+        section: 'lora',
       },
       {
         name: 'alpha',
@@ -11361,6 +11520,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 512,
         description: 'Scaling factor for LoRA weights',
+        section: 'lora',
       },
       {
         name: 'lora_dropout',
@@ -11370,6 +11530,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.5,
         description: 'Dropout probability for LoRA layers',
+        section: 'lora',
       },
       {
         name: 'target_modules',
@@ -11377,10 +11538,27 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'string',
         default: 'q_proj,v_proj',
         description: 'Comma-separated module names to apply LoRA to (e.g. q_proj,v_proj)',
+        section: 'lora',
       },
-      { name: 'lr', label: 'Learning Rate', type: 'float', default: 1e-04, min: 1e-07, max: 0.01 },
-      { name: 'epochs', label: 'Epochs', type: 'integer', default: 3, min: 1, max: 100 },
-      { name: 'batch_size', label: 'Batch Size', type: 'integer', default: 4, min: 1, max: 128 },
+      {
+        name: 'lr',
+        label: 'Learning Rate',
+        type: 'float',
+        default: 1e-04,
+        min: 1e-07,
+        max: 0.01,
+        section: 'training',
+      },
+      { name: 'epochs', label: 'Epochs', type: 'integer', default: 3, min: 1, max: 100, section: 'training' },
+      {
+        name: 'batch_size',
+        label: 'Batch Size',
+        type: 'integer',
+        default: 4,
+        min: 1,
+        max: 128,
+        section: 'training',
+      },
       {
         name: 'max_seq_length',
         label: 'Max Sequence Length',
@@ -11389,6 +11567,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 64,
         max: 32768,
         description: 'Maximum token length for training samples',
+        propagate: true,
+        section: 'training',
       },
       {
         name: 'text_column',
@@ -11396,6 +11576,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'string',
         default: '',
         description: 'JSON key containing training text (leave empty for auto-detect: \'text\' or first key)',
+        propagate: true,
       },
       {
         name: 'training_format',
@@ -11403,6 +11584,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'text_area',
         default: '',
         description: 'Template for structuring training examples. Use {text}, {instruction}, {output} placeholders.',
+        propagate: true,
       },
       {
         name: 'eval_split',
@@ -11412,6 +11594,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.3,
         description: 'Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)',
+        section: 'advanced',
       },
       {
         name: 'save_merged',
@@ -11419,6 +11602,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'boolean',
         default: false,
         description: 'Merge LoRA adapters into base model weights before saving (creates standalone model instead of adapter-only)',
+        section: 'advanced',
       },
       {
         name: 'checkpoint_interval',
@@ -11428,6 +11612,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0,
         max: 100,
         description: 'Save checkpoint every N epochs (0 = final only)',
+        section: 'advanced',
       },
       {
         name: 'mlx_lora_layers',
@@ -11437,6 +11622,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 64,
         description: 'Number of layers to apply LoRA to (MLX only). Lower = less memory, potentially less quality.',
+        section: 'advanced',
       },
       {
         name: 'prefer_framework',
@@ -11445,6 +11631,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'auto',
         options: ['auto', 'mlx', 'pytorch'],
         description: 'Force a specific training framework. \'auto\' detects the best available.',
+        section: 'advanced',
       },
     ],
     side_inputs: [
@@ -11506,6 +11693,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 256,
         description: 'Rank of the low-rank adaptation matrices',
+        section: 'lora',
       },
       {
         name: 'alpha',
@@ -11515,6 +11703,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 512,
         description: 'Scaling factor for LoRA weights',
+        section: 'lora',
       },
       {
         name: 'bits',
@@ -11539,6 +11728,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.5,
         description: 'Dropout probability for LoRA layers',
+        section: 'lora',
       },
       {
         name: 'target_modules',
@@ -11546,10 +11736,27 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'string',
         default: 'q_proj,v_proj',
         description: 'Comma-separated module names to apply LoRA to',
+        section: 'lora',
       },
-      { name: 'lr', label: 'Learning Rate', type: 'float', default: 2e-04, min: 1e-07, max: 0.01 },
-      { name: 'epochs', label: 'Epochs', type: 'integer', default: 3, min: 1, max: 100 },
-      { name: 'batch_size', label: 'Batch Size', type: 'integer', default: 4, min: 1, max: 128 },
+      {
+        name: 'lr',
+        label: 'Learning Rate',
+        type: 'float',
+        default: 2e-04,
+        min: 1e-07,
+        max: 0.01,
+        section: 'training',
+      },
+      { name: 'epochs', label: 'Epochs', type: 'integer', default: 3, min: 1, max: 100, section: 'training' },
+      {
+        name: 'batch_size',
+        label: 'Batch Size',
+        type: 'integer',
+        default: 4,
+        min: 1,
+        max: 128,
+        section: 'training',
+      },
       {
         name: 'max_seq_length',
         label: 'Max Sequence Length',
@@ -11558,6 +11765,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 64,
         max: 32768,
         description: 'Maximum token length for training samples',
+        propagate: true,
+        section: 'training',
       },
       {
         name: 'text_column',
@@ -11565,6 +11774,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'string',
         default: '',
         description: 'JSON key containing training text (leave empty for auto-detect: \'text\' or first key)',
+        propagate: true,
       },
       {
         name: 'training_format',
@@ -11572,6 +11782,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'text_area',
         default: '',
         description: 'Template for structuring training examples. Use {text}, {instruction}, {output} placeholders.',
+        propagate: true,
       },
       {
         name: 'eval_split',
@@ -11581,6 +11792,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0.0,
         max: 0.3,
         description: 'Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)',
+        section: 'advanced',
       },
       {
         name: 'save_merged',
@@ -11588,6 +11800,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'boolean',
         default: false,
         description: 'Merge QLoRA adapters into base model weights before saving (creates standalone model instead of adapter-only)',
+        section: 'advanced',
       },
       {
         name: 'checkpoint_interval',
@@ -11597,6 +11810,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 0,
         max: 100,
         description: 'Save checkpoint every N epochs (0 = final only)',
+        section: 'advanced',
       },
       {
         name: 'mlx_lora_layers',
@@ -11606,6 +11820,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         min: 1,
         max: 64,
         description: 'Number of layers to apply LoRA to (MLX only). Lower = less memory, potentially less quality.',
+        section: 'advanced',
       },
       {
         name: 'prefer_framework',
@@ -11614,6 +11829,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: 'auto',
         options: ['auto', 'mlx', 'pytorch'],
         description: 'Force a specific training framework. \'auto\' detects the best available.',
+        section: 'advanced',
       },
     ],
     side_inputs: [
