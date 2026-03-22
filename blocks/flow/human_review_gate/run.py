@@ -1,4 +1,4 @@
-"""Human Review Gate — pause pipeline for human review and approval before continuing."""
+"""Human Review Gate — pause pipeline for human review with optional scoring rubric."""
 
 import json
 import os
@@ -48,16 +48,58 @@ def _generate_data_summary(data):
     return summary
 
 
+def _parse_rubric(rubric_text):
+    """Parse rubric text into structured criteria.
+
+    Supported formats:
+      - Simple: 'accuracy, fluency, relevance' (defaults to 1-5 scale)
+      - Detailed: 'accuracy: 1-10\nfluency: 1-5\nrelevance: 1-5'
+    """
+    criteria = []
+    if not rubric_text.strip():
+        return [{"name": "overall", "min": 1, "max": 5}]
+
+    for part in rubric_text.replace(",", "\n").splitlines():
+        part = part.strip()
+        if not part:
+            continue
+        if ":" in part:
+            name, scale = part.split(":", 1)
+            name = name.strip()
+            scale = scale.strip()
+            if "-" in scale:
+                try:
+                    lo, hi = scale.split("-", 1)
+                    criteria.append({"name": name, "min": int(lo.strip()), "max": int(hi.strip())})
+                except ValueError:
+                    criteria.append({"name": name, "min": 1, "max": 5})
+            else:
+                criteria.append({"name": name, "min": 1, "max": 5})
+        else:
+            criteria.append({"name": part, "min": 1, "max": 5})
+    return criteria if criteria else [{"name": "overall", "min": 1, "max": 5}]
+
+
 def run(ctx):
-    review_prompt = ctx.config.get("review_prompt", "Review the data and approve to continue")
+    review_prompt = ctx.config.get("review_prompt",
+                                    ctx.config.get("review_criteria", "Review the data and approve to continue"))
     auto_approve_after_s = int(ctx.config.get("auto_approve_after_s", 0))
     require_comment = ctx.config.get("require_comment", False)
     poll_interval_s = int(ctx.config.get("poll_interval_s", 5))
     reviewer_name = ctx.config.get("reviewer_name", "").strip()
-    urgency = ctx.config.get("urgency", "normal").lower().strip()
+    urgency = ctx.config.get("urgency",
+                              ctx.config.get("priority", "normal")).lower().strip()
     auto_action = ctx.config.get("auto_action", "approve").lower().strip()
     display_fields = ctx.config.get("display_fields", "").strip()
     include_data_in_notes = ctx.config.get("include_data_in_notes", True)
+    decision_options = ctx.config.get("decision_options", "").strip()
+
+    # Scoring config
+    enable_scoring = ctx.config.get("enable_scoring", False)
+    scoring_rubric = ctx.config.get("scoring_rubric", "overall: 1-5")
+    require_score = ctx.config.get("require_score", True)
+    min_passing_score = float(ctx.config.get("min_passing_score", 0.0))
+    review_type = ctx.config.get("review_type", "approve_reject").lower().strip()
 
     ctx.log_message("Human Review Gate activated")
     ctx.report_progress(0, 4)
@@ -90,6 +132,14 @@ def run(ctx):
     now = datetime.now(timezone.utc)
     review_id = f"review_{now.strftime('%Y%m%d_%H%M%S')}"
 
+    # Parse rubric if scoring is enabled
+    rubric = _parse_rubric(scoring_rubric) if enable_scoring else None
+
+    # Parse custom decision options
+    custom_decisions = []
+    if decision_options:
+        custom_decisions = [d.strip() for d in decision_options.split(",") if d.strip()]
+
     review_request = {
         "review_id": review_id,
         "status": "pending",
@@ -101,6 +151,13 @@ def run(ctx):
         "urgency": urgency,
         "data_summary": data_summary,
     }
+    if enable_scoring:
+        review_request["review_type"] = review_type
+        review_request["rubric"] = rubric
+        review_request["require_score"] = require_score
+        review_request["min_passing_score"] = min_passing_score
+    if custom_decisions:
+        review_request["decision_options"] = custom_decisions
 
     # Write review request file
     request_path = os.path.join(ctx.run_dir, "review_request.json")
@@ -140,9 +197,15 @@ def run(ctx):
     ctx.log_message("WAITING FOR HUMAN REVIEW")
     ctx.log_message("=" * 60)
     ctx.log_message(f"To APPROVE: create {approval_path}")
-    ctx.log_message('  Contents: {"approved": true, "comment": "Looks good"}')
+    if enable_scoring:
+        ctx.log_message('  Contents: {"approved": true, "scores": {"accuracy": 4, "fluency": 5}, "comment": "Good"}')
+        ctx.log_message(f"  Rubric: {rubric}")
+    else:
+        ctx.log_message('  Contents: {"approved": true, "comment": "Looks good"}')
     ctx.log_message(f"To REJECT:  create {approval_path}")
     ctx.log_message('  Contents: {"approved": false, "comment": "Reason..."}')
+    if custom_decisions:
+        ctx.log_message(f"Custom decision options: {custom_decisions}")
     if auto_approve_after_s > 0:
         ctx.log_message(f"Timeout: {auto_approve_after_s}s → auto-{auto_action}")
     else:
@@ -151,50 +214,88 @@ def run(ctx):
 
     # ---- Step 3: Poll for approval ----
     ctx.report_progress(3, 4)
-    approved = None
-    reviewer_comment = None
+    decision = None
     start_time = time.time()
 
-    while approved is None:
+    while decision is None:
         # Check for approval file
         if os.path.isfile(approval_path):
             try:
                 with open(approval_path, "r", encoding="utf-8") as f:
                     decision = json.load(f)
-                approved = bool(decision.get("approved", False))
-                reviewer_comment = decision.get("comment", "")
-                reviewer = decision.get("reviewer", "unknown")
 
-                if require_comment and not reviewer_comment:
+                if require_comment and not decision.get("comment", ""):
                     ctx.log_message("Comment required but not provided — waiting for comment...")
-                    approved = None
+                    decision = None
                     time.sleep(poll_interval_s)
                     continue
 
-                ctx.log_message(f"Review decision received: {'APPROVED' if approved else 'REJECTED'}")
-                if reviewer_comment:
-                    ctx.log_message(f"Reviewer comment: {reviewer_comment}")
+                ctx.log_message("Review decision received")
                 break
             except (json.JSONDecodeError, ValueError):
                 ctx.log_message("WARNING: review_approval.json is malformed, waiting...")
+                decision = None
 
-        # Check timeout — auto_action determines approve or reject
+        # Check timeout
         elapsed = time.time() - start_time
         if auto_approve_after_s > 0 and elapsed >= auto_approve_after_s:
-            if auto_action == "reject":
-                approved = False
-                reviewer_comment = f"Auto-rejected after {auto_approve_after_s}s timeout (no reviewer responded)"
-                ctx.log_message(f"Auto-REJECTED: timeout of {auto_approve_after_s}s reached")
-            else:
-                approved = True
-                reviewer_comment = f"Auto-approved after {auto_approve_after_s}s timeout (no reviewer responded)"
-                ctx.log_message(f"Auto-approved: timeout of {auto_approve_after_s}s reached")
+            auto_approved = auto_action != "reject"
+            decision = {
+                "approved": auto_approved,
+                "comment": f"Auto-{auto_action}ed after {auto_approve_after_s}s timeout (no reviewer responded)",
+            }
+            if enable_scoring and auto_approved and rubric:
+                decision["scores"] = {c["name"]: c["max"] for c in rubric}
+            ctx.log_message(f"Auto-{auto_action}ed: timeout of {auto_approve_after_s}s reached")
             break
 
         time.sleep(poll_interval_s)
 
-    # ---- Step 4: Produce outputs ----
+    # ---- Step 4: Process decision and route outputs ----
     ctx.report_progress(4, 4)
+
+    approved = bool(decision.get("approved", False))
+    reviewer_comment = decision.get("comment", decision.get("notes", ""))
+    reviewer = decision.get("reviewer", "unknown")
+    scores = decision.get("scores", {})
+    chosen_decision = decision.get("decision", "")
+
+    # Handle custom decision options
+    if custom_decisions and chosen_decision:
+        ctx.log_message(f"Custom decision: {chosen_decision}")
+
+    # In scoring_only mode, approval is determined by score vs min_passing_score
+    if enable_scoring and review_type == "scoring_only":
+        approved = True  # default to pass; overridden below if score too low
+
+    # Calculate normalized score if scoring is enabled
+    avg_score = None
+    if enable_scoring and scores and rubric:
+        total_normalized = 0.0
+        count = 0
+        for criterion in rubric:
+            name = criterion["name"]
+            if name in scores:
+                raw = float(scores[name])
+                # Validate range
+                if raw < criterion["min"] or raw > criterion["max"]:
+                    ctx.log_message(
+                        f"WARNING: score for '{name}' ({raw}) is outside "
+                        f"rubric range [{criterion['min']}-{criterion['max']}]"
+                    )
+                normalized = (raw - criterion["min"]) / max(criterion["max"] - criterion["min"], 1)
+                total_normalized += normalized
+                count += 1
+                ctx.log_metric(f"score_{name}", raw)
+        avg_score = total_normalized / max(count, 1)
+        ctx.log_metric("avg_normalized_score", avg_score)
+
+        # Override approval if min_passing_score is set and score is below
+        if min_passing_score > 0 and avg_score < min_passing_score:
+            ctx.log_message(
+                f"Score {avg_score:.3f} is below minimum {min_passing_score} — overriding to REJECTED"
+            )
+            approved = False
 
     decision_time = datetime.now(timezone.utc)
     status_record["status"] = "approved" if approved else "rejected"
@@ -215,6 +316,13 @@ def run(ctx):
         "created_at": now.isoformat(),
         "decided_at": decision_time.isoformat(),
     }
+    if enable_scoring:
+        review_notes["review_type"] = review_type
+        review_notes["scores"] = scores
+        review_notes["avg_normalized_score"] = avg_score
+        review_notes["rubric"] = rubric
+    if chosen_decision:
+        review_notes["decision_label"] = chosen_decision
     if include_data_in_notes:
         review_notes["data_summary"] = data_summary
 
@@ -223,17 +331,15 @@ def run(ctx):
         json.dump(review_notes, f, indent=2, default=str, ensure_ascii=False)
 
     if approved:
-        # Branch: data approved
         ctx.save_output("approved", data)
-        # Branch: data approved
         ctx.save_output("rejected", None)
-        ctx.log_message("GATE PASSED: data approved and forwarded downstream")
+        score_info = f" (score: {avg_score:.3f})" if avg_score is not None else ""
+        ctx.log_message(f"GATE PASSED: data approved and forwarded downstream{score_info}")
     else:
-        # Branch: data rejected
         ctx.save_output("approved", None)
-        # Branch: data rejected
         ctx.save_output("rejected", data)
-        ctx.log_message("GATE BLOCKED: data was rejected")
+        score_info = f" (score: {avg_score:.3f})" if avg_score is not None else ""
+        ctx.log_message(f"GATE BLOCKED: data was rejected{score_info}")
 
     ctx.save_output("review_notes", review_notes)
     ctx.save_artifact("review_request", request_path)

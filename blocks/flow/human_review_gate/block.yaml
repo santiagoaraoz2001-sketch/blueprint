@@ -1,8 +1,9 @@
 name: Human Review Gate
 type: human_review_gate
 category: interventions
-description: Pause pipeline for human review — blocks execution until a reviewer approves or rejects via an approval file
-version: "1.0.0"
+description: Pause pipeline for human review — blocks execution until a reviewer approves or rejects, with optional scoring rubric
+version: "1.1.0"
+aliases: [manual_review]
 
 inputs:
   - id: data
@@ -22,9 +23,9 @@ outputs:
   - id: review_notes
     label: Review Notes
     data_type: metrics
-    description: "JSON: {review_id, approved, reviewer_comment, urgency, created_at, decided_at, data_summary}"
+    description: "JSON: {review_id, approved, reviewer_comment, urgency, created_at, decided_at, data_summary, scores (if scoring enabled)}"
+    aliases: [metrics, notes]
 
-    aliases: [metrics]
 config:
   review_prompt:
     type: text_area
@@ -76,6 +77,51 @@ config:
     label: Include Data Summary in Notes
     default: true
     description: "Include a data preview in the review_notes output (disable to reduce output size)"
+  decision_options:
+    type: string
+    label: Custom Decision Labels
+    default: ""
+    description: "Comma-separated custom labels for reviewers (e.g., 'safe, flagged, escalate, remove'). Empty = standard approve/reject."
+  enable_scoring:
+    type: boolean
+    label: Enable Scoring
+    default: false
+    description: "Enable scoring rubric for structured reviews with numeric scores per criterion"
+  scoring_rubric:
+    type: text_area
+    label: Scoring Rubric
+    default: "overall: 1-5"
+    description: "One criterion per line. Format: 'name: min-max' (e.g., 'accuracy: 1-5'). Comma-separated also works."
+    depends_on:
+      field: enable_scoring
+      value: true
+  require_score:
+    type: boolean
+    label: Require Score
+    default: true
+    description: "Whether scores must be provided with the review decision"
+    depends_on:
+      field: enable_scoring
+      value: true
+  min_passing_score:
+    type: float
+    label: Min Passing Score (0-1)
+    default: 0.0
+    min: 0
+    max: 1
+    description: "Minimum normalized score to pass. 0 = no minimum (purely manual decision)."
+    depends_on:
+      field: enable_scoring
+      value: true
+  review_type:
+    type: select
+    label: Review Type
+    default: "approve_reject"
+    options: ["approve_reject", "scoring_only"]
+    description: "approve_reject = reviewer decides pass/fail; scoring_only = approval determined by score vs min_passing_score"
+    depends_on:
+      field: enable_scoring
+      value: true
 
 side_inputs:
   - id: _loop

@@ -472,8 +472,8 @@ export default function BlocksReference() {
               <span style={code}>composite: true</span> in block.yaml)
             </li>
             <li>
-              Example: <span style={code}>debate_composite</span> wires 3 LLM instances (pessimist,
-              optimist, judge) as a sub-pipeline
+              Example: <span style={code}>multi_agent_debate</span> orchestrates multiple LLM instances
+              with distinct personas to debate a topic
             </li>
             <li>Useful for multi-agent architectures that should appear as one unit on the canvas</li>
           </ul>

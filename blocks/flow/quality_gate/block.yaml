@@ -2,7 +2,8 @@ name: Quality Gate
 type: quality_gate
 category: interventions
 description: Auto-check data quality and metrics against configurable thresholds — computes quality metrics automatically from data
-version: "1.0.0"
+version: "1.1.0"
+aliases: [checkpoint_gate]
 
 inputs:
   - id: data
@@ -46,8 +47,13 @@ config:
     type: select
     label: Operator
     default: ">="
-    options: [">=", ">", "<=", "<", "=="]
+    options: [">=", ">", "<=", "<", "==", "!="]
     description: "Comparison operator"
+  label:
+    type: string
+    label: Gate Label
+    default: ""
+    description: "A label for this gate (shown in logs and reports)"
   on_fail:
     type: select
     label: On Fail

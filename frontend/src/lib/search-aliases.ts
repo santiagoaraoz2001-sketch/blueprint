@@ -84,21 +84,17 @@ export const BLOCK_ALIASES: Record<string, string[]> = {
   artifact_viewer: ['view', 'inspect', 'browse', 'artifact viewer'],
   knowledge_graph_builder: ['knowledge graph', 'graph', 'entities', 'relations', 'ontology'],
   // Intervention blocks
-  manual_review: ['manual review', 'human scoring', 'rubric', 'annotate', 'score', 'quality review'],
-  notification_hub: ['telegram', 'slack', 'email alert', 'messaging', 'multi-channel', 'notification hub'],
+  human_review_gate: ['manual review', 'human scoring', 'rubric', 'annotate', 'score', 'quality review', 'approve', 'reject', 'human gate'],
+  notification_hub: ['telegram', 'slack', 'email alert', 'messaging', 'multi-channel', 'notification hub', 'webhook', 'desktop alert', 'log', 'notify'],
+  quality_gate: ['quality check', 'threshold', 'pass/fail', 'validation gate', 'metric check', 'checkpoint'],
   agentic_review_loop: ['agentic review', 'LLM judge', 'iterative', 'self-critique', 'auto-review', 'refinement loop'],
   ab_split_test: ['A/B test', 'split test', 'comparison', 'experiment', 'bucket test', 'variant'],
-  quality_gate: ['quality check', 'threshold', 'pass/fail', 'validation gate', 'metric check'],
   rollback_point: ['rollback', 'snapshot', 'undo', 'recovery', 'restore point', 'state save'],
   // Save blocks
-  save_csv: ['export CSV', 'write CSV', 'save spreadsheet', 'CSV output'],
-  save_txt: ['export text', 'write text', 'save TXT', 'plain text export'],
-  save_json: ['export JSON', 'write JSON', 'JSONL output', 'save structured'],
-  save_parquet: ['export Parquet', 'write Parquet', 'columnar export', 'arrow export'],
+  data_export: ['export', 'save', 'write', 'CSV', 'JSON', 'JSONL', 'Parquet', 'YAML', 'TXT', 'text', 'spreadsheet', 'columnar', 'structured', 'config export', 'output file'],
   save_pdf: ['export PDF', 'write PDF', 'PDF report', 'document export'],
   save_model: ['export model', 'save weights', 'save checkpoint', 'serialize model'],
   save_embeddings: ['export embeddings', 'save vectors', 'vector export', 'FAISS export'],
-  save_yaml: ['export YAML', 'write YAML', 'config export', 'save config'],
 }
 
 /** Category-level aliases */

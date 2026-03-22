@@ -27,6 +27,7 @@ _OPERATORS = {
     "<=": lambda a, b: a <= b,
     "<": lambda a, b: a < b,
     "==": lambda a, b: abs(a - b) < 1e-9,
+    "!=": lambda a, b: abs(a - b) >= 1e-9,
 }
 
 
@@ -78,14 +79,19 @@ def run(ctx):
     metric_name = ctx.config.get("metric_name", "accuracy")
     threshold = float(ctx.config.get("threshold", 0.8))
     operator = ctx.config.get("operator", ">=")
+    label = ctx.config.get("label", "").strip()
     on_fail = ctx.config.get("on_fail", "route_rejected")
+    # Backward compat: checkpoint_gate used "route_fail" instead of "route_rejected"
+    if on_fail == "route_fail":
+        on_fail = "route_rejected"
     auto_compute_quality = ctx.config.get("auto_compute_quality", True)
     additional_checks = ctx.config.get("additional_checks", "").strip()
     match_mode = ctx.config.get("match_mode", "all").lower().strip()
     required_columns = ctx.config.get("required_columns", "").strip()
     report_detail = ctx.config.get("report_detail", "detailed").lower().strip()
 
-    ctx.log_message(f"Quality Gate: checking '{metric_name}' {operator} {threshold}")
+    label_prefix = f" [{label}]" if label else ""
+    ctx.log_message(f"Quality Gate{label_prefix}: checking '{metric_name}' {operator} {threshold}")
     ctx.report_progress(0, 3)
 
     # ---- Step 1: Load inputs ----
@@ -218,6 +224,8 @@ def run(ctx):
         "passed_checks": sum(1 for r in results if r["passed"]),
         "failed_checks": sum(1 for r in results if not r["passed"]),
     }
+    if label:
+        report["label"] = label
     if report_detail == "detailed":
         report["checks"] = results
         report["all_metrics"] = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
