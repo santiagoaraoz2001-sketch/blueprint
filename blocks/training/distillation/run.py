@@ -44,6 +44,12 @@ except ImportError:
         return model_name
 
 
+def _has_gpu():
+    """Check for GPU: CUDA or Apple MPS."""
+    import torch
+    return torch.cuda.is_available() or (hasattr(torch.backends, "mps") and torch.backends.mps.is_available())
+
+
 def run(ctx):
     dataset_path = ctx.resolve_as_file_path("dataset")
 
@@ -150,7 +156,7 @@ def run(ctx):
         output_dir = os.path.join(ctx.run_dir, "model")
         os.makedirs(output_dir, exist_ok=True)
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else "cpu"))
         ctx.log_message(f"Device: {device}")
 
         # Load teacher and student
@@ -158,7 +164,7 @@ def run(ctx):
         teacher_tokenizer = AutoTokenizer.from_pretrained(teacher_name, trust_remote_code=True)
         teacher_model = AutoModelForCausalLM.from_pretrained(
             teacher_name, trust_remote_code=True,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            torch_dtype=torch.float16 if _has_gpu() else torch.float32,
         ).to(device)
         teacher_model.eval()
 
@@ -166,7 +172,7 @@ def run(ctx):
         student_tokenizer = AutoTokenizer.from_pretrained(student_name, trust_remote_code=True)
         student_model = AutoModelForCausalLM.from_pretrained(
             student_name, trust_remote_code=True,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            torch_dtype=torch.float16 if _has_gpu() else torch.float32,
         ).to(device)
 
         if student_tokenizer.pad_token is None:

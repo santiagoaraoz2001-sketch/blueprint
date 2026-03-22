@@ -47,6 +47,12 @@ except ImportError:
         return model_name
 
 
+def _has_gpu():
+    """Check for GPU: CUDA or Apple MPS."""
+    import torch
+    return torch.cuda.is_available() or (hasattr(torch.backends, "mps") and torch.backends.mps.is_available())
+
+
 def run(ctx):
     dataset_path = ctx.resolve_as_file_path("dataset")
 
@@ -184,7 +190,7 @@ def run(ctx):
 
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            torch_dtype=torch.float16 if _has_gpu() else torch.float32,
             trust_remote_code=True,
         )
         ctx.log_message(f"Model loaded. Parameters: {sum(p.numel() for p in model.parameters()):,}")
@@ -255,7 +261,7 @@ def run(ctx):
             logging_steps=max(1, len(train_dataset) // (batch_size * 10)),
             save_strategy="epoch",
             eval_strategy="epoch" if eval_dataset else "no",
-            fp16=torch.cuda.is_available(),
+            fp16=_has_gpu(),
             report_to="none",
             disable_tqdm=True,
         )

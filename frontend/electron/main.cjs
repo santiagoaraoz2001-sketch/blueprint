@@ -17,6 +17,14 @@ const path = require("path");
 const http = require("http");
 const { pid: electronPid } = process;
 
+/* ── GPU Acceleration ─────────────────────────────────────────────── */
+
+// Ensure Chromium uses the GPU for rendering (especially on macOS Apple Silicon)
+app.commandLine.appendSwitch("enable-gpu-rasterization");
+app.commandLine.appendSwitch("enable-zero-copy");
+app.commandLine.appendSwitch("ignore-gpu-blocklist");
+app.commandLine.appendSwitch("enable-native-gpu-memory-buffers");
+
 /* ── Globals ───────────────────────────────────────────────────────── */
 
 let mainWindow = null;
