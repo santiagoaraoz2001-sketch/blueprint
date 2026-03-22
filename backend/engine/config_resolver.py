@@ -133,6 +133,105 @@ def _get_all_propagation_keys() -> set[str]:
     return keys
 
 
+@lru_cache(maxsize=256)
+def _load_file_path_fields(block_dir: str) -> frozenset[str]:
+    """Load config field names that have type ``file_path`` from block.yaml."""
+    schema_path = Path(block_dir) / "block.yaml"
+    if not schema_path.exists():
+        return frozenset()
+    try:
+        with open(schema_path) as f:
+            schema = yaml.safe_load(f) or {}
+        config_section = schema.get("config", {})
+        if not isinstance(config_section, dict):
+            return frozenset()
+        file_path_fields = set()
+        for field_name, field_def in config_section.items():
+            if isinstance(field_def, dict) and field_def.get("type") == "file_path":
+                file_path_fields.add(field_name)
+        return frozenset(file_path_fields)
+    except Exception:
+        return frozenset()
+
+
+def _get_workspace_settings():
+    """Load workspace settings from DB. Returns (root_path, auto_fill_paths) or (None, False)."""
+    try:
+        from ..database import SessionLocal
+        from ..models.workspace import WorkspaceSettings
+        session = SessionLocal()
+        try:
+            ws = session.query(WorkspaceSettings).filter_by(id="default").first()
+            if ws and ws.root_path and ws.auto_fill_paths:
+                return ws.root_path, True
+            return None, False
+        finally:
+            session.close()
+    except Exception:
+        return None, False
+
+
+def _inject_workspace_defaults(
+    topo_order: list[str],
+    node_map: dict[str, dict],
+    schema_defaults: dict[str, dict],
+    categories: dict[str, str],
+    find_block_dir_fn,
+) -> None:
+    """Replace schema-default file_path values with workspace absolute paths.
+
+    Only replaces values that match the schema default (i.e., not user-overridden).
+    This runs BEFORE propagation so workspace paths can flow downstream too.
+    """
+    root_path, auto_fill = _get_workspace_settings()
+    if not root_path or not auto_fill:
+        return
+
+    from ..services.workspace_manager import WorkspaceManager
+    manager = WorkspaceManager(root_path)
+
+    for node_id in topo_order:
+        node = node_map.get(node_id)
+        if not node or node.get("type") == "groupNode":
+            continue
+
+        node_data = node.get("data", {})
+        block_type = node_data.get("type", "")
+        category = categories.get(node_id, "")
+        node_config = node_data.get("config", {})
+        defaults = schema_defaults.get(node_id, {})
+
+        # Find file_path fields for this block
+        block_dir = None
+        try:
+            block_dir = find_block_dir_fn(block_type)
+        except (ValueError, OSError):
+            pass
+
+        if not block_dir:
+            continue
+
+        file_path_fields = _load_file_path_fields(str(block_dir))
+        if not file_path_fields:
+            continue
+
+        for field_name in file_path_fields:
+            current_value = node_config.get(field_name, defaults.get(field_name))
+            schema_default = defaults.get(field_name)
+
+            # Only replace if value matches schema default (not user-overridden)
+            if _is_user_override(field_name, current_value, schema_default):
+                continue
+
+            workspace_path = manager.resolve_output_path(block_type, field_name, category)
+            if workspace_path:
+                node_config[field_name] = workspace_path
+                logger.debug(
+                    "Workspace auto-fill: %s.%s → %s",
+                    block_type, field_name, workspace_path,
+                )
+
+
 def resolve_configs(
     nodes: list[dict],
     edges: list[dict],
@@ -202,6 +301,9 @@ def resolve_configs(
         else:
             schema_defaults[node_id] = {}
             block_prop_keys[node_id] = frozenset()
+
+    # Phase 1.5: Inject workspace defaults for file_path fields
+    _inject_workspace_defaults(topo_order, node_map, schema_defaults, categories, find_block_dir_fn)
 
     # Phase 2: Walk DAG in topo order, propagating values
     resolved: dict[str, dict] = {}

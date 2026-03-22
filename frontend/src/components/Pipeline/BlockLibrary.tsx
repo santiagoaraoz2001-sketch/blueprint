@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { T, F, FS, CONNECTOR_COLORS, CATEGORY_COLORS } from '@/lib/design-tokens'
-import { getBlocksByCategory, getPortColor, type BlockDefinition, BLOCK_REGISTRY } from '@/lib/block-registry'
+import { getBlocksByCategory, getPortColor, type BlockDefinition, BLOCK_REGISTRY, isPortCompatible, getBlockDefinition } from '@/lib/block-registry'
 import { BLOCK_ALIASES, CATEGORY_ALIASES } from '@/lib/search-aliases'
 import BlockTooltip from './BlockTooltip'
 import BlockDetailPanel from './BlockDetailPanel'
@@ -10,7 +10,7 @@ import { usePipelineStore } from '@/stores/pipelineStore'
 import { useIsSimpleMode } from '@/hooks/useIsSimpleMode'
 import * as Icons from 'lucide-react'
 
-const { Search, ChevronRight, ChevronDown, Plus, Sparkles } = Icons
+const { Search, ChevronRight, ChevronDown, Plus, Sparkles, Zap } = Icons
 
 const CATEGORY_ORDER = ['external', 'data', 'model', 'inference', 'training', 'metrics', 'embedding', 'utilities', 'agents', 'interventions', 'endpoints']
 
@@ -58,6 +58,66 @@ export default function BlockLibrary() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const blocksByCategory = getBlocksByCategory()
   const isSimple = useIsSimpleMode()
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // "/" keyboard shortcut to focus search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+      if (e.key === '/' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // Smart add: find best open port and auto-wire
+  const handleSmartAdd = useCallback((blockType: string) => {
+    const state = usePipelineStore.getState()
+    const { nodes, edges } = state
+    const def = getBlockDefinition(blockType)
+    if (!def) return
+
+    // Find the best open port to connect to
+    const connectedSources = new Set(edges.map((e) => `${e.source}:${e.sourceHandle}`))
+    const connectedTargets = new Set(edges.map((e) => `${e.target}:${e.targetHandle}`))
+
+    // Try to connect to an open output (this block goes downstream)
+    for (const node of nodes) {
+      const nodeDef = getBlockDefinition(node.data?.type)
+      if (!nodeDef) continue
+      for (const out of nodeDef.outputs) {
+        if (connectedSources.has(`${node.id}:${out.id}`)) continue
+        const compatible = def.inputs.some((inp) => isPortCompatible(out.dataType, inp.dataType))
+        if (compatible) {
+          state.addNodeAndConnect(blockType, { nodeId: node.id, portId: out.id, direction: 'downstream' })
+          return
+        }
+      }
+    }
+
+    // Try to connect to an open required input (this block goes upstream)
+    for (const node of nodes) {
+      const nodeDef = getBlockDefinition(node.data?.type)
+      if (!nodeDef) continue
+      for (const inp of nodeDef.inputs) {
+        if (!inp.required) continue
+        if (connectedTargets.has(`${node.id}:${inp.id}`)) continue
+        const compatible = def.outputs.some((out) => isPortCompatible(out.dataType, inp.dataType))
+        if (compatible) {
+          state.addNodeAndConnect(blockType, { nodeId: node.id, portId: inp.id, direction: 'upstream' })
+          return
+        }
+      }
+    }
+
+    // No compatible open port — just add at center
+    state.addNode(blockType, { x: 300, y: 300 })
+  }, [])
 
   // Custom modules
   const [customBlocks, setCustomBlocks] = useState<CustomBlock[]>(() => loadCustomBlocks())
@@ -233,6 +293,7 @@ export default function BlockLibrary() {
       >
         <Search size={14} color={T.dim} />
         <input
+          ref={searchInputRef}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search components..."
@@ -247,6 +308,15 @@ export default function BlockLibrary() {
             width: '100%',
           }}
         />
+        {!search && (
+          <span style={{
+            fontFamily: F, fontSize: '9px', color: T.dim,
+            background: T.surface4, padding: '1px 5px', borderRadius: 3,
+            opacity: 0.6, flexShrink: 0,
+          }}>
+            /
+          </span>
+        )}
       </div>
 
       {/* Generate with AI button */}
@@ -311,6 +381,7 @@ export default function BlockLibrary() {
                     onMouseEnter={(e) => handleItemHover(block.type, e.currentTarget.getBoundingClientRect())}
                     onMouseLeave={handleItemLeave}
                     onDuplicate={(type) => { setDuplicateTarget(type); setShowCustomEditor(true) }}
+                    onSmartAdd={handleSmartAdd}
                   />
                 ))}
               </div>
@@ -378,6 +449,7 @@ export default function BlockLibrary() {
                       onDragStart={onDragStart}
                       onMouseEnter={(e) => handleItemHover(b.type, e.currentTarget.getBoundingClientRect())}
                       onMouseLeave={handleItemLeave}
+                      onSmartAdd={handleSmartAdd}
                       onClick={(type) => setDetailBlock(type)}
                     />
                   ))}
@@ -388,13 +460,13 @@ export default function BlockLibrary() {
         })}
       </div>
 
-      {/* Category bar */}
-      <CategoryBar onCategoryClick={(cat) => setCategoryPopup(cat)} categories={effectiveCategoryOrder} />
+      {/* Connector type legend bar */}
+      <ConnectorLegend onConnectorClick={(ct) => setCategoryPopup(ct)} />
 
-      {/* Category detail popup */}
+      {/* Connector detail popup */}
       {categoryPopup && (
-        <CategoryDetailPopup
-          category={categoryPopup}
+        <ConnectorDetailPopup
+          connectorType={categoryPopup}
           onClose={() => setCategoryPopup(null)}
           onBlockClick={(type) => { setCategoryPopup(null); setDetailBlock(type) }}
         />
@@ -442,6 +514,7 @@ function BlockItem({
   onMouseLeave,
   onDuplicate,
   onClick,
+  onSmartAdd,
 }: {
   block: BlockDefinition
   tourId?: string
@@ -450,6 +523,7 @@ function BlockItem({
   onMouseLeave: () => void
   onDuplicate?: (blockType: string) => void
   onClick?: (blockType: string) => void
+  onSmartAdd?: (blockType: string) => void
 }) {
   const [hovered, setHovered] = useState(false)
   const IconComponent = (Icons as any)[block.icon] || Icons.Box
@@ -610,6 +684,20 @@ function BlockItem({
             </div>
           )}
         </div>
+        {hovered && onSmartAdd && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onSmartAdd(block.type) }}
+            title="Add to canvas & auto-connect"
+            style={{
+              background: `${T.green}18`, border: `1px solid ${T.green}35`, borderRadius: 4,
+              color: T.green, cursor: 'pointer', padding: '2px 6px', display: 'flex',
+              alignItems: 'center', gap: 2,
+            }}
+          >
+            <Zap size={8} />
+            <Plus size={8} />
+          </button>
+        )}
         {hovered && onDuplicate && (
           <button
             onClick={(e) => { e.stopPropagation(); onDuplicate(block.type) }}
@@ -642,8 +730,24 @@ const CATEGORY_DESCRIPTIONS: Record<string, { summary: string; connectorNote: st
   endpoints:     { summary: 'Terminal blocks that persist or export pipeline results — save to files, push to APIs, databases, and HuggingFace Hub.',     connectorNote: 'Consumes dataset, text, model, config, or any connectors. No outputs (true sinks).' },
 }
 
-/* ── CategoryBar — 10 category buttons at the bottom ── */
-function CategoryBar({ onCategoryClick, categories }: { onCategoryClick: (cat: string) => void; categories: string[] }) {
+/* ── Connector type descriptions for legend popup ── */
+const CONNECTOR_DESCRIPTIONS: Record<string, { label: string; summary: string; examples: string }> = {
+  dataset:   { label: 'Dataset',   summary: 'Structured tabular data — CSV rows, Parquet tables, HuggingFace datasets. The primary data format for training, evaluation, and transforms.', examples: 'CSV files, Parquet tables, JSONL, HuggingFace datasets' },
+  text:      { label: 'Text',      summary: 'Raw text strings — prompts, documents, generated output. Used for LLM input/output and text processing pipelines.', examples: 'Prompts, completions, documents, Markdown' },
+  model:     { label: 'Model',     summary: 'Model weights, adapters, and checkpoints. Connects model loading/training to inference or export blocks.', examples: 'LoRA adapters, safetensors, GGUF files, checkpoints' },
+  config:    { label: 'Config',    summary: 'Configuration objects and hyperparameters. Passes settings between blocks for consistent pipeline behavior.', examples: 'Generation params, training hyperparams, API settings' },
+  metrics:   { label: 'Metrics',   summary: 'Evaluation scores, benchmark results, and statistical outputs. Connects evaluation blocks to reports and loggers.', examples: 'Accuracy scores, BLEU/ROUGE, perplexity, custom metrics' },
+  embedding: { label: 'Embedding', summary: 'Vector embeddings for similarity search, clustering, and RAG. Dense numerical representations of text or data.', examples: 'Sentence embeddings, document vectors, index files' },
+  artifact:  { label: 'Artifact',  summary: 'Generic files, reports, and exported assets. Catch-all for non-structured outputs like PDFs, images, or packages.', examples: 'PDF reports, ZIP archives, images, HTML files' },
+  agent:     { label: 'Agent',     summary: 'Autonomous agent instances with tools and memory. Connects agent orchestrators to downstream processing.', examples: 'ReAct agents, tool-using agents, multi-agent systems' },
+  llm:       { label: 'LLM',       summary: 'LLM provider configuration — API keys, model names, and generation settings. Connects model selectors to inference blocks.', examples: 'OpenAI config, Ollama endpoint, HuggingFace model ID' },
+  any:       { label: 'Any',       summary: 'Universal connector — accepts or produces any data type. Used by flow control blocks (branching, looping, gates) for type-agnostic routing.', examples: 'Pass-through, conditional routing, fan-out/fan-in' },
+}
+
+const CONNECTOR_ORDER = ['dataset', 'text', 'model', 'config', 'metrics', 'embedding', 'artifact', 'agent', 'llm', 'any']
+
+/* ── ConnectorLegend — bottom bar showing connector types as a legend ── */
+function ConnectorLegend({ onConnectorClick }: { onConnectorClick: (ct: string) => void }) {
   const [hovered, setHovered] = useState<string | null>(null)
   return (
     <div style={{
@@ -654,14 +758,21 @@ function CategoryBar({ onCategoryClick, categories }: { onCategoryClick: (cat: s
       gap: 1,
       alignItems: 'center',
     }}>
-      {categories.map((cat) => {
-        const color = CATEGORY_COLORS[cat] || T.dim
-        const isHov = hovered === cat
+      <span style={{
+        fontFamily: F, fontSize: 6, color: T.dim, letterSpacing: '0.08em',
+        fontWeight: 700, marginRight: 2, textTransform: 'uppercase',
+      }}>
+        WIRES
+      </span>
+      {CONNECTOR_ORDER.map((ct) => {
+        const color = CONNECTOR_COLORS[ct] || T.dim
+        const isHov = hovered === ct
+        const desc = CONNECTOR_DESCRIPTIONS[ct]
         return (
           <button
-            key={cat}
-            onClick={() => onCategoryClick(cat)}
-            onMouseEnter={() => setHovered(cat)}
+            key={ct}
+            onClick={() => onConnectorClick(ct)}
+            onMouseEnter={() => setHovered(ct)}
             onMouseLeave={() => setHovered(null)}
             style={{
               display: 'flex',
@@ -677,8 +788,8 @@ function CategoryBar({ onCategoryClick, categories }: { onCategoryClick: (cat: s
             }}
           >
             <span style={{
-              width: 4,
-              height: 4,
+              width: 5,
+              height: 5,
               background: color,
               borderRadius: '50%',
               display: 'block',
@@ -693,7 +804,7 @@ function CategoryBar({ onCategoryClick, categories }: { onCategoryClick: (cat: s
               fontWeight: 600,
               transition: 'color 0.15s',
             }}>
-              {cat}
+              {desc?.label || ct}
             </span>
           </button>
         )
@@ -702,28 +813,23 @@ function CategoryBar({ onCategoryClick, categories }: { onCategoryClick: (cat: s
   )
 }
 
-/* ── CategoryDetailPopup — full detail overlay for a category ── */
-function CategoryDetailPopup({
-  category,
+/* ── ConnectorDetailPopup — detail overlay for a connector type ── */
+function ConnectorDetailPopup({
+  connectorType,
   onClose,
   onBlockClick,
 }: {
-  category: string
+  connectorType: string
   onClose: () => void
   onBlockClick: (blockType: string) => void
 }) {
-  const color = CATEGORY_COLORS[category] || T.dim
-  const label = CATEGORY_LABELS[category] || category.toUpperCase()
-  const desc = CATEGORY_DESCRIPTIONS[category]
-  const blocks = Object.values(BLOCK_REGISTRY).filter(b => b.category === category)
-  const hasConnector = ['external', 'data', 'model', 'inference', 'training', 'metrics', 'embedding', 'agents', 'endpoints'].includes(category)
+  const color = CONNECTOR_COLORS[connectorType] || T.dim
+  const desc = CONNECTOR_DESCRIPTIONS[connectorType]
+  if (!desc) { onClose(); return null }
 
-  // Collect unique port types used by blocks in this category
-  const portTypes = new Set<string>()
-  blocks.forEach(b => {
-    b.inputs.forEach(p => portTypes.add(p.dataType))
-    b.outputs.forEach(p => portTypes.add(p.dataType))
-  })
+  // Find blocks that use this connector type as input or output
+  const inputBlocks = BLOCK_REGISTRY.filter(b => !b.deprecated && b.inputs.some(p => p.dataType === connectorType))
+  const outputBlocks = BLOCK_REGISTRY.filter(b => !b.deprecated && b.outputs.some(p => p.dataType === connectorType))
 
   return (
     <div
@@ -766,13 +872,13 @@ function CategoryDetailPopup({
               boxShadow: `0 0 10px ${color}80`,
             }} />
             <span style={{ fontFamily: F, fontSize: FS.md, color, fontWeight: 900, letterSpacing: '0.08em' }}>
-              {label}
+              {desc.label.toUpperCase()}
             </span>
             <span style={{
               marginLeft: 'auto', fontFamily: F, fontSize: FS.xxs, color: T.dim,
               background: T.surface3, padding: '2px 8px', borderRadius: 4,
             }}>
-              {blocks.length} blocks
+              wire type
             </span>
             <button
               onClick={onClose}
@@ -785,71 +891,95 @@ function CategoryDetailPopup({
             </button>
           </div>
           <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec, lineHeight: 1.5 }}>
-            {desc?.summary || ''}
+            {desc.summary}
           </div>
         </div>
 
-        {/* Connector info */}
+        {/* Examples */}
         <div style={{ padding: '8px 16px', borderBottom: `1px solid ${T.border}`, background: `${color}06` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{
-              fontFamily: F, fontSize: 7, fontWeight: 700, letterSpacing: '0.08em',
-              color: hasConnector ? color : T.dim,
-              textTransform: 'uppercase',
-            }}>
-              {hasConnector ? '● HAS CONNECTOR TYPE' : '○ NO DEDICATED CONNECTOR'}
-            </span>
+          <div style={{
+            fontFamily: F, fontSize: 7, fontWeight: 700, letterSpacing: '0.08em',
+            color, textTransform: 'uppercase', marginBottom: 4,
+          }}>
+            EXAMPLES
           </div>
-          <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, marginTop: 3, lineHeight: 1.4 }}>
-            {desc?.connectorNote || ''}
+          <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, lineHeight: 1.4 }}>
+            {desc.examples}
           </div>
-          {portTypes.size > 0 && (
-            <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
-              {Array.from(portTypes).map(pt => (
-                <span key={pt} style={{
-                  fontFamily: F, fontSize: 7, color: CONNECTOR_COLORS[pt] || T.dim,
-                  background: `${CONNECTOR_COLORS[pt] || T.dim}12`,
-                  border: `1px solid ${CONNECTOR_COLORS[pt] || T.dim}25`,
-                  padding: '1px 5px', borderRadius: 3,
-                }}>
-                  {pt}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
-        {/* Block list */}
+        {/* Blocks that use this connector */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px', scrollbarWidth: 'thin' }}>
-          <div style={{ fontFamily: F, fontSize: 7, color: T.dim, letterSpacing: '0.1em', fontWeight: 700, padding: '4px 8px', marginBottom: 2 }}>
-            BLOCKS IN THIS CATEGORY
-          </div>
-          {blocks.map(b => {
-            const IconComp = (Icons as any)[b.icon] || Icons.Box
-            return (
-              <button
-                key={b.type}
-                onClick={() => onBlockClick(b.type)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  width: '100%', padding: '6px 8px',
-                  background: 'transparent', border: 'none', borderRadius: 4,
-                  cursor: 'pointer', textAlign: 'left',
-                  transition: 'background 0.1s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = `${color}12` }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-              >
-                <IconComp size={11} color={color} style={{ flexShrink: 0 }} />
-                <span style={{ fontFamily: F, fontSize: FS.xxs, color: b.deprecated ? T.dim : T.sec, fontWeight: 500, opacity: b.deprecated ? 0.6 : 1 }}>
-                  {b.name}
-                </span>
-                {b.deprecated && <span style={{ ...BADGE_STYLES.deprecated, fontSize: '6px', padding: '0px 3px', borderRadius: 2, marginLeft: 'auto' }}>DEPRECATED</span>}
-                {b.recommended && <span style={{ ...BADGE_STYLES.recommended, fontSize: '6px', padding: '0px 3px', borderRadius: 2, marginLeft: 'auto' }}>RECOMMENDED</span>}
-                {(() => { const m = getMaturityLabel(b); return m && <span style={{ ...BADGE_STYLES[m === 'BETA' ? 'beta' : 'experimental'], fontSize: '6px', padding: '0px 3px', borderRadius: 2, marginLeft: 'auto' }}>{m}</span> })()}
-              </button>
-            )
-          })}
+          {outputBlocks.length > 0 && (
+            <>
+              <div style={{ fontFamily: F, fontSize: 7, color: T.green, letterSpacing: '0.1em', fontWeight: 700, padding: '4px 8px', marginBottom: 2 }}>
+                PRODUCES {desc.label.toUpperCase()} ({outputBlocks.length})
+              </div>
+              {outputBlocks.slice(0, 8).map(b => {
+                const IconComp = (Icons as any)[b.icon] || Icons.Box
+                return (
+                  <button
+                    key={b.type}
+                    onClick={() => onBlockClick(b.type)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      width: '100%', padding: '5px 8px',
+                      background: 'transparent', border: 'none', borderRadius: 4,
+                      cursor: 'pointer', textAlign: 'left',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = `${color}12` }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                  >
+                    <IconComp size={10} color={b.accent} style={{ flexShrink: 0 }} />
+                    <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec, fontWeight: 500 }}>
+                      {b.name}
+                    </span>
+                  </button>
+                )
+              })}
+              {outputBlocks.length > 8 && (
+                <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, padding: '2px 8px' }}>
+                  +{outputBlocks.length - 8} more
+                </div>
+              )}
+            </>
+          )}
+          {inputBlocks.length > 0 && (
+            <>
+              <div style={{ fontFamily: F, fontSize: 7, color: T.cyan, letterSpacing: '0.1em', fontWeight: 700, padding: '4px 8px', marginTop: 6, marginBottom: 2 }}>
+                CONSUMES {desc.label.toUpperCase()} ({inputBlocks.length})
+              </div>
+              {inputBlocks.slice(0, 8).map(b => {
+                const IconComp = (Icons as any)[b.icon] || Icons.Box
+                return (
+                  <button
+                    key={b.type}
+                    onClick={() => onBlockClick(b.type)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      width: '100%', padding: '5px 8px',
+                      background: 'transparent', border: 'none', borderRadius: 4,
+                      cursor: 'pointer', textAlign: 'left',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = `${color}12` }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                  >
+                    <IconComp size={10} color={b.accent} style={{ flexShrink: 0 }} />
+                    <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec, fontWeight: 500 }}>
+                      {b.name}
+                    </span>
+                  </button>
+                )
+              })}
+              {inputBlocks.length > 8 && (
+                <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, padding: '2px 8px' }}>
+                  +{inputBlocks.length - 8} more
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

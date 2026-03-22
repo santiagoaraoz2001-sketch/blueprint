@@ -4,13 +4,15 @@ import { getBlockDefinition, getFileFormatWarning, type ConfigField, type Connec
 import { usePresetStore } from '@/stores/presetStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getIcon } from '@/lib/icon-utils'
-import { Trash2, X, Save, ChevronDown, ChevronRight, AlertTriangle, GitBranch, FolderOpen, Search, Copy, ClipboardPaste, RotateCcw, Info } from 'lucide-react'
+import { Trash2, X, Save, ChevronDown, ChevronRight, AlertTriangle, GitBranch, FolderOpen, Search, Copy, ClipboardPaste, RotateCcw, Info, Zap, ArrowRight, Plus } from 'lucide-react'
 import type { Node } from '@xyflow/react'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { api } from '@/api/client'
-import RecommendedBlocks from './RecommendedBlocks'
+import RecommendedBlocks, { computeRecommendations, type Recommendation } from './RecommendedBlocks'
 import { useIsSimpleMode } from '@/hooks/useIsSimpleMode'
 import InheritedFieldBadge from './InheritedFieldBadge'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 import toast from 'react-hot-toast'
 
 export default function BlockConfig() {
@@ -44,6 +46,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
   const selectNode = usePipelineStore((s) => s.selectNode)
   const edges = usePipelineStore((s) => s.edges)
   const nodes = usePipelineStore((s) => s.nodes)
+  const addNodeAndConnect = usePipelineStore((s) => s.addNodeAndConnect)
   const activateInheritanceOverlay = usePipelineStore((s) => s.activateInheritanceOverlay)
   const resolvedConfigs = usePipelineStore((s) => s.resolvedConfigs)
   const propagationKeys = usePipelineStore((s) => s.propagationKeys)
@@ -233,21 +236,44 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
   // Config Inheritance summary section state
   const [showInheritanceSummary, setShowInheritanceSummary] = useState(false)
 
+  // Delete confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
   // Config search
   const [searchQuery, setSearchQuery] = useState('')
   const showSearch = (displayFields?.length || 0) >= 6
 
-  // Filter fields by search
+  // Filter fields by search, sort mandatory first
   const filteredFields = useMemo(() => {
     if (!displayFields) return []
-    if (!searchQuery.trim()) return displayFields
-    const q = searchQuery.toLowerCase()
-    return displayFields.filter(f =>
-      f.name.toLowerCase().includes(q) ||
-      f.label.toLowerCase().includes(q) ||
-      (f.description || '').toLowerCase().includes(q)
-    )
+    let fields = displayFields
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      fields = fields.filter(f =>
+        f.name.toLowerCase().includes(q) ||
+        f.label.toLowerCase().includes(q) ||
+        (f.description || '').toLowerCase().includes(q)
+      )
+    }
+    // Sort: mandatory fields first, then optional
+    return [...fields].sort((a, b) => {
+      if (a.mandatory && !b.mandatory) return -1
+      if (!a.mandatory && b.mandatory) return 1
+      return 0
+    })
   }, [displayFields, searchQuery])
+
+  // Mandatory field completion tracking
+  const mandatoryStats = useMemo(() => {
+    if (!displayFields) return { total: 0, filled: 0 }
+    const mandatory = displayFields.filter(f => f.mandatory)
+    const filled = mandatory.filter(f => {
+      const val = node.data.config[f.name]
+      const inherited = inheritedConfig[f.name]
+      return (val !== undefined && val !== null && val !== '' && String(val) !== String(f.default ?? '')) || !!inherited
+    })
+    return { total: mandatory.length, filled: filled.length }
+  }, [displayFields, node.data.config, inheritedConfig])
 
   // Group fields by section
   const groupedFields = useMemo(() => {
@@ -577,6 +603,17 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
           >
             CONFIGURATION
           </span>
+          {mandatoryStats.total > 0 && (
+            <span style={{
+              fontFamily: F,
+              fontSize: FS.xxs,
+              color: mandatoryStats.filled === mandatoryStats.total ? T.green : T.amber,
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+            }}>
+              {mandatoryStats.filled}/{mandatoryStats.total} required
+            </span>
+          )}
           <div style={{ flex: 1, height: 1, background: T.border }} />
           {/* Copy/Paste buttons */}
           <button
@@ -689,6 +726,9 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
           ))}
         </div>
 
+        {/* Next Steps — recommend blocks to add & auto-wire */}
+        <NextStepsSection nodeId={node.id} nodes={nodes} edges={edges} addNodeAndConnect={addNodeAndConnect} />
+
         {/* Inputs/Outputs info */}
         {def && (def.inputs.length > 0 || def.outputs.length > 0) && (
           <div style={{ marginTop: 32 }}>
@@ -739,7 +779,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
         }}
       >
         <button
-          onClick={() => removeNode(node.id)}
+          onClick={() => setShowDeleteConfirm(true)}
           className="hover-glow"
           style={{
             width: '100%',
@@ -767,6 +807,16 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
           DELETE BLOCK
         </button>
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Block"
+        message={`Remove "${node.data.label}" from the pipeline? This will also remove its connections.`}
+        confirmLabel="Delete"
+        confirmColor={T.red}
+        onConfirm={() => { setShowDeleteConfirm(false); removeNode(node.id) }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </motion.div>
   )
 }
@@ -887,8 +937,11 @@ function ConfigFieldInput({
 
   const hasError = !!validationError
 
-  // Left border accent: red for error, blue for inherited, orange for overridden inherited
-  const leftBorderColor = hasError ? T.red : isInherited ? T.blue : isOverriddenInherited ? T.orange : 'transparent'
+  // Mandatory empty field highlight
+  const isMandatoryEmpty = field.mandatory && !isInherited && (value === '' || value === undefined || value === null)
+
+  // Left border accent: red for error, amber for mandatory empty, blue for inherited, orange for overridden inherited
+  const leftBorderColor = hasError ? T.red : isMandatoryEmpty ? T.amber : isInherited ? T.blue : isOverriddenInherited ? T.orange : 'transparent'
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -943,7 +996,18 @@ function ConfigFieldInput({
       >
         {field.label}
         {field.mandatory && (
-          <span style={{ color: T.red, fontWeight: 900, marginLeft: 2 }}>*</span>
+          <>
+            <span style={{ color: T.red, fontWeight: 900, marginLeft: 2 }}>*</span>
+            {isMandatoryEmpty && (
+              <span style={{
+                fontFamily: F, fontSize: '7px', color: T.amber, fontWeight: 700,
+                padding: '1px 4px', background: `${T.amber}12`, border: `1px solid ${T.amber}25`,
+                borderRadius: 3, letterSpacing: '0.06em',
+              }}>
+                REQUIRED
+              </span>
+            )}
+          </>
         )}
         {/* Description tooltip icon */}
         {field.description && (
@@ -1055,19 +1119,44 @@ function ConfigFieldInput({
           ))}
         </select>
       ) : field.type === 'boolean' ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             onClick={() => onChange(!value)}
             style={{
-              ...inputStyle,
-              flex: 1,
-              textAlign: 'left',
-              color: isInherited ? T.blue : (value ? T.cyan : T.dim),
+              position: 'relative',
+              width: 36,
+              height: 20,
+              borderRadius: 10,
+              border: 'none',
+              background: (isInherited ? fieldInfo.effectiveValue : value)
+                ? `${T.cyan}40`
+                : T.surface4,
               cursor: 'pointer',
+              transition: 'background 0.2s',
+              flexShrink: 0,
+              padding: 0,
             }}
           >
-            {isInherited ? (fieldInfo.effectiveValue ? 'ON' : 'OFF') : (value ? 'ON' : 'OFF')}
+            <div style={{
+              position: 'absolute',
+              top: 2,
+              left: (isInherited ? fieldInfo.effectiveValue : value) ? 18 : 2,
+              width: 16,
+              height: 16,
+              borderRadius: '50%',
+              background: (isInherited ? fieldInfo.effectiveValue : value) ? T.cyan : T.dim,
+              transition: 'left 0.2s, background 0.2s',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            }} />
           </button>
+          <span style={{
+            fontFamily: F,
+            fontSize: FS.xs,
+            color: isInherited ? T.blue : ((isInherited ? fieldInfo.effectiveValue : value) ? T.cyan : T.dim),
+            fontWeight: 600,
+          }}>
+            {(isInherited ? fieldInfo.effectiveValue : value) ? 'ON' : 'OFF'}
+          </span>
         </div>
       ) : field.type === 'text_area' ? (
         <textarea
@@ -1081,27 +1170,49 @@ function ConfigFieldInput({
           }}
         />
       ) : field.type === 'integer' ? (
-        <input
-          type="number"
-          value={isInherited ? '' : (value === '' ? '' : Number(value))}
-          placeholder={inheritedPlaceholder}
-          onChange={(e) => onChange(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-          min={field.min}
-          max={field.max}
-          step={1}
-          style={inputStyle}
-        />
+        <div>
+          <input
+            type="number"
+            value={isInherited ? '' : (value === '' ? '' : Number(value))}
+            placeholder={inheritedPlaceholder}
+            onChange={(e) => onChange(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+            min={field.min}
+            max={field.max}
+            step={1}
+            style={inputStyle}
+          />
+          {field.min !== undefined && field.max !== undefined && (
+            <NumberSlider
+              value={isInherited ? fieldInfo.effectiveValue : value}
+              min={field.min}
+              max={field.max}
+              step={1}
+              onChange={(v) => onChange(Math.round(v))}
+            />
+          )}
+        </div>
       ) : field.type === 'float' ? (
-        <input
-          type="number"
-          value={isInherited ? '' : (value === '' ? '' : Number(value))}
-          placeholder={inheritedPlaceholder}
-          onChange={(e) => onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-          min={field.min}
-          max={field.max}
-          step={0.01}
-          style={inputStyle}
-        />
+        <div>
+          <input
+            type="number"
+            value={isInherited ? '' : (value === '' ? '' : Number(value))}
+            placeholder={inheritedPlaceholder}
+            onChange={(e) => onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+            min={field.min}
+            max={field.max}
+            step={0.01}
+            style={inputStyle}
+          />
+          {field.min !== undefined && field.max !== undefined && (
+            <NumberSlider
+              value={isInherited ? fieldInfo.effectiveValue : value}
+              min={field.min}
+              max={field.max}
+              step={0.01}
+              onChange={(v) => onChange(parseFloat(v.toFixed(2)))}
+            />
+          )}
+        </div>
       ) : field.type === 'file_path' ? (
         <FilePathInput
           value={isInherited ? '' : String(value)}
@@ -1198,6 +1309,24 @@ function FilePathInput({
 }) {
   const [browsing, setBrowsing] = useState(false)
   const pathMode = inferPathMode(field)
+  const { paths, autoFillEnabled } = useWorkspaceStore()
+
+  // Determine if workspace auto-fill applies to this field
+  const workspacePath = useMemo(() => {
+    if (!autoFillEnabled || Object.keys(paths).length === 0) return null
+    // Check if this field has a workspace path based on common field names
+    const fieldName = field.name.toLowerCase()
+    if (fieldName.includes('output') || fieldName === 'save_path' || fieldName === 'export_path') {
+      return paths.outputs_exports || paths.outputs_inference || null
+    }
+    if (fieldName === 'cache_dir' || fieldName === 'model_path' || fieldName === 'local_path') {
+      return paths.models_base || null
+    }
+    if (fieldName === 'file_path' || fieldName === 'data_path' || fieldName === 'input_path') {
+      return paths.datasets_raw || null
+    }
+    return null
+  }, [autoFillEnabled, paths, field.name])
 
   const handleBrowse = useCallback(async () => {
     if (browsing) return
@@ -1247,45 +1376,58 @@ function FilePathInput({
     }
   }, [browsing, pathMode, field, value, onChange])
 
+  const isDefaultValue = !value || value === './output' || value === field.default
+
   return (
-    <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
-      <input
-        type="text"
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ ...inputStyle, flex: 1 }}
-      />
-      <button
-        onClick={handleBrowse}
-        disabled={browsing}
-        title={pathMode === 'directory' ? 'Browse for folder' : 'Browse for file'}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '0 8px',
-          background: `${T.text}08`,
-          border: `1px solid ${T.text}15`,
-          borderRadius: 4,
-          color: browsing ? T.dim : T.cyan,
-          cursor: browsing ? 'wait' : 'pointer',
-          transition: 'all 0.15s ease',
-          flexShrink: 0,
-        }}
-        onMouseEnter={(e) => {
-          if (!browsing) {
-            e.currentTarget.style.background = `${T.cyan}18`
-            e.currentTarget.style.borderColor = `${T.cyan}40`
-          }
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = `${T.text}08`
-          e.currentTarget.style.borderColor = `${T.text}15`
-        }}
-      >
-        <FolderOpen size={13} />
-      </button>
+    <div>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
+        <input
+          type="text"
+          value={value}
+          placeholder={workspacePath && isDefaultValue ? workspacePath : placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ ...inputStyle, flex: 1 }}
+        />
+        <button
+          onClick={handleBrowse}
+          disabled={browsing}
+          title={pathMode === 'directory' ? 'Browse for folder' : 'Browse for file'}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 8px',
+            background: `${T.text}08`,
+            border: `1px solid ${T.text}15`,
+            borderRadius: 4,
+            color: browsing ? T.dim : T.cyan,
+            cursor: browsing ? 'wait' : 'pointer',
+            transition: 'all 0.15s ease',
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            if (!browsing) {
+              e.currentTarget.style.background = `${T.cyan}18`
+              e.currentTarget.style.borderColor = `${T.cyan}40`
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = `${T.text}08`
+            e.currentTarget.style.borderColor = `${T.text}15`
+          }}
+        >
+          <FolderOpen size={13} />
+        </button>
+      </div>
+      {workspacePath && isDefaultValue && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4, marginTop: 4,
+          fontFamily: F, fontSize: '8px', color: T.green, lineHeight: 1.3,
+        }}>
+          <FolderOpen size={8} />
+          <span>Workspace auto-fill: {workspacePath.split('/').slice(-2).join('/')}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -1478,6 +1620,148 @@ function PresetSelector({ blockType, nodeId, currentConfig }: { blockType: strin
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ── Number Slider for bounded fields ── */
+function NumberSlider({ value, min, max, step, onChange }: {
+  value: any
+  min: number
+  max: number
+  step: number
+  onChange: (v: number) => void
+}) {
+  const numValue = typeof value === 'number' ? value : (typeof value === 'string' && value !== '' ? parseFloat(value) : min)
+  const percent = max > min ? ((numValue - min) / (max - min)) * 100 : 0
+
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ position: 'relative', height: 20, display: 'flex', alignItems: 'center' }}>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={numValue}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          style={{
+            width: '100%',
+            height: 4,
+            appearance: 'none',
+            WebkitAppearance: 'none',
+            background: `linear-gradient(to right, ${T.cyan} 0%, ${T.cyan} ${percent}%, ${T.surface4} ${percent}%, ${T.surface4} 100%)`,
+            borderRadius: 2,
+            outline: 'none',
+            cursor: 'pointer',
+          }}
+        />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ fontFamily: F, fontSize: '7px', color: T.dim }}>{min}</span>
+        <span style={{ fontFamily: F, fontSize: '7px', color: T.dim }}>{max}</span>
+      </div>
+    </div>
+  )
+}
+
+/* ── Next Steps Section — shows recommended blocks scoped to current node ── */
+function NextStepsSection({ nodeId, nodes, edges, addNodeAndConnect }: {
+  nodeId: string
+  nodes: any[]
+  edges: any[]
+  addNodeAndConnect: (type: string, connectTo: { nodeId: string; portId: string; direction: 'upstream' | 'downstream' }) => void
+}) {
+  const recs = useMemo(() => {
+    if (nodes.length === 0) return []
+    const { inputBlocks, outputBlocks } = computeRecommendations(nodes, edges)
+    // Filter to only recs that connect to THIS node
+    const relevant = [...inputBlocks, ...outputBlocks].filter(
+      (r) => r.connectTo?.nodeId === nodeId
+    )
+    return relevant.slice(0, 3)
+  }, [nodes, edges, nodeId])
+
+  if (recs.length === 0) return null
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <span
+        style={{
+          fontFamily: F, fontSize: FS.xs, color: T.dim,
+          letterSpacing: '0.16em', fontWeight: 900, textTransform: 'uppercase',
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
+        }}
+      >
+        <Zap size={10} color={T.green} />
+        NEXT STEPS
+        <div style={{ flex: 1, height: 1, background: T.border }} />
+      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {recs.map((rec) => {
+          const IconComp = getIcon(rec.block.icon)
+          const accent = rec.block.accent || T.cyan
+          return (
+            <button
+              key={rec.block.type}
+              onClick={() => {
+                if (rec.connectTo) {
+                  addNodeAndConnect(rec.block.type, rec.connectTo)
+                }
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 10px',
+                background: `${T.green}08`,
+                border: `1px solid ${T.green}20`,
+                borderRadius: 6,
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = `${T.green}15`
+                e.currentTarget.style.borderColor = `${T.green}40`
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = `${T.green}08`
+                e.currentTarget.style.borderColor = `${T.green}20`
+              }}
+            >
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 20, height: 20, borderRadius: 4,
+                background: `${accent}15`, flexShrink: 0,
+              }}>
+                <IconComp size={10} color={accent} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontFamily: F, fontSize: FS.xs, color: T.text,
+                  fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {rec.block.name}
+                </div>
+                <div style={{ fontFamily: F, fontSize: '7px', color: T.dim, lineHeight: 1.3 }}>
+                  {rec.reason}
+                </div>
+              </div>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 3,
+                padding: '3px 8px', borderRadius: 4,
+                background: `${T.green}15`, border: `1px solid ${T.green}30`,
+                flexShrink: 0,
+              }}>
+                <Plus size={8} color={T.green} />
+                <span style={{ fontFamily: F, fontSize: '7px', color: T.green, fontWeight: 700 }}>
+                  ADD
+                </span>
+                <ArrowRight size={7} color={T.green} />
+              </div>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

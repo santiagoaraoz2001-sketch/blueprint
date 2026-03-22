@@ -10,7 +10,8 @@ import {
   BackgroundVariant,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { T, F, FS } from '@/lib/design-tokens'
+import { T, F, FD, FS } from '@/lib/design-tokens'
+import { LayoutTemplate, Sparkles as SparklesIcon, Search as SearchIcon } from 'lucide-react'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useShallow } from 'zustand/react/shallow'
 import { getBlockDefinition, getPortColor, isPortCompatible, resolvePort, findBestInputPort, type PortDefinition } from '@/lib/block-registry'
@@ -30,7 +31,7 @@ const nodeTypes: NodeTypes = {
   groupNode: GroupNode as any,
 }
 
-export default function PipelineCanvas() {
+export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onShowTemplates?: () => void; onShowAgent?: () => void } = {}) {
   const { fitView, flowToScreenPosition } = useReactFlow()
   const {
     nodes,
@@ -421,6 +422,11 @@ export default function PipelineCanvas() {
           e.preventDefault()
           usePipelineStore.getState().removeSelectedNodes()
         }
+      } else if (meta && e.key === 'Enter') {
+        // Cmd/Ctrl+Enter to run pipeline
+        e.preventDefault()
+        const runBtn = document.querySelector('[data-tour="btn-run-pipeline"]') as HTMLButtonElement
+        if (runBtn) runBtn.click()
       }
     }
 
@@ -483,6 +489,7 @@ export default function PipelineCanvas() {
         flex: 1,
         height: '100%',
         position: 'relative',
+        overflow: 'hidden',
         transition: 'box-shadow 0.2s',
         boxShadow: isDragOver ? `inset 0 0 0 2px ${T.cyan}60, inset 0 0 40px ${T.cyan}10` : 'none',
       }}
@@ -535,6 +542,94 @@ export default function PipelineCanvas() {
           }}
         />
       </div>
+      {/* Empty canvas guidance — contained within canvas, not overlapping sidebars */}
+      {nodes.length === 0 && (
+        <div style={{
+          position: 'absolute',
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 10,
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          pointerEvents: 'none', gap: 20,
+          maxWidth: 360,
+        }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 10,
+            background: `${T.cyan}10`, border: `1px solid ${T.cyan}20`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <SparklesIcon size={22} color={T.cyan} strokeWidth={1.2} />
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontFamily: FD, fontSize: 16, color: T.sec,
+              fontWeight: 500, letterSpacing: '0.04em', marginBottom: 4,
+            }}>
+              Start building your pipeline
+            </div>
+            <div style={{
+              fontFamily: F, fontSize: FS.xs, color: T.dim,
+              maxWidth: 280, lineHeight: 1.5,
+            }}>
+              Drag a block from the library, or use one of the options below
+            </div>
+          </div>
+          <div style={{
+            display: 'flex', gap: 8, pointerEvents: 'auto',
+          }}>
+            {onShowTemplates && (
+              <button
+                onClick={onShowTemplates}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  padding: '12px 14px', background: `${T.blue}08`,
+                  border: `1px solid ${T.blue}25`, borderRadius: 8,
+                  cursor: 'pointer', transition: 'all 0.15s', minWidth: 90,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = `${T.blue}15`; e.currentTarget.style.borderColor = `${T.blue}40` }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = `${T.blue}08`; e.currentTarget.style.borderColor = `${T.blue}25` }}
+              >
+                <LayoutTemplate size={16} color={T.blue} />
+                <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.blue, fontWeight: 700 }}>Templates</span>
+              </button>
+            )}
+            {onShowAgent && (
+              <button
+                onClick={onShowAgent}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  padding: '12px 14px', background: `${T.purple}08`,
+                  border: `1px solid ${T.purple}25`, borderRadius: 8,
+                  cursor: 'pointer', transition: 'all 0.15s', minWidth: 90,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = `${T.purple}15`; e.currentTarget.style.borderColor = `${T.purple}40` }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = `${T.purple}08`; e.currentTarget.style.borderColor = `${T.purple}25` }}
+              >
+                <SparklesIcon size={16} color={T.purple} />
+                <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.purple, fontWeight: 700 }}>AI Generate</span>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                const el = document.querySelector('input[placeholder="Search components..."]') as HTMLInputElement
+                if (el) { el.focus(); el.select() }
+              }}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                padding: '12px 14px', background: `${T.cyan}08`,
+                border: `1px solid ${T.cyan}25`, borderRadius: 8,
+                cursor: 'pointer', transition: 'all 0.15s', minWidth: 90,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}15`; e.currentTarget.style.borderColor = `${T.cyan}40` }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = `${T.cyan}08`; e.currentTarget.style.borderColor = `${T.cyan}25` }}
+            >
+              <SearchIcon size={16} color={T.cyan} />
+              <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.cyan, fontWeight: 700 }}>Add Block</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <ReactFlow
         nodes={nodes}
         edges={coloredEdges}

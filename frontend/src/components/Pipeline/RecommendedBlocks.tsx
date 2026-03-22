@@ -1,30 +1,32 @@
 import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { T, F, FS } from '@/lib/design-tokens'
-import { BLOCK_REGISTRY, type BlockDefinition, isPortCompatible, getPortNames } from '@/lib/block-registry'
+import { BLOCK_REGISTRY, type BlockDefinition, isPortCompatible, getPortNames, findBestInputPort } from '@/lib/block-registry'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { getIcon } from '@/lib/icon-utils'
-import { Sparkles, Plus, Lightbulb, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
+import { Sparkles, Plus, Lightbulb, ArrowDownToLine, ArrowUpFromLine, Zap } from 'lucide-react'
 
 /**
  * RecommendedBlocks — persistent right-side panel that analyzes the current
  * pipeline and suggests blocks the user might want to add next.
  *
- * Recommendation logic:
- * 1. Find all unconnected output ports → suggest compatible downstream blocks
- * 2. Find all unconnected required input ports → suggest compatible upstream blocks
- * 3. Detect missing pipeline patterns (e.g., training without evaluation)
- * 4. Prioritize by relevance score
- * 5. Display in two sections: Input Blocks (producers) and Output Blocks (consumers)
+ * Now with AUTO-WIRING: clicking a recommendation adds the block AND connects
+ * it to the relevant open port automatically.
  */
 
-interface Recommendation {
+export interface Recommendation {
   block: BlockDefinition
   reason: string
   score: number
+  // Connection info for auto-wiring
+  connectTo?: {
+    nodeId: string
+    portId: string
+    direction: 'upstream' | 'downstream'
+  }
 }
 
-interface SplitRecommendations {
+export interface SplitRecommendations {
   inputBlocks: Recommendation[]
   outputBlocks: Recommendation[]
 }
@@ -49,6 +51,7 @@ function SectionHeader({ icon: Icon, label, accent }: { icon: any; label: string
 function RecommendationCard({ rec, onAdd }: { rec: Recommendation; onAdd: () => void }) {
   const IconComp = getIcon(rec.block.icon)
   const accent = rec.block.accent || T.cyan
+  const hasAutoWire = !!rec.connectTo
   return (
     <div
       style={{
@@ -90,10 +93,24 @@ function RecommendationCard({ rec, onAdd }: { rec: Recommendation; onAdd: () => 
         </div>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: 18, height: 18, borderRadius: 4,
-          background: `${accent}10`, flexShrink: 0,
+          gap: 2,
+          height: 18, borderRadius: 4,
+          padding: hasAutoWire ? '0 6px' : undefined,
+          width: hasAutoWire ? 'auto' : 18,
+          background: hasAutoWire ? `${T.green}15` : `${accent}10`,
+          border: hasAutoWire ? `1px solid ${T.green}30` : 'none',
+          flexShrink: 0,
         }}>
-          <Plus size={10} color={accent} />
+          {hasAutoWire ? (
+            <>
+              <Zap size={8} color={T.green} />
+              <span style={{ fontFamily: F, fontSize: '7px', color: T.green, fontWeight: 700, letterSpacing: '0.04em' }}>
+                ADD
+              </span>
+            </>
+          ) : (
+            <Plus size={10} color={accent} />
+          )}
         </div>
       </div>
 
@@ -102,6 +119,13 @@ function RecommendationCard({ rec, onAdd }: { rec: Recommendation; onAdd: () => 
         fontFamily: F, fontSize: '8px', color: T.dim,
         lineHeight: 1.4, marginLeft: 30,
       }}>
+        {hasAutoWire ? (
+          <>
+            <Zap size={7} color={T.green} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />
+            <span style={{ color: T.green }}>Auto-connects</span>
+            {' · '}
+          </>
+        ) : null}
         {rec.reason}
       </div>
     </div>
@@ -109,8 +133,8 @@ function RecommendationCard({ rec, onAdd }: { rec: Recommendation; onAdd: () => 
 }
 
 export default function RecommendedBlocks() {
-  const { nodes, edges, addNode } = usePipelineStore(useShallow((s) => ({
-    nodes: s.nodes, edges: s.edges, addNode: s.addNode,
+  const { nodes, edges, addNode, addNodeAndConnect } = usePipelineStore(useShallow((s) => ({
+    nodes: s.nodes, edges: s.edges, addNode: s.addNode, addNodeAndConnect: s.addNodeAndConnect,
   })))
 
   const { inputBlocks, outputBlocks } = useMemo<SplitRecommendations>(() => {
@@ -120,11 +144,15 @@ export default function RecommendedBlocks() {
     return computeRecommendations(nodes, edges)
   }, [nodes, edges])
 
-  const handleAdd = (blockType: string) => {
-    const lastNode = nodes[nodes.length - 1]
-    const x = lastNode ? (lastNode.position?.x ?? 200) + 50 : 200
-    const y = lastNode ? (lastNode.position?.y ?? 200) + 280 : 200
-    addNode(blockType, { x, y })
+  const handleAdd = (rec: Recommendation) => {
+    if (rec.connectTo) {
+      addNodeAndConnect(rec.block.type, rec.connectTo)
+    } else {
+      const lastNode = nodes[nodes.length - 1]
+      const x = lastNode ? (lastNode.position?.x ?? 200) + 50 : 200
+      const y = lastNode ? (lastNode.position?.y ?? 200) + 280 : 200
+      addNode(rec.block.type, { x, y })
+    }
   }
 
   const hasAny = inputBlocks.length > 0 || outputBlocks.length > 0
@@ -170,7 +198,7 @@ export default function RecommendedBlocks() {
             fontFamily: F, fontSize: '7px', color: T.dim,
             letterSpacing: '0.04em',
           }}>
-            Based on your pipeline
+            Click to add &amp; auto-connect
           </div>
         </div>
       </div>
@@ -194,7 +222,7 @@ export default function RecommendedBlocks() {
                   <RecommendationCard
                     key={`in-${rec.block.type}-${idx}`}
                     rec={rec}
-                    onAdd={() => handleAdd(rec.block.type)}
+                    onAdd={() => handleAdd(rec)}
                   />
                 ))}
               </>
@@ -206,7 +234,7 @@ export default function RecommendedBlocks() {
                   <RecommendationCard
                     key={`out-${rec.block.type}-${idx}`}
                     rec={rec}
-                    onAdd={() => handleAdd(rec.block.type)}
+                    onAdd={() => handleAdd(rec)}
                   />
                 ))}
               </>
@@ -235,7 +263,7 @@ function getEmptyPipelineRecommendations(): Recommendation[] {
     .filter(Boolean) as Recommendation[]
 }
 
-function computeRecommendations(
+export function computeRecommendations(
   nodes: any[],
   edges: any[],
 ): SplitRecommendations {
@@ -248,7 +276,7 @@ function computeRecommendations(
     edges.map((e) => `${e.source}:${e.sourceHandle}`)
   )
 
-  const openOutputs: { nodeType: string; portType: string; portLabel: string; portNames: Set<string> }[] = []
+  const openOutputs: { nodeId: string; nodeType: string; portId: string; portType: string; portLabel: string; portNames: Set<string> }[] = []
   for (const node of nodes) {
     const def = BLOCK_REGISTRY.find((b) => b.type === node.data?.type)
     if (!def) continue
@@ -256,7 +284,9 @@ function computeRecommendations(
       const key = `${node.id}:${out.id}`
       if (!connectedSources.has(key)) {
         openOutputs.push({
+          nodeId: node.id,
           nodeType: def.type,
+          portId: out.id,
           portType: out.dataType,
           portLabel: out.label,
           portNames: new Set(getPortNames(out)),
@@ -285,6 +315,11 @@ function computeRecommendations(
             block: candidate,
             reason: `Connects to open "${open.portLabel}" output`,
             score: 3 + aliasBonus,
+            connectTo: {
+              nodeId: open.nodeId,
+              portId: open.portId,
+              direction: 'downstream',
+            },
           })
         }
       }
@@ -296,7 +331,7 @@ function computeRecommendations(
     edges.map((e) => `${e.target}:${e.targetHandle}`)
   )
 
-  const openInputs: { nodeType: string; portType: string; portLabel: string; portNames: Set<string> }[] = []
+  const openInputs: { nodeId: string; nodeType: string; portId: string; portType: string; portLabel: string; portNames: Set<string> }[] = []
   for (const node of nodes) {
     const def = BLOCK_REGISTRY.find((b) => b.type === node.data?.type)
     if (!def) continue
@@ -305,7 +340,9 @@ function computeRecommendations(
       const key = `${node.id}:${inp.id}`
       if (!connectedTargets.has(key)) {
         openInputs.push({
+          nodeId: node.id,
           nodeType: def.type,
+          portId: inp.id,
           portType: inp.dataType,
           portLabel: inp.label,
           portNames: new Set(getPortNames(inp)),
@@ -334,6 +371,11 @@ function computeRecommendations(
             block: candidate,
             reason: `Provides "${open.portLabel}" input`,
             score: 4 + aliasBonus,
+            connectTo: {
+              nodeId: open.nodeId,
+              portId: open.portId,
+              direction: 'upstream',
+            },
           })
         }
       }
@@ -344,6 +386,21 @@ function computeRecommendations(
   const categories = new Set(nodes.map((n) => n.data?.category).filter(Boolean))
   const types = existingTypes
 
+  // For pattern-based recs, try to find a connection point
+  const findConnectionForBlock = (block: BlockDefinition): Recommendation['connectTo'] => {
+    // Check if any open output can connect to this block's inputs
+    for (const open of openOutputs) {
+      const match = block.inputs.some((inp) => isPortCompatible(open.portType, inp.dataType))
+      if (match) return { nodeId: open.nodeId, portId: open.portId, direction: 'downstream' }
+    }
+    // Check if this block's outputs can connect to any open input
+    for (const open of openInputs) {
+      const match = block.outputs.some((out) => isPortCompatible(out.dataType, open.portType))
+      if (match) return { nodeId: open.nodeId, portId: open.portId, direction: 'upstream' }
+    }
+    return undefined
+  }
+
   // Has training but no evaluation
   if (categories.has('training') && !categories.has('evaluation')) {
     const evalBlocks = BLOCK_REGISTRY.filter((b) => b.category === 'evaluation' && !types.has(b.type))
@@ -353,7 +410,7 @@ function computeRecommendations(
         existing.score += 5
         existing.reason = 'Evaluate your trained model'
       } else {
-        outputRecs.push({ block: eb, reason: 'Evaluate your trained model', score: 5 })
+        outputRecs.push({ block: eb, reason: 'Evaluate your trained model', score: 5, connectTo: findConnectionForBlock(eb) })
       }
     }
   }
@@ -369,7 +426,7 @@ function computeRecommendations(
         if (existing) {
           existing.score += 4
         } else {
-          outputRecs.push({ block, reason: 'Process your data before training', score: 4 })
+          outputRecs.push({ block, reason: 'Process your data before training', score: 4, connectTo: findConnectionForBlock(block) })
         }
       }
     }
@@ -386,7 +443,7 @@ function computeRecommendations(
         if (existing) {
           existing.score += 3
         } else {
-          outputRecs.push({ block, reason: 'Save and export your results', score: 3 })
+          outputRecs.push({ block, reason: 'Save and export your results', score: 3, connectTo: findConnectionForBlock(block) })
         }
       }
     }
@@ -396,7 +453,7 @@ function computeRecommendations(
   if ((categories.has('training') || categories.has('inference')) && !types.has('model_selector')) {
     const block = BLOCK_REGISTRY.find((b) => b.type === 'model_selector')
     if (block) {
-      inputRecs.push({ block, reason: 'Select a base model for your pipeline', score: 6 })
+      inputRecs.push({ block, reason: 'Select a base model for your pipeline', score: 6, connectTo: findConnectionForBlock(block) })
     }
   }
 
@@ -409,7 +466,7 @@ function computeRecommendations(
     if (needsText) {
       const block = BLOCK_REGISTRY.find((b) => b.type === 'text_input')
       if (block) {
-        inputRecs.push({ block, reason: 'Provide text input for inference', score: 5 })
+        inputRecs.push({ block, reason: 'Provide text input for inference', score: 5, connectTo: findConnectionForBlock(block) })
       }
     }
   }
@@ -418,7 +475,7 @@ function computeRecommendations(
   if (nodes.length >= 3 && !types.has('human_review_gate')) {
     const block = BLOCK_REGISTRY.find((b) => b.type === 'human_review_gate')
     if (block) {
-      outputRecs.push({ block, reason: 'Add a review checkpoint', score: 2 })
+      outputRecs.push({ block, reason: 'Add a review checkpoint', score: 2, connectTo: findConnectionForBlock(block) })
     }
   }
 

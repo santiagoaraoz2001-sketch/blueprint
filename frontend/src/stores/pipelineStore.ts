@@ -13,7 +13,7 @@ import {
 } from '@xyflow/react'
 import { api } from '@/api/client'
 import type { PipelineResponse } from '@/api/types'
-import { getBlockDefinition, getPortColor, isPortCompatible, resolvePort, type PortDefinition } from '@/lib/block-registry'
+import { getBlockDefinition, getPortColor, isPortCompatible, resolvePort, findBestInputPort, type PortDefinition } from '@/lib/block-registry'
 import { type ConnectionSuggestion, suggestConnections, findNearbyNodes } from '@/lib/auto-wiring'
 import { getLayoutedElements } from '@/lib/layout-utils'
 import { useSettingsStore } from './settingsStore'
@@ -175,6 +175,7 @@ interface PipelineState {
   onConnect: OnConnect
 
   addNode: (type: string, position: { x: number; y: number }) => void
+  addNodeAndConnect: (type: string, connectTo: { nodeId: string; portId: string; direction: 'upstream' | 'downstream' }) => void
   addStickyNote: (position: { x: number; y: number }) => void
   updateStickyNote: (id: string, data: Partial<{ text: string; color: string; width: number; height: number }>) => void
   removeNode: (id: string) => void
@@ -502,6 +503,107 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
       state.nodes.push(newNode)
       state.isDirty = true
       state.selectedNodeId = id
+    })
+  },
+
+  addNodeAndConnect: (type, connectTo) => {
+    const def = getBlockDefinition(type)
+    if (!def) return
+    const state = get()
+    const anchorNode = state.nodes.find((n) => n.id === connectTo.nodeId)
+    if (!anchorNode) return
+
+    const anchorDef = getBlockDefinition(anchorNode.data.type)
+    if (!anchorDef) return
+
+    // Position: place below for downstream, above for upstream
+    const offsetY = connectTo.direction === 'downstream' ? 200 : -200
+    const position = {
+      x: anchorNode.position.x,
+      y: anchorNode.position.y + offsetY,
+    }
+
+    const id = `block_${++nodeIdCounter}_${Date.now()}`
+    const newNode: Node<BlockNodeData> = {
+      id,
+      type: 'blockNode',
+      position,
+      data: {
+        type: def.type,
+        label: def.name,
+        category: def.category,
+        icon: def.icon,
+        accent: def.accent,
+        config: { ...def.defaultConfig },
+        inputs: def.inputs,
+        outputs: def.outputs,
+        status: 'idle',
+        progress: 0,
+      },
+    }
+
+    // Figure out the connection
+    let source: string, sourceHandle: string, target: string, targetHandle: string
+    if (connectTo.direction === 'downstream') {
+      // anchor's output → new node's input
+      source = connectTo.nodeId
+      sourceHandle = connectTo.portId
+      const sourcePort = resolvePort(anchorDef.outputs, connectTo.portId)
+      const bestInput = sourcePort ? findBestInputPort(sourcePort, def.inputs) : def.inputs[0]
+      target = id
+      targetHandle = bestInput?.id || def.inputs[0]?.id || ''
+    } else {
+      // new node's output → anchor's input
+      target = connectTo.nodeId
+      targetHandle = connectTo.portId
+      const targetPort = resolvePort(anchorDef.inputs, connectTo.portId)
+      // Find best output from new node that matches the anchor's input
+      let bestOutput = def.outputs[0]
+      if (targetPort) {
+        for (const out of def.outputs) {
+          if (out.dataType === targetPort.dataType) { bestOutput = out; break }
+          if (isPortCompatible(out.dataType, targetPort.dataType) && !bestOutput) bestOutput = out
+        }
+      }
+      source = id
+      sourceHandle = bestOutput?.id || def.outputs[0]?.id || ''
+    }
+
+    if (!sourceHandle || !targetHandle) {
+      // Fallback: just add without connecting
+      set((s) => {
+        _pushHistory(s)
+        s.nodes.push(newNode)
+        s.isDirty = true
+        s.selectedNodeId = id
+      })
+      return
+    }
+
+    const edgeColor = getPortColor(
+      connectTo.direction === 'downstream'
+        ? (resolvePort(anchorDef.outputs, sourceHandle)?.dataType || 'any')
+        : (resolvePort(def.outputs, sourceHandle)?.dataType || 'any')
+    )
+
+    set((s) => {
+      _pushHistory(s)
+      s.nodes.push(newNode)
+      s.edges = addEdge(
+        {
+          id: `e-${source}-${sourceHandle}-${target}-${targetHandle}`,
+          source,
+          sourceHandle,
+          target,
+          targetHandle,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: edgeColor, strokeWidth: 1.5 },
+        } as Edge,
+        s.edges,
+      )
+      s.isDirty = true
+      s.selectedNodeId = id
     })
   },
 

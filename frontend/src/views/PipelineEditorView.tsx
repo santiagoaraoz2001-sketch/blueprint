@@ -13,10 +13,12 @@ import ValidationPanel from '@/components/Pipeline/ValidationPanel'
 import PipelineTabBar from '@/components/Pipeline/PipelineTabBar'
 import { validatePipelineClient, type DiagnosticReport } from '@/lib/pipeline-validator'
 import PipelineMonitor, { type MonitorBlock } from '@/components/Pipeline/PipelineMonitor'
-import { Save, Download, Upload, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate } from 'lucide-react'
+import { Save, Download, Upload, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp } from 'lucide-react'
 import TemplateGallery from '@/components/Pipeline/TemplateGallery'
+import ToolbarDropdown from '@/components/Pipeline/ToolbarDropdown'
 import MissionController from '@/components/Mission/MissionController'
 import { useRunStore } from '@/stores/runStore'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import toast from 'react-hot-toast'
 
 const btnStyle: React.CSSProperties = {
@@ -74,6 +76,8 @@ export default function PipelineEditorView() {
 
   const [showAgent, setShowAgent] = useState(false)
   const [showPipelineList, setShowPipelineList] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [showNewConfirm, setShowNewConfirm] = useState(false)
   const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const [showValidation, setShowValidation] = useState(false)
   const [validationReport, setValidationReport] = useState<DiagnosticReport | null>(null)
@@ -123,7 +127,10 @@ export default function PipelineEditorView() {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
       const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey
 
-      if (isCmdOrCtrl && e.key.toLowerCase() === 'z') {
+      if (isCmdOrCtrl && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        handleSave()
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         if (e.shiftKey) {
           redo()
@@ -217,7 +224,9 @@ export default function PipelineEditorView() {
                 fontWeight: 600,
                 outline: 'none',
                 padding: '2px 4px',
-                width: 160,
+                minWidth: 140,
+                maxWidth: 300,
+                width: 'auto',
               }}
             />
             <button
@@ -253,7 +262,15 @@ export default function PipelineEditorView() {
             >
               {/* New pipeline */}
               <button
-                onClick={() => { newPipeline(); setShowPipelineList(false) }}
+                onClick={() => {
+                  if (isDirty) {
+                    setShowPipelineList(false)
+                    setShowNewConfirm(true)
+                  } else {
+                    newPipeline()
+                    setShowPipelineList(false)
+                  }
+                }}
                 style={{
                   ...btnStyle,
                   width: '100%',
@@ -297,7 +314,7 @@ export default function PipelineEditorView() {
                       </div>
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); deletePipeline(p.id) }}
+                      onClick={(e) => { e.stopPropagation(); setConfirmDelete(p.id); setShowPipelineList(false) }}
                       style={{
                         background: 'none',
                         border: 'none',
@@ -324,36 +341,46 @@ export default function PipelineEditorView() {
         {/* Separator */}
         <div style={{ width: 1, height: 14, background: T.border }} />
 
-        {/* Left Actions */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', borderRight: `1px solid ${T.border}`, paddingRight: 16 }}>
-          <button
-            onClick={() => usePipelineStore.getState().newPipeline()}
-            style={btnStyle}
-            title="New Pipeline"
-          >
-            <FolderOpen size={10} />
-            NEW
-          </button>
+        {/* File actions dropdown */}
+        <ToolbarDropdown
+          label="FILE"
+          icon={<FolderOpen size={10} />}
+          items={[
+            {
+              label: 'New Pipeline',
+              icon: <FilePlus size={12} />,
+              onClick: () => {
+                if (isDirty) setShowNewConfirm(true)
+                else usePipelineStore.getState().newPipeline()
+              },
+            },
+            {
+              label: 'Browse Templates',
+              icon: <LayoutTemplate size={12} />,
+              onClick: () => setShowTemplateSelector(true),
+            },
+            {
+              label: 'Import JSON',
+              icon: <FileUp size={12} />,
+              onClick: handleImport,
+              separator: true,
+            },
+            {
+              label: 'Export JSON',
+              icon: <FileDown size={12} />,
+              onClick: exportPipeline,
+            },
+          ]}
+        />
 
-          <button
-            onClick={() => setShowTemplateSelector(true)}
-            style={btnStyle}
-            title="Pipeline Templates"
-          >
-            <LayoutTemplate size={10} />
-            TEMPLATES
-          </button>
-
-          <button
-            onClick={tidyUp}
-            style={btnStyle}
-            title="Auto-Layout / Tidy Up Pipeline"
-          >
+        {/* Quick actions */}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <button onClick={tidyUp} style={btnStyle} title="Auto-Layout (Tidy)">
             <Wand2 size={10} />
             TIDY
           </button>
 
-          <div style={{ width: 1, height: 12, background: T.border, margin: '0 4px' }} />
+          <div style={{ width: 1, height: 12, background: T.border, margin: '0 2px' }} />
 
           <button
             onClick={undo}
@@ -363,7 +390,6 @@ export default function PipelineEditorView() {
           >
             <Undo2 size={12} />
           </button>
-
           <button
             onClick={redo}
             disabled={futureLength === 0}
@@ -373,21 +399,22 @@ export default function PipelineEditorView() {
             <Redo2 size={12} />
           </button>
         </div>
+
+        <div style={{ width: 1, height: 14, background: T.border }} />
+
         <button onClick={handleAddStickyNote} style={btnStyle} title="Add sticky note">
           <StickyNote size={10} />
-          NOTE
         </button>
 
-        {/* Grouping */}
-        <div style={{ width: 1, height: 14, background: T.border }} />
-        <button onClick={groupSelectedNodes} style={btnStyle} title="Group selected nodes">
-          <Combine size={10} />
-          GROUP
-        </button>
-        <button onClick={ungroupSelectedNodes} style={btnStyle} title="Ungroup selected node">
-          <Ungroup size={10} />
-          UNGROUP
-        </button>
+        <ToolbarDropdown
+          label="GROUP"
+          icon={<Combine size={10} />}
+          items={[
+            { label: 'Group Selected', icon: <Combine size={12} />, onClick: groupSelectedNodes },
+            { label: 'Ungroup Selected', icon: <Ungroup size={12} />, onClick: ungroupSelectedNodes },
+          ]}
+        />
+
         <div style={{ width: 1, height: 14, background: T.border }} />
 
         {/* Agent button */}
@@ -414,10 +441,7 @@ export default function PipelineEditorView() {
 
         <div style={{ width: 1, height: 14, background: T.border }} />
 
-        {/* Import */}
-        <button onClick={handleImport} style={btnStyle} title="Import pipeline JSON">
-          <Upload size={10} />
-        </button>
+        {/* Hidden file input for import */}
         <input
           ref={fileInputRef}
           type="file"
@@ -425,11 +449,6 @@ export default function PipelineEditorView() {
           style={{ display: 'none' }}
           onChange={handleFileChange}
         />
-
-        {/* Export */}
-        <button onClick={exportPipeline} style={btnStyle} title="Export pipeline JSON">
-          <Download size={10} />
-        </button>
 
         {/* Save */}
         <button
@@ -475,7 +494,10 @@ export default function PipelineEditorView() {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         <ReactFlowProvider>
           <BlockLibrary />
-          <PipelineCanvas />
+          <PipelineCanvas
+            onShowTemplates={() => setShowTemplateSelector(true)}
+            onShowAgent={() => setShowAgent(true)}
+          />
           <BlockConfig />
 
           {/* Validation panel modal – must be inside ReactFlowProvider (uses useReactFlow hook) */}
@@ -508,6 +530,28 @@ export default function PipelineEditorView() {
 
       {/* Mission system */}
       <MissionController />
+
+      {/* Confirm delete pipeline */}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete Pipeline"
+        message="This pipeline will be permanently deleted. This action cannot be undone."
+        confirmLabel="Delete"
+        confirmColor={T.red}
+        onConfirm={() => { if (confirmDelete) deletePipeline(confirmDelete); setConfirmDelete(null) }}
+        onCancel={() => setConfirmDelete(null)}
+      />
+
+      {/* Confirm new pipeline when dirty */}
+      <ConfirmDialog
+        open={showNewConfirm}
+        title="Unsaved Changes"
+        message="You have unsaved changes. Create a new pipeline anyway? Your current changes will be lost."
+        confirmLabel="Create New"
+        confirmColor={T.amber}
+        onConfirm={() => { newPipeline(); setShowNewConfirm(false) }}
+        onCancel={() => setShowNewConfirm(false)}
+      />
     </div>
   )
 }

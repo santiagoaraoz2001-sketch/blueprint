@@ -23,6 +23,7 @@ from .routers import (
     block_generator, blocks, connectors, control_tower, custom_blocks,
     datasets, events, execution, inference, marketplace, models, outputs,
     papers, pipelines, plugins, projects, runs, secrets, sweeps, system,
+    workspace,
 )
 from .utils.structured_logger import init_structured_logging, log_event, log_recovery
 
@@ -139,6 +140,13 @@ def _full_shutdown():
     except Exception:
         pass
 
+    # 5. Inbox watcher
+    try:
+        from .services.inbox_watcher import stop_watcher as stop_inbox_watcher
+        stop_inbox_watcher()
+    except Exception:
+        pass
+
     _shutdown_logger.info("Shutdown sequence complete.")
 
 
@@ -190,6 +198,21 @@ async def lifespan(app: FastAPI):
         )
     except Exception:
         pass  # Non-critical — watcher is a convenience feature
+
+    # Start inbox watcher if workspace is configured
+    try:
+        from .services.inbox_watcher import start_watcher as start_inbox_watcher
+        _ws_session = SessionLocal()
+        try:
+            from .models.workspace import WorkspaceSettings as WS
+            ws = _ws_session.query(WS).filter_by(id="default").first()
+            if ws and ws.root_path and ws.watcher_enabled:
+                start_inbox_watcher(ws.root_path)
+                logging.getLogger(__name__).info("Inbox watcher started: %s", ws.root_path)
+        finally:
+            _ws_session.close()
+    except Exception:
+        pass  # Non-critical
     yield
     # Shutdown
     _full_shutdown()
@@ -234,6 +257,7 @@ app.include_router(sweeps.router)
 app.include_router(connectors.router)
 app.include_router(block_generator.router)
 app.include_router(outputs.router)
+app.include_router(workspace.router)
 if ENABLE_MARKETPLACE:
     app.include_router(marketplace.router)
 

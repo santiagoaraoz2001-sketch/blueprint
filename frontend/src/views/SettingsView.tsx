@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { T, F, FD, FS, getTheme } from '@/lib/design-tokens'
 import { playSound } from '@/lib/audio'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { FolderOpen, RefreshCw, ExternalLink } from 'lucide-react'
 import {
   useSettingsStore,
   FONT_MAP,
@@ -833,6 +835,9 @@ export default function SettingsView() {
             </div>
           </motion.div>
 
+          {/* ── WORKSPACE ──────────────────────────────────── */}
+          <WorkspaceSection />
+
           {/* ── AUDIO ALERTS ──────────────────────────────── */}
           <motion.div variants={fadeUp} style={sectionContainer}>
             <h2 style={sectionHeader}>AUDIO ALERTS</h2>
@@ -966,5 +971,238 @@ export default function SettingsView() {
         </motion.div>
       </div>
     </div>
+  )
+}
+
+/* ── Workspace Section ──────────────────────────────────────────── */
+
+function WorkspaceSection() {
+  const { settings, status, loading, fetchSettings, updateSettings, fetchStatus, openInFinder, initialize } = useWorkspaceStore()
+  const [browsing, setBrowsing] = useState(false)
+
+  useEffect(() => {
+    fetchSettings()
+    fetchStatus()
+  }, [fetchSettings, fetchStatus])
+
+  const handleBrowse = async () => {
+    if (browsing) return
+    setBrowsing(true)
+    try {
+      let selectedPath: string | null = null
+      if ((window as any).blueprint?.selectDirectory) {
+        selectedPath = await (window as any).blueprint.selectDirectory({
+          title: 'Select Workspace Folder',
+          defaultPath: settings.root_path || undefined,
+        })
+      } else {
+        const res = await fetch('/api/system/browse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'directory', title: 'Select Workspace Folder', default_path: settings.root_path || '' }),
+        })
+        const data = await res.json()
+        selectedPath = data.path
+      }
+      if (selectedPath) {
+        await updateSettings({ root_path: selectedPath })
+      }
+    } catch {
+      // Silently handle errors
+    } finally {
+      setBrowsing(false)
+    }
+  }
+
+  const isConfigured = !!settings.root_path
+
+  return (
+    <motion.div variants={fadeUp} style={sectionContainer}>
+      <h2 style={sectionHeader}>WORKSPACE</h2>
+
+      {/* Folder Location */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={labelStyle}>FOLDER LOCATION</label>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+          <div style={{
+            ...inputStyle,
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            color: settings.root_path ? T.text : T.dim,
+            fontStyle: settings.root_path ? 'normal' : 'italic',
+          }}>
+            {settings.root_path || 'No workspace configured'}
+          </div>
+          <button
+            onClick={handleBrowse}
+            disabled={browsing}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '0 12px',
+              background: `${T.cyan}14`,
+              border: `1px solid ${T.cyan}33`,
+              borderRadius: 4,
+              color: T.cyan,
+              fontFamily: F,
+              fontSize: FS.xxs,
+              cursor: browsing ? 'wait' : 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <FolderOpen size={12} />
+            {browsing ? 'Browsing...' : 'Browse'}
+          </button>
+          {settings.root_path && (
+            <button
+              onClick={() => updateSettings({ root_path: '' })}
+              style={{
+                padding: '0 8px',
+                background: 'none',
+                border: `1px solid ${T.border}`,
+                borderRadius: 4,
+                color: T.dim,
+                fontFamily: F,
+                fontSize: FS.xxs,
+                cursor: 'pointer',
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <span style={descStyle}>
+          Blueprint organizes your datasets, models, outputs, and configs in this folder
+        </span>
+      </div>
+
+      {/* Auto-fill & Watcher toggles */}
+      {isConfigured && (
+        <>
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>AUTO-FILL PATHS</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                onClick={() => updateSettings({ auto_fill_paths: !settings.auto_fill_paths })}
+                style={{
+                  position: 'relative', width: 36, height: 20, borderRadius: 10,
+                  border: 'none', background: settings.auto_fill_paths ? `${T.cyan}40` : T.surface4,
+                  cursor: 'pointer', padding: 0, transition: 'background 0.2s',
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: 2, left: settings.auto_fill_paths ? 18 : 2,
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: settings.auto_fill_paths ? T.cyan : T.dim,
+                  transition: 'left 0.2s, background 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                }} />
+              </button>
+              <span style={descStyle}>Auto-fill output paths in pipeline blocks</span>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>INBOX WATCHER</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                onClick={() => updateSettings({ watcher_enabled: !settings.watcher_enabled })}
+                style={{
+                  position: 'relative', width: 36, height: 20, borderRadius: 10,
+                  border: 'none', background: settings.watcher_enabled ? `${T.cyan}40` : T.surface4,
+                  cursor: 'pointer', padding: 0, transition: 'background 0.2s',
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: 2, left: settings.watcher_enabled ? 18 : 2,
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: settings.watcher_enabled ? T.cyan : T.dim,
+                  transition: 'left 0.2s, background 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                }} />
+              </button>
+              <span style={descStyle}>Auto-categorize files dropped in the inbox folder</span>
+            </div>
+          </div>
+
+          {/* Status */}
+          <div style={{
+            padding: 12, background: T.surface3, border: `1px solid ${T.border}`,
+            borderRadius: 6,
+          }}>
+            <div style={{
+              fontFamily: F, fontSize: FS.xxs, color: T.dim,
+              letterSpacing: '0.1em', fontWeight: 700, marginBottom: 8,
+            }}>
+              STATUS
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {/* Watcher status */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: status?.watcher_running ? T.green : T.dim,
+                  boxShadow: status?.watcher_running ? `0 0 6px ${T.green}80` : 'none',
+                }} />
+                <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec }}>
+                  Watcher: {status?.watcher_running ? 'Running' : 'Stopped'}
+                </span>
+              </div>
+
+              {/* Inbox count */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec }}>
+                  Inbox: {status?.inbox_count ?? 0} file{(status?.inbox_count ?? 0) !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              {/* Folder health */}
+              {status?.folder_health && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                  {Object.entries(status.folder_health).map(([key, exists]) => (
+                    <span key={key} style={{
+                      fontFamily: F, fontSize: '7px', color: exists ? T.green : T.red,
+                      background: exists ? `${T.green}10` : `${T.red}10`,
+                      border: `1px solid ${exists ? `${T.green}20` : `${T.red}20`}`,
+                      padding: '1px 5px', borderRadius: 3,
+                    }}>
+                      {exists ? '\u2713' : '\u2717'} {key.replace(/_/g, '/')}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              <button
+                onClick={openInFinder}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px', background: 'none',
+                  border: `1px solid ${T.border}`, borderRadius: 4,
+                  color: T.sec, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer',
+                }}
+              >
+                <ExternalLink size={10} />
+                Open in Finder
+              </button>
+              <button
+                onClick={initialize}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px', background: 'none',
+                  border: `1px solid ${T.border}`, borderRadius: 4,
+                  color: T.sec, fontFamily: F, fontSize: FS.xxs, cursor: 'pointer',
+                }}
+              >
+                <RefreshCw size={10} />
+                Re-initialize
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </motion.div>
   )
 }

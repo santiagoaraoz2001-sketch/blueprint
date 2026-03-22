@@ -5,7 +5,8 @@ import { useOutputStore } from '@/stores/outputStore'
 import { useUIStore } from '@/stores/uiStore'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { validatePipelineClient } from '@/lib/pipeline-validator'
-import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Check, AlertTriangle, Gauge, FileDown } from 'lucide-react'
+import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Check, AlertTriangle, Gauge, FileDown, MoreVertical } from 'lucide-react'
+import ToolbarDropdown from './ToolbarDropdown'
 import toast from 'react-hot-toast'
 import PipelineAnalysisPanel from './PipelineAnalysisPanel'
 import { getBlockDefinition } from '@/lib/block-registry'
@@ -293,81 +294,38 @@ export default function RunControls() {
           <button
             onClick={handleRun}
             data-tour="btn-run-pipeline"
+            title="Run Pipeline (Cmd/Ctrl + Enter)"
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 4,
-              padding: '3px 10px',
-              background: `${T.green}14`,
-              border: `1px solid ${T.green}33`,
+              gap: 6,
+              padding: '5px 16px',
+              background: `${T.green}22`,
+              border: `1px solid ${T.green}50`,
+              borderRadius: 4,
               color: T.green,
               fontFamily: F,
               fontSize: FS.xs,
+              fontWeight: 800,
               letterSpacing: '0.08em',
               cursor: 'pointer',
+              transition: 'all 0.15s',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = `${T.green}30`; e.currentTarget.style.borderColor = `${T.green}70` }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = `${T.green}22`; e.currentTarget.style.borderColor = `${T.green}50` }}
           >
-            <Play size={10} />
-            RUN
+            <Play size={12} />
+            {status === 'complete' || status === 'failed' ? 'RE-RUN' : 'RUN'}
           </button>
-          <button
-            onClick={handleSaveTemplate}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '3px 10px',
-              background: `${T.blue}14`,
-              border: `1px solid ${T.blue}33`,
-              color: T.blue,
-              fontFamily: F,
-              fontSize: FS.xs,
-              letterSpacing: '0.08em',
-              cursor: 'pointer',
-            }}
-          >
-            <LayoutTemplate size={10} />
-            SAVE AS TEMPLATE
-          </button>
-          <button
-            onClick={() => setShowAnalysis(true)}
-            data-tour="btn-analyze"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '3px 10px',
-              background: `${T.amber}14`,
-              border: `1px solid ${T.amber}33`,
-              color: T.amber,
-              fontFamily: F,
-              fontSize: FS.xs,
-              letterSpacing: '0.08em',
-              cursor: 'pointer',
-            }}
-          >
-            <Gauge size={10} />
-            ANALYZE
-          </button>
-          <button
-            onClick={handleEject}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '3px 10px',
-              background: `${T.purple}14`,
-              border: `1px solid ${T.purple}33`,
-              color: T.purple,
-              fontFamily: F,
-              fontSize: FS.xs,
-              letterSpacing: '0.08em',
-              cursor: 'pointer',
-            }}
-          >
-            <FileCode size={10} />
-            EJECT TO PYTHON
-          </button>
+          <ToolbarDropdown
+            label=""
+            icon={<MoreVertical size={12} />}
+            items={[
+              { label: 'Save as Template', icon: <LayoutTemplate size={12} color={T.blue} />, onClick: handleSaveTemplate, color: T.blue },
+              { label: 'Analyze Pipeline', icon: <Gauge size={12} color={T.amber} />, onClick: () => setShowAnalysis(true), color: T.amber },
+              { label: 'Eject to Python', icon: <FileCode size={12} color={T.purple} />, onClick: handleEject, color: T.purple, separator: true },
+            ]}
+          />
         </>
       ) : (
         <>
