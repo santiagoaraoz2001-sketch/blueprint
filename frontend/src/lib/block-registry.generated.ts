@@ -1,5 +1,5 @@
 // AUTO-GENERATED — DO NOT EDIT MANUALLY
-// Generated from 127 block.yaml files across 12 categories
+// Generated from 128 block.yaml files across 12 categories
 // Run: python scripts/generate_block_registry.py
 
 import type { BlockDefinition } from './block-registry'
@@ -911,7 +911,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (15 blocks)
+  //  DATA (16 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1003,6 +1003,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
+    deprecated: true,
+    deprecatedMessage: 'Use the Dataset Builder block instead — it provides column mapping, keep/drop columns, and Python script transforms that cover all column_transform operations.',
   },
 
   // ═══════════════════════════════════════════════
@@ -1102,7 +1104,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (15 blocks)
+  //  DATA (16 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1432,6 +1434,312 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     ],
   },
   {
+    type: 'dataset_builder',
+    name: 'Dataset Builder',
+    description: 'All-in-one dataset preparation for training — load from HuggingFace or local files, transform with column mapping and Python scripts, format for any training task, and validate schema',
+    category: 'data',
+    tags: ['dataset', 'training', 'preparation', 'transform', 'huggingface', 'formatting', 'script'],
+    aliases: [],
+    icon: 'Database',
+    accent: '#3b82f6',
+    maturity: 'beta',
+    inputs: [
+      { id: 'dataset', label: 'Input Dataset', dataType: 'dataset', required: false },
+      { id: 'config', label: 'Config Override', dataType: 'config', required: false },
+      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
+    ],
+    outputs: [
+      { id: 'dataset', label: 'Training Dataset', dataType: 'dataset', required: false },
+      { id: 'eval_dataset', label: 'Eval Dataset', dataType: 'dataset', required: false },
+      { id: 'dataset_meta', label: 'Dataset Info', dataType: 'config', required: false },
+      { id: 'metrics', label: 'Build Stats', dataType: 'metrics', required: false },
+    ],
+    defaultConfig: {
+      source: 'upstream',
+      hf_dataset: '',
+      hf_subset: '',
+      hf_split: 'train',
+      hf_token: '',
+      hf_streaming: false,
+      hf_max_samples: 0,
+      file_path: '',
+      file_format: 'auto',
+      file_encoding: 'utf-8',
+      column_mapping: '',
+      keep_columns: '',
+      transform_script: '',
+      training_format: 'none',
+      instruction_template: '### Instruction:\n{instruction}\n\n### Response:\n{output}',
+      system_prompt: '',
+      text_column: '',
+      prompt_column: '',
+      chosen_column: 'chosen',
+      rejected_column: 'rejected',
+      deduplicate: false,
+      min_length: 0,
+      max_length: 0,
+      filter_expression: '',
+      sample_size: 0,
+      eval_split: 0.0,
+      validate_schema: true,
+      target_block: 'auto',
+      shuffle: true,
+      seed: 42,
+    },
+    configFields: [
+      {
+        name: 'source',
+        label: 'Data Source',
+        type: 'select',
+        default: 'upstream',
+        options: ['upstream', 'huggingface', 'local_file'],
+        description: '\'upstream\' uses the connected dataset input. \'huggingface\' loads directly from HF Hub with auto-detection. \'local_file\' reads a file from disk.',
+        mandatory: true,
+      },
+      {
+        name: 'hf_dataset',
+        label: 'HF Dataset Name',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace dataset identifier (e.g. \'tatsu-lab/alpaca\', \'Anthropic/hh-rlhf\'). Available subsets and splits are auto-detected and logged.',
+        depends_on: { field: 'source', value: 'huggingface' },
+        mandatory: true,
+      },
+      {
+        name: 'hf_subset',
+        label: 'HF Subset',
+        type: 'string',
+        default: '',
+        description: 'Dataset subset/config name. Leave empty for the default config — available subsets are logged on load.',
+        depends_on: { field: 'source', value: 'huggingface' },
+      },
+      {
+        name: 'hf_split',
+        label: 'HF Split',
+        type: 'select',
+        default: 'train',
+        options: ['train', 'validation', 'test', 'all'],
+        description: 'Which split to load. \'all\' concatenates every available split into one dataset.',
+        depends_on: { field: 'source', value: 'huggingface' },
+      },
+      {
+        name: 'hf_token',
+        label: 'HF Token',
+        type: 'string',
+        default: '',
+        description: 'HuggingFace API token for private or gated datasets. Stored in config only — not logged.',
+        depends_on: { field: 'source', value: 'huggingface' },
+      },
+      {
+        name: 'hf_streaming',
+        label: 'Streaming',
+        type: 'boolean',
+        default: false,
+        description: 'Stream rows incrementally instead of downloading the full dataset. Recommended for datasets > 1GB.',
+        depends_on: { field: 'source', value: 'huggingface' },
+      },
+      {
+        name: 'hf_max_samples',
+        label: 'Max Samples',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 10000000,
+        description: 'Maximum rows to load from HF (0 = load all). Applied before any transforms.',
+        depends_on: { field: 'source', value: 'huggingface' },
+      },
+      {
+        name: 'file_path',
+        label: 'File Path',
+        type: 'file_path',
+        default: '',
+        description: 'Absolute or relative path to a local data file (CSV, TSV, JSON, JSONL, or Parquet)',
+        depends_on: { field: 'source', value: 'local_file' },
+        mandatory: true,
+      },
+      {
+        name: 'file_format',
+        label: 'File Format',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'csv', 'tsv', 'json', 'jsonl', 'parquet'],
+        description: '\'auto\' detects format from file extension. Use explicit format if extension doesn\'t match content.',
+        depends_on: { field: 'source', value: 'local_file' },
+      },
+      {
+        name: 'file_encoding',
+        label: 'File Encoding',
+        type: 'string',
+        default: 'utf-8',
+        description: 'Character encoding for CSV/TSV/JSON/JSONL files (e.g. \'utf-8\', \'latin-1\', \'cp1252\')',
+        depends_on: { field: 'source', value: 'local_file' },
+      },
+      {
+        name: 'column_mapping',
+        label: 'Column Mapping (JSON)',
+        type: 'text_area',
+        default: '',
+        description: 'Rename columns before transforms. JSON object mapping old names to new: {"original": "new_name"}. Leave empty to skip. Applied before keep_columns.',
+      },
+      {
+        name: 'keep_columns',
+        label: 'Keep Columns',
+        type: 'string',
+        default: '',
+        description: 'Comma-separated list of columns to keep after mapping (all others dropped). Empty = keep all columns.',
+      },
+      {
+        name: 'transform_script',
+        label: 'Transform Script (Python)',
+        type: 'text_area',
+        default: '',
+        description: 'Python function body that transforms each row. Receives \'row\' (dict), must return a dict or None to drop the row. Available modules: re, json, math, datetime. Available builtins: len, str, int, float, bool, list, dict, min, max, sum, sorted, range, enumerate, zip, etc.\n\nExample:\nrow[\'text\'] = row[\'instruction\'] + \'\\n\' + row[\'output\']\nreturn row',
+      },
+      {
+        name: 'training_format',
+        label: 'Training Format',
+        type: 'select',
+        default: 'none',
+        options: ['none', 'instruction', 'chat', 'completion', 'preference_pairs', 'rlhf_prompts'],
+        description: 'Format output for a specific training task. \'none\' passes data through as-is. Other formats restructure columns to match what training blocks expect.',
+      },
+      {
+        name: 'instruction_template',
+        label: 'Instruction Template',
+        type: 'text_area',
+        default: '### Instruction:\n{instruction}\n\n### Response:\n{output}',
+        description: 'Template with {column_name} placeholders. Each row is formatted using this template and stored in a \'text\' column. All referenced columns must exist in your data.',
+        depends_on: { field: 'training_format', value: 'instruction' },
+        mandatory: true,
+      },
+      {
+        name: 'system_prompt',
+        label: 'System Prompt',
+        type: 'text_area',
+        default: '',
+        description: 'Optional system message prepended to each conversation in ChatML format. Leave empty for no system message.',
+        depends_on: { field: 'training_format', value: 'chat' },
+      },
+      {
+        name: 'text_column',
+        label: 'Text Column',
+        type: 'string',
+        default: '',
+        description: 'Column containing the main text for completion/pretraining. Auto-detects from \'text\', \'content\', or first column if empty.',
+        depends_on: { field: 'training_format', value: 'completion' },
+      },
+      {
+        name: 'prompt_column',
+        label: 'Prompt Column',
+        type: 'string',
+        default: '',
+        description: 'Column containing prompts. Auto-detects from \'prompt\', \'instruction\', \'query\', \'question\' if empty. Used by preference_pairs and rlhf_prompts formats.',
+      },
+      {
+        name: 'chosen_column',
+        label: 'Chosen Column',
+        type: 'string',
+        default: 'chosen',
+        description: 'Column containing preferred/chosen responses for DPO or reward model training. Will be renamed to \'chosen\' in output.',
+        depends_on: { field: 'training_format', value: 'preference_pairs' },
+        mandatory: true,
+      },
+      {
+        name: 'rejected_column',
+        label: 'Rejected Column',
+        type: 'string',
+        default: 'rejected',
+        description: 'Column containing rejected/dispreferred responses for DPO or reward model training. Will be renamed to \'rejected\' in output.',
+        depends_on: { field: 'training_format', value: 'preference_pairs' },
+        mandatory: true,
+      },
+      {
+        name: 'deduplicate',
+        label: 'Deduplicate Rows',
+        type: 'boolean',
+        default: false,
+        description: 'Remove duplicate rows using content hashing (MD5 of all column values). Applied after transforms and format conversion.',
+      },
+      {
+        name: 'min_length',
+        label: 'Min Text Length (chars)',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 1000000,
+        description: 'Drop rows where the primary text column has fewer characters than this threshold. 0 = disabled. Primary column is auto-detected (text > query > chosen > first column).',
+      },
+      {
+        name: 'max_length',
+        label: 'Max Text Length (chars)',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 10000000,
+        description: 'Drop rows where the primary text column exceeds this character count. 0 = disabled.',
+      },
+      {
+        name: 'filter_expression',
+        label: 'Filter Expression (Python)',
+        type: 'text_area',
+        default: '',
+        description: 'Python expression that returns True to keep a row, False to drop it. Has access to \'row\' (dict) and the \'re\' module. Example: len(row.get(\'text\', \'\')) > 10 and \'error\' not in row.get(\'text\', \'\')',
+      },
+      {
+        name: 'sample_size',
+        label: 'Sample Size',
+        type: 'integer',
+        default: 0,
+        min: 0,
+        max: 10000000,
+        description: 'Randomly sample this many rows after all transforms and filters. 0 = keep all rows. Applied before eval split.',
+      },
+      {
+        name: 'eval_split',
+        label: 'Eval Split Ratio',
+        type: 'float',
+        default: 0.0,
+        min: 0.0,
+        max: 0.5,
+        description: 'Fraction of data reserved for the eval output (0 = no split, 0.1 = 10% eval). Data is shuffled before splitting unless shuffle is disabled. Max 0.5 to ensure training set is always the majority.',
+      },
+      {
+        name: 'validate_schema',
+        label: 'Validate Output Schema',
+        type: 'boolean',
+        default: true,
+        description: 'Check that output columns match what the target training block expects. Logs warnings for missing optional columns and fails on missing required columns.',
+      },
+      {
+        name: 'target_block',
+        label: 'Target Training Block',
+        type: 'select',
+        default: 'auto',
+        options: ['auto', 'lora_finetuning', 'qlora_finetuning', 'full_finetuning', 'dpo_alignment', 'reward_model_trainer', 'rlhf_ppo', 'distillation', 'continued_pretraining'],
+        description: 'Which downstream training block this dataset feeds. \'auto\' infers from training_format (instruction/chat/completion → LoRA, preference_pairs → DPO, rlhf_prompts → RLHF PPO).',
+      },
+      {
+        name: 'shuffle',
+        label: 'Shuffle',
+        type: 'boolean',
+        default: true,
+        description: 'Randomly shuffle rows before eval split. Recommended for training — disable only if row order matters (e.g. time-series).',
+      },
+      {
+        name: 'seed',
+        label: 'Random Seed',
+        type: 'integer',
+        default: 42,
+        min: 0,
+        max: 2147483647,
+        description: 'Seed for reproducible shuffling, sampling, and splitting',
+      },
+    ],
+    side_inputs: [
+      { id: '_loop', label: 'Loop', dataType: 'any', required: false },
+    ],
+  },
+  {
     type: 'dataset_row_selector',
     name: 'Dataset Row Selector',
     description: 'Extract specific rows from a dataset by index, column value, or random sampling',
@@ -1683,7 +1991,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (15 blocks)
+  //  DATA (16 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -1973,7 +2281,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (15 blocks)
+  //  DATA (16 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -2214,7 +2522,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (15 blocks)
+  //  DATA (16 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -2444,7 +2752,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (15 blocks)
+  //  DATA (16 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -2781,7 +3089,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════
-  //  DATA (15 blocks)
+  //  DATA (16 blocks)
   // ═══════════════════════════════════════════════
 
   {
@@ -2824,6 +3132,8 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     side_inputs: [
       { id: '_loop', label: 'Loop', dataType: 'any', required: false },
     ],
+    deprecated: true,
+    deprecatedMessage: 'Use the Dataset Builder block instead — it provides text-to-dataset functionality plus training format conversion, column mapping, and script transforms.',
   },
   {
     type: 'train_val_test_split',

@@ -4,6 +4,8 @@ category: data
 version: "2.0.0"
 description: Convert a text input into a dataset with a single row, useful for feeding text outputs into dataset-expecting blocks
 maturity: stable
+deprecated: true
+deprecated_message: "Use the Dataset Builder block instead — it provides text-to-dataset functionality plus training format conversion, column mapping, and script transforms."
 tags: [adapter, conversion, text, dataset]
 
 inputs:
