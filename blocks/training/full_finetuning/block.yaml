@@ -40,18 +40,21 @@ config:
     default: 0.00002
     min: 0.0000001
     max: 0.01
+    section: training
   epochs:
     type: integer
     label: Epochs
     default: 3
     min: 1
     max: 100
+    section: training
   batch_size:
     type: integer
     label: Batch Size
     default: 4
     min: 1
     max: 128
+    section: training
   warmup_steps:
     type: integer
     label: Warmup Steps
@@ -73,6 +76,8 @@ config:
     default: 512
     min: 64
     max: 32768
+    propagate: true
+    section: training
   gradient_checkpointing:
     type: boolean
     label: Gradient Checkpointing
@@ -83,11 +88,13 @@ config:
     label: Text Column
     description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
     default: ""
+    propagate: true
   training_format:
     type: text_area
     label: Training Format
     description: "Template for structuring training examples. Use {text}, {instruction}, {output} placeholders."
     default: ""
+    propagate: true
   eval_split:
     type: float
     label: Eval Split
@@ -95,6 +102,7 @@ config:
     default: 0.0
     min: 0.0
     max: 0.3
+    section: advanced
   checkpoint_interval:
     type: integer
     label: Checkpoint Interval
@@ -102,6 +110,7 @@ config:
     default: 0
     min: 0
     max: 100
+    section: advanced
   mlx_lora_layers:
     type: integer
     label: MLX LoRA Layers
@@ -109,12 +118,14 @@ config:
     min: 1
     max: 64
     description: "Number of transformer layers to fine-tune (MLX only). Lower = less memory."
+    section: advanced
   prefer_framework:
     type: select
     label: Preferred Framework
     options: ["auto", "mlx", "pytorch"]
     default: "auto"
     description: "Force a specific training framework. 'auto' detects the best available."
+    section: advanced
 
 side_inputs:
   - id: _loop

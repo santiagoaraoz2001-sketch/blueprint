@@ -35,6 +35,7 @@ config:
     options: [openai, anthropic, generic]
     default: openai
     description: Format of generated function-calling schemas
+    section: advanced
 
 side_inputs:
   - id: _loop

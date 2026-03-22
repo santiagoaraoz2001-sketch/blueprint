@@ -34,8 +34,10 @@ GLOBAL_PROPAGATION_KEYS = {
 # still flows through intermediate blocks of any category so that
 # inference→data→inference chains work correctly.
 CATEGORY_PROPAGATION_KEYS = {
-    "inference": {"system_prompt"},
-    "training": {"training_format", "prompt_template"},
+    "inference": {"system_prompt", "temperature", "max_tokens", "top_p"},
+    "agents": {"system_prompt", "temperature", "max_tokens", "top_p"},
+    "evaluation": {"decimal_precision", "max_samples"},
+    "training": {"training_format", "prompt_template", "max_seq_length"},
 }
 
 # Union of all category-specific keys — used when building the propagation pool
@@ -43,6 +45,32 @@ CATEGORY_PROPAGATION_KEYS = {
 _ALL_CATEGORY_KEYS: set[str] = set()
 for _keys in CATEGORY_PROPAGATION_KEYS.values():
     _ALL_CATEGORY_KEYS.update(_keys)
+
+
+@lru_cache(maxsize=256)
+def _load_block_propagation_keys(block_dir: str) -> frozenset[str]:
+    """Load config keys marked with ``propagate: true`` in block.yaml.
+
+    Cached by block_dir so the file is only parsed once per process lifetime.
+    """
+    schema_path = Path(block_dir) / "block.yaml"
+    if not schema_path.exists():
+        return frozenset()
+    try:
+        with open(schema_path) as f:
+            schema = yaml.safe_load(f) or {}
+    except (yaml.YAMLError, OSError):
+        return frozenset()
+
+    config_section = schema.get("config")
+    if not isinstance(config_section, dict):
+        return frozenset()
+
+    return frozenset(
+        field_name
+        for field_name, field_def in config_section.items()
+        if isinstance(field_def, dict) and field_def.get("propagate")
+    )
 
 
 @lru_cache(maxsize=256)
@@ -138,9 +166,10 @@ def resolve_configs(
 
     all_prop_keys = _get_all_propagation_keys()
 
-    # Phase 1: Load schema defaults for each node, with per-block_type caching
+    # Phase 1: Load schema defaults and block-declared propagation keys
     schema_defaults: dict[str, dict] = {}
     categories: dict[str, str] = {}
+    block_prop_keys: dict[str, frozenset[str]] = {}  # per-node propagation keys from block.yaml
 
     for node_id in topo_order:
         node = node_map.get(node_id)
@@ -167,10 +196,12 @@ def resolve_configs(
                 )
 
         if block_dir:
-            # lru_cache requires a hashable key — use the string path
-            schema_defaults[node_id] = dict(_load_schema_defaults(str(block_dir)))
+            dir_str = str(block_dir)
+            schema_defaults[node_id] = dict(_load_schema_defaults(dir_str))
+            block_prop_keys[node_id] = _load_block_propagation_keys(dir_str)
         else:
             schema_defaults[node_id] = {}
+            block_prop_keys[node_id] = frozenset()
 
     # Phase 2: Walk DAG in topo order, propagating values
     resolved: dict[str, dict] = {}
@@ -190,7 +221,8 @@ def resolve_configs(
         node_config = dict(node_data.get("config", {}))
         category = categories.get(node_id, "")
         defaults = schema_defaults.get(node_id, {})
-        prop_keys = _get_propagation_keys(category)
+        # Merge hardcoded propagation keys with block.yaml-declared keys
+        prop_keys = _get_propagation_keys(category) | block_prop_keys.get(node_id, frozenset())
 
         # Collect propagated values from all upstream nodes
         upstream_values: dict[str, Any] = {}
@@ -225,10 +257,11 @@ def resolve_configs(
         # Build propagation pool for this node's downstream.
         # Pool starts from upstream values (so values flow through any category),
         # then merges in this node's own propagatable values.
-        # We use all_prop_keys (not category-scoped) so that e.g. system_prompt
+        # We use all_prop_keys + block-declared keys so that e.g. system_prompt
         # flows through a data block to reach a downstream inference block.
         pool = dict(upstream_values)
-        for key in all_prop_keys:
+        pool_keys = all_prop_keys | block_prop_keys.get(node_id, frozenset())
+        for key in pool_keys:
             if key in node_config and node_config[key] is not None and node_config[key] != "":
                 pool[key] = node_config[key]
         propagation_pool[node_id] = pool

@@ -163,6 +163,7 @@ config:
     options: [none, instruction, chat, completion, preference_pairs, rlhf_prompts]
     default: none
     description: "Format output for a specific training task. 'none' passes data through as-is. Other formats restructure columns to match what training blocks expect."
+    propagate: true
 
   instruction_template:
     type: text_area
@@ -224,6 +225,7 @@ config:
     label: Deduplicate Rows
     default: false
     description: "Remove duplicate rows using content hashing (MD5 of all column values). Applied after transforms and format conversion."
+    section: filtering
 
   min_length:
     type: integer
@@ -232,6 +234,7 @@ config:
     min: 0
     max: 1000000
     description: "Drop rows where the primary text column has fewer characters than this threshold. 0 = disabled. Primary column is auto-detected (text > query > chosen > first column)."
+    section: filtering
 
   max_length:
     type: integer
@@ -240,12 +243,14 @@ config:
     min: 0
     max: 10000000
     description: "Drop rows where the primary text column exceeds this character count. 0 = disabled."
+    section: filtering
 
   filter_expression:
     type: text_area
     label: Filter Expression (Python)
     default: ""
     description: "Python expression that returns True to keep a row, False to drop it. Has access to 'row' (dict) and the 're' module. Example: len(row.get('text', '')) > 10 and 'error' not in row.get('text', '')"
+    section: filtering
 
   sample_size:
     type: integer
@@ -254,6 +259,7 @@ config:
     min: 0
     max: 10000000
     description: "Randomly sample this many rows after all transforms and filters. 0 = keep all rows. Applied before eval split."
+    section: filtering
 
   # ── Eval split ──
   eval_split:
@@ -263,6 +269,7 @@ config:
     min: 0.0
     max: 0.5
     description: "Fraction of data reserved for the eval output (0 = no split, 0.1 = 10% eval). Data is shuffled before splitting unless shuffle is disabled. Max 0.5 to ensure training set is always the majority."
+    section: advanced
 
   # ── Validation ──
   validate_schema:
@@ -270,6 +277,7 @@ config:
     label: Validate Output Schema
     default: true
     description: "Check that output columns match what the target training block expects. Logs warnings for missing optional columns and fails on missing required columns."
+    section: advanced
 
   target_block:
     type: select
@@ -277,6 +285,7 @@ config:
     options: [auto, lora_finetuning, qlora_finetuning, full_finetuning, dpo_alignment, reward_model_trainer, rlhf_ppo, distillation, continued_pretraining]
     default: auto
     description: "Which downstream training block this dataset feeds. 'auto' infers from training_format (instruction/chat/completion → LoRA, preference_pairs → DPO, rlhf_prompts → RLHF PPO)."
+    section: advanced
 
   # ── General ──
   shuffle:
@@ -292,6 +301,7 @@ config:
     min: 0
     max: 2147483647
     description: "Seed for reproducible shuffling, sampling, and splitting"
+    propagate: true
 
 side_inputs:
   - id: _loop

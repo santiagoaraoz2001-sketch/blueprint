@@ -103,6 +103,7 @@ def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
         resolve_configs,
         GLOBAL_PROPAGATION_KEYS,
         CATEGORY_PROPAGATION_KEYS,
+        _load_block_propagation_keys,
     )
 
     pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
@@ -125,6 +126,20 @@ def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
             f"Config resolution failed: {exc}",
         ) from exc
 
+    # Collect block-declared propagation keys per node
+    block_declared: dict[str, list[str]] = {}
+    for n in nodes:
+        nid = n.get("id", "")
+        bt = n.get("data", {}).get("type", "")
+        if bt:
+            try:
+                bdir = _find_block_module(bt)
+                bkeys = _load_block_propagation_keys(str(bdir))
+                if bkeys:
+                    block_declared[nid] = sorted(bkeys)
+            except Exception:
+                pass
+
     return {
         "resolved": resolved,
         "propagation_keys": {
@@ -133,6 +148,7 @@ def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
                 cat: sorted(keys)
                 for cat, keys in CATEGORY_PROPAGATION_KEYS.items()
             },
+            "by_block": block_declared,
         },
     }
 

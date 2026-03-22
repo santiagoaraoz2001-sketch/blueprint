@@ -45,6 +45,10 @@ export interface ConfigField {
   path_mode?: 'file' | 'directory'
   /** File extension filters for file_path fields (e.g. ['.csv', '.json']) */
   file_extensions?: string[]
+  /** When true, this field's value propagates to downstream blocks that share the same key */
+  propagate?: boolean
+  /** UI grouping section (e.g. "sampling", "advanced"). Fields without a section appear in the default group. */
+  section?: string
 }
 
 export type BlockMaturity = 'stable' | 'beta' | 'experimental'

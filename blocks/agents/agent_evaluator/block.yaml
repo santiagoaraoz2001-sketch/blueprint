@@ -63,10 +63,12 @@ config:
     options: [markdown, plain, json]
     default: markdown
     description: "Format for the evaluation report text output"
+    section: advanced
   seed:
     type: integer
     label: Random Seed
     default: 42
+    propagate: true
 
 side_inputs:
   - id: _loop

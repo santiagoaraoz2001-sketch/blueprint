@@ -49,6 +49,7 @@ config:
     label: Prompt Template
     default: "{input}"
     description: "Use {context} for upstream context, {input} for user_input"
+    propagate: true
   user_input:
     type: text_area
     label: User Input
@@ -61,6 +62,8 @@ config:
     min: 1
     max: 32768
     description: "null = use framework default"
+    propagate: true
+    section: sampling
   temperature:
     type: float
     label: Temperature
@@ -68,6 +71,8 @@ config:
     min: 0.0
     max: 2.0
     description: "null = use framework default"
+    propagate: true
+    section: sampling
   system_prompt:
     type: text_area
     label: System Prompt
@@ -78,24 +83,30 @@ config:
     label: Stop Sequences
     default: ""
     description: "Comma-separated stop strings"
+    section: advanced
   top_p:
     type: float
     label: Top P
     default: null
     min: 0.0
     max: 1.0
+    propagate: true
+    section: sampling
   repeat_penalty:
     type: float
     label: Repeat Penalty
     default: null
     min: 0.0
     max: 3.0
+    propagate: true
+    section: sampling
   output_format:
     type: select
     label: Output Format
     default: text
     options: [text, json]
     description: "text = raw response, json = wrapped with metadata"
+    section: advanced
 
 side_inputs:
   - id: _loop

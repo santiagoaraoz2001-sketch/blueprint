@@ -78,7 +78,7 @@ export interface InheritanceOverlay {
   participatingEdges: string[] // edge IDs on the propagation path
 }
 
-/** Config keys that propagate through model/config edges */
+/** Config keys that propagate through model/config edges (legacy fallback) */
 export const INHERITABLE_KEYS = [
   'model_name', 'model', 'model_id',
   'provider', 'backend', 'source',
@@ -90,6 +90,15 @@ export const INHERITABLE_KEYS = [
   'frequency_penalty', 'presence_penalty',
   'seed', 'random_seed',
 ]
+
+/** Keys that should NEVER inherit through edges — block-specific behavioral settings */
+export const INHERITANCE_DENY_LIST = new Set([
+  'output_format', 'format', 'method',
+  'scoring_function', 'trust_level', 'error_handling',
+  'topic', 'custom_personas', 'moderator_prompt',
+  'num_agents', 'num_rounds',
+  'aggregate',
+])
 
 /** Edge target handles that carry config propagation */
 export const CONFIG_PROPAGATION_HANDLES = new Set(['model', 'llm_config', 'llm', 'config'])

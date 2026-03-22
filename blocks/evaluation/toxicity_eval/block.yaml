@@ -86,6 +86,7 @@ config:
     default: 0
     min: 0
     description: "Limit evaluation to N samples (0 = all)"
+    propagate: true
   generation_temperature:
     type: float
     label: Generation Temperature
@@ -113,6 +114,7 @@ config:
     options: [json, csv]
     default: json
     description: "Format for dataset and report outputs (json or csv)"
+    section: advanced
   decimal_precision:
     type: integer
     label: Decimal Precision
@@ -120,6 +122,7 @@ config:
     min: 1
     max: 6
     description: "Decimal places for all computed scores"
+    propagate: true
 
 side_inputs:
   - id: _loop

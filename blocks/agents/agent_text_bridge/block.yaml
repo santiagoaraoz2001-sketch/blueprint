@@ -57,6 +57,7 @@ config:
     options: [raw, markdown, json]
     default: raw
     description: "raw: text as-is, markdown: with metadata header, json: structured extraction result"
+    section: advanced
 
 side_inputs:
   - id: _loop
