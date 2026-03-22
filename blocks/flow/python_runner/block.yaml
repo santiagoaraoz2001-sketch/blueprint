@@ -38,6 +38,7 @@ config:
     label: Script File Path
     default: ""
     description: "Optional: path to .py file (overrides inline script)"
+    file_extensions: [".py"]
   timeout_seconds:
     type: integer
     label: Timeout (seconds)

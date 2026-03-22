@@ -10,7 +10,7 @@
  * Dev with:    npm run electron:dev
  */
 
-const { app, BrowserWindow, shell, Menu } = require("electron");
+const { app, BrowserWindow, shell, Menu, ipcMain, dialog } = require("electron");
 const { spawn, execSync } = require("child_process");
 const { createServer } = require("net");
 const path = require("path");
@@ -173,6 +173,29 @@ function buildMenu() {
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
+
+/* ── File / Directory Picker IPC ───────────────────────────────────── */
+
+ipcMain.handle("dialog:open-file", async (_event, options = {}) => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openFile"],
+    title: options.title || "Select File",
+    filters: options.filters || [],
+    defaultPath: options.defaultPath || undefined,
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
+});
+
+ipcMain.handle("dialog:open-directory", async (_event, options = {}) => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openDirectory", "createDirectory"],
+    title: options.title || "Select Folder",
+    defaultPath: options.defaultPath || undefined,
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
+});
 
 /* ── App Lifecycle ─────────────────────────────────────────────────── */
 

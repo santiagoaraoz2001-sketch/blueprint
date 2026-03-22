@@ -1,13 +1,19 @@
 /**
  * Electron Preload Script — Blueprint
  * ────────────────────────────────────
- * Minimal context bridge. The app runs as a standard web page
- * talking to FastAPI backend, so very little IPC is needed.
+ * Context bridge exposing platform info and native file dialogs
+ * to the sandboxed renderer process.
  */
 
-const { contextBridge } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("blueprint", {
   platform: process.platform,
   isElectron: true,
+
+  /** Open a native file picker. Returns the selected path or null if cancelled. */
+  selectFile: (options) => ipcRenderer.invoke("dialog:open-file", options),
+
+  /** Open a native directory picker. Returns the selected path or null if cancelled. */
+  selectDirectory: (options) => ipcRenderer.invoke("dialog:open-directory", options),
 });

@@ -29,6 +29,7 @@ config:
     label: Output Directory
     description: Custom output directory for the package
     default: ""
+    path_mode: directory
   include_readme:
     type: boolean
     label: Include README

@@ -80,6 +80,7 @@ config:
     label: Cache Directory
     default: ""
     description: "Custom cache directory for downloaded datasets (empty = HF default)"
+    path_mode: directory
   shuffle:
     type: boolean
     label: Shuffle

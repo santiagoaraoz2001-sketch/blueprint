@@ -42,6 +42,7 @@ config:
     label: Cache Directory
     description: Custom cache directory for model files
     default: ""
+    path_mode: directory
   torch_dtype:
     type: select
     label: Torch Dtype

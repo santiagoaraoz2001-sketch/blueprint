@@ -30,6 +30,7 @@ config:
     label: Output Directory
     default: ""
     description: Absolute path on your machine
+    path_mode: directory
   filename:
     type: string
     label: Filename
