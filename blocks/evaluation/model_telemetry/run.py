@@ -207,6 +207,13 @@ def _analyze_torch_model(ctx, model_path, telemetry, sample_texts,
         if torch.cuda.is_available():
             telemetry["memory"]["gpu_allocated_mb"] = round(torch.cuda.memory_allocated() / 1024 / 1024, 2)
             telemetry["memory"]["gpu_reserved_mb"] = round(torch.cuda.memory_reserved() / 1024 / 1024, 2)
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            # MPS doesn't expose fine-grained memory stats, but report driver allocations
+            try:
+                telemetry["memory"]["gpu_backend"] = "mps"
+                telemetry["memory"]["gpu_allocated_mb"] = round(torch.mps.driver_allocated_size() / 1024 / 1024, 2)
+            except Exception:
+                telemetry["memory"]["gpu_backend"] = "mps"
         try:
             import psutil
             process = psutil.Process()

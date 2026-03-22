@@ -391,3 +391,33 @@ def _detect_accelerators() -> dict[str, bool]:
         pass
 
     return accel
+
+
+# ---------------------------------------------------------------------------
+# PyTorch Device Helpers
+# ---------------------------------------------------------------------------
+
+def has_gpu() -> bool:
+    """Return True if a GPU is available for PyTorch (CUDA or MPS)."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return True
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return True
+    except ImportError:
+        pass
+    return False
+
+
+def get_torch_device() -> str:
+    """Return the best available PyTorch device string: 'cuda', 'mps', or 'cpu'."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return "mps"
+    except ImportError:
+        pass
+    return "cpu"

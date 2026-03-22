@@ -49,6 +49,12 @@ except ImportError:
         return model_name
 
 
+def _has_gpu():
+    """Check for GPU: CUDA or Apple MPS."""
+    import torch
+    return torch.cuda.is_available() or (hasattr(torch.backends, "mps") and torch.backends.mps.is_available())
+
+
 def run(ctx):
     dataset_path = ctx.resolve_as_file_path("dataset")
 
@@ -221,8 +227,8 @@ def run(ctx):
 
             model = AutoModelForCausalLM.from_pretrained(
                 model_name,
-                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                device_map="auto" if torch.cuda.is_available() else None,
+                torch_dtype=torch.float16 if _has_gpu() else torch.float32,
+                device_map="auto" if _has_gpu() else None,
             )
 
             # Tokenize
@@ -254,7 +260,7 @@ def run(ctx):
                 logging_steps=max(1, len(train_dataset) // (batch_size * 10)),
                 save_strategy="no",
                 eval_strategy="epoch",
-                fp16=torch.cuda.is_available(),
+                fp16=_has_gpu(),
                 report_to="none",
                 disable_tqdm=True,
             )
@@ -317,6 +323,8 @@ def run(ctx):
             del model, trainer
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+            elif hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
+                torch.mps.empty_cache()
 
         ctx.log_message(f"Sweep complete! Best trial: {best_trial_idx + 1} with {optimize_metric}: {best_value:.4f}")
         ctx.log_message(f"Best hyperparameters: {best_trial}")

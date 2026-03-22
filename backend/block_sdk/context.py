@@ -59,6 +59,24 @@ class BlockContext:
 
         os.makedirs(run_dir, exist_ok=True)
 
+    @property
+    def device(self) -> str:
+        """Return the best available compute device: 'cuda', 'mps', or 'cpu'."""
+        try:
+            import torch
+            if torch.cuda.is_available():
+                return "cuda"
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                return "mps"
+        except ImportError:
+            pass
+        return "cpu"
+
+    @property
+    def has_gpu(self) -> bool:
+        """Return True if a GPU is available (CUDA or Apple MPS)."""
+        return self.device != "cpu"
+
     def load_input(self, name: str) -> Any:
         """Load an input by name. Auto-fingerprints dataset inputs."""
         if name not in self._inputs:

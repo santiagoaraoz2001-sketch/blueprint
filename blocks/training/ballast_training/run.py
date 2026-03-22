@@ -44,6 +44,12 @@ except ImportError:
         return model_name
 
 
+def _has_gpu():
+    """Check for GPU: CUDA or Apple MPS."""
+    import torch
+    return torch.cuda.is_available() or (hasattr(torch.backends, "mps") and torch.backends.mps.is_available())
+
+
 def run(ctx):
     dataset_path = ctx.resolve_as_file_path("dataset")
 
@@ -206,8 +212,8 @@ def _run_real_training(
 
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-        device_map="auto" if torch.cuda.is_available() else None,
+        torch_dtype=torch.float16 if _has_gpu() else torch.float32,
+        device_map="auto" if _has_gpu() else None,
     )
 
     # ── Identify transformer layers ─────────────────────────────────────
@@ -316,7 +322,7 @@ def _run_real_training(
         save_strategy="epoch",
         eval_strategy="epoch" if eval_dataset else "no",
         report_to="none",
-        fp16=torch.cuda.is_available(),
+        fp16=_has_gpu(),
     )
 
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)

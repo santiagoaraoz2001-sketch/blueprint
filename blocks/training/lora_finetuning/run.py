@@ -27,6 +27,12 @@ except ImportError:
         return model_name
 
 
+def _has_gpu():
+    """Check for GPU: CUDA or Apple MPS."""
+    import torch
+    return torch.cuda.is_available() or (hasattr(torch.backends, "mps") and torch.backends.mps.is_available())
+
+
 def run(ctx):
     # Read upstream dataset metadata
     _dataset_meta = {}
@@ -225,8 +231,8 @@ def _run_pytorch_path(
 
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-        device_map="auto" if torch.cuda.is_available() else None,
+        torch_dtype=torch.float16 if _has_gpu() else torch.float32,
+        device_map="auto" if _has_gpu() else None,
     )
 
     # Apply LoRA
@@ -298,7 +304,7 @@ def _run_pytorch_path(
         save_strategy="epoch",
         eval_strategy="epoch" if eval_dataset else "no",
         report_to="none",
-        fp16=torch.cuda.is_available(),
+        fp16=_has_gpu(),
     )
 
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)

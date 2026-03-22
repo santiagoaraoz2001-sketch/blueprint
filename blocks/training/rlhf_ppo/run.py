@@ -43,6 +43,12 @@ except ImportError:
         return model_name
 
 
+def _has_gpu():
+    """Check for GPU: CUDA or Apple MPS."""
+    import torch
+    return torch.cuda.is_available() or (hasattr(torch.backends, "mps") and torch.backends.mps.is_available())
+
+
 def run(ctx):
     dataset_path = ctx.resolve_as_file_path("dataset")
     model_name = ctx.config.get("model_name", "")
@@ -136,7 +142,7 @@ def run(ctx):
         output_dir = os.path.join(ctx.run_dir, "model")
         os.makedirs(output_dir, exist_ok=True)
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else "cpu"))
 
         # Load model and tokenizer
         ctx.log_message(f"Loading model: {model_name}")
@@ -146,7 +152,7 @@ def run(ctx):
 
         model = AutoModelForCausalLMWithValueHead.from_pretrained(
             model_name, trust_remote_code=True,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            torch_dtype=torch.float16 if _has_gpu() else torch.float32,
         )
         ctx.log_message(f"Model loaded with value head.")
 

@@ -278,10 +278,11 @@ def _try_transformers(ctx, model_id, inputs, total, max_tokens):
         except Exception:
             task = "text-generation"
 
-        device = 0 if torch.cuda.is_available() else -1
+        _gpu = torch.cuda.is_available() or (hasattr(torch.backends, "mps") and torch.backends.mps.is_available())
+        device = 0 if torch.cuda.is_available() else ("mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else -1)
         pipe = pipeline(
             task, model=model_id, device=device,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            torch_dtype=torch.float16 if _gpu else torch.float32,
             max_new_tokens=max_tokens,
         )
 
