@@ -3,6 +3,8 @@ type: column_transform
 category: data
 description: Rename, drop, keep, cast, or derive columns in a dataset
 version: "2.0.0"
+deprecated: true
+deprecated_message: "Use the Dataset Builder block instead — it provides column mapping, keep/drop columns, and Python script transforms that cover all column_transform operations."
 
 inputs:
   - id: dataset
