@@ -41,6 +41,10 @@ export interface ConfigField {
   description?: string
   depends_on?: { field: string; value: any }
   mandatory?: boolean
+  /** For file_path fields: 'file' (default) opens a file picker, 'directory' opens a folder picker */
+  path_mode?: 'file' | 'directory'
+  /** File extension filters for file_path fields (e.g. ['.csv', '.json']) */
+  file_extensions?: string[]
 }
 
 export type BlockMaturity = 'stable' | 'beta' | 'experimental'

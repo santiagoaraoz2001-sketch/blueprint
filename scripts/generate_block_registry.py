@@ -190,6 +190,10 @@ def _convert_config_fields(config_schema: dict | None) -> list[dict]:
             field["depends_on"] = field_def["depends_on"]
         if field_def.get("mandatory"):
             field["mandatory"] = True
+        if "path_mode" in field_def:
+            field["path_mode"] = field_def["path_mode"]
+        if "file_extensions" in field_def:
+            field["file_extensions"] = field_def["file_extensions"]
         fields.append(field)
     return fields
 
@@ -276,6 +280,11 @@ def _format_config_field(field: dict, indent: str) -> str:
         parts.append(f"depends_on: {{ field: '{_esc(dep['field'])}', value: {_ts_value(dep['value'])} }}")
     if field.get("mandatory"):
         parts.append("mandatory: true")
+    if "path_mode" in field:
+        parts.append(f"path_mode: '{_esc(field['path_mode'])}'")
+    if "file_extensions" in field:
+        exts = ", ".join(f"'{_esc(e)}'" for e in field["file_extensions"])
+        parts.append(f"file_extensions: [{exts}]")
 
     joined = ", ".join(parts)
     if len(joined) < 100:

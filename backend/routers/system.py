@@ -419,6 +419,54 @@ def install_packages(body: dict):
 
 
 # ---------------------------------------------------------------------------
+# File / Directory Browser (fallback for non-Electron environments)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/browse")
+def browse_filesystem(body: dict = Body(...)):
+    """Open a native file or directory picker dialog.
+
+    Used as a fallback when the Electron IPC bridge is not available
+    (e.g. running the frontend via plain Vite in a browser).
+
+    Body: { "mode": "file" | "directory", "title": "...", "default_path": "..." }
+    Returns: { "path": "/selected/path" } or { "path": null } if cancelled.
+    """
+    import tkinter as tk
+    from tkinter import filedialog
+
+    mode = body.get("mode", "file")
+    title = body.get("title", "Select File" if mode == "file" else "Select Folder")
+    default_path = body.get("default_path", "")
+
+    # Create a hidden root window
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+
+    try:
+        if mode == "directory":
+            path = filedialog.askdirectory(title=title, initialdir=default_path or None)
+        else:
+            file_extensions = body.get("file_extensions", [])
+            filetypes = []
+            if file_extensions:
+                ext_str = " ".join(f"*{ext}" for ext in file_extensions)
+                filetypes.append(("Supported files", ext_str))
+            filetypes.append(("All files", "*.*"))
+            path = filedialog.askopenfilename(
+                title=title,
+                initialdir=default_path or None,
+                filetypes=filetypes,
+            )
+    finally:
+        root.destroy()
+
+    return {"path": path if path else None}
+
+
+# ---------------------------------------------------------------------------
 # Run Diagnostics
 # ---------------------------------------------------------------------------
 

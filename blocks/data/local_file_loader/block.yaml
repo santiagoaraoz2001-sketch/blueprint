@@ -33,6 +33,7 @@ config:
     label: File Path
     description: "Path to the data file"
     mandatory: true
+    file_extensions: [".csv", ".tsv", ".json", ".jsonl", ".parquet", ".xlsx", ".txt"]
   format:
     type: select
     label: Format

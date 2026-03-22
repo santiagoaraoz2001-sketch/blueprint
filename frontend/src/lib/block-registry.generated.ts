@@ -1069,6 +1069,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'file_path',
         default: '',
         description: 'Path to config file (JSON, YAML, or TOML)',
+        file_extensions: ['.json', '.yaml', '.yml', '.toml'],
       },
       {
         name: 'format',
@@ -1092,6 +1093,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         default: '',
         description: 'Path to JSON Schema file for validation',
         depends_on: { field: 'validate_schema', value: true },
+        file_extensions: ['.json'],
       },
     ],
     side_inputs: [
@@ -1601,6 +1603,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'file_path',
         description: 'Directory containing documents to ingest',
         mandatory: true,
+        path_mode: 'directory',
       },
       {
         name: 'glob_pattern',
@@ -1928,6 +1931,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'file_path',
         default: '',
         description: 'Custom cache directory for downloaded datasets (empty = HF default)',
+        path_mode: 'directory',
       },
       {
         name: 'shuffle',
@@ -2037,6 +2041,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'file_path',
         default: '',
         description: 'Custom cache directory for model files',
+        path_mode: 'directory',
       },
       {
         name: 'torch_dtype',
@@ -2091,6 +2096,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'file_path',
         description: 'Path to the data file',
         mandatory: true,
+        file_extensions: ['.csv', '.tsv', '.json', '.jsonl', '.parquet', '.xlsx', '.txt'],
       },
       {
         name: 'format',
@@ -3688,6 +3694,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'file_path',
         default: '',
         description: 'Absolute path on your machine',
+        path_mode: 'directory',
       },
       {
         name: 'filename',
@@ -8001,6 +8008,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'file_path',
         default: '',
         description: 'Optional: path to .py file (overrides inline script)',
+        file_extensions: ['.py'],
       },
       {
         name: 'timeout_seconds',
@@ -10338,6 +10346,7 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
         type: 'file_path',
         default: '',
         description: 'Custom output directory for the package',
+        path_mode: 'directory',
       },
       { name: 'include_readme', label: 'Include README', type: 'boolean', default: true },
       {

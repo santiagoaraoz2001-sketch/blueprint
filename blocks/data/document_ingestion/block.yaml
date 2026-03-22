@@ -28,6 +28,7 @@ config:
     label: Folder Path
     description: "Directory containing documents to ingest"
     mandatory: true
+    path_mode: directory
   glob_pattern:
     type: string
     label: File Type Pattern

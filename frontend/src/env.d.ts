@@ -12,3 +12,15 @@ interface ImportMeta {
 
 // Global constants injected by Vite define
 declare const __APP_VERSION__: string
+
+// Electron preload bridge
+interface BlueprintBridge {
+  platform: string
+  isElectron: boolean
+  selectFile: (options?: { title?: string; defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<string | null>
+  selectDirectory: (options?: { title?: string; defaultPath?: string }) => Promise<string | null>
+}
+
+interface Window {
+  blueprint?: BlueprintBridge
+}

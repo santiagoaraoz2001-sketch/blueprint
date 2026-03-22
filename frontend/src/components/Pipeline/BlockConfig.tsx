@@ -4,7 +4,7 @@ import { getBlockDefinition, getFileFormatWarning, type ConfigField, type Connec
 import { usePresetStore } from '@/stores/presetStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getIcon } from '@/lib/icon-utils'
-import { Trash2, X, Save, ChevronDown, AlertTriangle, GitBranch } from 'lucide-react'
+import { Trash2, X, Save, ChevronDown, AlertTriangle, GitBranch, FolderOpen } from 'lucide-react'
 import type { Node } from '@xyflow/react'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { api } from '@/api/client'
@@ -772,6 +772,14 @@ function ConfigFieldInput({
           step={0.01}
           style={inputStyle}
         />
+      ) : field.type === 'file_path' ? (
+        <FilePathInput
+          value={isInherited ? '' : String(value)}
+          placeholder={inheritedPlaceholder}
+          onChange={onChange}
+          inputStyle={inputStyle}
+          field={field}
+        />
       ) : (
         <input
           type="text"
@@ -821,6 +829,136 @@ function ConfigFieldInput({
           {field.description}
         </span>
       )}
+    </div>
+  )
+}
+
+/* ── File Path Input with Browse Button ── */
+
+/** Infer whether a file_path field expects a directory based on path_mode or field name heuristics */
+function inferPathMode(field: ConfigField): 'file' | 'directory' {
+  if (field.path_mode) return field.path_mode
+  const name = field.name.toLowerCase()
+  if (name.includes('dir') || name.includes('directory') || name.includes('folder') || name.includes('output_path')) {
+    return 'directory'
+  }
+  return 'file'
+}
+
+/** Build Electron dialog file filters from file_extensions or field context */
+function buildFileFilters(field: ConfigField): { name: string; extensions: string[] }[] {
+  if (field.file_extensions?.length) {
+    return [
+      { name: 'Supported files', extensions: field.file_extensions.map((e) => e.replace(/^\./, '')) },
+      { name: 'All files', extensions: ['*'] },
+    ]
+  }
+  return []
+}
+
+function FilePathInput({
+  value,
+  placeholder,
+  onChange,
+  inputStyle,
+  field,
+}: {
+  value: string
+  placeholder: string
+  onChange: (v: string) => void
+  inputStyle: React.CSSProperties
+  field: ConfigField
+}) {
+  const [browsing, setBrowsing] = useState(false)
+  const pathMode = inferPathMode(field)
+
+  const handleBrowse = useCallback(async () => {
+    if (browsing) return
+    setBrowsing(true)
+
+    try {
+      let selectedPath: string | null = null
+
+      // Try Electron IPC first, fall back to backend API
+      if (window.blueprint?.selectFile) {
+        if (pathMode === 'directory') {
+          selectedPath = await window.blueprint.selectDirectory({
+            title: field.label || 'Select Folder',
+            defaultPath: value || undefined,
+          })
+        } else {
+          selectedPath = await window.blueprint.selectFile({
+            title: field.label || 'Select File',
+            defaultPath: value || undefined,
+            filters: buildFileFilters(field),
+          })
+        }
+      } else {
+        // Backend fallback for non-Electron environments
+        const res = await fetch('/api/system/browse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: pathMode,
+            title: field.label || (pathMode === 'directory' ? 'Select Folder' : 'Select File'),
+            default_path: value || '',
+            file_extensions: field.file_extensions || [],
+          }),
+        })
+        const data = await res.json()
+        selectedPath = data.path
+      }
+
+      if (selectedPath) {
+        onChange(selectedPath)
+      }
+    } catch (err) {
+      console.error('Browse dialog error:', err)
+      toast.error('Failed to open file browser')
+    } finally {
+      setBrowsing(false)
+    }
+  }, [browsing, pathMode, field, value, onChange])
+
+  return (
+    <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ ...inputStyle, flex: 1 }}
+      />
+      <button
+        onClick={handleBrowse}
+        disabled={browsing}
+        title={pathMode === 'directory' ? 'Browse for folder' : 'Browse for file'}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '0 8px',
+          background: `${T.white}08`,
+          border: `1px solid ${T.white}15`,
+          borderRadius: 4,
+          color: browsing ? T.dim : T.cyan,
+          cursor: browsing ? 'wait' : 'pointer',
+          transition: 'all 0.15s ease',
+          flexShrink: 0,
+        }}
+        onMouseEnter={(e) => {
+          if (!browsing) {
+            e.currentTarget.style.background = `${T.cyan}18`
+            e.currentTarget.style.borderColor = `${T.cyan}40`
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = `${T.white}08`
+          e.currentTarget.style.borderColor = `${T.white}15`
+        }}
+      >
+        <FolderOpen size={13} />
+      </button>
     </div>
   )
 }
