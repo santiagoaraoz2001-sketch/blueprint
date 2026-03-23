@@ -7,7 +7,7 @@ const steps = [
   {
     icon: GitBranch,
     title: 'BUILD PIPELINES',
-    description: 'Drag blocks from the library and connect them to create ML experiment workflows. 100+ blocks across 10 categories.',
+    description: 'Drag blocks from the library and connect them to create ML experiment workflows. 118 blocks across 9 categories.',
     accent: '#4af6c3',
   },
   {
