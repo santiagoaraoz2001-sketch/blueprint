@@ -30,6 +30,8 @@ export default function RunControls() {
   const [showAnalysis, setShowAnalysis] = useState(false)
 
   const isRunning = status === 'running'
+  const isStarting = useRunStore((s) => s.isStarting)
+  const isRunDisabled = isRunning || isStarting || nodes.length === 0
 
   // SSE subscription via centralized manager
   useEffect(() => {
@@ -292,9 +294,9 @@ export default function RunControls() {
       {!isRunning ? (
         <>
           <button
-            onClick={handleRun}
+            onClick={isRunDisabled ? undefined : handleRun}
             data-tour="btn-run-pipeline"
-            title="Run Pipeline (Cmd/Ctrl + Enter)"
+            title={nodes.length === 0 ? 'Add blocks to run' : isStarting ? 'Starting...' : 'Run Pipeline (Cmd/Ctrl + Enter)'}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -308,14 +310,16 @@ export default function RunControls() {
               fontSize: FS.xs,
               fontWeight: 800,
               letterSpacing: '0.08em',
-              cursor: 'pointer',
+              cursor: isRunDisabled ? 'not-allowed' : 'pointer',
               transition: 'all 0.15s',
+              opacity: isRunDisabled ? 0.35 : 1,
+              pointerEvents: isRunDisabled ? 'none' as const : 'auto' as const,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = `${T.green}30`; e.currentTarget.style.borderColor = `${T.green}70` }}
+            onMouseEnter={(e) => { if (!isRunDisabled) { e.currentTarget.style.background = `${T.green}30`; e.currentTarget.style.borderColor = `${T.green}70` } }}
             onMouseLeave={(e) => { e.currentTarget.style.background = `${T.green}22`; e.currentTarget.style.borderColor = `${T.green}50` }}
           >
-            <Play size={12} />
-            {status === 'complete' || status === 'failed' ? 'RE-RUN' : 'RUN'}
+            {isStarting ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={12} />}
+            {isStarting ? 'STARTING...' : status === 'complete' || status === 'failed' ? 'RE-RUN' : 'RUN'}
           </button>
           <ToolbarDropdown
             label=""

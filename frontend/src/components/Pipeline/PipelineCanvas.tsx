@@ -627,6 +627,12 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
               <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.cyan, fontWeight: 700 }}>Add Block</span>
             </button>
           </div>
+          <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, marginTop: 4 }}>
+            or press <span style={{
+              padding: '1px 5px', background: T.surface2, border: `1px solid ${T.border}`,
+              borderRadius: 3, fontFamily: F, fontSize: 10, fontWeight: 600,
+            }}>Space</span> to search blocks
+          </div>
         </div>
       )}
 

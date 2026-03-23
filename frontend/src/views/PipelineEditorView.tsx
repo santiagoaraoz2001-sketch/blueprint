@@ -13,7 +13,7 @@ import ValidationPanel from '@/components/Pipeline/ValidationPanel'
 import PipelineTabBar from '@/components/Pipeline/PipelineTabBar'
 import { validatePipelineClient, type DiagnosticReport } from '@/lib/pipeline-validator'
 import PipelineMonitor, { type MonitorBlock } from '@/components/Pipeline/PipelineMonitor'
-import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp } from 'lucide-react'
+import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp, AlertCircle, WifiOff } from 'lucide-react'
 import TemplateGallery from '@/components/Pipeline/TemplateGallery'
 import ToolbarDropdown from '@/components/Pipeline/ToolbarDropdown'
 import MissionController from '@/components/Mission/MissionController'
@@ -90,6 +90,8 @@ export default function PipelineEditorView() {
   const overallProgress = useRunStore((s) => s.overallProgress)
   const runLogs = useRunStore((s) => s.logs)
   const runStatus = useRunStore((s) => s.status)
+  const sseStatus = useRunStore((s) => s.sseStatus)
+  const runError = useRunStore((s) => s.error)
 
   // Convert nodeStatuses to MonitorBlock format — memoized to avoid re-creating on every render
   const monitorBlocks: MonitorBlock[] = useMemo(() =>
@@ -151,6 +153,17 @@ export default function PipelineEditorView() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [undo, redo, handleSave])
+
+  // Warn before closing tab with unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (usePipelineStore.getState().isDirty) {
+        e.preventDefault()
+      }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
 
   const handleImport = useCallback(() => {
     fileInputRef.current?.click()
@@ -489,6 +502,50 @@ export default function PipelineEditorView() {
 
       {/* Pipeline Tabs */}
       <PipelineTabBar />
+
+      {/* Persistent error banner for failed runs */}
+      {runStatus === 'failed' && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 12px',
+          background: `${T.red}10`,
+          borderBottom: `1px solid ${T.red}25`,
+          flexShrink: 0,
+        }}>
+          <AlertCircle size={14} color={T.red} />
+          <span style={{ fontFamily: F, fontSize: FS.sm, color: T.red, flex: 1 }}>
+            Pipeline run failed{runError ? `: ${runError.substring(0, 120)}` : ''}
+          </span>
+          <button
+            onClick={() => useRunStore.getState().reset()}
+            style={{
+              background: 'none', border: `1px solid ${T.red}30`,
+              color: T.red, fontFamily: F, fontSize: FS.xxs,
+              padding: '2px 8px', cursor: 'pointer',
+            }}
+          >
+            DISMISS
+          </button>
+        </div>
+      )}
+
+      {/* SSE connection warning during active run */}
+      {runStatus === 'running' && (sseStatus === 'reconnecting' || sseStatus === 'stale') && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '6px 12px',
+          background: '#F59E0B10',
+          borderBottom: '1px solid #F59E0B25',
+          flexShrink: 0,
+        }}>
+          <WifiOff size={14} color="#F59E0B" />
+          <span style={{ fontFamily: F, fontSize: FS.xs, color: '#F59E0B' }}>
+            {sseStatus === 'reconnecting'
+              ? 'Reconnecting to server\u2026 Your run is still executing.'
+              : 'Connection lost. Your run may still be executing on the server.'}
+          </span>
+        </div>
+      )}
 
       {/* Editor area */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>

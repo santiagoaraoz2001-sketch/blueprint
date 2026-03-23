@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useRunStore } from '@/stores/runStore'
 import { useReactFlow } from '@xyflow/react'
 import { Settings, Copy, Maximize, Trash2, RotateCcw, Eye, GitCompare } from 'lucide-react'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 
 interface NodeContextMenuProps {
   visible: boolean
@@ -17,7 +19,8 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
   const runStatus = useRunStore((s) => s.status)
   const activeRunId = useRunStore((s) => s.activeRunId)
   const nodeStatuses = useRunStore((s) => s.nodeStatuses)
-  if (!visible) return null
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  if (!visible && !showDeleteConfirm) return null
 
   const isRunComplete = runStatus === 'complete' || runStatus === 'failed'
   const nodeRunStatus = nodeStatuses[nodeId]
@@ -67,8 +70,13 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
   }
 
   const handleDelete = () => {
-    usePipelineStore.getState().removeNode(nodeId)
+    setShowDeleteConfirm(true)
     onClose()
+  }
+
+  const confirmDelete = () => {
+    usePipelineStore.getState().removeNode(nodeId)
+    setShowDeleteConfirm(false)
   }
 
   // Compute disabled reason for tooltip
@@ -80,7 +88,8 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
   }
 
   return (
-    <div
+    <div onClick={(e) => e.stopPropagation()}>
+    {visible && <div
       style={{
         position: 'fixed',
         left: x,
@@ -93,7 +102,6 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
         borderRadius: 4,
         overflow: 'hidden',
       }}
-      onClick={(e) => e.stopPropagation()}
     >
       {/* Re-run section — only when a run exists */}
       {isRunComplete && activeRunId && (
@@ -154,6 +162,16 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
         color={T.red}
         onClick={handleDelete}
       />
+    </div>}
+    <ConfirmDialog
+      open={showDeleteConfirm}
+      title="Delete Block"
+      message="This block and its connections will be removed. You can undo with \u2318Z."
+      confirmLabel="Delete"
+      confirmColor={T.red}
+      onConfirm={confirmDelete}
+      onCancel={() => setShowDeleteConfirm(false)}
+    />
     </div>
   )
 }

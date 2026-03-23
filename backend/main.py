@@ -222,7 +222,7 @@ app = FastAPI(
     lifespan=lifespan,
     title="Blueprint API",
     description="Specific Labs Blueprint — ML Experiment Workbench",
-    version="0.2.1",
+    version="0.2.2",
 )
 
 app.add_middleware(
