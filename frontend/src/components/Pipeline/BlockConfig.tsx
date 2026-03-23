@@ -4,7 +4,7 @@ import { getBlockDefinition, getFileFormatWarning, type ConfigField, type Connec
 import { usePresetStore } from '@/stores/presetStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getIcon } from '@/lib/icon-utils'
-import { Trash2, X, Save, ChevronDown, ChevronRight, AlertTriangle, GitBranch, FolderOpen, Search, Copy, ClipboardPaste, RotateCcw, Info, Zap, ArrowRight, Plus } from 'lucide-react'
+import { Trash2, X, Save, ChevronDown, ChevronRight, AlertTriangle, GitBranch, FolderOpen, Search, Copy, ClipboardPaste, RotateCcw, Info, Zap, ArrowRight, Plus, Play, Loader2 } from 'lucide-react'
 import type { Node } from '@xyflow/react'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { api } from '@/api/client'
@@ -193,8 +193,20 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
 
   const [frameworkData, setFrameworkData] = useState<any[]>([])
 
+  // Field names that represent model selection and should get a dropdown
+  const MODEL_FIELD_NAMES = new Set([
+    'model_id', 'model_name', 'model_a', 'model_b',
+    'model_a_name', 'model_b_name', 'primary_model',
+    'fallback_model', 'base_model',
+  ])
+
+  // Check if this block has any model fields that need a dropdown
+  const hasModelFields = def?.configFields.some(f =>
+    f.type === 'string' && MODEL_FIELD_NAMES.has(f.name)
+  )
+
   useEffect(() => {
-    if (def?.type === 'model_selector') {
+    if (hasModelFields) {
       api.get<any[]>('/system/models')
         .then(data => {
           if (Array.isArray(data)) {
@@ -203,16 +215,61 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
         })
         .catch(err => console.error('Failed to fetch models', err))
     }
-  }, [def?.type])
+  }, [hasModelFields])
 
-  // Filter config fields by depends_on and enrich model_id with auto-detected options
+  // Collect all available models across all frameworks for general model fields
+  const allAvailableModels = useMemo(() => {
+    const models: string[] = []
+    for (const fw of frameworkData) {
+      if (Array.isArray(fw.models)) {
+        for (const m of fw.models) {
+          if (!models.includes(m)) models.push(m)
+        }
+      }
+    }
+    return models
+  }, [frameworkData])
+
+  // Ollama status — only check when we have model fields and Ollama has models
+  const ollamaFramework = frameworkData.find((d: any) => d.id === 'ollama')
+  const ollamaHasModels = (ollamaFramework?.models?.length ?? 0) > 0
+  const ollamaAvailable = ollamaFramework?.available ?? false
+  const [ollamaRunning, setOllamaRunning] = useState<boolean | null>(null)
+  const [ollamaStarting, setOllamaStarting] = useState(false)
+
+  useEffect(() => {
+    if (ollamaHasModels) {
+      fetch('/api/models/ollama/status')
+        .then(r => r.json())
+        .then(d => setOllamaRunning(d.running))
+        .catch(() => setOllamaRunning(false))
+    }
+  }, [ollamaHasModels])
+
+  const handleStartOllama = useCallback(async () => {
+    if (ollamaStarting) return
+    setOllamaStarting(true)
+    try {
+      const resp = await fetch('/api/models/ollama/start', { method: 'POST' })
+      const data = await resp.json()
+      if (data.status === 'running' || data.status === 'already_running') {
+        setOllamaRunning(true)
+        // Refresh framework data
+        const fresh = await api.get<any[]>('/system/models')
+        if (Array.isArray(fresh)) setFrameworkData(fresh)
+      }
+    } catch { /* ignore */ }
+    setOllamaStarting(false)
+  }, [ollamaStarting])
+
+  // Filter config fields by depends_on and enrich model fields with auto-detected options
   const displayFields = def?.configFields
     .filter(f => {
       if (!f.depends_on) return true
       return node.data.config[f.depends_on.field] === f.depends_on.value
     })
     .map(f => {
-      // Auto-populate model_id field with discovered models for the selected source
+      // For model_selector block, scope model_id options to the selected source
       if (def.type === 'model_selector' && f.name === 'model_id') {
         const source = (node.data.config.source as string) || 'huggingface'
         const sourceToFramework: Record<string, string> = { ollama: 'ollama', mlx: 'mlx', huggingface: 'pytorch', local_path: '' }
@@ -221,6 +278,12 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
         const models: string[] = fwEntry?.models || []
         if (models.length > 0) {
           return { ...f, type: 'select' as const, options: models } as ConfigField
+        }
+      }
+      // For all other blocks, enrich any model field with all available models
+      if (def.type !== 'model_selector' && f.type === 'string' && MODEL_FIELD_NAMES.has(f.name)) {
+        if (allAvailableModels.length > 0) {
+          return { ...f, type: 'select' as const, options: allAvailableModels } as ConfigField
         }
       }
       return f
@@ -680,6 +743,53 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
 
         {/* Preset selector */}
         {def && <PresetSelector blockType={def.type} nodeId={node.id} currentConfig={node.data.config} />}
+
+        {/* Ollama not-running banner */}
+        {hasModelFields && ollamaHasModels && ollamaRunning === false && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 8px',
+              marginBottom: 4,
+              background: `${T.amber}10`,
+              border: `1px solid ${T.amber}25`,
+            }}
+          >
+            <AlertTriangle size={11} color={T.amber} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1, fontFamily: F, fontSize: FS.xxs, color: T.amber }}>
+              Ollama has {ollamaFramework.models.length} model{ollamaFramework.models.length > 1 ? 's' : ''} installed but is not running
+            </span>
+            <button
+              type="button"
+              onClick={handleStartOllama}
+              disabled={ollamaStarting}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '2px 8px',
+                background: `${T.green}20`,
+                border: `1px solid ${T.green}40`,
+                color: T.green,
+                fontFamily: F,
+                fontSize: FS.xxs,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase' as const,
+                cursor: ollamaStarting ? 'wait' : 'pointer',
+                whiteSpace: 'nowrap' as const,
+              }}
+            >
+              {ollamaStarting ? (
+                <><Loader2 size={9} style={{ animation: 'spin 1s linear infinite' }} /> Starting...</>
+              ) : (
+                <><Play size={8} /> Start Ollama</>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* Grouped config fields */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

@@ -64,7 +64,8 @@ def _scan_local_models(source, ctx):
             )
 
     elif source == "ollama":
-        # Query Ollama API for locally pulled models
+        # Try running server first, fall back to manifest scanning
+        server_up = False
         try:
             req = urllib.request.Request(
                 "http://localhost:11434/api/tags",
@@ -73,6 +74,7 @@ def _scan_local_models(source, ctx):
             )
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
+                    server_up = True
                     body = response.read().decode("utf-8")
                     api_data = json.loads(body)
                     for m in api_data.get("models", []):
@@ -86,13 +88,44 @@ def _scan_local_models(source, ctx):
                 )
             else:
                 ctx.log_message("Ollama is running but no models pulled yet.")
-        except urllib.error.URLError:
-            ctx.log_message(
-                "Ollama not detected at localhost:11434. "
-                "Start with: ollama serve"
-            )
-        except Exception:
+        except (urllib.error.URLError, Exception):
             pass
+
+        # Fallback: scan Ollama manifests on disk
+        if not server_up:
+            try:
+                from backend.utils.model_scanner import detect_ollama_models
+                offline_models = detect_ollama_models()
+                for m in offline_models:
+                    if m["name"] not in discovered:
+                        discovered.append(m["name"])
+            except ImportError:
+                # Scan manifests directly if backend module not available
+                manifest_dir = os.path.expanduser("~/.ollama/models/manifests")
+                if os.path.isdir(manifest_dir):
+                    for root, _dirs, files in os.walk(manifest_dir):
+                        for f in files:
+                            parts = os.path.relpath(os.path.join(root, f), manifest_dir).split(os.sep)
+                            if len(parts) == 4:
+                                registry, namespace, model, tag = parts
+                                if registry == "registry.ollama.ai" and namespace == "library":
+                                    name = f"{model}:{tag}" if tag != "latest" else model
+                                else:
+                                    name = f"{registry}/{namespace}/{model}:{tag}"
+                                if name not in discovered:
+                                    discovered.append(name)
+
+            if discovered:
+                ctx.log_message(
+                    f"Ollama server not running, but found {len(discovered)} "
+                    f"installed model(s): {', '.join(discovered[:8])}. "
+                    f"Start Ollama from the toolbar or run: ollama serve"
+                )
+            else:
+                ctx.log_message(
+                    "Ollama not detected at localhost:11434 and no installed models found. "
+                    "Install from https://ollama.com then run: ollama pull <model>"
+                )
 
     return discovered
 
@@ -208,10 +241,22 @@ def _validate_ollama(model_id, ctx):
                     model_info["available_models"] = model_names[:20]
 
     except urllib.error.URLError:
-        ctx.log_message(
-            "WARNING: Cannot connect to Ollama at localhost:11434. "
-            "Ensure Ollama is running (ollama serve)."
-        )
+        # Check if models are installed offline
+        installed_count = 0
+        manifest_dir = os.path.expanduser("~/.ollama/models/manifests")
+        if os.path.isdir(manifest_dir):
+            for _root, _dirs, files in os.walk(manifest_dir):
+                installed_count += len(files)
+        if installed_count > 0:
+            ctx.log_message(
+                f"WARNING: Ollama has ~{installed_count} model(s) installed but the "
+                f"server is not running. Start it from the toolbar or run: ollama serve"
+            )
+        else:
+            ctx.log_message(
+                "WARNING: Cannot connect to Ollama at localhost:11434. "
+                "Ensure Ollama is running (ollama serve)."
+            )
     except Exception as e:
         ctx.log_message(f"WARNING: Ollama API error: {e}")
 

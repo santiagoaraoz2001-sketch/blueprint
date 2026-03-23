@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useModelHubStore, type LocalModel } from '@/stores/modelHubStore'
 import { useAgentStore } from '@/stores/agentStore'
-import { ChevronDown, Search, HardDrive, Cloud, PenLine, RefreshCw } from 'lucide-react'
+import { ChevronDown, Search, HardDrive, Cloud, PenLine, RefreshCw, Play, Loader2 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,6 +42,7 @@ const FORMAT_COLORS: Record<string, string> = {
   pytorch: '#FB923C',
   onnx: '#B87EFF',
   mlx: '#F472B6',
+  ollama: '#E8E8E8',
 }
 
 function getFormatColor(format: string): string {
@@ -183,6 +184,8 @@ export default function ModelSelector({
   const [customValue, setCustomValue] = useState('')
   const [highlightIndex, setHighlightIndex] = useState(-1)
   const [isScanning, setIsScanning] = useState(false)
+  const [ollamaRunning, setOllamaRunning] = useState<boolean | null>(null)
+  const [ollamaStarting, setOllamaStarting] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -192,6 +195,30 @@ export default function ModelSelector({
   const fetchLocalModels = useModelHubStore((s) => s.fetchLocalModels)
   const availableModels = useAgentStore((s) => s.availableModels)
   const fetchModels = useAgentStore((s) => s.fetchModels)
+
+  const checkOllamaStatus = useCallback(async () => {
+    try {
+      const resp = await fetch('/api/models/ollama/status')
+      const data = await resp.json()
+      setOllamaRunning(data.running)
+    } catch {
+      setOllamaRunning(false)
+    }
+  }, [])
+
+  const handleStartOllama = useCallback(async () => {
+    if (ollamaStarting) return
+    setOllamaStarting(true)
+    try {
+      const resp = await fetch('/api/models/ollama/start', { method: 'POST' })
+      const data = await resp.json()
+      if (data.status === 'running' || data.status === 'already_running') {
+        setOllamaRunning(true)
+        await Promise.all([fetchLocalModels(), fetchModels()])
+      }
+    } catch { /* ignore */ }
+    setOllamaStarting(false)
+  }, [ollamaStarting, fetchLocalModels, fetchModels])
 
   const handleRescan = useCallback(async () => {
     if (isScanning) return
@@ -265,11 +292,12 @@ export default function ModelSelector({
     // Always re-fetch models on open so newly downloaded models appear
     fetchLocalModels()
     fetchModels()
+    checkOllamaStatus()
 
     requestAnimationFrame(() => {
       searchInputRef.current?.focus()
     })
-  }, [fetchLocalModels, fetchModels])
+  }, [fetchLocalModels, fetchModels, checkOllamaStatus])
 
   const close = useCallback(() => {
     setIsOpen(false)
@@ -503,6 +531,67 @@ export default function ModelSelector({
             ref={dropdownRef}
             style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
           >
+            {/* Ollama status banner */}
+            {ollamaRunning === false && localOptions.some(o => o.format === 'ollama') && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 8px',
+                  background: `${T.amber}10`,
+                  borderBottom: `1px solid ${T.border}`,
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    fontFamily: F,
+                    fontSize: FS.xxs,
+                    color: T.amber,
+                  }}
+                >
+                  Ollama installed but not running
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleStartOllama() }}
+                  disabled={ollamaStarting}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 8px',
+                    background: `${T.green}20`,
+                    border: `1px solid ${T.green}40`,
+                    color: T.green,
+                    fontFamily: F,
+                    fontSize: FS.xxs,
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    cursor: ollamaStarting ? 'wait' : 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {ollamaStarting ? (
+                    <>
+                      <Loader2
+                        size={9}
+                        style={{ animation: 'spin 1s linear infinite' }}
+                      />
+                      Starting...
+                    </>
+                  ) : (
+                    <>
+                      <Play size={8} />
+                      Start Ollama
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
             {/* Local Models Section */}
             {localOptions.length > 0 && (
               <>

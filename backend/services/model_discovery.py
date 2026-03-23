@@ -21,44 +21,24 @@ def discover_frameworks() -> list[dict]:
     frameworks = []
 
     # ── Ollama ───────────────────────────────────────────────────────
-    try:
-        import urllib.request
-        import json
+    from ..utils.model_scanner import detect_ollama_models
 
-        req = urllib.request.Request(
-            "http://localhost:11434/api/tags",
-            headers={"Accept": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=2) as resp:
-            data = json.loads(resp.read().decode())
-            models = [m["name"] for m in data.get("models", [])]
-            frameworks.append({
-                "id": "ollama",
-                "name": "Ollama",
-                "available": True,
-                "models": models,
-                "default_config": {
-                    "max_tokens": 2048,
-                    "temperature": 0.7,
-                    "supports_system_prompt": True,
-                    "supports_chat": True,
-                    "supports_streaming": True,
-                },
-            })
-    except Exception:
-        frameworks.append({
-            "id": "ollama",
-            "name": "Ollama",
-            "available": False,
-            "models": [],
-            "default_config": {
-                "max_tokens": 2048,
-                "temperature": 0.7,
-                "supports_system_prompt": True,
-                "supports_chat": True,
-                "supports_streaming": True,
-            },
-        })
+    ollama_detected = detect_ollama_models()
+    ollama_models = [m["name"] for m in ollama_detected]
+    # Consider Ollama "available" if we found any models (even via CLI)
+    frameworks.append({
+        "id": "ollama",
+        "name": "Ollama",
+        "available": len(ollama_models) > 0,
+        "models": ollama_models,
+        "default_config": {
+            "max_tokens": 2048,
+            "temperature": 0.7,
+            "supports_system_prompt": True,
+            "supports_chat": True,
+            "supports_streaming": True,
+        },
+    })
 
     # ── MLX (Apple Silicon) ─────────────────────────────────────────
     try:

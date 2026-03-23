@@ -11,7 +11,7 @@ SAFE_MODEL_ID = re.compile(r'^[a-zA-Z0-9_\-./]+$')
 
 from ..config import OLLAMA_URL
 from ..utils.hf_hub import search_models, get_model_details
-from ..utils.model_scanner import scan_directories
+from ..utils.model_scanner import scan_directories, detect_ollama_models
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -22,15 +22,9 @@ def available_models():
     local = scan_directories()
     result = {'ollama': [], 'gguf': [], 'mlx': [], 'huggingface': []}
 
-    # Try to query Ollama API for installed models
-    try:
-        import urllib.request
-        import json as _json
-        resp = urllib.request.urlopen(f'{OLLAMA_URL}/api/tags', timeout=2)
-        data = _json.loads(resp.read())
-        result['ollama'] = [{'name': m['name'], 'size': m.get('size', 0)} for m in data.get('models', [])]
-    except Exception:
-        pass
+    # Detect Ollama models (works even when server is stopped via `ollama list`)
+    for m in detect_ollama_models(OLLAMA_URL):
+        result['ollama'].append({'name': m['name'], 'size': m['size_bytes']})
 
     # Try to query running MLX server for its loaded model
     try:
@@ -45,10 +39,13 @@ def available_models():
     except Exception:
         pass
 
-    # Categorize scanned local models by format — skip MLX entries already from live server
+    # Categorize scanned local models by format — skip Ollama and MLX duplicates
     live_mlx_ids = {m['name'] for m in result['mlx']}
     for m in local:
-        if m['format'] == 'gguf':
+        if m['format'] == 'ollama':
+            # Already handled above via detect_ollama_models()
+            continue
+        elif m['format'] == 'gguf':
             result['gguf'].append({'name': m['name'], 'path': m['path'], 'size': m['size_bytes'], 'quant': m.get('detected_quant')})
         elif 'mlx' in m['path'].lower() or 'mlx' in m['name'].lower():
             if m['name'] not in live_mlx_ids:
@@ -94,8 +91,67 @@ def list_local():
 @router.post("/local/scan")
 def trigger_scan():
     """Trigger a fresh scan of local model directories."""
+    from ..services.model_discovery import invalidate_cache
+    invalidate_cache()
     models = scan_directories()
     return {"count": len(models), "models": models}
+
+
+@router.get("/ollama/status")
+def ollama_status():
+    """Check whether the Ollama server is currently running."""
+    import urllib.request
+    try:
+        urllib.request.urlopen(f"{OLLAMA_URL}", timeout=1)
+        return {"running": True}
+    except Exception:
+        return {"running": False}
+
+
+@router.post("/ollama/start")
+def ollama_start():
+    """Start the Ollama server if it is not already running."""
+    import shutil
+    import subprocess
+    import time
+    import urllib.request
+
+    # Check if already running
+    try:
+        urllib.request.urlopen(f"{OLLAMA_URL}", timeout=1)
+        return {"status": "already_running"}
+    except Exception:
+        pass
+
+    # Find ollama binary
+    ollama_bin = shutil.which("ollama")
+    if not ollama_bin:
+        raise HTTPException(404, "Ollama binary not found on PATH. Install from https://ollama.com")
+
+    # Launch detached process
+    try:
+        subprocess.Popen(
+            [ollama_bin, "serve"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError as exc:
+        raise HTTPException(500, f"Failed to start Ollama: {exc}")
+
+    # Poll for readiness (up to 10s)
+    for _ in range(20):
+        time.sleep(0.5)
+        try:
+            urllib.request.urlopen(f"{OLLAMA_URL}", timeout=1)
+            # Invalidate discovery cache so next fetch sees running state
+            from ..services.model_discovery import invalidate_cache
+            invalidate_cache()
+            return {"status": "running"}
+        except Exception:
+            continue
+
+    return {"status": "failed", "error": "Ollama started but did not respond within 10 seconds"}
 
 
 class InferenceRequest(BaseModel):
