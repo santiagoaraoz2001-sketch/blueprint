@@ -11,7 +11,7 @@ SAFE_MODEL_ID = re.compile(r'^[a-zA-Z0-9_\-./]+$')
 
 from ..config import OLLAMA_URL
 from ..utils.hf_hub import search_models, get_model_details
-from ..utils.model_scanner import scan_directories
+from ..utils.model_scanner import scan_directories, detect_ollama_models
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -22,15 +22,9 @@ def available_models():
     local = scan_directories()
     result = {'ollama': [], 'gguf': [], 'mlx': [], 'huggingface': []}
 
-    # Try to query Ollama API for installed models
-    try:
-        import urllib.request
-        import json as _json
-        resp = urllib.request.urlopen(f'{OLLAMA_URL}/api/tags', timeout=2)
-        data = _json.loads(resp.read())
-        result['ollama'] = [{'name': m['name'], 'size': m.get('size', 0)} for m in data.get('models', [])]
-    except Exception:
-        pass
+    # Detect Ollama models (works even when server is stopped via `ollama list`)
+    for m in detect_ollama_models(OLLAMA_URL):
+        result['ollama'].append({'name': m['name'], 'size': m['size_bytes']})
 
     # Try to query running MLX server for its loaded model
     try:
@@ -45,10 +39,13 @@ def available_models():
     except Exception:
         pass
 
-    # Categorize scanned local models by format — skip MLX entries already from live server
+    # Categorize scanned local models by format — skip Ollama and MLX duplicates
     live_mlx_ids = {m['name'] for m in result['mlx']}
     for m in local:
-        if m['format'] == 'gguf':
+        if m['format'] == 'ollama':
+            # Already handled above via detect_ollama_models()
+            continue
+        elif m['format'] == 'gguf':
             result['gguf'].append({'name': m['name'], 'path': m['path'], 'size': m['size_bytes'], 'quant': m.get('detected_quant')})
         elif 'mlx' in m['path'].lower() or 'mlx' in m['name'].lower():
             if m['name'] not in live_mlx_ids:
@@ -94,6 +91,8 @@ def list_local():
 @router.post("/local/scan")
 def trigger_scan():
     """Trigger a fresh scan of local model directories."""
+    from ..services.model_discovery import invalidate_cache
+    invalidate_cache()
     models = scan_directories()
     return {"count": len(models), "models": models}
 

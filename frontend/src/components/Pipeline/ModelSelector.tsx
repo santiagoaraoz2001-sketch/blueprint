@@ -42,6 +42,7 @@ const FORMAT_COLORS: Record<string, string> = {
   pytorch: '#FB923C',
   onnx: '#B87EFF',
   mlx: '#F472B6',
+  ollama: '#E8E8E8',
 }
 
 function getFormatColor(format: string): string {

@@ -193,8 +193,20 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
 
   const [frameworkData, setFrameworkData] = useState<any[]>([])
 
+  // Field names that represent model selection and should get a dropdown
+  const MODEL_FIELD_NAMES = new Set([
+    'model_id', 'model_name', 'model_a', 'model_b',
+    'model_a_name', 'model_b_name', 'primary_model',
+    'fallback_model', 'base_model',
+  ])
+
+  // Check if this block has any model fields that need a dropdown
+  const hasModelFields = def?.configFields.some(f =>
+    f.type === 'string' && MODEL_FIELD_NAMES.has(f.name)
+  )
+
   useEffect(() => {
-    if (def?.type === 'model_selector') {
+    if (hasModelFields) {
       api.get<any[]>('/system/models')
         .then(data => {
           if (Array.isArray(data)) {
@@ -203,16 +215,29 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
         })
         .catch(err => console.error('Failed to fetch models', err))
     }
-  }, [def?.type])
+  }, [hasModelFields])
 
-  // Filter config fields by depends_on and enrich model_id with auto-detected options
+  // Collect all available models across all frameworks for general model fields
+  const allAvailableModels = useMemo(() => {
+    const models: string[] = []
+    for (const fw of frameworkData) {
+      if (Array.isArray(fw.models)) {
+        for (const m of fw.models) {
+          if (!models.includes(m)) models.push(m)
+        }
+      }
+    }
+    return models
+  }, [frameworkData])
+
+  // Filter config fields by depends_on and enrich model fields with auto-detected options
   const displayFields = def?.configFields
     .filter(f => {
       if (!f.depends_on) return true
       return node.data.config[f.depends_on.field] === f.depends_on.value
     })
     .map(f => {
-      // Auto-populate model_id field with discovered models for the selected source
+      // For model_selector block, scope model_id options to the selected source
       if (def.type === 'model_selector' && f.name === 'model_id') {
         const source = (node.data.config.source as string) || 'huggingface'
         const sourceToFramework: Record<string, string> = { ollama: 'ollama', mlx: 'mlx', huggingface: 'pytorch', local_path: '' }
@@ -221,6 +246,12 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
         const models: string[] = fwEntry?.models || []
         if (models.length > 0) {
           return { ...f, type: 'select' as const, options: models } as ConfigField
+        }
+      }
+      // For all other blocks, enrich any model field with all available models
+      if (def.type !== 'model_selector' && f.type === 'string' && MODEL_FIELD_NAMES.has(f.name)) {
+        if (allAvailableModels.length > 0) {
+          return { ...f, type: 'select' as const, options: allAvailableModels } as ConfigField
         }
       }
       return f

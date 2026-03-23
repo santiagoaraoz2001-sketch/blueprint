@@ -188,6 +188,99 @@ def _scan_pytorch(root: Path) -> list[LocalModelInfo]:
 # Public API
 # ---------------------------------------------------------------------------
 
+def detect_ollama_models(ollama_url: str = "http://localhost:11434") -> list[LocalModelInfo]:
+    """Detect installed Ollama models by querying the API or falling back to CLI.
+
+    Returns Ollama models as LocalModelInfo entries with format ``"ollama"``.
+    Works even when the Ollama server is not running by using ``ollama list``.
+    """
+    import subprocess
+
+    models: list[LocalModelInfo] = []
+
+    # 1) Try the running server first (fast path)
+    try:
+        import urllib.request
+        import json as _json
+        resp = urllib.request.urlopen(f"{ollama_url}/api/tags", timeout=2)
+        data = _json.loads(resp.read())
+        for m in data.get("models", []):
+            name = m.get("name", "")
+            if name:
+                models.append(LocalModelInfo(
+                    name=name,
+                    path="ollama",
+                    format="ollama",
+                    size_bytes=m.get("size", 0),
+                    detected_quant=None,
+                ))
+        return models
+    except Exception:
+        pass
+
+    # 2) Server not running — scan Ollama manifest directories on disk.
+    # Ollama stores manifests at ~/.ollama/models/manifests/<registry>/<namespace>/<model>/<tag>
+    # Each manifest is a JSON file containing layer sizes.
+    ollama_dir = Path(os.path.expanduser("~/.ollama/models/manifests"))
+    if not ollama_dir.is_dir():
+        return []
+
+    try:
+        import json as _json
+
+        for registry_dir in ollama_dir.iterdir():
+            if not registry_dir.is_dir():
+                continue
+            for namespace_dir in registry_dir.iterdir():
+                if not namespace_dir.is_dir():
+                    continue
+                for model_dir in namespace_dir.iterdir():
+                    if not model_dir.is_dir():
+                        continue
+                    for tag_file in model_dir.iterdir():
+                        if not tag_file.is_file():
+                            continue
+                        tag = tag_file.name
+                        # Build model name from path components
+                        registry = registry_dir.name
+                        namespace = namespace_dir.name
+                        model_name = model_dir.name
+
+                        if registry == "registry.ollama.ai" and namespace == "library":
+                            # Standard Ollama models: "model:tag"
+                            display_name = f"{model_name}:{tag}" if tag != "latest" else model_name
+                        elif registry == "hf.co":
+                            # HuggingFace models pulled via ollama: "hf.co/namespace/model:tag"
+                            display_name = f"hf.co/{namespace}/{model_name}:{tag}" if tag != "latest" else f"hf.co/{namespace}/{model_name}"
+                        else:
+                            display_name = f"{registry}/{namespace}/{model_name}:{tag}"
+
+                        # Parse manifest JSON to get total model size
+                        size_bytes = 0
+                        try:
+                            manifest = _json.loads(tag_file.read_text())
+                            for layer in manifest.get("layers", []):
+                                if layer.get("mediaType", "").endswith(".model"):
+                                    size_bytes += layer.get("size", 0)
+                        except Exception:
+                            pass
+
+                        # Detect quantization from tag or model name
+                        quant = _detect_quant_from_filename(tag) or _detect_quant_from_filename(model_name)
+
+                        models.append(LocalModelInfo(
+                            name=display_name,
+                            path="ollama",
+                            format="ollama",
+                            size_bytes=size_bytes,
+                            detected_quant=quant,
+                        ))
+    except OSError as exc:
+        logger.debug("Ollama manifest scan error: %s", exc)
+
+    return models
+
+
 def scan_directories(paths: list[str] | None = None) -> list[LocalModelInfo]:
     """Scan a list of directories for downloaded models.
 
@@ -220,6 +313,13 @@ def scan_directories(paths: list[str] | None = None) -> list[LocalModelInfo]:
                 if model["path"] not in seen_paths:
                     seen_paths.add(model["path"])
                     all_models.append(model)
+
+    # Also detect Ollama models (works even when server is stopped)
+    seen_names: set[str] = {m["name"] for m in all_models}
+    for model in detect_ollama_models():
+        if model["name"] not in seen_names:
+            seen_names.add(model["name"])
+            all_models.append(model)
 
     # Sort by name
     all_models.sort(key=lambda m: m["name"].lower())
