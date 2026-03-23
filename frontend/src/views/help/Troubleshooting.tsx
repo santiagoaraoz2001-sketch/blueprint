@@ -68,6 +68,18 @@ const TROUBLESHOOTING = [
     issue: 'Checkpoint rollback shows no checkpoints',
     fix: 'Set checkpoint_interval > 0 in the training block config. Default is 0 (final model only). For example, checkpoint_interval: 5 saves a checkpoint every 5 epochs.',
   },
+  {
+    issue: 'Chrome extension not connecting to Blueprint',
+    fix: 'Ensure the Blueprint backend is running on port 8000. The extension sends requests to http://localhost:8000. Check that CORS is configured to allow the extension origin. Try reloading the extension from chrome://extensions.',
+  },
+  {
+    issue: 'GPU not detected (MPS/Metal)',
+    fix: 'MPS/Metal acceleration requires macOS 12.3+ and Apple Silicon (M1/M2/M3). Check Settings for hardware capabilities. Verify PyTorch is installed with MPS support: python -c "import torch; print(torch.backends.mps.is_available())". If False, reinstall PyTorch.',
+  },
+  {
+    issue: 'Circuit breaker stuck in open state',
+    fix: 'The circuit breaker opens after repeated backend failures to prevent retry storms. Ensure the backend is running and healthy. The circuit breaker will automatically reset after a cooldown period. Restart the frontend if the issue persists.',
+  },
 ]
 
 export const TROUBLESHOOTING_TEXT = TROUBLESHOOTING.map(

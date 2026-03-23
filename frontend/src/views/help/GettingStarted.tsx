@@ -3,7 +3,7 @@ import SectionAnchor from '@/components/Help/SectionAnchor'
 import { Rocket, Monitor, Download, ToggleLeft, Play } from 'lucide-react'
 import { helpCard as card, helpBody as body, helpTip as tip, helpStepList as stepList, helpCode as code } from './styles'
 
-export const GETTING_STARTED_TEXT = `What is Blueprint? Blueprint is a local-first ML experiment workbench that lets you visually build, run, and analyze machine learning pipelines using a drag-and-drop canvas with 135+ block types. It runs entirely on your machine — no cloud, no accounts, no data leaves your computer. System Requirements: Python 3.10+, Node.js 18+, macOS (Apple Silicon recommended), Linux, or Windows. Optional: Ollama for local LLM inference, MLX for Apple Silicon training. 16GB+ RAM recommended (8GB minimum for inference-only). Installation: git clone, then run ./launch.sh which auto-creates venv, installs deps, and starts both servers. Electron desktop app: cd frontend && npm run electron:dev. Data location: ~/.specific-labs/ (database, models, artifacts, plugins, logs). Simple vs Professional Mode: Settings → UI Mode toggle. Simple Mode shows core workflow only — data, training, inference, evaluation, output categories. Hides plugins, export connectors, config inheritance badges, Paper tool, Control Tower. Professional Mode shows all block categories, plugin panels, export connectors, config inheritance visualization, advanced monitoring. First Pipeline Walkthrough: Create project → open pipeline editor → drag Text Input block → drag LLM Inference block → connect them → configure model name → click Run → view results.`
+export const GETTING_STARTED_TEXT = `What is Blueprint? Blueprint is a local-first ML experiment workbench that lets you visually build, run, and analyze machine learning pipelines using a drag-and-drop canvas with 118 block types across 9 categories. It runs entirely on your machine — no cloud, no accounts, no data leaves your computer. System Requirements: Python 3.10+, Node.js 18+, macOS (Apple Silicon recommended), Linux, or Windows. Optional: Ollama for local LLM inference, MLX for Apple Silicon training. 16GB+ RAM recommended (8GB minimum for inference-only). Installation: git clone, then run ./launch.sh which auto-creates venv, installs deps, and starts both servers. Electron desktop app: cd frontend && npm run electron:dev. Data location: ~/.specific-labs/ (database, models, artifacts, plugins, logs). Simple vs Professional Mode: Settings → UI Mode toggle. Simple Mode shows core workflow only — data, training, inference, evaluation, output categories. Hides plugins, export connectors, config inheritance badges, Paper tool, Control Tower. Professional Mode shows all block categories, plugin panels, export connectors, config inheritance visualization, advanced monitoring. First Pipeline Walkthrough: Create project → open pipeline editor → drag Text Input block → drag LLM Inference block → connect them → configure model name → click Run → view results. New in v0.2: GPU acceleration (MPS/Metal on macOS), HuggingFace dataset import via Chrome extension, artifact registry for tracking outputs across runs, circuit breaker to prevent retry storms, memory pressure monitoring with automatic cleanup, native file path selection in block configs, and dataset builder block.`
 
 export default function GettingStarted() {
   return (
@@ -17,7 +17,7 @@ export default function GettingStarted() {
       <div style={card}>
         <p style={body}>
           Blueprint is a local-first ML experiment workbench by Specific Labs that lets you visually
-          build, run, and analyze machine learning pipelines using a drag-and-drop canvas with 135+
+          build, run, and analyze machine learning pipelines using a drag-and-drop canvas with 118
           block types across 9 categories. It runs entirely on your machine — no cloud accounts, no
           data leaves your computer.
         </p>
@@ -44,8 +44,8 @@ export default function GettingStarted() {
           <li>16GB+ RAM recommended (8GB minimum for inference-only workflows)</li>
         </ul>
         <div style={tip}>
-          Apple Silicon Macs get the best experience: Metal GPU acceleration for PyTorch, native MLX
-          support, and optimized Ollama performance.
+          Apple Silicon Macs get the best experience: MPS/Metal GPU acceleration for PyTorch (auto-detected),
+          native MLX support, and optimized Ollama performance.
         </div>
       </div>
 
@@ -70,6 +70,11 @@ export default function GettingStarted() {
           <strong>Data location:</strong> All data is stored in{' '}
           <span style={code}>~/.specific-labs/</span> including the SQLite database, model
           artifacts, plugins, custom blocks, and logs.
+        </p>
+        <p style={{ ...body, marginTop: 12 }}>
+          <strong>Chrome Extension (optional):</strong> Install the HuggingFace Dataset Importer
+          extension from <span style={code}>extensions/chrome-blueprint-hf/</span> to import datasets
+          directly from HuggingFace dataset pages into Blueprint.
         </p>
         <div style={tip}>
           The launch script is idempotent — running it again won&apos;t reinstall deps if they&apos;re
@@ -121,7 +126,7 @@ export default function GettingStarted() {
               Professional Mode
             </div>
             <ul style={{ ...stepList, fontSize: FS.xs, color: T.dim }}>
-              <li>All 135+ blocks across all categories</li>
+              <li>All 118 blocks across all categories</li>
               <li>Plugin panels, export connectors</li>
               <li>Config inheritance visualization, advanced monitoring</li>
             </ul>

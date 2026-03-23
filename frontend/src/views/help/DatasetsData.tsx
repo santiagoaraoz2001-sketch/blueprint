@@ -3,7 +3,7 @@ import SectionAnchor from '@/components/Help/SectionAnchor'
 import { Database, Search, FileSpreadsheet, ArrowRightLeft } from 'lucide-react'
 import { helpCard as card, helpBody as body, helpTip as tip, helpStepList as stepList, helpCode as code, helpCodeBlock as codeBlock } from './styles'
 
-export const DATASETS_DATA_TEXT = `Datasets & Data Management. Blueprint provides a complete dataset management system for importing, previewing, scanning, and transforming data files. Supported Formats: CSV, TSV, JSON, JSONL, Parquet, SQLite, Excel (xlsx/xls), YAML, and plain text files (txt, md, log). Registering Datasets: In the Datasets view, click "+ Add Dataset" to register a file from your filesystem. Provide a name, source path, and optional description and tags. The dataset is registered in Blueprint's database with metadata like row count, column count, and file size. Dataset Preview: Click any dataset to see a paginated preview of its contents. The preview supports all formats — CSV shows as a table, JSON/JSONL shows flattened rows, SQLite reads the first table, and even Parquet files are previewed (requires pyarrow). You can adjust the number of preview rows (1-500) and offset for pagination. File Scanner: Use the file scanner (POST /api/datasets/scan/discover) to automatically discover data files across your filesystem. By default it scans Desktop, Documents, Downloads, Data, and Projects folders. You can specify custom directories, filter by extension, set size limits, and control scan depth (max 6 levels). Results are sorted by modification time (newest first). Batch Registration: After scanning, select discovered files and register them in bulk via the batch registration endpoint. Already-registered files are skipped automatically. Dataset Snapshots: Create point-in-time snapshots of any dataset for versioning. Snapshots are stored in ~/.specific-labs/snapshots/{dataset_id}/ and automatically cleaned up after 24 hours. Restore any snapshot to revert the dataset to a previous state. Re-Architecture Templates: Transform datasets between formats using built-in templates. Standard Tabular — flattens nested JSON/YAML into CSV with consistent columns. ML Train/Test Split — splits any dataset into 80/20 train/test CSV files with deterministic shuffle (seed=42). JSONL Normalize — converts any structured data into one-JSON-object-per-line format. Chat/Instruct Format — converts tabular data with input/output columns into chat-style JSONL for LLM fine-tuning, auto-detecting common column names (input, question, prompt → user; output, answer, response → assistant). Templates run in isolated subprocesses with 120-second timeout for safety.`
+export const DATASETS_DATA_TEXT = `Datasets & Data Management. Blueprint provides a complete dataset management system for importing, previewing, scanning, and transforming data files. HuggingFace Import: Use the Blueprint Chrome extension to import datasets directly from HuggingFace dataset pages with one click. The extension sends the dataset config to your local Blueprint instance. Dataset Builder: The dataset_builder block prepares training-ready datasets from raw data with splitting, shuffling, and format conversion. Supported Formats: CSV, TSV, JSON, JSONL, Parquet, SQLite, Excel (xlsx/xls), YAML, and plain text files (txt, md, log). Registering Datasets: In the Datasets view, click "+ Add Dataset" to register a file from your filesystem. Provide a name, source path, and optional description and tags. The dataset is registered in Blueprint's database with metadata like row count, column count, and file size. Dataset Preview: Click any dataset to see a paginated preview of its contents. The preview supports all formats — CSV shows as a table, JSON/JSONL shows flattened rows, SQLite reads the first table, and even Parquet files are previewed (requires pyarrow). You can adjust the number of preview rows (1-500) and offset for pagination. File Scanner: Use the file scanner (POST /api/datasets/scan/discover) to automatically discover data files across your filesystem. By default it scans Desktop, Documents, Downloads, Data, and Projects folders. You can specify custom directories, filter by extension, set size limits, and control scan depth (max 6 levels). Results are sorted by modification time (newest first). Batch Registration: After scanning, select discovered files and register them in bulk via the batch registration endpoint. Already-registered files are skipped automatically. Dataset Snapshots: Create point-in-time snapshots of any dataset for versioning. Snapshots are stored in ~/.specific-labs/snapshots/{dataset_id}/ and automatically cleaned up after 24 hours. Restore any snapshot to revert the dataset to a previous state. Re-Architecture Templates: Transform datasets between formats using built-in templates. Standard Tabular — flattens nested JSON/YAML into CSV with consistent columns. ML Train/Test Split — splits any dataset into 80/20 train/test CSV files with deterministic shuffle (seed=42). JSONL Normalize — converts any structured data into one-JSON-object-per-line format. Chat/Instruct Format — converts tabular data with input/output columns into chat-style JSONL for LLM fine-tuning, auto-detecting common column names (input, question, prompt → user; output, answer, response → assistant). Templates run in isolated subprocesses with 120-second timeout for safety.`
 
 export default function DatasetsData() {
   return (
@@ -11,6 +11,26 @@ export default function DatasetsData() {
       <SectionAnchor id="datasets-data" title="Datasets & Data" level={1}>
         <Database size={22} color={T.cyan} />
       </SectionAnchor>
+
+      {/* HuggingFace Import */}
+      <div style={card}>
+        <p style={body}>
+          <strong>HuggingFace Import:</strong> Use the Blueprint Chrome extension to import datasets
+          directly from HuggingFace dataset pages. Browse any dataset on huggingface.co, click the
+          Blueprint extension icon, and the dataset is sent to your local Blueprint instance.
+        </p>
+        <ul style={stepList}>
+          <li>Install the Chrome extension from <span style={code}>extensions/chrome-blueprint-hf/</span></li>
+          <li>Navigate to any HuggingFace dataset page</li>
+          <li>Click the Blueprint extension icon to import</li>
+          <li>The dataset appears in your local Datasets view</li>
+        </ul>
+        <p style={{ ...body, marginTop: 12 }}>
+          <strong>Dataset Builder:</strong> The <span style={code}>dataset_builder</span> block
+          prepares training-ready datasets from raw data with splitting, shuffling, and format conversion.
+          Find it under the Data category in the block library.
+        </p>
+      </div>
 
       {/* Supported Formats */}
       <SectionAnchor id="datasets-data/formats" title="Supported Formats" level={2} />
