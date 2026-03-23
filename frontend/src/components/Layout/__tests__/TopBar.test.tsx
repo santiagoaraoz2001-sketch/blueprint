@@ -11,9 +11,14 @@ vi.mock('@/stores/guideStore', () => ({
 }))
 
 describe('TopBar', () => {
-  it('renders active view breadcrumb label', () => {
+  it('renders the BLUEPRINT product subtitle', () => {
     render(<TopBar />)
-    expect(screen.getByText('Build')).toBeInTheDocument()
+    expect(screen.getByText('BLUEPRINT')).toBeInTheDocument()
+  })
+
+  it('renders active view label in uppercase', () => {
+    render(<TopBar />)
+    expect(screen.getByText('PIPELINE EDITOR')).toBeInTheDocument()
   })
 
   it('renders the exact logo SVG with correct viewBox', () => {
@@ -34,21 +39,19 @@ describe('TopBar', () => {
     expect(circle).toBeTruthy()
   })
 
-  it('renders SPECIFIC and LABS text in the logotype', () => {
+  it('renders SPECIFIC and LABS wordmark text', () => {
     render(<TopBar />)
     expect(screen.getByText('SPECIFIC')).toBeInTheDocument()
     expect(screen.getByText('LABS')).toBeInTheDocument()
   })
 
-  it('does NOT render a "Blueprint" label next to the logo (removed from framing)', () => {
+  it('renders the LOCAL connection badge', () => {
     render(<TopBar />)
-    // "Blueprint" as a standalone text node should be absent — logotype is in SVG now
-    const blueprintEl = screen.queryByText((content) => content.trim() === 'Blueprint')
-    expect(blueprintEl).toBeNull()
+    expect(screen.getByText('LOCAL')).toBeInTheDocument()
   })
 
-  it('renders the Guide toggle button', () => {
+  it('renders the GUIDE toggle button', () => {
     render(<TopBar />)
-    expect(screen.getByText('Guide')).toBeInTheDocument()
+    expect(screen.getByText('GUIDE')).toBeInTheDocument()
   })
 })
