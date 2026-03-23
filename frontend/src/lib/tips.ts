@@ -14,7 +14,7 @@ export const VIEW_TIPS: Record<ViewId, GuideTip[]> = {
     { id: 'dash-status', label: 'STATUS TRACKING', description: 'Projects flow through planning → active → complete. Track progress at a glance from the dashboard cards.', level: 'deep' },
   ],
   editor: [
-    { id: 'ed-blocks', label: 'BLOCK LIBRARY', description: 'Drag blocks from the library panel on the left onto the canvas to build your pipeline. 100+ blocks across 11 categories.', level: 'dash' },
+    { id: 'ed-blocks', label: 'BLOCK LIBRARY', description: 'Drag blocks from the library panel on the left onto the canvas to build your pipeline. 118 blocks across 9 categories.', level: 'dash' },
     { id: 'ed-ports', label: 'PORT COLORS', description: 'Each color represents a data type: green=dataset, pink=text, violet=model, cyan=config, amber=metrics, teal=embedding, red=artifact, sky=agent, gold=llm, gray=any. Match colors for compatible connections.', level: 'dash' },
     { id: 'ed-connect', label: 'CONNECTIONS', description: 'Drag from an output handle (bottom) to an input handle (top) to connect blocks. Mismatched types will be rejected.', level: 'dash' },
     { id: 'ed-config', label: 'CONFIGURATION', description: 'Click a block to open its config panel on the right. Each block has type-specific parameters.', level: 'deep' },
