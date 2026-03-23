@@ -6,7 +6,7 @@ import { HelpCircle, Search, ChevronDown, ChevronRight } from 'lucide-react'
 const FAQ_DATA = [
   {
     q: 'What is Blueprint?',
-    a: 'Blueprint is a local-first ML experiment workbench by Specific Labs. It lets you visually build, run, and analyze machine learning pipelines using a drag-and-drop interface with 135+ block types across 9 categories. It runs entirely on your machine — no cloud, no accounts, no data leaves your computer.',
+    a: 'Blueprint is a local-first ML experiment workbench by Specific Labs. It lets you visually build, run, and analyze machine learning pipelines using a drag-and-drop interface with 118 block types across 9 categories. It runs entirely on your machine — no cloud, no accounts, no data leaves your computer.',
   },
   {
     q: 'Do I need an internet connection?',
@@ -75,6 +75,22 @@ const FAQ_DATA = [
   {
     q: 'How does Blueprint ensure reproducibility?',
     a: 'Four mechanisms: (1) Dataset hashing — SHA256 of all inputs recorded per run. (2) Config snapshots — every run records its full pipeline config. (3) Metrics versioning — versioned metrics with aggregation types. (4) Structured exports — run-export.json contains everything needed to reproduce results.',
+  },
+  {
+    q: 'How do I import datasets from HuggingFace?',
+    a: 'Two ways: (1) Use the HuggingFace Loader block in a pipeline to load datasets programmatically. (2) Install the Blueprint Chrome extension from extensions/chrome-blueprint-hf/ — browse any dataset on huggingface.co and click the extension icon to send it directly to your local Blueprint instance.',
+  },
+  {
+    q: 'What is the Artifact Registry?',
+    a: 'The Artifact Registry tracks all outputs produced by block executions across pipeline runs. Browse artifacts from the Outputs Monitor view. Each artifact records its source block, run ID, timestamp, and file path. This gives you a global view of everything Blueprint has produced.',
+  },
+  {
+    q: 'What happens if the backend goes down during a run?',
+    a: 'The API client includes a circuit breaker that prevents retry storms. When the backend becomes unavailable, the client automatically backs off instead of flooding it with retries. Partial outputs from completed blocks are preserved. When the backend recovers, the circuit breaker resets and normal operation resumes.',
+  },
+  {
+    q: 'How does memory pressure monitoring work?',
+    a: 'Blueprint monitors system memory usage during pipeline execution. When memory pressure gets high, it automatically identifies and cleans up zombie processes to free resources, preventing out-of-memory crashes. This is especially useful during training and inference of large models.',
   },
 ]
 

@@ -69,7 +69,8 @@ export default function ExportConnectors() {
         </ul>
         <div style={tip}>
           The auto-generated model card is publication-ready and includes all metadata from your
-          Blueprint run.
+          Blueprint run. For <strong>importing</strong> datasets from HuggingFace, use the Blueprint
+          Chrome extension (see Datasets &amp; Data section).
         </div>
       </div>
 

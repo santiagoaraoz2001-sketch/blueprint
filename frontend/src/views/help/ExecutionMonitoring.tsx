@@ -3,7 +3,7 @@ import SectionAnchor from '@/components/Help/SectionAnchor'
 import { Activity, Cpu, Wifi, FileText } from 'lucide-react'
 import { helpCard as card, helpBody as body, helpTip as tip, helpStepList as stepList, helpCode as code } from './styles'
 
-export const EXECUTION_MONITORING_TEXT = `Execution Engine. Pipelines execute as a DAG in topological order. Each block receives outputs from upstream via BlockContext. Outputs are persisted after each block (partial outputs survive crashes). JSONL + SQLite dual-write for metrics. Heartbeat every 30 seconds during long blocks. Stale runs (no heartbeat for 5 min) auto-recover to failed status. Monitor View. Real-time dashboard during pipeline execution. Shows current block, progress bars, ETA, elapsed time, live logs, system metrics (CPU, memory, GPU). Specialized dashboards per category: Training (loss curves), Evaluation (benchmark bars), Inference (latency), Merge (progress), Data (row counts). Plugin Panels: Plugins can inject custom panels. SSE Connection. Blueprint uses Server-Sent Events for real-time updates. Single connection per run. Auto-reconnects with exponential backoff (up to 10 attempts). lastEventId replay on reconnect. Status badge: green (Live), yellow (Reconnecting), red (Connection lost), gray (Disconnected). 15-second keepalive prevents proxy/NAT timeouts. Structured Logging. All executor events logged as JSON lines to ~/.specific-labs/logs/blueprint.jsonl. Events: run_start, block_start, block_complete, block_failed, run_complete, run_failed, stale_recovery, config_resolved. Log rotation at 50MB, 5 backups. Diagnostics endpoint: GET /api/system/diagnostics/{run_id}.`
+export const EXECUTION_MONITORING_TEXT = `Execution Engine. Pipelines execute as a DAG in topological order. Each block receives outputs from upstream via BlockContext. Outputs are persisted after each block (partial outputs survive crashes). JSONL + SQLite dual-write for metrics. Heartbeat every 30 seconds during long blocks. Stale runs (no heartbeat for 5 min) auto-recover to failed status. Circuit Breaker: The API client includes a circuit breaker that prevents retry storms when the backend is unavailable, automatically backing off and recovering. Memory Pressure Monitoring: Blueprint monitors system memory and triggers automatic cleanup of zombie processes when pressure is high, preventing OOM crashes. Artifact Registry: All block outputs are tracked in a global artifact registry, browsable from the Outputs Monitor. Monitor View. Real-time dashboard during pipeline execution. Shows current block, progress bars, ETA, elapsed time, live logs, system metrics (CPU, memory, GPU). Control Tower provides live heartbeat tracking across all active runs. Specialized dashboards per category: Training (loss curves), Evaluation (benchmark bars), Inference (latency), Merge (progress), Data (row counts). Plugin Panels: Plugins can inject custom panels. SSE Connection. Blueprint uses Server-Sent Events for real-time updates. Single connection per run. Auto-reconnects with exponential backoff (up to 10 attempts). lastEventId replay on reconnect. Status badge: green (Live), yellow (Reconnecting), red (Connection lost), gray (Disconnected). 15-second keepalive prevents proxy/NAT timeouts. Structured Logging. All executor events logged as JSON lines to ~/.specific-labs/logs/blueprint.jsonl. Events: run_start, block_start, block_complete, block_failed, run_complete, run_failed, stale_recovery, config_resolved. Log rotation at 50MB, 5 backups. Diagnostics endpoint: GET /api/system/diagnostics/{run_id}.`
 
 export default function ExecutionMonitoring() {
   return (
@@ -29,6 +29,18 @@ export default function ExecutionMonitoring() {
             Stale runs (no heartbeat for 5 min) auto-recover to &ldquo;failed&rdquo; status with a
             stale_recovery event logged
           </li>
+          <li>
+            <strong>Circuit breaker:</strong> The API client prevents retry storms when the backend is
+            unavailable — automatically backs off and recovers when the server returns
+          </li>
+          <li>
+            <strong>Memory pressure monitoring:</strong> Blueprint monitors system memory and
+            automatically cleans up zombie processes when memory pressure is high, preventing OOM crashes
+          </li>
+          <li>
+            <strong>Artifact registry:</strong> All block outputs are tracked in a global artifact
+            registry, browsable from the Outputs Monitor view
+          </li>
         </ul>
         <div style={tip}>
           Because outputs persist after each block, if a pipeline fails at step 5 of 8, you don&apos;t
@@ -48,6 +60,10 @@ export default function ExecutionMonitoring() {
         <ul style={stepList}>
           <li>Shows: current block, progress bars, ETA, elapsed time, live logs</li>
           <li>System metrics: CPU, memory, GPU utilization</li>
+          <li>
+            <strong>Control Tower:</strong> A live dashboard showing all active runs with heartbeat
+            tracking, status, and elapsed time across the entire workspace
+          </li>
           <li>
             Specialized dashboards per category:
             <ul style={{ paddingLeft: 16, marginTop: 4 }}>

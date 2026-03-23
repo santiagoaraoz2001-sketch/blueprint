@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { helpCard as card, helpBody as body, helpTip as tip, helpStepList as stepList, helpCode as code } from './styles'
 
-export const PIPELINE_EDITOR_TEXT = `Canvas Basics. Drag blocks from the block library onto the canvas. Connect blocks by dragging from output port to input port. Ports are color-coded by data type: green=dataset, pink=text, violet=model, cyan=config, amber=metrics, teal=embedding, red=artifact, sky=agent, gold=llm. Zoom: Cmd+/Cmd- or scroll wheel. Pan: hold Space + drag. Fit: Cmd+0. Minimap in bottom-right corner. Block Library. 135+ blocks across 9 categories. Categories: data, training, inference, evaluation, merge, flow, agents, endpoints, output. Search blocks by name, description, or tags. Each block has a maturity badge: stable, beta, experimental. Block Configuration. Click any block to open its config panel. Config fields are typed: string, integer, float, boolean, select, multiselect, file_path, text_area. Config Inheritance: Some fields (seed, text_column, trust_remote_code) auto-propagate from upstream blocks. Inherited fields show a blue left border and Inherited from badge. Click unlink icon to override. Inheritance Overlay shows which downstream blocks inherit a value. Pipeline Templates. Click Templates button in the toolbar. Template gallery shows pre-wired pipelines. Each template has variables you fill in. Templates auto-layout using dagre. Pipeline Validation. Click the shield icon (Cmd+Shift+V). Checks: empty pipeline, duplicate IDs, cycles, disconnected blocks, missing required inputs, type mismatches. Running Pipelines. Click the green Run button. Blocks execute in topological order. Real-time progress with ETA countdown. SSE connection status badge. Cancel anytime. Re-Run from Node (Partial Re-Execution). Right-click any node then Re-run from here. Upstream nodes use cached outputs. Target node and downstream re-execute. Config diff preview shows what changed. Shift+R keyboard shortcut. Parameter Sweeps. Right-click a node then Parameter Sweep. Define parameter ranges. Grid search or Random search. Sweep Heatmap in Results. Best Config badge. Sweeps run up to 4 parallel. Sticky Notes and Groups. Annotate canvas with sticky notes. Group related blocks. Command Palette. Cmd+K opens command palette. Quick-search for blocks, pipelines, actions.`
+export const PIPELINE_EDITOR_TEXT = `Canvas Basics. Drag blocks from the block library onto the canvas. Connect blocks by dragging from output port to input port. Ports are color-coded by data type: green=dataset, pink=text, violet=model, cyan=config, amber=metrics, teal=embedding, red=artifact, sky=agent, gold=llm. Zoom: Cmd+/Cmd- or scroll wheel. Pan: hold Space + drag. Fit: Cmd+0. Minimap in bottom-right corner. Block Library. 118 blocks across 9 categories. Categories: data, training, inference, evaluation, merge, flow, agents, endpoints, output. Search blocks by name, description, or tags. Each block has a maturity badge: stable, beta, experimental. Block Configuration. Click any block to open its config panel. Config fields are typed: string, integer, float, boolean, select, multiselect, file_path, text_area. Config Inheritance: Some fields (seed, text_column, trust_remote_code) auto-propagate from upstream blocks. Inherited fields show a blue left border and Inherited from badge. Click unlink icon to override. Inheritance Overlay shows which downstream blocks inherit a value. Pipeline Templates. Click Templates button in the toolbar. Template gallery shows pre-wired pipelines. Each template has variables you fill in. Templates auto-layout using dagre. Pipeline Validation. Click the shield icon (Cmd+Shift+V). Checks: empty pipeline, duplicate IDs, cycles, disconnected blocks, missing required inputs, type mismatches. Running Pipelines. Click the green Run button. Blocks execute in topological order. Real-time progress with ETA countdown. SSE connection status badge. Cancel anytime. Re-Run from Node (Partial Re-Execution). Right-click any node then Re-run from here. Upstream nodes use cached outputs. Target node and downstream re-execute. Config diff preview shows what changed. Shift+R keyboard shortcut. Parameter Sweeps. Right-click a node then Parameter Sweep. Define parameter ranges. Grid search or Random search. Sweep Heatmap in Results. Best Config badge. Sweeps run up to 4 parallel. Sticky Notes and Groups. Annotate canvas with sticky notes. Group related blocks. Command Palette. Cmd+K opens command palette. Quick-search for blocks, pipelines, actions.`
 
 export default function PipelineEditor() {
   return (
@@ -62,7 +62,7 @@ export default function PipelineEditor() {
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
-          <strong>What:</strong> 135+ blocks across 9 categories (12 including composite/plugin
+          <strong>What:</strong> 118 blocks across 9 categories (12 including composite/plugin
           blocks), searchable by name, description, or tags.
         </p>
         <ul style={stepList}>
@@ -96,7 +96,8 @@ export default function PipelineEditor() {
           <li>Click any block to open its config panel on the right</li>
           <li>
             Fields are typed: string, integer, float, boolean, select, multiselect, file_path,
-            text_area
+            text_area. The <span style={code}>file_path</span> type opens a native file/directory
+            picker dialog.
           </li>
           <li>Fields show descriptions, defaults, and min/max bounds</li>
         </ul>

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Blueprint - HuggingFace Dataset Importer",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Send HuggingFace datasets to your local Blueprint ML workbench",
   "permissions": ["activeTab"],
   "host_permissions": [
