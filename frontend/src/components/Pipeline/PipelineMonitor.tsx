@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { T, F, FS } from '@/lib/design-tokens'
+import { T, F, FS, ELEVATION } from '@/lib/design-tokens'
 import { useUIStore } from '@/stores/uiStore'
 import { useRunStore } from '@/stores/runStore'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -88,15 +88,18 @@ export default function PipelineMonitor({
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           style={{
             position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 280,
-            background: T.surface1,
-            borderTop: `1px solid ${T.borderHi}`,
+            bottom: 10,
+            left: 10,
+            right: 10,
+            height: 320,
+            background: `linear-gradient(180deg, ${T.surface2}f0 0%, ${T.surface1}ea 100%)`,
+            border: `1px solid ${T.borderHi}`,
+            borderRadius: 16,
             display: 'flex',
             flexDirection: 'column',
             zIndex: 50,
+            boxShadow: ELEVATION.floating,
+            backdropFilter: 'blur(14px)',
           }}
         >
           {/* Header */}
@@ -104,7 +107,7 @@ export default function PipelineMonitor({
             style={{
               display: 'flex',
               alignItems: 'center',
-              padding: '6px 12px',
+              padding: '10px 12px',
               gap: 10,
               borderBottom: `1px solid ${T.border}`,
               flexShrink: 0,
@@ -126,17 +129,18 @@ export default function PipelineMonitor({
             <div
               style={{
                 flex: 1,
-                height: 4,
+                height: 6,
                 background: T.surface3,
                 overflow: 'hidden',
                 maxWidth: 200,
+                borderRadius: 999,
               }}
             >
               <div
                 style={{
                   width: `${pct}%`,
                   height: '100%',
-                  background: T.cyan,
+                  background: `linear-gradient(90deg, ${T.amber}, ${T.cyan})`,
                   transition: 'width 0.3s ease',
                 }}
               />

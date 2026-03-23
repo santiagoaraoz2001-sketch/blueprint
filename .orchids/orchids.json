@@ -1,0 +1,8 @@
+{
+  "startupCommands": [
+    "cd /home/user/app && python3 -m venv .venv; .venv/bin/pip install -r backend/requirements.txt; nohup .venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload > .orchids/logs/backend.log 2>&1 &",
+    "cd /home/user/app/frontend && npm ci; PATH=/home/user/app/.venv/bin:$PATH VITE_PORT=4174 VITE_API_TARGET=http://127.0.0.1:8000 nohup npm run dev > /home/user/app/.orchids/logs/frontend.log 2>&1 &"
+  ],
+  "projectId": "e751c357-593e-4491-8701-1c983bdd162c",
+  "templateId": "any"
+}

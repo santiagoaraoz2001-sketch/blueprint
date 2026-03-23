@@ -1,5 +1,6 @@
 import tseslint from 'typescript-eslint'
 import react from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
 
 export default tseslint.config(
   {
@@ -19,6 +20,7 @@ export default tseslint.config(
     plugins: {
       '@typescript-eslint': tseslint.plugin,
       react,
+      'react-hooks': reactHooks,
     },
     languageOptions: {
       parser: tseslint.parser,
@@ -29,6 +31,9 @@ export default tseslint.config(
     rules: {
       // Phase 1: warn on explicit any — will escalate to error after cleanup
       '@typescript-eslint/no-explicit-any': 'warn',
+      ...reactHooks.configs.recommended.rules,
+      'react-hooks/rules-of-hooks': 'warn',
+      'react-hooks/exhaustive-deps': 'warn',
     },
   },
 )

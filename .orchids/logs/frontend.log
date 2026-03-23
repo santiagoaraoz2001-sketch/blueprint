@@ -1,0 +1,41 @@
+
+> blueprint@0.2.2 dev
+> npm run codegen && npm run generate:api && concurrently "npm run codegen:watch" "vite"
+
+
+> blueprint@0.2.2 codegen
+> cd .. && python3 scripts/generate_block_registry.py
+
+Generated /home/user/app/frontend/src/lib/block-registry.generated.ts with 119 blocks
+Generated /home/user/app/frontend/src/lib/block-configs.generated.ts with 119 config interfaces
+  agents: 9 blocks
+  data: 16 blocks
+  embedding: 2 blocks
+  endpoints: 8 blocks
+  evaluation: 17 blocks
+  flow: 11 blocks
+  inference: 18 blocks
+  interventions: 6 blocks
+  merge: 5 blocks
+  output: 5 blocks
+  source: 10 blocks
+  training: 12 blocks
+
+> blueprint@0.2.2 generate:api
+> cd .. && python3 scripts/generate_api_types.py && cd frontend && npx openapi-typescript src/api/schema.json -o src/api/generated-types.ts
+
+Exported OpenAPI schema to /home/user/app/frontend/src/api/schema.json
+  142 endpoints, 67 schemas
+✨ openapi-typescript 7.13.0
+🚀 src/api/schema.json → src/api/generated-types.ts [179.2ms]
+[0] 
+[0] > blueprint@0.2.2 codegen:watch
+[0] > cd .. && python3 scripts/watch_block_registry.py
+[0] 
+[0] Watching 119 block.yaml files for changes...
+[1] 5:38:20 AM [vite] (client) Re-optimizing dependencies because lockfile has changed
+[1] 
+[1]   VITE v6.4.1  ready in 173 ms
+[1] 
+[1]   ➜  Local:   http://localhost:5173/
+[1]   ➜  Network: use --host to expose
