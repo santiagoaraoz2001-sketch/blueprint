@@ -184,6 +184,7 @@ export const T: ThemeTokens = new Proxy(DARK, {
   },
 })
 
+// Body + UI font
 export const F     = "'IBM Plex Sans','Inter','Segoe UI',sans-serif"
 export const FCODE = "'JetBrains Mono','SF Mono','Fira Code',monospace"
 
@@ -212,7 +213,9 @@ export const FS: FontSizeTokens = new Proxy(FS_BASE, {
   },
 })
 
-export const FD = "'Sora','Avenir Next','Segoe UI',sans-serif"
+// Display / brand font — MUST remain Space Grotesk; this is the identity font
+// used in the SPECIFIC LABS logomark SVG wordmark. Do not change.
+export const FD = "'Space Grotesk','Helvetica Neue',Arial,sans-serif"
 
 export const MOTION = {
   fast:   0.16,
