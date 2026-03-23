@@ -42,6 +42,7 @@ interface RunState {
   error: string | null
   logs: string[]
   sseStatus: 'connected' | 'reconnecting' | 'stale' | 'disconnected'
+  isStarting: boolean
   partialRunMeta: PartialRunMeta | null
   _demoTimer: number | null
   _elapsedTimer: number | null
@@ -84,43 +85,46 @@ export const useRunStore = create<RunState>((set, get) => ({
   error: null,
   logs: [],
   sseStatus: 'disconnected' as const,
+  isStarting: false,
   partialRunMeta: null,
   _demoTimer: null,
   _elapsedTimer: null,
   _sseUnsubscribe: null,
 
   startRun: async (pipelineId: string) => {
-    if (isDemoMode()) {
-      // Simulate a pipeline run in demo mode
-      set({
-        activeRunId: `demo-run-${Date.now()}`,
-        pipelineId,
-        status: 'running',
-        nodeStatuses: {},
-        overallProgress: 0,
-        eta: 30,
-        elapsed: 0,
-        error: null,
-      })
-      // Simulate progress updates every 500ms
-      let progress = 0
-      const timer = window.setInterval(() => {
-        progress += 0.05
-        if (progress >= 1) {
-          window.clearInterval(timer)
-          set({ status: 'complete', overallProgress: 1, eta: 0 })
-          return
-        }
-        set((s) => ({
-          overallProgress: progress,
-          elapsed: s.elapsed + 0.5,
-          eta: Math.max(0, (1 - progress) * 30),
-        }))
-      }, 500)
-      set({ _demoTimer: timer })
-      return
-    }
+    if (get().isStarting || get().status === 'running') return
+    set({ isStarting: true })
     try {
+      if (isDemoMode()) {
+        // Simulate a pipeline run in demo mode
+        set({
+          activeRunId: `demo-run-${Date.now()}`,
+          pipelineId,
+          status: 'running',
+          nodeStatuses: {},
+          overallProgress: 0,
+          eta: 30,
+          elapsed: 0,
+          error: null,
+        })
+        // Simulate progress updates every 500ms
+        let progress = 0
+        const timer = window.setInterval(() => {
+          progress += 0.05
+          if (progress >= 1) {
+            window.clearInterval(timer)
+            set({ status: 'complete', overallProgress: 1, eta: 0 })
+            return
+          }
+          set((s) => ({
+            overallProgress: progress,
+            elapsed: s.elapsed + 0.5,
+            eta: Math.max(0, (1 - progress) * 30),
+          }))
+        }, 500)
+        set({ _demoTimer: timer })
+        return
+      }
       _clearElapsedTimer(get)
       const res = await api.post<ExecuteResponse>(
         `/pipelines/${pipelineId}/execute`
@@ -142,46 +146,50 @@ export const useRunStore = create<RunState>((set, get) => ({
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to start run'
       set({ status: 'failed', error: msg })
+    } finally {
+      set({ isStarting: false })
     }
   },
 
   startPartialRun: async (pipelineId: string, sourceRunId: string, startNodeId: string, configOverrides: Record<string, Record<string, unknown>>, reusedNodes: string[]) => {
-    if (isDemoMode()) {
-      // Simulate partial run in demo mode
-      const meta: PartialRunMeta = { sourceRunId, startNodeId, reusedNodes, configOverrides }
-      const cachedStatuses: Record<string, NodeStatus> = {}
-      for (const nid of reusedNodes) {
-        cachedStatuses[nid] = { nodeId: nid, status: 'cached', progress: 1 }
-      }
-      set({
-        activeRunId: `demo-partial-${Date.now()}`,
-        pipelineId,
-        status: 'running',
-        nodeStatuses: cachedStatuses,
-        overallProgress: 0,
-        eta: 15,
-        elapsed: 0,
-        error: null,
-        partialRunMeta: meta,
-      })
-      let progress = 0
-      const timer = window.setInterval(() => {
-        progress += 0.08
-        if (progress >= 1) {
-          window.clearInterval(timer)
-          set({ status: 'complete', overallProgress: 1, eta: 0 })
-          return
-        }
-        set((s) => ({
-          overallProgress: progress,
-          elapsed: s.elapsed + 0.5,
-          eta: Math.max(0, (1 - progress) * 15),
-        }))
-      }, 500)
-      set({ _demoTimer: timer })
-      return
-    }
+    if (get().isStarting || get().status === 'running') return
+    set({ isStarting: true })
     try {
+      if (isDemoMode()) {
+        // Simulate partial run in demo mode
+        const meta: PartialRunMeta = { sourceRunId, startNodeId, reusedNodes, configOverrides }
+        const cachedStatuses: Record<string, NodeStatus> = {}
+        for (const nid of reusedNodes) {
+          cachedStatuses[nid] = { nodeId: nid, status: 'cached', progress: 1 }
+        }
+        set({
+          activeRunId: `demo-partial-${Date.now()}`,
+          pipelineId,
+          status: 'running',
+          nodeStatuses: cachedStatuses,
+          overallProgress: 0,
+          eta: 15,
+          elapsed: 0,
+          error: null,
+          partialRunMeta: meta,
+        })
+        let progress = 0
+        const timer = window.setInterval(() => {
+          progress += 0.08
+          if (progress >= 1) {
+            window.clearInterval(timer)
+            set({ status: 'complete', overallProgress: 1, eta: 0 })
+            return
+          }
+          set((s) => ({
+            overallProgress: progress,
+            elapsed: s.elapsed + 0.5,
+            eta: Math.max(0, (1 - progress) * 15),
+          }))
+        }, 500)
+        set({ _demoTimer: timer })
+        return
+      }
       _clearElapsedTimer(get)
       const meta: PartialRunMeta = { sourceRunId, startNodeId, reusedNodes, configOverrides }
       const cachedStatuses: Record<string, NodeStatus> = {}
@@ -210,6 +218,8 @@ export const useRunStore = create<RunState>((set, get) => ({
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to start partial run'
       set({ status: 'failed', error: msg })
+    } finally {
+      set({ isStarting: false })
     }
   },
 
@@ -415,6 +425,7 @@ export const useRunStore = create<RunState>((set, get) => ({
       error: null,
       logs: [],
       sseStatus: 'disconnected',
+      isStarting: false,
       partialRunMeta: null,
       _demoTimer: null,
       _elapsedTimer: null,
