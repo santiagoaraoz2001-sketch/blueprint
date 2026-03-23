@@ -17,7 +17,12 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "vite build && electron-forge make"
+    "electron:build": "vite build && electron-forge make",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
+    "test:all": "npm run test && npm run test:e2e"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -38,6 +43,10 @@
     "@electron-forge/cli": "^7.6.0",
     "@electron-forge/maker-dmg": "^7.6.0",
     "@electron-forge/maker-zip": "^7.6.0",
+    "@playwright/test": "^1.49.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/dagre": "^0.7.54",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
@@ -47,12 +56,15 @@
     "electron": "^34.2.0",
     "eslint": "^9.39.3",
     "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "jsdom": "^25.0.1",
     "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.57.1",
     "vite": "^6.1.1",
+    "vitest": "^2.1.8",
     "wait-on": "^8.0.3"
   }
 }

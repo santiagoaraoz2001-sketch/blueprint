@@ -3,20 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FD } from '@/lib/design-tokens'
 
 const CYAN = '#4af6c3'
-const BG = '#000000'
 
 interface SplashScreenProps {
   children: React.ReactNode
 }
 
 export default function SplashScreen({ children }: SplashScreenProps) {
-  const [ready, setReady] = useState(false)
+  const [ready,     setReady]     = useState(false)
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    let attempts = 0
-    const maxAttempts = 10 // 5 seconds at 500ms intervals
+    let attempts  = 0
+    const maxAttempts = 10
 
     const check = async () => {
       try {
@@ -26,29 +25,20 @@ export default function SplashScreen({ children }: SplashScreenProps) {
           return
         }
       } catch {
-        // Backend not ready yet
+        // backend not ready yet
       }
-
       attempts++
       if (attempts >= maxAttempts) {
-        // Timeout — show app anyway (offline mode)
         if (!cancelled) setReady(true)
         return
       }
-
-      if (!cancelled) {
-        setTimeout(check, 500)
-      }
+      if (!cancelled) setTimeout(check, 500)
     }
 
     check()
-
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
 
-  // Auto-dismiss after ready + brief hold for the exit animation to feel good
   useEffect(() => {
     if (ready) {
       const timer = setTimeout(() => setDismissed(true), 600)
@@ -60,24 +50,23 @@ export default function SplashScreen({ children }: SplashScreenProps) {
 
   return (
     <>
-      {/* The app is always mounted underneath (for pre-loading) */}
       <div style={{ visibility: dismissed ? 'visible' : 'hidden', height: '100%' }}>
         {children}
       </div>
 
-      {/* Splash overlay */}
       <AnimatePresence>
         {!dismissed && (
           <motion.div
             key="splash"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
+            transition={{ duration: 0.55, ease: 'easeInOut' }}
             style={{
               position: 'fixed',
               inset: 0,
               zIndex: 99999,
-              background: BG,
+              // Warmer deep void — not flat black
+              background: 'radial-gradient(ellipse at 50% 44%, #0A0F14 0%, #030405 100%)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -85,52 +74,81 @@ export default function SplashScreen({ children }: SplashScreenProps) {
               gap: 28,
             }}
           >
-            {/* Animated logo */}
+            {/* Ambient teal breathing glow behind logo */}
+            <motion.div
+              animate={{ opacity: [0.5, 1, 0.5], scale: [0.95, 1.06, 0.95] }}
+              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+              style={{
+                position: 'absolute',
+                width: 220,
+                height: 220,
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(62,232,196,0.07) 0%, transparent 70%)',
+                pointerEvents: 'none',
+              }}
+            />
+            {/* Secondary purple ambient */}
+            <motion.div
+              animate={{ opacity: [0.3, 0.7, 0.3], scale: [1, 1.08, 1] }}
+              transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
+              style={{
+                position: 'absolute',
+                width: 280,
+                height: 280,
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(152,128,232,0.04) 0%, transparent 70%)',
+                pointerEvents: 'none',
+              }}
+            />
+
+            {/* Animated logo — exact SVG, immutable geometry */}
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              style={{ position: 'relative', zIndex: 1 }}
             >
               <svg
                 id="icon-animated-dark"
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="-84 -36 240 240"
-                width={80}
-                height={80}
+                width={86}
+                height={86}
                 style={{
-                  filter: 'drop-shadow(0 0 12px rgba(74, 246, 195, 0.2))',
+                  filter: 'drop-shadow(0 0 14px rgba(62,232,196,0.18))',
+                  display: 'block',
                 }}
               >
                 <defs>
                   <style>
                     {`
                       @keyframes scanOrbitDark {
-                          0%, 15% { transform: rotate(0deg); }
-                          25%, 40% { transform: rotate(90deg); }
-                          50%, 65% { transform: rotate(180deg); }
-                          75%, 90% { transform: rotate(270deg); }
-                          100% { transform: rotate(360deg); }
+                        0%, 15%  { transform: rotate(0deg);   }
+                        25%, 40% { transform: rotate(90deg);  }
+                        50%, 65% { transform: rotate(180deg); }
+                        75%, 90% { transform: rotate(270deg); }
+                        100%     { transform: rotate(360deg); }
                       }
                       .sl-arm-dark {
-                          transform-origin: 36px 84px;
-                          animation: scanOrbitDark 6s cubic-bezier(0.8, 0, 0.2, 1) infinite;
+                        transform-origin: 36px 84px;
+                        animation: scanOrbitDark 6s cubic-bezier(0.8, 0, 0.2, 1) infinite;
                       }
                       @keyframes scanColorDark {
-                          0%, 15% { fill: #0068ff; }
-                          25%, 40% { fill: #4af6c3; }
-                          50%, 65% { fill: #fb8b1e; }
-                          75%, 90% { fill: #ff433d; }
-                          100% { fill: #0068ff; }
+                        0%, 15%  { fill: #0068ff; }
+                        25%, 40% { fill: #4af6c3; }
+                        50%, 65% { fill: #fb8b1e; }
+                        75%, 90% { fill: #ff433d; }
+                        100%     { fill: #0068ff; }
                       }
                       .sl-core-scan-dark {
-                          animation: scanColorDark 6s cubic-bezier(0.8, 0, 0.2, 1) infinite;
+                        animation: scanColorDark 6s cubic-bezier(0.8, 0, 0.2, 1) infinite;
                       }
                     `}
                   </style>
                 </defs>
                 <g textRendering="geometricPrecision" shapeRendering="geometricPrecision">
                   <circle className="sl-core-scan-dark" cx="36" cy="84" r="36" />
-                  <path className="sl-arm-dark" fill="#FFFFFF" d="M 0,0 H 120 V 120 H 96 V 24 H 0 Z" />
+                  <path   className="sl-arm-dark" fill="#FFFFFF" d="M 0,0 H 120 V 120 H 96 V 24 H 0 Z" />
                 </g>
               </svg>
             </motion.div>
@@ -140,16 +158,17 @@ export default function SplashScreen({ children }: SplashScreenProps) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.5 }}
-              style={{ textAlign: 'center' }}
+              style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}
             >
               <div
                 style={{
                   fontFamily: FD,
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: 700,
                   letterSpacing: '0.28em',
                   color: '#FFFFFF',
-                  marginBottom: 6,
+                  marginBottom: 7,
+                  textTransform: 'uppercase',
                 }}
               >
                 BLUEPRINT
@@ -157,17 +176,18 @@ export default function SplashScreen({ children }: SplashScreenProps) {
               <div
                 style={{
                   fontFamily: FD,
-                  fontSize: 9,
+                  fontSize: 10,
                   fontWeight: 500,
-                  letterSpacing: '0.18em',
-                  color: '#666666',
+                  letterSpacing: '0.22em',
+                  color: 'rgba(255,255,255,0.32)',
+                  textTransform: 'uppercase',
                 }}
               >
                 SPECIFIC LABS
               </div>
             </motion.div>
 
-            {/* Loading indicator */}
+            {/* Loading dots */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -176,14 +196,16 @@ export default function SplashScreen({ children }: SplashScreenProps) {
                 display: 'flex',
                 gap: 6,
                 alignItems: 'center',
+                position: 'relative',
+                zIndex: 1,
               }}
             >
               {[0, 1, 2].map((i) => (
                 <motion.div
                   key={i}
                   animate={{
-                    opacity: [0.2, 1, 0.2],
-                    scale: [0.8, 1.1, 0.8],
+                    opacity: [0.15, 1, 0.15],
+                    scale:   [0.7, 1.1, 0.7],
                   }}
                   transition={{
                     duration: 1.2,
@@ -192,28 +214,29 @@ export default function SplashScreen({ children }: SplashScreenProps) {
                     ease: 'easeInOut',
                   }}
                   style={{
-                    width: 4,
-                    height: 4,
+                    width: 3,
+                    height: 3,
                     borderRadius: '50%',
-                    background: ready ? CYAN : '#444444',
-                    transition: 'background 0.3s ease',
+                    background: ready ? CYAN : 'rgba(110,120,136,0.6)',
+                    transition: 'background 0.35s ease',
                   }}
                 />
               ))}
             </motion.div>
 
-            {/* Status text */}
+            {/* Status label */}
             <motion.div
               initial={{ opacity: 0 }}
-              animate={{ opacity: 0.5 }}
+              animate={{ opacity: 0.45 }}
               transition={{ delay: 1 }}
               style={{
                 position: 'absolute',
-                bottom: 40,
+                bottom: 38,
                 fontFamily: FD,
-                fontSize: 7,
-                letterSpacing: '0.14em',
-                color: '#444444',
+                fontSize: 8,
+                letterSpacing: '0.18em',
+                color: 'rgba(110,120,136,0.7)',
+                textTransform: 'uppercase',
               }}
             >
               {ready ? 'READY' : 'INITIALIZING'}
