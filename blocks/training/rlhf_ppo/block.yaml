@@ -1,0 +1,105 @@
+name: RLHF (PPO)
+type: rlhf_ppo
+category: training
+description: Reinforcement Learning from Human Feedback using Proximal Policy Optimization
+version: "1.0.0"
+
+inputs:
+  - id: dataset
+    label: Prompts
+    data_type: dataset
+    required: true
+  - id: model
+    label: Policy Model
+    data_type: model
+    required: false
+  - id: reward_model
+    label: Reward Model
+    data_type: model
+    required: false
+
+outputs:
+  - id: trained_model
+    label: RLHF Model
+    aliases: [model]
+    data_type: model
+
+  - id: metrics
+    label: PPO Metrics
+    data_type: metrics
+
+config:
+  model_name:
+    type: string
+    label: Policy Model
+    description: HuggingFace model name or local path for the policy model
+    mandatory: true
+  reward_model:
+    type: string
+    label: Reward Model
+    description: HuggingFace model name or path for the reward model (leave empty for heuristic reward)
+    mandatory: true
+  lr:
+    type: float
+    label: Learning Rate
+    default: 0.000014
+    min: 0.0000001
+    max: 0.001
+  epochs:
+    type: integer
+    label: Epochs
+    description: Number of PPO epochs over the prompt dataset
+    default: 1
+    min: 1
+    max: 20
+  batch_size:
+    type: integer
+    label: Batch Size
+    default: 4
+    min: 1
+    max: 64
+  kl_coeff:
+    type: float
+    label: KL Coefficient
+    description: Weight for KL penalty to prevent policy from diverging too far from reference
+    default: 0.2
+    min: 0.0
+    max: 1.0
+  clip_range:
+    type: float
+    label: Clip Range
+    description: PPO clipping parameter
+    default: 0.2
+    min: 0.05
+    max: 0.5
+  prompt_column:
+    type: string
+    label: Prompt Column
+    description: "Column name for prompts in your dataset (leave empty for auto-detect: query, prompt, text)"
+    default: ""
+  max_new_tokens:
+    type: integer
+    label: Max New Tokens
+    description: Maximum tokens to generate during PPO rollouts
+    default: 128
+    min: 16
+    max: 1024
+  temperature:
+    type: float
+    label: Temperature
+    description: "Sampling temperature for PPO rollout generation (higher = more diverse)"
+    default: 0.7
+    min: 0.1
+    max: 2.0
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -1,0 +1,10 @@
+{"text": "The quick brown fox jumps over the lazy dog.", "label": "positive"}
+{"text": "Machine learning models require large amounts of training data.", "label": "neutral"}
+{"text": "Natural language processing has advanced significantly.", "label": "positive"}
+{"text": "The experiment failed to produce meaningful results.", "label": "negative"}
+{"text": "Gradient descent optimizes model parameters iteratively.", "label": "neutral"}
+{"text": "This dataset contains too many errors to be useful.", "label": "negative"}
+{"text": "Transfer learning reduces the need for task-specific data.", "label": "positive"}
+{"text": "The model overfit badly on the training set.", "label": "negative"}
+{"text": "Attention mechanisms transformed the field of NLP.", "label": "positive"}
+{"text": "Fine-tuning pre-trained models is now standard practice.", "label": "neutral"}

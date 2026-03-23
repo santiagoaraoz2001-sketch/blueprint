@@ -1,0 +1,77 @@
+name: Agent Evaluator
+type: agent_evaluator
+category: agents
+description: "Evaluate agent performance on tasks using multiple scoring methods (task completion, accuracy, efficiency, custom criteria)"
+version: "1.1.0"
+
+inputs:
+  - id: dataset
+    label: Agent Outputs
+    data_type: dataset
+    required: false
+    description: "Agent outputs to evaluate. Generates demo data when not connected."
+  - id: references
+    label: Reference Answers
+    data_type: dataset
+    required: false
+
+outputs:
+  - id: evaluation_dataset
+    label: Evaluation Results
+    aliases: [dataset]
+    data_type: dataset
+
+  - id: report
+    label: Eval Report
+    data_type: artifact
+  - id: metrics
+    label: Aggregate Scores
+    data_type: metrics
+
+config:
+  method:
+    type: select
+    label: Evaluation Method
+    options: [task_completion, accuracy, efficiency, custom]
+    default: task_completion
+    description: "task_completion: response quality heuristics, accuracy: compare against references, efficiency: score based on steps taken, custom: user-defined criteria"
+  pass_threshold:
+    type: float
+    label: Pass Threshold
+    default: 0.5
+    min: 0.0
+    max: 1.0
+    description: Score threshold for a task to be marked as passed
+  custom_criteria:
+    type: text_area
+    label: Custom Criteria
+    default: ""
+    description: "For 'custom' method: describe evaluation criteria. Scored fields are checked in each output dict."
+    depends_on:
+      field: method
+      value: custom
+  num_tasks:
+    type: integer
+    label: Demo Task Count
+    default: 10
+    min: 1
+    max: 1000
+    description: Number of tasks to generate in demo mode (when no data connected)
+  output_format:
+    type: select
+    label: Report Format
+    options: [markdown, plain, json]
+    default: markdown
+    description: "Format for the evaluation report text output"
+    section: advanced
+  seed:
+    type: integer
+    label: Random Seed
+    default: 42
+    propagate: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

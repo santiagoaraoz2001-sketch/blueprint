@@ -1,0 +1,118 @@
+name: API Publisher
+type: api_publisher
+category: endpoints
+description: Push pipeline results to an external REST API endpoint with auth and retry.
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Data
+    data_type: any
+    required: true
+  - id: config
+    label: Auth Config
+    data_type: config
+    required: false
+
+outputs:
+  - id: status
+    label: Response Status
+    data_type: text
+    description: "Human-readable status message (e.g. 'Published 100/100 records')"
+  - id: summary
+    label: Publish Summary
+    data_type: metrics
+    description: "Object with keys: records_sent (int), records_failed (int), batches (int), url (string), method (string)"
+    aliases: [metrics]
+  - id: results
+    label: Response Data
+    data_type: dataset
+    description: "Array of per-batch results with keys: batch (int), status (int) or error (string), records (int)"
+
+    aliases: [dataset]
+config:
+  url:
+    type: string
+    label: Target URL
+    default: ""
+    description: REST API endpoint URL
+  method:
+    type: select
+    label: HTTP Method
+    options: [POST, PUT, PATCH]
+    default: POST
+  headers:
+    type: text_area
+    label: Headers
+    default: "{}"
+    description: JSON object of custom headers
+  auth_type:
+    type: select
+    label: Auth Type
+    options: [none, bearer, basic, api_key]
+    default: none
+  auth_token:
+    type: string
+    label: Auth Token / API Key
+    default: ""
+    description: Bearer token, password, or API key. Supports $secret:NAME syntax
+  auth_username:
+    type: string
+    label: Username (Basic Auth)
+    default: ""
+    depends_on:
+      field: auth_type
+      value: basic
+  api_key_header:
+    type: string
+    label: API Key Header Name
+    default: X-API-Key
+    depends_on:
+      field: auth_type
+      value: api_key
+  batch_size:
+    type: integer
+    label: Batch Size
+    default: 100
+    min: 1
+    description: Records per request (0 = send all at once)
+  retry_count:
+    type: integer
+    label: Retry Count
+    default: 3
+    min: 0
+    max: 10
+  timeout:
+    type: integer
+    label: Timeout (seconds)
+    default: 30
+    min: 5
+    max: 300
+  payload_template:
+    type: text_area
+    label: Payload Template
+    default: ""
+    description: "JSON template with {data} placeholder. Empty = send data directly"
+  content_type:
+    type: select
+    label: Content Type
+    options: [application/json, application/x-ndjson]
+    default: application/json
+  rate_limit:
+    type: float
+    label: Rate Limit (req/s)
+    default: 0
+    min: 0
+    description: Max requests per second (0 = unlimited)
+  on_error:
+    type: select
+    label: On Error
+    options: [skip, fail]
+    default: skip
+    description: "skip = continue on error, fail = abort entire batch"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

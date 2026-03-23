@@ -1,0 +1,56 @@
+name: HuggingFace Model Loader
+type: huggingface_model_loader
+category: data
+description: Load a pre-trained model from HuggingFace Hub
+version: "1.0.0"
+
+inputs: []
+
+outputs:
+  - id: model
+    label: Model
+    data_type: model
+
+config:
+  model_id:
+    type: string
+    label: Model ID
+    description: "HuggingFace model identifier (e.g. 'meta-llama/Llama-2-7b-hf')"
+    default: ""
+  revision:
+    type: string
+    label: Revision
+    description: Git revision or branch
+    default: "main"
+  quantization:
+    type: select
+    label: Quantization
+    options: [none, 4bit, 8bit]
+    default: "none"
+  trust_remote_code:
+    type: boolean
+    label: Trust Remote Code
+    description: Allow custom model code from the Hub
+    default: false
+  device_map:
+    type: select
+    label: Device Map
+    options: [auto, cpu, cuda, mps]
+    default: "auto"
+  cache_dir:
+    type: file_path
+    label: Cache Directory
+    description: Custom cache directory for model files
+    default: ""
+    path_mode: directory
+  torch_dtype:
+    type: select
+    label: Torch Dtype
+    options: [auto, float16, bfloat16, float32]
+    default: "auto"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

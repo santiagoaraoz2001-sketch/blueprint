@@ -1,0 +1,54 @@
+name: Experiment Logger
+type: experiment_logger
+category: flow
+description: Log experiment results with metadata, timestamps, and run tracking
+version: "1.0.0"
+icon: ScrollText
+accent: '#34D399'
+tags: [logging, experiment-tracking, metadata]
+aliases: [experiment log, run logger, experiment tracker, training log, run tracking]
+
+inputs:
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+    required: true
+    description: Metrics to log for the experiment
+  - id: config
+    label: Run Config
+    data_type: config
+    required: false
+    description: Configuration used for the experiment run
+  - id: model
+    label: Model Info
+    data_type: model
+    required: false
+    description: Model metadata to include in the log
+
+outputs:
+  - id: experiment_log
+    label: Experiment Log
+    data_type: artifact
+    description: JSON log file with experiment record
+
+config:
+  experiment_name:
+    type: string
+    label: Experiment Name
+    default: "default_experiment"
+    description: Name for this experiment run
+  tags:
+    type: string
+    label: Tags
+    default: ""
+    description: Comma-separated tags for filtering
+  log_to_file:
+    type: boolean
+    label: Log to File
+    default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

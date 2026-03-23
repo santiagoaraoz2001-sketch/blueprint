@@ -1,0 +1,89 @@
+name: Local File Loader
+type: local_file_loader
+category: source
+description: Load data from local file — supports CSV, TSV, JSON, JSONL, Parquet, Excel, and plain text
+version: "2.0.0"
+
+inputs:
+  - id: config
+    label: Config Override
+    data_type: config
+    required: false
+    description: "JSON config to override file_path, format, encoding, columns, max_rows, sheet_name dynamically"
+
+outputs:
+  - id: dataset
+    label: Dataset
+    data_type: dataset
+    description: "JSON output (dataset/data.json): array of objects, one per row. Keys are column names. TXT files produce [{line_number, text}]."
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
+    description: "Metadata about the dataset: text_column, columns, num_rows, source"
+  - id: metrics
+    label: Stats
+    data_type: metrics
+    required: false
+    description: "JSON object: {row_count, column_count, columns[], format, file_size_bytes}"
+
+config:
+  file_path:
+    type: file_path
+    label: File Path
+    description: "Path to the data file"
+    mandatory: true
+    file_extensions: [".csv", ".tsv", ".json", ".jsonl", ".parquet", ".xlsx", ".txt"]
+  format:
+    type: select
+    label: Format
+    options: [auto, csv, tsv, jsonl, json, parquet, xlsx, txt]
+    default: auto
+    description: "File format (auto-detect from extension)"
+  encoding:
+    type: select
+    label: Encoding
+    options: [utf-8, ascii, latin-1, utf-16]
+    default: utf-8
+    description: "File encoding"
+  has_header:
+    type: boolean
+    label: Has Header Row
+    default: true
+    description: "Uncheck if your CSV/TSV file has no header row"
+  delimiter:
+    type: string
+    label: Delimiter
+    default: ","
+    description: "Column delimiter for CSV files"
+  skip_rows:
+    type: integer
+    label: Skip Rows
+    default: 0
+    min: 0
+    description: "Skip first N data rows (after header)"
+  max_rows:
+    type: integer
+    label: Max Rows
+    default: 0
+    min: 0
+    description: "0 = load all rows"
+  columns:
+    type: string
+    label: Columns
+    default: ""
+    description: "Comma-separated column names to keep (empty = all)"
+  sheet_name:
+    type: string
+    label: Sheet Name
+    default: ""
+    description: "Excel sheet name (for .xlsx files)"
+    depends_on:
+      field: format
+      value: xlsx
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

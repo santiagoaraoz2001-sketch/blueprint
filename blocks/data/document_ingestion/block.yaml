@@ -1,0 +1,96 @@
+name: Document Ingestion
+type: document_ingestion
+category: source
+description: Ingest PDF, DOCX, TXT, Markdown, and HTML files from a directory for RAG pipelines
+version: "2.0.0"
+
+inputs:
+  - id: config
+    label: Config Override
+    data_type: config
+    required: false
+    description: "JSON config to override directory_path, glob_pattern, max_files, language, chunk_size dynamically"
+
+outputs:
+  - id: dataset
+    label: Documents
+    data_type: dataset
+    description: "JSON output (dataset/data.json): array of objects. Each doc: {id, filename, text, format, char_count, language, page_count?}. If chunked: {id, filename, text, format, chunk_index, char_count, language}."
+  - id: metrics
+    label: Stats
+    data_type: metrics
+    required: false
+    description: "JSON object: {documents_ingested, total_chars, formats[], chunked}"
+
+config:
+  directory_path:
+    type: file_path
+    label: Folder Path
+    description: "Directory containing documents to ingest"
+    mandatory: true
+    path_mode: directory
+  glob_pattern:
+    type: string
+    label: File Type Pattern
+    default: "*.*"
+    description: "Glob pattern to match files (e.g. '*.pdf', '*.txt', '*.*')"
+  recursive:
+    type: boolean
+    label: Recursive
+    default: true
+    description: "Search subdirectories"
+  max_files:
+    type: integer
+    label: Max Files
+    default: 0
+    min: 0
+    description: "0 = process all matching files"
+  chunk_text:
+    type: boolean
+    label: Pre-Chunk Documents
+    default: false
+    description: "Split long documents into smaller chunks"
+  chunk_size:
+    type: integer
+    label: Chunk Size (chars)
+    default: 1000
+    min: 100
+    description: "Characters per chunk"
+    depends_on:
+      field: chunk_text
+      value: true
+  chunk_overlap:
+    type: integer
+    label: Chunk Overlap (chars)
+    default: 200
+    min: 0
+    description: "Overlapping characters between adjacent chunks (prevents context loss at boundaries)"
+    depends_on:
+      field: chunk_text
+      value: true
+  chunk_strategy:
+    type: select
+    label: Chunk Strategy
+    options: [character, paragraph, sentence]
+    default: character
+    description: "character = fixed-size sliding window, paragraph = split on \\n\\n, sentence = split on sentence boundaries"
+    depends_on:
+      field: chunk_text
+      value: true
+  error_handling:
+    type: select
+    label: Error Handling
+    options: [skip, fail_fast]
+    default: skip
+    description: "skip = log failures and continue, fail_fast = stop on first error"
+  language:
+    type: string
+    label: Language
+    default: "en"
+    description: "Language hint for processing"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

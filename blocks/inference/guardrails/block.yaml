@@ -1,0 +1,94 @@
+name: Guardrails
+type: guardrails
+category: inference
+description: Content filtering and safety layer for LLM inputs/outputs
+version: "1.0.0"
+
+inputs:
+  - id: text
+    label: Text to Check
+    data_type: text
+    required: true
+
+outputs:
+  - id: filtered_text
+    label: Filtered Text
+    data_type: text
+    aliases: [text, response, output]
+    description: >
+      When output_format is "text", a plain text file (filtered.txt) with the
+      processed content. Depending on the action setting the text may be
+      unmodified (passthrough), prefixed with a [WARNING] tag (flag), have PII
+      tokens replaced with redaction labels (redact), or be entirely replaced
+      with a [BLOCKED] message (block). When output_format is "json", a JSON
+      file (filtered.json) containing: result (string, "safe" or "flagged"),
+      filtered_text (string, the processed text described above), flags (array
+      of category strings that exceeded the threshold), scores (object mapping
+      each category to its float 0-1 score), details (object with per-category
+      evidence), action_taken (string, the action applied — or "none" if no
+      flags), model (string, always "rule-based"), provider (string, always
+      "built-in"), and timestamp (ISO-8601 string).
+
+  - id: metrics
+    label: Safety Scores
+    data_type: metrics
+    description: >
+      Dictionary with the full safety report. Fields: scores (object mapping
+      each checked category to a float 0-1 score), details (object with per-
+      category evidence — e.g. PII counts, found toxicity words, bias indicator
+      count), flagged (array of category names that exceeded the threshold),
+      action_taken (string, the action applied or "none"), threshold (float,
+      the configured threshold), text_modified (boolean, whether the output
+      text differs from the input).
+
+config:
+  categories:
+    type: string
+    label: Safety Categories
+    default: "toxicity,pii,bias"
+    description: "Comma-separated categories to check: toxicity, pii, bias, profanity, self_harm"
+  threshold:
+    type: float
+    label: Flagging Threshold
+    default: 0.5
+    min: 0.0
+    max: 1.0
+    description: "Score above this threshold triggers the action"
+  action:
+    type: select
+    label: Action on Flag
+    options: [flag, redact, block, passthrough]
+    default: flag
+    description: "flag=prepend warning, redact=replace PII, block=replace entire text, passthrough=log only"
+  custom_banned_words:
+    type: text_area
+    label: Custom Banned Words
+    default: ""
+    description: "Additional words/phrases to flag (one per line)"
+  pii_types:
+    type: string
+    label: PII Types to Detect
+    default: "email,phone,ssn,credit_card,ip_address"
+    description: "Comma-separated PII types to detect and optionally redact"
+  redaction_string:
+    type: string
+    label: Redaction String
+    default: ""
+    description: "Custom replacement for redacted PII (e.g. '***'). Empty = type label like [EMAIL_REDACTED]"
+  fail_on_flag:
+    type: boolean
+    label: Fail on Flag
+    default: false
+    description: "Raise an error and stop the pipeline if any content is flagged"
+  output_format:
+    type: select
+    label: Output Format
+    description: "Format for text output — text returns raw result, json wraps with metadata"
+    default: text
+    options: [text, json]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

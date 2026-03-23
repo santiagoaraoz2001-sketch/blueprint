@@ -1,0 +1,69 @@
+name: Save Model
+type: save_model
+category: endpoints
+description: Save model weights or checkpoint to disk in safetensors, PyTorch, or GGUF format.
+version: "1.0.0"
+
+inputs:
+  - id: model
+    label: Model Data
+    data_type: model
+    required: true
+
+outputs:
+  - id: file_path
+    label: Saved File Path
+    data_type: artifact
+    description: "Absolute path to the saved model directory"
+  - id: status
+    label: Save Status
+    data_type: metrics
+  - id: summary
+    label: Export Summary
+    data_type: metrics
+    description: "Object with keys: total_size_bytes (int), files_saved (int), format (string), quantize (string)"
+
+    aliases: [metrics]
+config:
+  output_path:
+    type: string
+    label: Output Path
+    default: ./output
+    description: Directory to save model to
+  filename:
+    type: string
+    label: Filename
+    default: model
+    description: Base name for model files
+  format:
+    type: select
+    label: Format
+    options: [safetensors, pytorch, gguf, auto]
+    default: safetensors
+    description: Model serialization format
+  quantize:
+    type: select
+    label: Quantize on Save
+    options: [none, 4bit, 8bit]
+    default: none
+    description: Apply quantization when saving
+  save_config:
+    type: boolean
+    label: Save Config
+    default: true
+    description: Include model config.json alongside weights
+  save_tokenizer:
+    type: boolean
+    label: Save Tokenizer
+    default: true
+    description: Include tokenizer files alongside model
+  overwrite_existing:
+    type: boolean
+    label: Overwrite Existing
+    default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

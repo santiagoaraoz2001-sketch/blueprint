@@ -1,0 +1,110 @@
+name: Multi-Agent Debate
+type: multi_agent_debate
+category: agents
+description: Multiple agents with distinct personas debate a topic to reach consensus
+version: "1.2.0"
+aliases: [debate_composite]
+
+inputs:
+  - id: llm
+    label: LLM
+    data_type: llm
+    required: false
+    description: "LLM config from llm_inference or model info from model_selector"
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Direct model connection (alternative to LLM port)"
+  - id: input
+    label: Topic / Prompt
+    data_type: text
+    required: true
+
+outputs:
+  - id: response
+    label: Debate Summary
+    data_type: text
+    aliases: [text, output, consensus]
+  - id: dataset
+    label: Debate Log
+    data_type: dataset
+  - id: metrics
+    label: Consensus Metrics
+    data_type: metrics
+  - id: llm_config
+    label: LLM Config
+    data_type: llm
+    aliases: [llm]
+    description: "Passthrough of the LLM configuration — enables agent chaining and downstream inference"
+
+config:
+  topic:
+    type: text_area
+    label: Debate Topic
+    default: ""
+    description: "Topic for debate (used when input port not connected)"
+  num_agents:
+    type: integer
+    label: Number of Agents
+    default: 3
+    min: 2
+    max: 10
+  num_rounds:
+    type: integer
+    label: Debate Rounds
+    default: 3
+    min: 1
+    max: 10
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.7
+    min: 0.0
+    max: 2.0
+    propagate: true
+    section: sampling
+  max_tokens:
+    type: integer
+    label: Max Tokens per Turn
+    default: 256
+    min: 64
+    max: 2048
+    propagate: true
+    section: sampling
+  format:
+    type: select
+    label: Debate Format
+    options: [free_form, structured, socratic]
+    default: free_form
+    description: "free_form: open discussion, structured: opening/rebuttal/closing, socratic: question-driven"
+  custom_personas:
+    type: text_area
+    label: Custom Personas
+    default: ""
+    description: "One per line: 'Name: style description'. Leave empty for defaults (Analyst, Advocate, Critic, etc.)"
+    section: advanced
+  output_format:
+    type: select
+    label: Output Format
+    options: [markdown, plain, json]
+    default: markdown
+    description: "markdown: formatted summary, plain: text only, json: structured debate object"
+    section: advanced
+  moderator_prompt:
+    type: text_area
+    label: Moderator Prompt
+    default: ""
+    description: "Custom summary template. Use {topic}, {agents}, {rounds}, {consensus} placeholders. Leave empty for default."
+    section: advanced
+  seed:
+    type: integer
+    label: Random Seed
+    default: 42
+    description: Seed for reproducible demo outputs
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

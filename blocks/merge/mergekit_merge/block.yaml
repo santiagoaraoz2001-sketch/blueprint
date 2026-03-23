@@ -1,0 +1,69 @@
+name: MergeKit Merge
+type: mergekit_merge
+category: merge
+description: Merge models using MergeKit
+version: "1.0.0"
+
+inputs:
+  - id: model_a
+    label: Model A
+    data_type: model
+    required: true
+  - id: model_b
+    label: Model B
+    data_type: model
+    required: true
+  - id: base
+    label: "Base Model (for TIES/DARE)"
+    data_type: model
+    required: false
+
+outputs:
+  - id: model
+    label: Merged Model
+    data_type: model
+  - id: metrics
+    label: Merge Metrics
+    data_type: metrics
+
+config:
+  model_a_name:
+    type: string
+    label: Model A (fallback)
+    default: ""
+    description: "HuggingFace model ID for Model A (used when input port not connected)"
+  model_b_name:
+    type: string
+    label: Model B (fallback)
+    default: ""
+    description: "HuggingFace model ID for Model B (used when input port not connected)"
+  method:
+    type: select
+    label: Merge Method
+    options: [slerp, ties, dare_ties, linear, passthrough]
+    default: "slerp"
+  weight:
+    type: float
+    label: "Weight (Model B)"
+    description: "0 = all Model A, 1 = all Model B"
+    default: 0.5
+    min: 0
+    max: 1
+  density:
+    type: float
+    label: Density
+    description: "Parameter retention rate (used by TIES and DARE methods)"
+    default: 0.5
+    min: 0
+    max: 1
+  output_name:
+    type: string
+    label: Output Name
+    description: Name for the merged model
+    default: "merged-model"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

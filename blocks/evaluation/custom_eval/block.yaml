@@ -1,0 +1,92 @@
+name: Custom Eval
+type: custom_eval
+category: evaluation
+description: Run a custom Python scoring function on model outputs — maximum flexibility for domain-specific evaluation
+version: "2.0.0"
+
+inputs:
+  - id: predictions
+    label: Model Output
+    data_type: dataset
+    required: true
+    description: Model outputs to score (JSON list, file path, or single value)
+  - id: reference
+    label: Reference Data
+    data_type: dataset
+    required: false
+    description: Optional reference/ground truth data for comparison
+
+outputs:
+  - id: scores
+    label: Scores
+    data_type: metrics
+    description: 'Aggregate: user-defined score keys aggregated by chosen method (mean/median/min/max/sum)'
+    aliases: [metrics]
+  - id: report
+    label: Detailed Report
+    data_type: artifact
+    description: 'eval_report.json: aggregate_method, total_samples, aggregated_scores, per-sample details'
+
+  - id: dataset
+    label: Scored Samples
+    data_type: dataset
+    description: "Per-sample scores: index, output_preview, reference_preview, {user_defined_score_keys}"
+
+config:
+  scoring_function:
+    type: text_area
+    label: Scoring Function
+    description: "Python function: score(output, reference, idx) -> dict of scores"
+    default: |
+      def score(output: str, reference: str = None, idx: int = 0) -> dict:
+          return {
+              'length': len(output.split()),
+              'has_greeting': 1.0 if 'hello' in output.lower() else 0.0,
+          }
+  aggregate:
+    type: select
+    label: Aggregation Method
+    options: [mean, median, min, max, sum]
+    default: mean
+  trust_level:
+    type: select
+    label: Execution Trust Level
+    options: [sandboxed, trusted]
+    default: trusted
+    description: "Sandboxed: restricted builtins (safe). Trusted: full Python access."
+    section: advanced
+  error_handling:
+    type: select
+    label: Error Handling
+    options: [skip_errors, fail_fast]
+    default: skip_errors
+    description: "skip_errors: log and continue. fail_fast: stop on first error."
+    section: advanced
+  max_samples:
+    type: integer
+    label: Max Samples
+    default: 0
+    min: 0
+    description: "Limit to N samples (0 = all)"
+    propagate: true
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+    section: advanced
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"
+    propagate: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -1,0 +1,310 @@
+name: Dataset Builder
+type: dataset_builder
+category: data
+description: All-in-one dataset preparation for training — load from HuggingFace or local files, transform with column mapping and Python scripts, format for any training task, and validate schema
+version: "1.0.0"
+maturity: beta
+tags: [dataset, training, preparation, transform, huggingface, formatting, script]
+
+inputs:
+  - id: dataset
+    label: Input Dataset
+    data_type: dataset
+    required: false
+    description: "Existing dataset from upstream block (optional — can also load from HF or local file)"
+  - id: config
+    label: Config Override
+    data_type: config
+    required: false
+    description: "JSON config to override any config field dynamically (keys match config field names)"
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
+    description: "Metadata from upstream dataset block — inherits text_column and seed as defaults"
+
+outputs:
+  - id: dataset
+    label: Training Dataset
+    data_type: dataset
+    description: "JSON output (dataset/data.json): array of objects formatted for downstream training"
+  - id: eval_dataset
+    label: Eval Dataset
+    data_type: dataset
+    required: false
+    description: "Evaluation split (eval_dataset/data.json) — only produced when eval_split > 0"
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
+    description: "Metadata: text_column, columns, num_rows, training_format, target_block, schema_valid, validation_warnings"
+  - id: metrics
+    label: Build Stats
+    data_type: metrics
+    required: false
+    description: "Build statistics: source, row_count, eval_row_count, columns, format_applied, validation_result, dropped_rows breakdown"
+
+config:
+  # ── Source ──
+  source:
+    type: select
+    label: Data Source
+    options: [upstream, huggingface, local_file]
+    default: upstream
+    description: "'upstream' uses the connected dataset input. 'huggingface' loads directly from HF Hub with auto-detection. 'local_file' reads a file from disk."
+    mandatory: true
+
+  # ── HuggingFace source fields ──
+  hf_dataset:
+    type: string
+    label: HF Dataset Name
+    default: ""
+    description: "HuggingFace dataset identifier (e.g. 'tatsu-lab/alpaca', 'Anthropic/hh-rlhf'). Available subsets and splits are auto-detected and logged."
+    mandatory: true
+    depends_on:
+      field: source
+      value: huggingface
+  hf_subset:
+    type: string
+    label: HF Subset
+    default: ""
+    description: "Dataset subset/config name. Leave empty for the default config — available subsets are logged on load."
+    depends_on:
+      field: source
+      value: huggingface
+  hf_split:
+    type: select
+    label: HF Split
+    options: [train, validation, test, all]
+    default: train
+    description: "Which split to load. 'all' concatenates every available split into one dataset."
+    depends_on:
+      field: source
+      value: huggingface
+  hf_token:
+    type: string
+    label: HF Token
+    default: ""
+    description: "HuggingFace API token for private or gated datasets. Stored in config only — not logged."
+    depends_on:
+      field: source
+      value: huggingface
+  hf_streaming:
+    type: boolean
+    label: Streaming
+    default: false
+    description: "Stream rows incrementally instead of downloading the full dataset. Recommended for datasets > 1GB."
+    depends_on:
+      field: source
+      value: huggingface
+  hf_max_samples:
+    type: integer
+    label: Max Samples
+    default: 0
+    min: 0
+    max: 10000000
+    description: "Maximum rows to load from HF (0 = load all). Applied before any transforms."
+    depends_on:
+      field: source
+      value: huggingface
+
+  # ── Local file source ──
+  file_path:
+    type: file_path
+    label: File Path
+    default: ""
+    description: "Absolute or relative path to a local data file (CSV, TSV, JSON, JSONL, or Parquet)"
+    mandatory: true
+    depends_on:
+      field: source
+      value: local_file
+  file_format:
+    type: select
+    label: File Format
+    options: [auto, csv, tsv, json, jsonl, parquet]
+    default: auto
+    description: "'auto' detects format from file extension. Use explicit format if extension doesn't match content."
+    depends_on:
+      field: source
+      value: local_file
+  file_encoding:
+    type: string
+    label: File Encoding
+    default: "utf-8"
+    description: "Character encoding for CSV/TSV/JSON/JSONL files (e.g. 'utf-8', 'latin-1', 'cp1252')"
+    depends_on:
+      field: source
+      value: local_file
+
+  # ── Column mapping ──
+  column_mapping:
+    type: text_area
+    label: Column Mapping (JSON)
+    default: ""
+    description: 'Rename columns before transforms. JSON object mapping old names to new: {"original": "new_name"}. Leave empty to skip. Applied before keep_columns.'
+
+  keep_columns:
+    type: string
+    label: Keep Columns
+    default: ""
+    description: "Comma-separated list of columns to keep after mapping (all others dropped). Empty = keep all columns."
+
+  # ── Script-based transform ──
+  transform_script:
+    type: text_area
+    label: Transform Script (Python)
+    default: ""
+    description: "Python function body that transforms each row. Receives 'row' (dict), must return a dict or None to drop the row. Available modules: re, json, math, datetime. Available builtins: len, str, int, float, bool, list, dict, min, max, sum, sorted, range, enumerate, zip, etc.\n\nExample:\nrow['text'] = row['instruction'] + '\\n' + row['output']\nreturn row"
+
+  # ── Training format ──
+  training_format:
+    type: select
+    label: Training Format
+    options: [none, instruction, chat, completion, preference_pairs, rlhf_prompts]
+    default: none
+    description: "Format output for a specific training task. 'none' passes data through as-is. Other formats restructure columns to match what training blocks expect."
+    propagate: true
+
+  instruction_template:
+    type: text_area
+    label: Instruction Template
+    default: "### Instruction:\n{instruction}\n\n### Response:\n{output}"
+    description: "Template with {column_name} placeholders. Each row is formatted using this template and stored in a 'text' column. All referenced columns must exist in your data."
+    mandatory: true
+    depends_on:
+      field: training_format
+      value: instruction
+
+  system_prompt:
+    type: text_area
+    label: System Prompt
+    default: ""
+    description: "Optional system message prepended to each conversation in ChatML format. Leave empty for no system message."
+    depends_on:
+      field: training_format
+      value: chat
+
+  text_column:
+    type: string
+    label: Text Column
+    default: ""
+    description: "Column containing the main text for completion/pretraining. Auto-detects from 'text', 'content', or first column if empty."
+    depends_on:
+      field: training_format
+      value: completion
+
+  prompt_column:
+    type: string
+    label: Prompt Column
+    default: ""
+    description: "Column containing prompts. Auto-detects from 'prompt', 'instruction', 'query', 'question' if empty. Used by preference_pairs and rlhf_prompts formats."
+
+  chosen_column:
+    type: string
+    label: Chosen Column
+    default: "chosen"
+    description: "Column containing preferred/chosen responses for DPO or reward model training. Will be renamed to 'chosen' in output."
+    mandatory: true
+    depends_on:
+      field: training_format
+      value: preference_pairs
+
+  rejected_column:
+    type: string
+    label: Rejected Column
+    default: "rejected"
+    description: "Column containing rejected/dispreferred responses for DPO or reward model training. Will be renamed to 'rejected' in output."
+    mandatory: true
+    depends_on:
+      field: training_format
+      value: preference_pairs
+
+  # ── Filtering ──
+  deduplicate:
+    type: boolean
+    label: Deduplicate Rows
+    default: false
+    description: "Remove duplicate rows using content hashing (MD5 of all column values). Applied after transforms and format conversion."
+    section: filtering
+
+  min_length:
+    type: integer
+    label: Min Text Length (chars)
+    default: 0
+    min: 0
+    max: 1000000
+    description: "Drop rows where the primary text column has fewer characters than this threshold. 0 = disabled. Primary column is auto-detected (text > query > chosen > first column)."
+    section: filtering
+
+  max_length:
+    type: integer
+    label: Max Text Length (chars)
+    default: 0
+    min: 0
+    max: 10000000
+    description: "Drop rows where the primary text column exceeds this character count. 0 = disabled."
+    section: filtering
+
+  filter_expression:
+    type: text_area
+    label: Filter Expression (Python)
+    default: ""
+    description: "Python expression that returns True to keep a row, False to drop it. Has access to 'row' (dict) and the 're' module. Example: len(row.get('text', '')) > 10 and 'error' not in row.get('text', '')"
+    section: filtering
+
+  sample_size:
+    type: integer
+    label: Sample Size
+    default: 0
+    min: 0
+    max: 10000000
+    description: "Randomly sample this many rows after all transforms and filters. 0 = keep all rows. Applied before eval split."
+    section: filtering
+
+  # ── Eval split ──
+  eval_split:
+    type: float
+    label: Eval Split Ratio
+    default: 0.0
+    min: 0.0
+    max: 0.5
+    description: "Fraction of data reserved for the eval output (0 = no split, 0.1 = 10% eval). Data is shuffled before splitting unless shuffle is disabled. Max 0.5 to ensure training set is always the majority."
+    section: advanced
+
+  # ── Validation ──
+  validate_schema:
+    type: boolean
+    label: Validate Output Schema
+    default: true
+    description: "Check that output columns match what the target training block expects. Logs warnings for missing optional columns and fails on missing required columns."
+    section: advanced
+
+  target_block:
+    type: select
+    label: Target Training Block
+    options: [auto, lora_finetuning, qlora_finetuning, full_finetuning, dpo_alignment, reward_model_trainer, rlhf_ppo, distillation, continued_pretraining]
+    default: auto
+    description: "Which downstream training block this dataset feeds. 'auto' infers from training_format (instruction/chat/completion → LoRA, preference_pairs → DPO, rlhf_prompts → RLHF PPO)."
+    section: advanced
+
+  # ── General ──
+  shuffle:
+    type: boolean
+    label: Shuffle
+    default: true
+    description: "Randomly shuffle rows before eval split. Recommended for training — disable only if row order matters (e.g. time-series)."
+
+  seed:
+    type: integer
+    label: Random Seed
+    default: 42
+    min: 0
+    max: 2147483647
+    description: "Seed for reproducible shuffling, sampling, and splitting"
+    propagate: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

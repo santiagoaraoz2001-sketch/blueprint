@@ -1,0 +1,95 @@
+name: Quality Gate
+type: quality_gate
+category: interventions
+description: Auto-check data quality and metrics against configurable thresholds — computes quality metrics automatically from data
+version: "1.1.0"
+aliases: [checkpoint_gate]
+
+inputs:
+  - id: data
+    label: Input Data
+    data_type: any
+    required: true
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+    required: false
+
+outputs:
+  - id: passed
+    label: Passed
+    data_type: any
+    description: "Input data forwarded when gate passes (None when rejected)"
+  - id: rejected
+    label: Rejected
+    data_type: any
+    description: "Input data routed here when gate fails (None when passed)"
+  - id: gate_metrics
+    label: Gate Report
+    data_type: metrics
+    description: "JSON: {gate_passed, total_checks, passed/failed counts, checks[{metric, value, operator, threshold, passed}], all_metrics}"
+
+    aliases: [metrics]
+config:
+  metric_name:
+    type: string
+    label: Metric Name
+    default: "accuracy"
+    description: "Primary metric to check (from metrics input, data fields, or auto-computed: row_count, null_ratio, duplicate_ratio, etc.)"
+  threshold:
+    type: float
+    label: Threshold
+    default: 0.8
+    min: 0
+    max: 1000000
+    description: "Value to compare the metric against"
+  operator:
+    type: select
+    label: Operator
+    default: ">="
+    options: [">=", ">", "<=", "<", "==", "!="]
+    description: "Comparison operator"
+  label:
+    type: string
+    label: Gate Label
+    default: ""
+    description: "A label for this gate (shown in logs and reports)"
+  on_fail:
+    type: select
+    label: On Fail
+    default: "route_rejected"
+    options: ["route_rejected", "stop_pipeline", "warn_continue"]
+    description: "What to do when the gate fails"
+  auto_compute_quality:
+    type: boolean
+    label: Auto-Compute Quality Metrics
+    default: true
+    description: "Automatically compute row_count, null_ratio, duplicate_ratio from list/dict data"
+  additional_checks:
+    type: text_area
+    label: Additional Checks
+    default: ""
+    description: "One check per line: metric_name operator threshold (e.g., null_ratio < 0.05)"
+  match_mode:
+    type: select
+    label: Match Mode
+    default: "all"
+    options: ["all", "any"]
+    description: "all = every check must pass, any = at least one check must pass"
+  required_columns:
+    type: string
+    label: Required Columns
+    default: ""
+    description: "Comma-separated column names that must exist in list-of-dict data (e.g., 'name,email,age'). Empty = skip."
+  report_detail:
+    type: select
+    label: Report Detail
+    default: "detailed"
+    options: ["detailed", "summary"]
+    description: "detailed = full check results + all metrics, summary = pass/fail counts + failed metric names only"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

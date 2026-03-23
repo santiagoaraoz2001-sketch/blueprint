@@ -1,0 +1,94 @@
+name: Train/Val/Test Split
+type: train_val_test_split
+category: data
+description: Split dataset into train, validation, and test sets
+version: "2.0.0"
+
+inputs:
+  - id: dataset
+    label: Dataset
+    data_type: dataset
+    required: true
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
+
+outputs:
+  - id: train
+    label: Train
+    data_type: dataset
+    description: "JSON array of training rows. Schema matches input."
+    aliases: [dataset]
+  - id: val
+    label: Validation
+    data_type: dataset
+    description: "JSON array of validation rows. Empty array if val_ratio=0."
+    aliases: [dataset]
+  - id: test
+    label: Test
+    data_type: dataset
+    description: "JSON array of test rows. Schema matches input."
+    aliases: [dataset]
+  - id: output_dataset_meta
+    label: Dataset Info
+    data_type: config
+    aliases: [dataset_meta]
+    required: false
+
+  - id: stats
+    label: Split Stats
+    data_type: metrics
+    description: "Object with train, val, test counts, total, and stratified flag"
+
+    aliases: [metrics]
+config:
+  train_ratio:
+    type: float
+    label: Train Ratio
+    default: 0.8
+    min: 0.0
+    max: 1.0
+  val_ratio:
+    type: float
+    label: Val Ratio
+    default: 0.1
+    min: 0.0
+    max: 1.0
+  test_ratio:
+    type: float
+    label: Test Ratio
+    default: 0.1
+    min: 0.0
+    max: 1.0
+  seed:
+    type: integer
+    label: Random Seed
+    default: 42
+    propagate: true
+  stratify_column:
+    type: string
+    label: Stratify Column
+    default: ""
+    description: Column to stratify by (empty = random split)
+  shuffle:
+    type: boolean
+    label: Shuffle
+    default: true
+    description: Whether to shuffle before splitting
+  group_column:
+    type: string
+    label: Group Column
+    default: ""
+    description: Column for group-aware splitting (all rows with same group stay in same split, prevents data leakage)
+  sort_column:
+    type: string
+    label: Sort Column
+    default: ""
+    description: Sort rows by this column before splitting (for temporal/ordered splits — use with shuffle=false)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

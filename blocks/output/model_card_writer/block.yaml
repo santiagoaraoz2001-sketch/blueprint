@@ -1,0 +1,91 @@
+name: Model Card Writer
+type: model_card_writer
+category: output
+description: Auto-generate a model card from metrics and config
+version: "1.0.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+  - id: metrics
+    label: Eval Metrics
+    data_type: metrics
+    required: false
+
+outputs:
+  - id: artifact
+    label: Model Card
+    data_type: artifact
+  - id: text
+    label: Card Text
+    data_type: text
+
+    aliases: [response, output]
+config:
+  model_name:
+    type: string
+    label: Model Name
+    description: Display name for the model
+    default: "My Fine-Tuned Model"
+  base_model:
+    type: string
+    label: Base Model
+    description: "Base model identifier (e.g. 'meta-llama/Llama-3-8B')"
+    default: ""
+  language:
+    type: string
+    label: Language
+    default: "en"
+  license:
+    type: select
+    label: License
+    options: [apache-2.0, mit, cc-by-4.0, cc-by-sa-4.0, other]
+    default: "apache-2.0"
+  tags:
+    type: string
+    label: Tags
+    description: Comma-separated tags
+    default: "text-generation,fine-tuned"
+  description:
+    type: text_area
+    label: Description
+    description: Model description (leave blank for auto-generated)
+    default: ""
+  format:
+    type: select
+    label: Format
+    options: [markdown, html]
+    default: "markdown"
+  include_biases:
+    type: boolean
+    label: Include Bias Analysis
+    description: Add a Limitations and Biases section
+    default: true
+  include_usage:
+    type: boolean
+    label: Include Usage Example
+    description: Adds Python code snippet for loading and using the model
+    default: true
+  include_citation:
+    type: boolean
+    label: Include Citation
+    description: Adds BibTeX citation block
+    default: true
+  include_training_details:
+    type: boolean
+    label: Include Pipeline Details
+    description: Adds training/merge/quantization hyperparameters table
+    default: true
+  custom_sections:
+    type: text_area
+    label: Custom Sections (Markdown)
+    description: "Extra markdown appended before Citation. Use for Intended Use, Out-of-Scope, etc."
+    default: ""
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

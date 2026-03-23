@@ -1,0 +1,81 @@
+name: Aggregator
+type: aggregator
+category: flow
+description: Collect and combine results from multiple input branches into a single output
+version: "1.0.0"
+
+inputs:
+  - id: in_1
+    label: Input 1
+    data_type: any
+    required: true
+  - id: in_2
+    label: Input 2
+    data_type: any
+    required: true
+  - id: in_3
+    label: Input 3
+    data_type: any
+    required: false
+  - id: in_4
+    label: Input 4
+    data_type: any
+    required: false
+  - id: in_5
+    label: Input 5
+    data_type: any
+    required: false
+
+outputs:
+  - id: output
+    label: Combined Output
+    data_type: dataset
+    aliases: [dataset]
+  - id: metrics
+    label: Aggregation Metrics
+    data_type: metrics
+
+config:
+  strategy:
+    type: select
+    label: Merge Strategy
+    default: concatenate
+    options:
+      - concatenate
+      - interleave
+      - flatten
+      - merge_fields
+      - pick_first
+    description: "concatenate: append all rows; interleave: alternate rows from each input; flatten: flatten nested lists; merge_fields: combine dict keys horizontally; pick_first: use first non-empty"
+  deduplicate:
+    type: boolean
+    label: Deduplicate Rows
+    default: false
+    description: "Remove duplicate rows from the merged output"
+  add_source_label:
+    type: boolean
+    label: Add Source Label
+    default: false
+    description: "Tag each row with a '_source' field indicating which input port it came from"
+  join_key:
+    type: string
+    label: Join Key
+    default: ""
+    description: "When using merge_fields strategy, match rows by this field instead of by index (SQL-like JOIN). E.g. 'sample_id' to join predictions with labels."
+  sort_by:
+    type: string
+    label: Sort By Field
+    default: ""
+    description: "Sort merged output by this field. Prefix with '-' for descending (e.g. '-score'). Leave empty to skip sorting."
+  limit:
+    type: integer
+    label: Limit Output Rows
+    default: 0
+    min: 0
+    description: "Maximum number of rows in the final output (0 = no limit). Applied after sort, so combine with sort_by for top-N queries."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

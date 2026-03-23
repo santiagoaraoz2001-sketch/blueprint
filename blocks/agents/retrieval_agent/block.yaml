@@ -1,0 +1,102 @@
+name: Retrieval Agent (RAG)
+type: retrieval_agent
+category: agents
+description: Retrieval-Augmented Generation agent that searches a vector store and generates answers
+version: "1.1.0"
+
+inputs:
+  - id: llm
+    label: LLM
+    data_type: llm
+    required: false
+    description: "LLM config from llm_inference or model info from model_selector"
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Direct model connection (alternative to LLM port)"
+  - id: store
+    label: Vector Store Config
+    data_type: config
+    required: true
+  - id: dataset
+    label: Queries
+    data_type: dataset
+    required: false
+  - id: query
+    label: Single Query
+    data_type: text
+    required: false
+
+outputs:
+  - id: response
+    label: Response Text
+    data_type: text
+    aliases: [text, output]
+  - id: retrieval_log
+    label: Responses
+    aliases: [dataset]
+    data_type: dataset
+  - id: metrics
+    label: RAG Metrics
+    data_type: metrics
+  - id: llm_config
+    label: LLM Config
+    data_type: llm
+    aliases: [llm]
+    description: "Passthrough of the LLM configuration — enables agent chaining and downstream inference"
+
+config:
+  top_k:
+    type: integer
+    label: Top K
+    default: 5
+    min: 1
+    max: 50
+    description: Number of documents to retrieve per query
+  rerank:
+    type: boolean
+    label: Rerank Results
+    default: false
+    description: Re-score and reorder retrieved documents by relevance
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.3
+    min: 0.0
+    max: 2.0
+    description: LLM generation temperature (lower = more factual, higher = more creative)
+    propagate: true
+    section: sampling
+  include_sources:
+    type: boolean
+    label: Include Sources
+    default: false
+    description: Append retrieved source document references at the end of each response
+  max_tokens:
+    type: integer
+    label: Max Tokens
+    default: 1024
+    min: 64
+    max: 8192
+    description: Maximum tokens for generated response
+    propagate: true
+    section: sampling
+  prompt_template:
+    type: text_area
+    label: Prompt Template
+    default: "Context:\n{context}\n\nQuestion: {query}\n\nAnswer based on the context above:"
+    description: "RAG prompt template. Use {context} for retrieved docs and {query} for the user question."
+  output_format:
+    type: select
+    label: Output Format
+    options: [plain, markdown, json]
+    default: plain
+    description: "Format for the response text output"
+    section: advanced
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

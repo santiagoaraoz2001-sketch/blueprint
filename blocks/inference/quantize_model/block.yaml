@@ -1,0 +1,80 @@
+name: Quantize Model
+type: quantize_model
+category: inference
+description: Quantize model weights for efficient inference
+version: "1.0.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: true
+
+outputs:
+  - id: quantized_model
+    label: Quantized Model
+    data_type: model
+    aliases: [model]
+    description: >
+      JSON object describing the quantized model. Fields:
+      source (str) — quantization method used, one of "gptq", "bitsandbytes", "awq";
+      path (str) — filesystem path to the quantized model directory;
+      model_name (str) — the original model identifier;
+      bits (int) — quantization bit-width (2, 3, 4, or 8);
+      estimation_only (bool, optional) — true if no quantization library was available
+      and only size estimation was performed.
+
+  - id: metrics
+    label: Quant Stats
+    data_type: metrics
+    description: >
+      Dictionary with fields (vary by method and mode):
+      method (str) — quantization method ("gptq", "bitsandbytes", or "awq");
+      bits (int) — quantization bit-width;
+      group_size (int) — group size parameter (present for gptq and awq);
+      elapsed_s (float) — time taken in seconds;
+      calibration_dataset (str, optional) — dataset used for GPTQ calibration;
+      estimation_only (bool, optional) — true if running in estimation mode;
+      estimated_params (float, optional) — estimated parameter count (estimation mode);
+      original_size_gb (float, optional) — estimated FP16 model size in GB (estimation mode);
+      quantized_size_gb (float, optional) — estimated quantized size in GB (estimation mode);
+      compression_ratio (float, optional) — original/quantized size ratio (estimation mode).
+
+config:
+  method:
+    type: select
+    label: Method
+    options: [gptq, bitsandbytes, awq]
+    default: "gptq"
+  bits:
+    type: select
+    label: Bits
+    options: ["2", "3", "4", "8"]
+    default: "4"
+  group_size:
+    type: integer
+    label: Group Size
+    default: 128
+    min: 32
+  model_name:
+    type: string
+    label: "Model Name (fallback)"
+    description: Used if model input port does not provide a name
+    default: ""
+  calibration_dataset:
+    type: string
+    label: Calibration Dataset
+    description: "Dataset for GPTQ calibration (e.g. 'c4', 'wikitext')"
+    default: "c4"
+  compute_dtype:
+    type: select
+    label: Compute Dtype
+    description: "Compute precision for BitsAndBytes quantization"
+    options: [float16, bfloat16, float32]
+    default: "float16"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

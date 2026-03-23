@@ -1,0 +1,119 @@
+name: Custom Benchmark
+type: custom_benchmark
+category: evaluation
+description: Run evaluation benchmarks with standard NLP metrics — accuracy, F1, BLEU, ROUGE, perplexity, and exact match
+version: "2.0.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: true
+    description: Model to evaluate (HF, Ollama, or MLX)
+  - id: dataset
+    label: Test Data
+    data_type: dataset
+    required: true
+    description: JSON dataset with input/target fields
+
+outputs:
+  - id: metrics
+    label: Scores
+    data_type: metrics
+    description: 'Aggregate scores: metric value, passed (bool), num_samples — keyed by metric name'
+  - id: report
+    label: Detailed Report
+    data_type: artifact
+    description: 'benchmark_report.json: model, metrics, sample_predictions with input, target, prediction, score'
+
+  - id: benchmark_dataset
+    label: Predictions
+    data_type: dataset
+    aliases: [dataset]
+    description: "Per-sample predictions: input, target, prediction, score, correct"
+config:
+  model_name:
+    type: string
+    label: Model Name (fallback)
+    default: "llama3.2"
+    description: "Used when model input port is not connected"
+  provider:
+    type: select
+    label: Provider (fallback)
+    default: "ollama"
+    options: ["ollama", "mlx", "openai", "anthropic"]
+    description: "Inference provider (used when model input not connected)"
+  endpoint:
+    type: string
+    label: Endpoint (fallback)
+    default: "http://localhost:11434"
+    description: "API endpoint URL (used when model input not connected)"
+  metric:
+    type: select
+    label: Primary Metric
+    options: [accuracy, exact_match, f1, bleu, rouge, perplexity, all]
+    default: accuracy
+    description: "'all' computes every metric in a single run"
+  threshold:
+    type: float
+    label: Pass Threshold
+    default: 0.0
+    min: 0.0
+    max: 1.0
+    description: "Minimum score to pass (0 = no threshold). Applied to primary metric."
+  input_field:
+    type: string
+    label: Input Field Name
+    default: ""
+    description: "Field name containing inputs (auto-detected if empty)"
+  target_field:
+    type: string
+    label: Target Field Name
+    default: ""
+    description: "Field name containing expected outputs (auto-detected if empty)"
+  max_new_tokens:
+    type: integer
+    label: Max New Tokens
+    default: 128
+    min: 1
+    max: 2048
+    description: Maximum tokens to generate per sample
+  max_samples:
+    type: integer
+    label: Max Samples
+    default: 0
+    min: 0
+    description: "Limit evaluation to N samples (0 = use all)"
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.0
+    min: 0.0
+    max: 2.0
+    description: Sampling temperature for inference (0 = greedy/deterministic)
+  inference_timeout:
+    type: integer
+    label: Inference Timeout (s)
+    default: 120
+    min: 5
+    max: 600
+    description: Timeout in seconds for each inference request
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -1,0 +1,50 @@
+name: Text to Dataset
+type: text_to_dataset
+category: data
+version: "2.0.0"
+description: Convert a text input into a dataset with a single row, useful for feeding text outputs into dataset-expecting blocks
+maturity: stable
+deprecated: true
+deprecated_message: "Use the Dataset Builder block instead — it provides text-to-dataset functionality plus training format conversion, column mapping, and script transforms."
+tags: [adapter, conversion, text, dataset]
+
+inputs:
+  - id: text
+    label: Text Input
+    data_type: text
+    required: true
+  - id: text_b
+    label: Second Text (optional)
+    data_type: text
+    required: false
+  - id: text_c
+    label: Third Text (optional)
+    data_type: text
+    required: false
+
+outputs:
+  - id: dataset
+    label: Dataset
+    data_type: dataset
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+
+config:
+  column_name:
+    type: string
+    label: Column Name
+    default: "text"
+    description: "Name of the column to store the text in"
+  split_by:
+    type: select
+    label: Split Strategy
+    default: "none"
+    options: ["none", "newline", "paragraph", "sentence"]
+    description: "How to split the text into multiple rows"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

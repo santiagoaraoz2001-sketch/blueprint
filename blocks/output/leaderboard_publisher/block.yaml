@@ -1,0 +1,55 @@
+name: Leaderboard Publisher
+type: leaderboard_publisher
+category: output
+description: Publish results to a leaderboard or tracking system
+version: "1.0.0"
+icon: Trophy
+accent: '#34D399'
+tags: [tracking, leaderboard, experiment-tracking]
+aliases: [leaderboard, MLflow, W&B, Weights and Biases, experiment tracker, publish results]
+
+inputs:
+  - id: metrics
+    label: Results
+    data_type: metrics
+    required: false
+    description: "Metrics or evaluation results to publish. Generates demo leaderboard when not connected."
+
+outputs:
+  - id: artifact
+    label: Submission
+    data_type: artifact
+    description: Published leaderboard output
+  - id: output_metrics
+    label: Stats
+    data_type: metrics
+    aliases: [metrics]
+    description: Publishing statistics (num_entries, num_columns, format)
+config:
+  title:
+    type: string
+    label: Title
+    default: "Model Leaderboard"
+    description: Title for the leaderboard
+  sort_by:
+    type: string
+    label: Sort By
+    default: ""
+    description: Column name to sort by (empty = auto-detect)
+  sort_order:
+    type: select
+    label: Sort Order
+    options: [descending, ascending]
+    default: descending
+  format:
+    type: select
+    label: Output Format
+    options: [markdown, csv, json]
+    default: markdown
+    description: Format for the leaderboard output
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

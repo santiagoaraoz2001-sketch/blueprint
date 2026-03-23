@@ -1,0 +1,51 @@
+name: Checkpoint Selector
+type: checkpoint_selector
+category: training
+description: Select the best checkpoint from a training run by scanning checkpoint directories
+version: "1.0.0"
+
+inputs:
+  - id: model
+    label: Training Output
+    data_type: model
+    required: true
+
+outputs:
+  - id: selected_model
+    label: Best Checkpoint
+    aliases: [model]
+    data_type: model
+
+  - id: metrics
+    label: Checkpoint Metrics
+    data_type: metrics
+
+config:
+  checkpoint_dir:
+    type: string
+    label: Checkpoint Directory
+    description: Path to scan for checkpoints (overridden by model input port if connected)
+    mandatory: true
+  metric:
+    type: string
+    label: Selection Metric
+    description: Metric name to use for checkpoint comparison
+    default: eval_loss
+  mode:
+    type: select
+    label: Mode
+    description: Whether to pick the checkpoint with min or max metric value
+    default: min
+    options: [min, max]
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

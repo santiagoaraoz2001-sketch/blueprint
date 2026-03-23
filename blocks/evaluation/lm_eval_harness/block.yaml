@@ -1,0 +1,93 @@
+name: LM Eval Harness
+type: lm_eval_harness
+category: evaluation
+description: Evaluate models against standardized benchmarks using the EleutherAI lm-evaluation-harness framework
+version: "2.0.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: Model path, HF name, or upstream model block output
+
+outputs:
+  - id: metrics
+    label: Benchmark Scores
+    data_type: metrics
+    description: 'Aggregate scores: {task}_acc, _average_acc — piped to dashboards and downstream blocks'
+  - id: results
+    label: Full Results
+    data_type: artifact
+    description: 'Full eval_results.json: model, backend, task_results with acc, acc_stderr, samples per task'
+
+  - id: dataset
+    label: Per-Task Scores
+    data_type: dataset
+    description: "Per-task accuracy table: task, acc, acc_stderr, num_samples"
+
+config:
+  tasks:
+    type: string
+    label: Tasks
+    default: "hellaswag,arc_easy"
+    description: "Comma-separated lm-eval task names (e.g. hellaswag, arc_easy, winogrande, piqa, boolq)"
+  num_fewshot:
+    type: integer
+    label: Few-shot Examples
+    default: 0
+    min: 0
+    max: 100
+    description: Number of in-context examples per task
+  batch_size:
+    type: string
+    label: Batch Size
+    default: "auto"
+    description: "'auto' for adaptive, or an integer like '8'"
+  model_name:
+    type: string
+    label: Model Name / Path
+    default: ""
+    description: "HuggingFace model ID or local path (overridden by connected model input)"
+  model_backend:
+    type: select
+    label: Model Backend
+    options: [hf, vllm, local-completions]
+    default: hf
+    description: "hf = HuggingFace Transformers, vllm = vLLM server, local-completions = Ollama/API"
+  device:
+    type: select
+    label: Device
+    options: [auto, cpu, cuda, mps]
+    default: auto
+    description: Device to run evaluation on
+  limit:
+    type: integer
+    label: Sample Limit
+    default: 0
+    min: 0
+    description: "Limit samples per task (0 = full dataset). Useful for quick iteration."
+  trust_remote_code:
+    type: boolean
+    label: Trust Remote Code
+    default: false
+    description: Allow execution of model code from HuggingFace Hub
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

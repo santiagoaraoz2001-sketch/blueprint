@@ -1,0 +1,118 @@
+name: API Data Fetcher
+type: api_data_fetcher
+category: source
+description: Fetch data from a REST API endpoint with authentication, pagination, retry, and rate limiting
+version: "2.0.0"
+
+inputs:
+  - id: config
+    label: Request Config
+    data_type: config
+    required: false
+    description: "JSON config to override url, headers, body, or add auth credentials dynamically"
+
+outputs:
+  - id: dataset
+    label: Dataset
+    data_type: dataset
+    description: "JSON output (dataset/data.json): array of objects, one per record. Auto-parsed from JSON, XML, CSV, or raw text responses."
+  - id: metrics
+    label: Stats
+    data_type: metrics
+    required: false
+    description: "JSON object: {total_rows, pages_fetched, column_count, columns[], response_format}"
+
+config:
+  url:
+    type: string
+    label: API URL
+    description: "REST API endpoint URL"
+    mandatory: true
+  method:
+    type: select
+    label: Method
+    options: [GET, POST, PUT, PATCH, DELETE]
+    default: GET
+  headers:
+    type: text_area
+    label: Headers (JSON)
+    default: "{}"
+    description: "Custom HTTP headers as JSON object"
+  body:
+    type: text_area
+    label: Request Body
+    default: ""
+    description: "Request body for POST/PUT/PATCH requests"
+  auth_type:
+    type: select
+    label: Auth Type
+    options: [none, bearer, basic, api_key]
+    default: none
+  auth_token:
+    type: string
+    label: Auth Token
+    default: ""
+    description: "Bearer token, Basic user:pass, or API key depending on auth type"
+  response_path:
+    type: string
+    label: Response Path
+    default: ""
+    description: "Dot-notation path to extract data (e.g. 'data.items')"
+  pagination:
+    type: boolean
+    label: Auto-Paginate
+    default: false
+  pagination_key:
+    type: string
+    label: Pagination Key
+    default: ""
+    description: "JSON key containing the next page URL"
+    depends_on:
+      field: pagination
+      value: true
+  max_pages:
+    type: integer
+    label: Max Pages
+    default: 10
+    min: 1
+    description: "Maximum pages to fetch when paginating"
+    depends_on:
+      field: pagination
+      value: true
+  timeout:
+    type: integer
+    label: Timeout (s)
+    default: 30
+    min: 1
+  retry_count:
+    type: integer
+    label: Retry Count
+    default: 3
+    min: 0
+    description: "Retries on server errors (5xx) with exponential backoff"
+  rate_limit_ms:
+    type: integer
+    label: Rate Limit (ms)
+    default: 0
+    min: 0
+    description: "Delay between requests (0 = no limit)"
+  response_format:
+    type: select
+    label: Response Format
+    options: [auto, json, xml, csv, raw_text]
+    default: auto
+    description: "How to parse the API response (auto-detect from content)"
+  api_key_header:
+    type: string
+    label: API Key Header Name
+    default: "X-API-Key"
+    description: "Custom header name when using API key auth (e.g. 'X-Auth-Token', 'Authorization')"
+    depends_on:
+      field: auth_type
+      value: api_key
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

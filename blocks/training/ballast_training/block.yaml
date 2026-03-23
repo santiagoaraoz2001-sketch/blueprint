@@ -1,0 +1,110 @@
+name: BALLAST Training
+type: ballast_training
+category: training
+description: Balanced layer-wise training — freeze early layers, scale LR by depth
+version: "1.1.0"
+
+inputs:
+  - id: dataset
+    label: Training Data
+    data_type: dataset
+    required: true
+  - id: model
+    label: Base Model
+    data_type: model
+    required: false
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
+
+outputs:
+  - id: trained_model
+    label: Trained Model
+    aliases: [model]
+    data_type: model
+
+  - id: metrics
+    label: Training Metrics
+    data_type: metrics
+
+config:
+  model_name:
+    type: string
+    label: Base Model
+    description: HuggingFace model name or local path
+    mandatory: true
+  layer_depth:
+    type: float
+    label: Layer Depth
+    description: "Fraction of layers to train (0.5 = train top 50% of layers)"
+    default: 0.5
+    min: 0.1
+    max: 1.0
+  balance_factor:
+    type: float
+    label: Balance Factor
+    description: "LR scaling — deeper layers get up to balance_factor * base_lr"
+    default: 1.0
+    min: 0.1
+    max: 5.0
+  lr:
+    type: float
+    label: Learning Rate
+    default: 0.00002
+    min: 0.0000001
+    max: 0.01
+  epochs:
+    type: integer
+    label: Epochs
+    default: 5
+    min: 1
+    max: 100
+  batch_size:
+    type: integer
+    label: Batch Size
+    default: 4
+    min: 1
+    max: 128
+  max_seq_length:
+    type: integer
+    label: Max Sequence Length
+    default: 512
+    min: 64
+    max: 32768
+  text_column:
+    type: string
+    label: Text Column
+    description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
+    default: ""
+  training_format:
+    type: text_area
+    label: Training Format
+    description: "Template for structuring training examples. Use {text}, {instruction}, {output} placeholders."
+    default: ""
+  eval_split:
+    type: float
+    label: Eval Split
+    description: "Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)"
+    default: 0.0
+    min: 0.0
+    max: 0.3
+  checkpoint_interval:
+    type: integer
+    label: Checkpoint Interval
+    description: "Save checkpoint every N epochs (0 = final only)"
+    default: 0
+    min: 0
+    max: 100
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

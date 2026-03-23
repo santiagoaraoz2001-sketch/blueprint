@@ -1,0 +1,72 @@
+name: Database Writer
+type: database_writer
+category: endpoints
+description: Write pipeline results to a SQL database (SQLite, PostgreSQL, MySQL).
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Data
+    data_type: dataset
+    required: true
+
+outputs:
+  - id: status
+    label: Write Status
+    data_type: text
+    description: "Human-readable status message (e.g. 'Wrote 500 rows to table_name')"
+  - id: summary
+    label: Write Summary
+    data_type: metrics
+    description: "Object with keys: rows_written (int), columns (int), table_name (string), if_exists (string), database_type (string)"
+
+    aliases: [metrics]
+config:
+  connection_string:
+    type: string
+    label: Connection String
+    default: ""
+    description: "Database URL (e.g. sqlite:///data.db, postgresql://user:pass@host/db)"
+  table_name:
+    type: string
+    label: Table Name
+    default: ""
+    description: Target table name
+  if_exists:
+    type: select
+    label: If Table Exists
+    options: [append, replace, fail]
+    default: append
+    description: "append = add rows, replace = drop & recreate, fail = error"
+  batch_size:
+    type: integer
+    label: Batch Size
+    default: 1000
+    min: 1
+    description: Rows per INSERT batch
+  create_table:
+    type: boolean
+    label: Create Table
+    default: true
+    description: Auto-create table if it does not exist
+  schema:
+    type: text_area
+    label: Column Schema
+    default: ""
+    description: "Optional JSON column definitions (e.g. {\"name\": \"TEXT\", \"score\": \"REAL\"})"
+  dtype_mapping:
+    type: text_area
+    label: Type Mapping
+    default: ""
+    description: "JSON mapping of column names to SQL types for table creation"
+  timestamp_column:
+    type: string
+    label: Timestamp Column
+    default: ""
+    description: Auto-inject UTC timestamp column (e.g. inserted_at)
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -1,0 +1,47 @@
+name: Artifact Packager
+type: artifact_packager
+category: output
+description: Package model and artifacts for distribution
+version: "1.0.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: true
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+    required: false
+  - id: readme
+    label: "Custom README"
+    data_type: text
+    required: false
+
+outputs:
+  - id: artifact
+    label: Package
+    data_type: artifact
+
+config:
+  output_dir:
+    type: file_path
+    label: Output Directory
+    description: Custom output directory for the package
+    default: ""
+    path_mode: directory
+  include_readme:
+    type: boolean
+    label: Include README
+    default: true
+  compress:
+    type: boolean
+    label: "Compress (tar.gz)"
+    description: Create a compressed tar.gz archive
+    default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

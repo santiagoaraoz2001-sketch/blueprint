@@ -1,0 +1,83 @@
+name: Reward Model Trainer
+type: reward_model_trainer
+category: training
+description: Train a reward model from preference data for RLHF
+version: "1.1.0"
+
+inputs:
+  - id: dataset
+    label: Preference Data
+    data_type: dataset
+    required: true
+  - id: model
+    label: Base Model
+    data_type: model
+    required: true
+
+outputs:
+  - id: reward_model
+    label: Reward Model
+    aliases: [model]
+    data_type: model
+
+  - id: metrics
+    label: RM Metrics
+    data_type: metrics
+
+config:
+  lr:
+    type: float
+    label: Learning Rate
+    description: Training learning rate
+    default: 0.00001
+    min: 0.0000001
+    max: 0.01
+  epochs:
+    type: integer
+    label: Epochs
+    description: Number of training epochs
+    default: 1
+    min: 1
+    max: 50
+  batch_size:
+    type: integer
+    label: Batch Size
+    description: Per-device training batch size
+    default: 4
+    min: 1
+    max: 128
+  max_length:
+    type: integer
+    label: Max Length
+    description: Maximum sequence length
+    default: 512
+    min: 64
+    max: 8192
+  loss:
+    type: select
+    label: Loss Function
+    description: Reward model loss function
+    default: bce
+    options: [bce, hinge, margin_ranking]
+  chosen_column:
+    type: string
+    label: Chosen Column
+    description: Column name for preferred responses in preference data
+    default: chosen
+  rejected_column:
+    type: string
+    label: Rejected Column
+    description: Column name for rejected responses in preference data
+    default: rejected
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

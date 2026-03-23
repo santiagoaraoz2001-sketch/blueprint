@@ -1,0 +1,108 @@
+name: Model Router
+type: model_router
+category: inference
+description: Route prompts to different models based on complexity, cost, or latency
+version: "1.0.0"
+
+inputs:
+  - id: model
+    label: Primary Model
+    data_type: model
+    required: false
+  - id: text
+    label: Prompt / Input
+    data_type: text
+    required: false
+
+outputs:
+  - id: response
+    label: Response
+    data_type: text
+    aliases: [text, output]
+  - id: routing
+    label: Routing Decision
+    data_type: config
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+
+config:
+  routing_strategy:
+    type: select
+    label: Routing Strategy
+    options: [complexity, cost, latency, keyword]
+    default: complexity
+    description: "How to decide which model to use"
+  primary_provider:
+    type: select
+    label: Primary Provider
+    options: [ollama, mlx, openai, anthropic]
+    default: ollama
+  primary_model:
+    type: string
+    label: Primary Model
+    default: "llama3.2"
+  primary_endpoint:
+    type: string
+    label: Primary Endpoint
+    default: "http://localhost:11434"
+  fallback_provider:
+    type: select
+    label: Fallback Provider
+    options: [ollama, mlx, openai, anthropic]
+    default: openai
+  fallback_model:
+    type: string
+    label: Fallback Model
+    default: "gpt-4o-mini"
+  fallback_endpoint:
+    type: string
+    label: Fallback Endpoint
+    default: "https://api.openai.com"
+  api_key:
+    type: string
+    label: API Key
+    default: ""
+    description: "API key for cloud providers"
+  threshold:
+    type: float
+    label: Routing Threshold
+    default: 0.5
+    min: 0.0
+    max: 1.0
+    description: "Complexity score above this sends to fallback model"
+  keyword_triggers:
+    type: string
+    label: Keyword Triggers
+    default: "code,math,analyze,complex"
+    description: "Comma-separated keywords that trigger fallback (keyword strategy)"
+  prompt:
+    type: text_area
+    label: Prompt
+    default: ""
+    description: "Direct prompt (overridden by connected text input)"
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.7
+    min: 0.0
+    max: 2.0
+  max_tokens:
+    type: integer
+    label: Max Tokens
+    default: 512
+    min: 1
+    max: 32768
+  max_retries:
+    type: integer
+    label: Max Retries
+    default: 1
+    min: 0
+    max: 5
+    description: "Retry primary model N times before switching to fallback"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

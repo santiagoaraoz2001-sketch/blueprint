@@ -1,0 +1,99 @@
+name: Knowledge Distillation
+type: distillation
+category: training
+description: Distill a large teacher model into a smaller student using KL divergence
+version: "1.0.0"
+
+inputs:
+  - id: dataset
+    label: Training Data
+    data_type: dataset
+    required: true
+  - id: teacher
+    label: Teacher Model
+    data_type: model
+    required: true
+  - id: student
+    label: Student Model
+    data_type: model
+    required: true
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
+
+outputs:
+  - id: model
+    label: Distilled Model
+    data_type: model
+  - id: metrics
+    label: Distillation Metrics
+    data_type: metrics
+
+config:
+  teacher_model:
+    type: string
+    label: Teacher Model
+    description: HuggingFace name or path for the teacher model (overridden by input port)
+    mandatory: true
+  student_model:
+    type: string
+    label: Student Model
+    description: HuggingFace name or path for the student model (overridden by input port)
+    mandatory: true
+  temperature:
+    type: float
+    label: Temperature
+    description: "Softmax temperature for KL divergence — higher = softer probability distributions"
+    default: 2.0
+    min: 1.0
+    max: 20.0
+  alpha:
+    type: float
+    label: Alpha (KD Weight)
+    description: "Balance between KL loss (alpha) and cross-entropy loss (1-alpha)"
+    default: 0.5
+    min: 0.0
+    max: 1.0
+  lr:
+    type: float
+    label: Learning Rate
+    default: 0.00005
+    min: 0.0000001
+    max: 0.01
+  epochs:
+    type: integer
+    label: Epochs
+    default: 3
+    min: 1
+    max: 50
+  batch_size:
+    type: integer
+    label: Batch Size
+    default: 8
+    min: 1
+    max: 128
+  max_seq_length:
+    type: integer
+    label: Max Sequence Length
+    description: Maximum token length for training samples
+    default: 512
+    min: 64
+    max: 32768
+  text_column:
+    type: string
+    label: Text Column
+    description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
+    default: ""
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

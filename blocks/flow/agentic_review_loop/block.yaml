@@ -1,0 +1,114 @@
+name: Agentic Review Loop
+type: agentic_review_loop
+category: interventions
+description: LLM-as-judge iterative refinement — an LLM evaluates output quality and refines it until a threshold is met
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Data to Refine
+    data_type: any
+    required: true
+  - id: model
+    label: Judge Model
+    data_type: model
+    required: false
+
+outputs:
+  - id: refined_output
+    label: Refined Output
+    data_type: any
+    description: "Best-scoring iteration output. Text by default; parsed JSON if output_format=json."
+  - id: score_report
+    label: Score Report
+    data_type: metrics
+    description: "JSON: {final_score, best_score, quality_threshold, passed, iterations_used, iteration_log[{iteration, score, judge_feedback, output_preview}]}"
+
+    aliases: [metrics]
+config:
+  max_iterations:
+    type: integer
+    label: Max Iterations
+    default: 3
+    min: 1
+    max: 20
+    description: "Maximum refinement iterations before stopping"
+  quality_threshold:
+    type: float
+    label: Quality Threshold
+    default: 0.8
+    min: 0
+    max: 1
+    description: "Stop when the judge score exceeds this value (0-1)"
+  judge_prompt:
+    type: text_area
+    label: Judge Prompt
+    default: "Evaluate the quality of this output on a scale of 0-1."
+    description: "Instructions for the LLM judge. It will score the output 0-1."
+  rubric_scoring:
+    type: text_area
+    label: Rubric Scoring Criteria
+    default: ""
+    description: "Detailed rubric appended to the judge prompt (e.g., accuracy, fluency, relevance)"
+  refinement_prompt:
+    type: text_area
+    label: Refinement Prompt
+    default: "The previous output scored {score}. Here is the judge's feedback:\n{feedback}\n\nPlease improve the output to address the feedback. Original output:\n{output}"
+    description: "Prompt template for refinement. Use {score}, {feedback}, {output} placeholders."
+  model_provider:
+    type: select
+    label: Model Provider
+    default: "ollama"
+    options: ["ollama", "openai", "anthropic"]
+    description: "LLM provider for the judge"
+  model_name:
+    type: string
+    label: Model Name
+    default: ""
+    description: "e.g. llama3.2, gpt-4o, claude-sonnet-4-20250514"
+  api_key:
+    type: string
+    label: API Key
+    default: ""
+    description: "API key for OpenAI or Anthropic (not needed for Ollama)"
+  base_url:
+    type: string
+    label: Base URL
+    default: "http://localhost:11434"
+    description: "Base URL for Ollama server"
+  system_prompt:
+    type: text_area
+    label: System Prompt
+    default: ""
+    description: "System-level context for the judge (e.g., 'You are an expert writing evaluator')"
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.1
+    min: 0
+    max: 2.0
+    description: "LLM temperature for judge/refinement calls (lower = more deterministic)"
+  early_stop_patience:
+    type: integer
+    label: Early Stop Patience
+    default: 0
+    min: 0
+    max: 10
+    description: "Stop if score doesn't improve for N consecutive iterations (0 = disabled)"
+  save_all_iterations:
+    type: boolean
+    label: Save All Iterations
+    default: false
+    description: "Save full output text for every iteration (useful for research/debugging). Increases report size."
+  output_format:
+    type: select
+    label: Output Format
+    default: "text"
+    options: ["text", "json"]
+    description: "text = raw LLM output string, json = attempt to parse refined output as JSON object"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

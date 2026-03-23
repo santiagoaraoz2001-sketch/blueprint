@@ -1,0 +1,67 @@
+name: Vector Store Builder
+type: vector_store_build
+category: embedding
+description: Index text chunks into a local ChromaDB or FAISS vector store for retrieval
+version: "2.0.0"
+
+inputs:
+  - id: chunks
+    label: Text Chunks
+    data_type: dataset
+    required: true
+  - id: embeddings
+    label: Pre-computed Embeddings
+    data_type: embedding
+    required: false
+
+outputs:
+  - id: store_config
+    label: Vector Store Config
+    data_type: config
+    description: >
+      JSON with store connection info.
+      ChromaDB: {type, path, collection_name, distance_metric, count}.
+      FAISS: {type, index_path, metadata_path, collection_name, distance_metric, dimension, count}.
+  - id: metrics
+    label: Indexing Stats
+    data_type: metrics
+    description: >
+      {store_type, collection_name, distance_metric, total_chunks_indexed,
+      embedding_dimension, used_precomputed_embeddings, batch_size}
+
+config:
+  store_type:
+    type: select
+    label: Vector Database
+    description: Backend engine for vector storage
+    default: chroma
+    options: [chroma, faiss]
+  collection_name:
+    type: string
+    label: Collection Name
+    description: Name for the vector collection/index
+    default: blueprint_rag
+  distance_metric:
+    type: select
+    label: Distance Metric
+    description: Similarity function for nearest-neighbor search
+    default: cosine
+    options: [cosine, l2, ip]
+  batch_size:
+    type: integer
+    label: Batch Size
+    description: Number of vectors to insert per batch
+    default: 256
+    min: 1
+    max: 10000
+  overwrite:
+    type: boolean
+    label: Overwrite Existing
+    description: Delete existing collection before indexing (false = append to existing data)
+    default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -1,0 +1,165 @@
+name: Notification Hub
+type: notification_hub
+category: interventions
+description: Send notifications via Telegram, Slack, email, webhook, desktop alert, or log file
+version: "1.1.0"
+aliases: [notification_sender]
+
+inputs:
+  - id: data
+    label: Trigger Data
+    data_type: any
+    required: true
+  - id: message_data
+    label: Message Data
+    data_type: text
+    required: false
+    description: "Optional additional text to include in the notification"
+
+outputs:
+  - id: status
+    label: Send Status
+    data_type: metrics
+    description: "JSON: {channel, severity, message, delivered, attempts, timestamp, details}. If skipped: {skipped, reason, channel}."
+    aliases: [metrics]
+  - id: pass_through
+    label: Pass Through
+    data_type: any
+    description: "Trigger data forwarded unchanged — enables inline pipeline usage"
+
+config:
+  channel:
+    type: select
+    label: Channel
+    default: "telegram"
+    options: ["telegram", "email", "slack", "webhook", "desktop", "log"]
+    description: "Which delivery channel to use"
+  send_condition:
+    type: select
+    label: Send Condition
+    default: "always"
+    options: ["always", "on_failure", "on_success"]
+    description: "Conditionally send — checks trigger data for status/gate_passed/error fields"
+  api_token:
+    type: string
+    label: API Token
+    default: ""
+    description: "Telegram bot token, or Slack incoming webhook URL"
+  recipient:
+    type: string
+    label: Recipient
+    default: ""
+    description: "Telegram chat ID, email address, or Slack channel"
+  template:
+    type: text_area
+    label: Message Template
+    default: "Pipeline update: {status}"
+    description: "Use {status}, {timestamp}, {severity}, or any key from trigger data as placeholders"
+  severity:
+    type: select
+    label: Severity
+    default: "info"
+    options: ["info", "warning", "error", "critical"]
+    description: "Severity level — prepended as tag to message for warning/error/critical"
+  retry_count:
+    type: integer
+    label: Retry Count
+    default: 0
+    min: 0
+    max: 5
+    description: "Number of retries if delivery fails (0 = no retries)"
+  webhook_url:
+    type: string
+    label: Webhook URL
+    default: ""
+    description: "Target URL for webhook POST"
+    depends_on:
+      field: channel
+      value: "webhook"
+  webhook_headers:
+    type: text_area
+    label: Custom Webhook Headers
+    default: ""
+    description: "One header per line: Header-Name: value (e.g., Authorization: Bearer <token>)"
+    depends_on:
+      field: channel
+      value: "webhook"
+  notification_title:
+    type: string
+    label: Notification Title
+    default: ""
+    description: "Custom title for desktop notifications (defaults to 'Blueprint [SEVERITY]')"
+    depends_on:
+      field: channel
+      value: "desktop"
+  timeout:
+    type: integer
+    label: Timeout (seconds)
+    default: 30
+    min: 10
+    max: 300
+    description: "Maximum time for webhook or desktop notification delivery"
+  include_metrics:
+    type: boolean
+    label: Include Metrics
+    default: true
+    description: "Include numeric metrics from trigger data in the notification payload"
+  smtp_host:
+    type: string
+    label: SMTP Host
+    default: "smtp.gmail.com"
+    description: "SMTP server hostname"
+    depends_on:
+      field: channel
+      value: "email"
+  smtp_port:
+    type: integer
+    label: SMTP Port
+    default: 587
+    min: 1
+    max: 65535
+    description: "SMTP server port. 587 for TLS, 465 for SSL."
+    depends_on:
+      field: channel
+      value: "email"
+  smtp_user:
+    type: string
+    label: SMTP Username
+    default: ""
+    description: "SMTP login username"
+    depends_on:
+      field: channel
+      value: "email"
+  smtp_pass:
+    type: string
+    label: SMTP Password
+    default: ""
+    description: "SMTP login password or app password"
+    depends_on:
+      field: channel
+      value: "email"
+  email_subject:
+    type: string
+    label: Email Subject
+    default: "Blueprint Pipeline Notification"
+    description: "Subject line for email notifications"
+    depends_on:
+      field: channel
+      value: "email"
+  include_data_summary:
+    type: boolean
+    label: Include Data Summary
+    default: false
+    description: "Append a preview of trigger data fields to the notification message"
+  min_severity:
+    type: select
+    label: Min Severity
+    default: "info"
+    options: ["info", "warning", "error", "critical"]
+    description: "Only send if severity meets or exceeds this level (filters out noise)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

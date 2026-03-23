@@ -1,0 +1,32 @@
+name: Results Formatter
+type: results_formatter
+category: output
+description: Format and export results as CSV/JSON
+version: "1.0.0"
+
+inputs:
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+
+outputs:
+  - id: artifact
+    label: Report
+    data_type: artifact
+
+config:
+  format:
+    type: select
+    label: Output Format
+    options: [csv, json, markdown]
+    default: csv
+  include_config:
+    type: boolean
+    label: Include Config
+    default: true
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

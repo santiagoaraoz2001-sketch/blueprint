@@ -1,0 +1,62 @@
+name: Agent Memory
+type: agent_memory
+category: agents
+description: Persistent key-value memory store for maintaining agent context across runs
+version: "1.1.0"
+
+inputs:
+  - id: input
+    label: Value to Store
+    data_type: any
+    required: false
+  - id: dataset
+    label: Bulk Import
+    data_type: dataset
+    required: false
+
+outputs:
+  - id: output
+    label: Action Result
+    data_type: config
+  - id: memory
+    label: Full Memory
+    data_type: config
+  - id: metrics
+    label: Memory Stats
+    data_type: metrics
+
+config:
+  action:
+    type: select
+    label: Action
+    options: [store, retrieve, clear, list, search]
+    default: store
+    description: "store: save, retrieve: get, clear: delete, list: show all, search: find by substring"
+  key:
+    type: string
+    label: Key
+    default: ""
+    description: Memory key name. Leave empty for auto-key (store) or retrieve-all (retrieve).
+  value:
+    type: text_area
+    label: Value
+    default: ""
+    description: Value to store (used when no input port is connected)
+  namespace:
+    type: string
+    label: Namespace
+    default: default
+    description: Isolated memory space name (different namespaces don't share data)
+  max_entries:
+    type: integer
+    label: Max Entries
+    default: 0
+    min: 0
+    max: 100000
+    description: "Maximum memory entries (0 = unlimited). Oldest entries evicted when limit reached."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

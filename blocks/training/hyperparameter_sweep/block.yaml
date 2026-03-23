@@ -1,0 +1,68 @@
+name: Hyperparameter Sweep
+type: hyperparameter_sweep
+category: training
+description: "Grid or random search over hyperparameters with real training trials using HuggingFace Trainer"
+version: "1.1.0"
+
+inputs:
+  - id: dataset
+    label: Training Data
+    data_type: dataset
+    required: true
+  - id: model
+    label: Base Model
+    data_type: model
+    required: false
+
+outputs:
+  - id: best_model
+    label: Best Model
+    aliases: [model]
+    data_type: model
+
+  - id: metrics
+    label: Sweep Results
+    data_type: metrics
+
+config:
+  search_type:
+    type: select
+    label: Search Type
+    description: Strategy for exploring the hyperparameter space
+    default: grid
+    options: [grid, random]
+  param_space:
+    type: text_area
+    label: Parameter Space (JSON)
+    description: 'JSON object mapping param names to lists of values, e.g. {"lr": [1e-4, 5e-5], "batch_size": [4, 8]}'
+    default: "{}"
+  n_trials:
+    type: integer
+    label: Max Trials
+    description: Maximum number of hyperparameter combinations to try
+    default: 10
+    min: 1
+    max: 100
+  metric:
+    type: string
+    label: Optimize Metric
+    description: Name of the metric to optimize (e.g. eval_loss, accuracy)
+    default: eval_loss
+  mode:
+    type: select
+    label: Optimization Mode
+    description: Whether to minimize or maximize the target metric
+    default: min
+    options: [min, max]
+  prefer_framework:
+    type: select
+    label: Preferred Framework
+    options: ["auto", "mlx", "pytorch"]
+    default: "auto"
+    description: "Force a specific training framework. 'auto' detects the best available."
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -1,0 +1,120 @@
+name: Embedding Generator
+type: embedding_generator
+category: inference
+description: Generate vector embeddings for text data using sentence-transformers or API
+version: "1.0.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+    description: "Optional model configuration (overrides provider/model_name config)"
+  - id: dataset
+    label: Dataset
+    data_type: dataset
+    required: true
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
+
+outputs:
+  - id: enriched_dataset
+    label: Dataset with Embeddings
+    data_type: dataset
+    aliases: [dataset]
+    description: >
+      JSON array of row objects. Each row: {...original_row_fields, <embedding_column>: [float, ...]}.
+      The embedding vector is stored under the column name configured by embedding_column (default: "_embedding").
+      Each embedding is an array of floats with length equal to the model's output dimension.
+
+  - id: embeddings
+    label: Embeddings
+    data_type: embedding
+    description: >
+      {embeddings: [[float, ...], ...], labels: [string, ...], model: string, dimensions: int}.
+      embeddings: list of raw embedding vectors. labels: text labels for each vector.
+      Connect to Vector Store Builder, Embedding Clustering, Similarity Search, or Embedding Visualizer.
+  - id: metrics
+    label: Embedding Metrics
+    data_type: metrics
+    description: >
+      {num_embeddings, embedding_dim, model, provider, embedding_column}.
+      num_embeddings: total number of embeddings generated. embedding_dim: dimensionality of each vector.
+      model: model identifier used. provider: method used (sentence-transformers, ollama, openai, or demo).
+      embedding_column: the column name where embeddings are stored in the dataset output.
+
+config:
+  provider:
+    type: select
+    label: Provider
+    options: [sentence-transformers, ollama, openai]
+    default: sentence-transformers
+  backend:
+    type: select
+    label: Inference Backend
+    default: ""
+    options: ["", "sentence-transformers", "ollama", "openai"]
+    description: "Override framework auto-detection (leave empty for auto)"
+  model_name:
+    type: string
+    label: Model Name
+    default: "all-MiniLM-L6-v2"
+    description: "Embedding model (sentence-transformers model or API model name)"
+  text_column:
+    type: string
+    label: Text Column
+    default: "text"
+    description: "Column containing text to embed"
+  batch_size:
+    type: integer
+    label: Batch Size
+    default: 32
+    min: 1
+    max: 512
+  endpoint:
+    type: string
+    label: Endpoint URL
+    default: "http://localhost:11434"
+    description: "API endpoint (for Ollama or OpenAI)"
+  api_key:
+    type: string
+    label: API Key
+    default: ""
+    description: "API key for OpenAI embeddings"
+  embedding_column:
+    type: string
+    label: Embedding Column
+    default: "_embedding"
+    description: "Column name for storing embeddings in output"
+  normalize:
+    type: boolean
+    label: L2 Normalize
+    default: false
+    description: "L2-normalize vectors to unit length. Required for cosine similarity search"
+  truncate_length:
+    type: integer
+    label: Max Text Length
+    default: 0
+    min: 0
+    description: "Truncate input texts to N characters before embedding (0 = no truncation). Prevents errors on very long texts"
+  dimensions:
+    type: integer
+    label: Dimensions
+    default: 0
+    min: 0
+    max: 8192
+    description: "Output embedding dimensions (0 = model default). Only supported by OpenAI text-embedding-3 models."
+  output_format:
+    type: select
+    label: Output Format
+    description: "Format for the embeddings artifact file in the run directory. The pipeline 'embeddings' output port always uses JSON for downstream compatibility. Choose numpy for faster loading in external tools, or json for human-readable inspection."
+    default: numpy
+    options: [numpy, json]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -1,0 +1,125 @@
+name: Prompt Chain
+type: prompt_chain
+category: inference
+description: Sequential multi-step prompting pipeline with context passing
+version: "1.0.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: false
+  - id: text
+    label: Initial Input
+    data_type: text
+    required: false
+
+outputs:
+  - id: response
+    label: Final Output
+    data_type: text
+    description: >
+      Plain text file (final_output.txt) containing the LLM response from the
+      last step of the chain. When pass_context is true this is the cumulative
+      result of every step; when false it is only the output of the final
+      prompt template. The file is UTF-8 encoded with no surrounding wrapper.
+    aliases: [text, output]
+  - id: steps
+    label: Intermediate Steps
+    data_type: dataset
+    description: >
+      Dataset directory containing data.json — a JSON array of step objects.
+      Each object has the fields: step (integer, 1-based index), prompt (string,
+      the resolved prompt sent to the LLM, truncated to 500 chars), output
+      (string, the full LLM response for that step), latency_s (float, wall-
+      clock seconds for the API call), and tokens (integer, total tokens used
+      in the step). The array length equals the number of configured chain
+      steps.
+    aliases: [dataset]
+  - id: metrics
+    label: Metrics
+    data_type: metrics
+    description: >
+      Dictionary with aggregated run statistics. Fields: total_steps (integer,
+      number of chain steps executed), total_tokens (integer, sum of tokens
+      across all steps), model (string, model name used), provider (string,
+      one of ollama/mlx/openai/anthropic), pass_context (boolean, whether
+      context was forwarded between steps), final_output_length (integer,
+      character count of the final output text).
+
+config:
+  provider:
+    type: select
+    label: Provider
+    options: [ollama, mlx, openai, anthropic]
+    default: ollama
+  backend:
+    type: select
+    label: Inference Backend
+    default: ""
+    options: ["", "ollama", "mlx", "openai", "anthropic"]
+    description: "Override framework auto-detection (leave empty for auto)"
+  model_name:
+    type: string
+    label: Model Name
+    default: "llama3.2"
+  steps:
+    type: text_area
+    label: Chain Steps (JSON array)
+    default: '["Analyze the following text:\n{input}", "Based on the analysis:\n{previous}\n\nSummarize the key points."]'
+    description: "JSON array of prompt templates. Use {input} for initial input, {previous} for previous step output"
+  pass_context:
+    type: boolean
+    label: Pass Context Between Steps
+    default: true
+    description: "If true, each step receives the previous step's output"
+  endpoint:
+    type: string
+    label: Endpoint URL
+    default: "http://localhost:11434"
+  api_key:
+    type: string
+    label: API Key
+    default: ""
+  temperature:
+    type: float
+    label: Temperature
+    default: 0.5
+    min: 0.0
+    max: 2.0
+  max_tokens:
+    type: integer
+    label: Max Tokens per Step
+    default: 512
+    min: 1
+    max: 32768
+  system_prompt:
+    type: text_area
+    label: System Prompt
+    default: ""
+    description: "System instruction applied to every step in the chain"
+  stop_on_error:
+    type: boolean
+    label: Stop on Error
+    default: true
+    description: "If true, abort chain on step failure. If false, pass error text to next step"
+  frequency_penalty:
+    type: float
+    label: Frequency Penalty
+    default: 0.0
+    min: -2.0
+    max: 2.0
+    description: "Penalize repeated tokens (positive = less repetition)"
+  presence_penalty:
+    type: float
+    label: Presence Penalty
+    default: 0.0
+    min: -2.0
+    max: 2.0
+    description: "Penalize tokens already present (positive = more diverse topics)"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

@@ -1,0 +1,97 @@
+name: Save PDF
+type: save_pdf
+category: endpoints
+description: Export report or results as a PDF document with tables, charts, and metadata.
+version: "1.0.0"
+
+inputs:
+  - id: data
+    label: Data
+    data_type: any
+    required: true
+  - id: config
+    label: Report Config
+    data_type: config
+    required: false
+
+outputs:
+  - id: file_path
+    label: Saved File Path
+    data_type: artifact
+    description: "Absolute path to the saved PDF file"
+  - id: status
+    label: Save Status
+    data_type: metrics
+  - id: summary
+    label: Export Summary
+    data_type: metrics
+    description: "Object with keys: file_size_bytes (int), page_size (string)"
+
+    aliases: [metrics]
+config:
+  output_path:
+    type: string
+    label: Output Path
+    default: ./output
+  filename:
+    type: string
+    label: Filename
+    default: report.pdf
+  title:
+    type: string
+    label: Report Title
+    default: Pipeline Report
+    description: Title displayed at the top of the PDF
+  page_size:
+    type: select
+    label: Page Size
+    options: [A4, Letter, Legal]
+    default: A4
+  orientation:
+    type: select
+    label: Orientation
+    options: [portrait, landscape]
+    default: portrait
+  include_charts:
+    type: boolean
+    label: Include Charts
+    default: true
+    description: Generate charts from numeric data
+  include_timestamp:
+    type: boolean
+    label: Include Timestamp
+    default: true
+    description: Add generation timestamp to header
+  overwrite_existing:
+    type: boolean
+    label: Overwrite Existing
+    default: true
+  font_size:
+    type: integer
+    label: Font Size
+    default: 10
+    min: 6
+    max: 24
+    description: Body text font size in points
+  header_text:
+    type: string
+    label: Header Text
+    default: ""
+    description: Text shown at top of each page
+  footer_text:
+    type: string
+    label: Footer Text
+    default: ""
+    description: Custom footer text (default shows page numbers)
+  max_rows:
+    type: integer
+    label: Max Rows
+    default: 500
+    min: 1
+    description: Maximum table rows to include in PDF
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

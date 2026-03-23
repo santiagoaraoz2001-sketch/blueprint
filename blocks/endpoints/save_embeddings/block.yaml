@@ -1,0 +1,67 @@
+name: Save Embeddings
+type: save_embeddings
+category: endpoints
+description: Save vector embeddings to file in NumPy, FAISS, or HDF5 format.
+version: "1.0.0"
+
+inputs:
+  - id: embeddings
+    label: Embeddings
+    data_type: embedding
+    required: true
+
+outputs:
+  - id: file_path
+    label: Saved File Path
+    data_type: artifact
+    description: "Absolute path to the saved embeddings file"
+  - id: status
+    label: Save Status
+    data_type: metrics
+  - id: summary
+    label: Export Summary
+    data_type: metrics
+    description: "Object with keys: num_vectors (int), dimensions (int), file_size_bytes (int), format (string)"
+
+    aliases: [metrics]
+config:
+  output_path:
+    type: string
+    label: Output Path
+    default: ./output
+  filename:
+    type: string
+    label: Filename
+    default: embeddings
+  format:
+    type: select
+    label: Format
+    options: [npy, npz, faiss, json]
+    default: npy
+    description: "npy/npz = NumPy, faiss = FAISS index, json = JSON arrays"
+  save_metadata:
+    type: boolean
+    label: Save Metadata
+    default: true
+    description: Save a sidecar JSON with dimension info and source details
+  overwrite_existing:
+    type: boolean
+    label: Overwrite Existing
+    default: true
+  normalize:
+    type: boolean
+    label: L2 Normalize
+    default: false
+    description: Apply L2 normalization before saving (required for cosine similarity search)
+  precision:
+    type: select
+    label: Precision
+    options: [float32, float16]
+    default: float32
+    description: float16 halves file size with minimal quality loss
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

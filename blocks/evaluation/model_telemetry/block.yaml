@@ -1,0 +1,99 @@
+name: Model Telemetry
+type: model_telemetry
+category: evaluation
+description: Capture model internals — attention patterns, activations, memory usage, and layer statistics
+version: "2.0.0"
+
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    required: true
+    description: Model to analyze (HF name, local path, or upstream block)
+  - id: dataset
+    label: Sample Data
+    data_type: dataset
+    required: false
+    description: "Optional dataset for attention capture — uses sample texts if not provided"
+  - id: dataset_meta
+    label: Dataset Info
+    data_type: config
+    required: false
+
+outputs:
+  - id: telemetry
+    label: Telemetry
+    data_type: artifact
+    description: 'telemetry.json: model, timestamp, layers [{name, shape, dtype, numel, mean, std, min, max, norm}], memory {gpu_mb, cpu_mb}, attention patterns, config'
+  - id: metrics
+    label: Summary Metrics
+    data_type: metrics
+    description: 'Summary: total_parameters, trainable_parameters, model_size_mb, num_layers, num_attention_heads'
+
+config:
+  model_path:
+    type: string
+    label: Model Path / Name
+    default: ""
+    description: "HuggingFace model name or local path (overridden by connected model input)"
+  capture_attention:
+    type: boolean
+    label: Capture Attention Patterns
+    default: true
+  capture_activations:
+    type: boolean
+    label: Capture Layer Activations
+    default: false
+    description: "Can use significant memory for large models"
+  capture_memory:
+    type: boolean
+    label: Capture Memory Usage
+    default: true
+  capture_layer_stats:
+    type: boolean
+    label: Capture Layer Statistics
+    default: true
+    description: "Mean, std, min, max, norm per parameter tensor"
+  sample_size:
+    type: integer
+    label: Sample Size
+    default: 10
+    min: 1
+    max: 1000
+    description: "Number of samples for attention/activation capture"
+  text_column:
+    type: string
+    label: Text Column
+    default: "text"
+    description: "Column name in dataset for sample texts"
+  max_seq_length:
+    type: integer
+    label: Max Sequence Length
+    default: 128
+    min: 16
+    max: 4096
+    description: Maximum input sequence length for attention capture
+  trust_remote_code:
+    type: boolean
+    label: Trust Remote Code
+    default: true
+    description: Allow execution of model code from HuggingFace Hub
+  output_format:
+    type: select
+    label: Output Format
+    options: [json, csv]
+    default: json
+    description: "Format for dataset and report outputs (json or csv)"
+  decimal_precision:
+    type: integer
+    label: Decimal Precision
+    default: 4
+    min: 1
+    max: 6
+    description: "Decimal places for all computed scores"
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false

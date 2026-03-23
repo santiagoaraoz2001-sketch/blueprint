@@ -1,0 +1,129 @@
+name: Embedding Clustering
+type: embedding_clustering
+category: inference
+description: Cluster embedding vectors using K-Means, DBSCAN, HDBSCAN, or Agglomerative algorithms
+version: "2.1.0"
+
+inputs:
+  - id: embeddings
+    label: Embeddings
+    data_type: embedding
+    required: false
+  - id: dataset
+    label: Dataset
+    data_type: dataset
+    required: false
+  - id: labels
+    label: Labels
+    data_type: any
+    required: false
+
+outputs:
+  - id: clustered_dataset
+    label: Clustered Data
+    data_type: dataset
+    aliases: [dataset]
+    description: >
+      Array of rows. Each row: {index, label, cluster, ...original_metadata_fields}.
+      index: 0-based position in input. label: text label from input or external labels.
+      cluster: integer cluster assignment (-1 means noise for DBSCAN/HDBSCAN).
+      Embedding vectors are stripped from this output for compactness.
+      Output format configurable via dataset_format (json, jsonl, csv).
+
+  - id: clustered_embeddings
+    label: Labeled Embeddings
+    data_type: embedding
+    aliases: [embeddings]
+    description: >
+      {embeddings: [[float, ...], ...], labels: [string, ...], clusters: [int, ...]}.
+      embeddings: list of full embedding vectors (same order as input).
+      labels: string labels for each embedding. clusters: integer cluster assignment per embedding.
+      Full embedding vectors with cluster assignments for downstream Visualizer.
+
+  - id: metrics
+    label: Cluster Stats
+    data_type: metrics
+    description: >
+      {total_points, embedding_dimension, method, num_clusters, noise_points,
+      cluster_sizes, silhouette_score, calinski_harabasz_score, davies_bouldin_score, centroids}.
+      total_points: number of embeddings clustered. embedding_dimension: vector dimensionality.
+      method: algorithm used (kmeans, dbscan, hdbscan, agglomerative).
+      num_clusters: number of clusters found (excluding noise). noise_points: count of unassigned points.
+      cluster_sizes: dict mapping cluster ID to point count.
+      silhouette_score/calinski_harabasz_score/davies_bouldin_score: quality metrics (requires scikit-learn).
+      centroids: dict mapping cluster ID to centroid vector (only when include_centroids is true).
+
+config:
+  method:
+    type: select
+    label: Algorithm
+    description: Clustering method
+    default: kmeans
+    options: [kmeans, dbscan, hdbscan, agglomerative]
+  n_clusters:
+    type: integer
+    label: Num Clusters
+    description: Target number of clusters (K-Means / Agglomerative)
+    default: 8
+    min: 2
+    max: 500
+  min_cluster_size:
+    type: integer
+    label: Min Cluster Size
+    description: Minimum points to form a cluster (DBSCAN / HDBSCAN)
+    default: 5
+    min: 2
+    max: 1000
+  eps:
+    type: float
+    label: Epsilon (DBSCAN)
+    description: Maximum neighborhood distance for DBSCAN (0 = auto-estimate)
+    default: 0.0
+    min: 0
+    max: 100
+  linkage:
+    type: select
+    label: Linkage (Agglomerative)
+    description: Merge strategy for agglomerative clustering
+    default: ward
+    options: [ward, complete, average, single]
+  embedding_column:
+    type: string
+    label: Embedding Column
+    description: Column name containing embeddings in dataset input
+    default: "_embedding"
+  normalize:
+    type: boolean
+    label: Normalize Embeddings
+    description: L2-normalize vectors before clustering (recommended when mixing models or scales)
+    default: false
+  include_centroids:
+    type: boolean
+    label: Include Centroids
+    description: Add cluster centroid vectors to metrics output (useful for representative selection)
+    default: false
+  n_init:
+    type: integer
+    label: N Init (K-Means)
+    description: "Number of K-Means initializations (higher = more stable, slower)"
+    default: 10
+    min: 1
+    max: 100
+  random_seed:
+    type: integer
+    label: Random Seed
+    description: Seed for reproducible results (K-Means)
+    default: 42
+    min: 0
+  dataset_format:
+    type: select
+    label: Dataset Format
+    description: "Output format for the dataset — json (default), jsonl (one JSON object per line), csv (comma-separated values)"
+    default: json
+    options: [json, jsonl, csv]
+
+side_inputs:
+  - id: _loop
+    label: Loop
+    data_type: any
+    required: false
