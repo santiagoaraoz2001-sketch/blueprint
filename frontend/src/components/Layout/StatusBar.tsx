@@ -1,7 +1,7 @@
-import { T, F, FS } from '@/lib/design-tokens'
-import { useRunStore } from '@/stores/runStore'
+import { T, F, FS, FCODE, BRAND_TEAL } from '@/lib/design-tokens'
+import { useRunStore }      from '@/stores/runStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { Circle, Cpu } from 'lucide-react'
+import { Cpu, Sparkles, Radio } from 'lucide-react'
 import NotificationBell from './NotificationBell'
 import { useEffect } from 'react'
 
@@ -11,74 +11,150 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+// Pulsing dot — instrument-panel style live indicator
+function LiveDot({ color, pulse = false }: { color: string; pulse?: boolean }) {
+  return (
+    <span
+      style={{
+        position: 'relative',
+        display: 'inline-flex',
+        width: 7,
+        height: 7,
+        flexShrink: 0,
+      }}
+    >
+      {pulse && (
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '50%',
+            background: color,
+            opacity: 0.5,
+            animation: 'pulse-ring 1.4s ease-out infinite',
+          }}
+        />
+      )}
+      <span
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background: color,
+          boxShadow: `0 0 6px ${color}cc`,
+          display: 'block',
+        }}
+      />
+    </span>
+  )
+}
+
 export default function StatusBar() {
   const { status, overallProgress, elapsed, eta } = useRunStore()
   const { demoMode, hardware, hardwareLoading, fetchHardware } = useSettingsStore()
-  const isRunning = status === 'running'
+  const isRunning  = status === 'running'
+  const isComplete = status === 'complete'
+  const isFailed   = status === 'failed'
 
-  useEffect(() => {
-    fetchHardware()
-  }, [fetchHardware])
+  useEffect(() => { fetchHardware() }, [fetchHardware])
+
+  const dotColor = isRunning ? T.amber : isFailed ? T.red : isComplete ? T.green : BRAND_TEAL
+  const statusLabel = isRunning ? 'RUNNING' : isComplete ? 'COMPLETE' : isFailed ? 'FAILED' : 'READY'
 
   return (
-    <div
+    <footer
       style={{
-        height: 24,
-        background: T.surface1,
+        height: 28,
+        background: `linear-gradient(180deg, ${T.surface2}f6 0%, ${T.surface0}f4 100%)`,
         borderTop: `1px solid ${T.border}`,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 -1px 0 rgba(0,0,0,0.3)`,
         display: 'flex',
         alignItems: 'center',
-        padding: '0 12px',
+        padding: '0 14px',
         gap: 12,
+        backdropFilter: 'blur(10px)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }} role="status" aria-live="polite">
-        <Circle
-          size={4}
-          fill={isRunning ? T.cyan : status === 'failed' ? T.red : T.green}
-          color={isRunning ? T.cyan : status === 'failed' ? T.red : T.green}
-          aria-hidden="true"
-        />
-        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.1em', fontWeight: 900 }}>
-          {isRunning
-            ? 'RUNNING'
-            : status === 'complete'
-              ? 'COMPLETE'
-              : status === 'failed'
-                ? 'FAILED'
-                : 'READY'}
+      {/* System status — instrument panel dot + label */}
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+        role="status"
+        aria-live="polite"
+      >
+        <LiveDot color={dotColor} pulse={isRunning} />
+        <span
+          style={{
+            fontFamily: F,
+            fontSize: FS.xxs,
+            color: isRunning ? T.amber : isComplete ? T.green : isFailed ? T.red : T.dim,
+            letterSpacing: '0.14em',
+            fontWeight: 700,
+          }}
+        >
+          {statusLabel}
         </span>
       </div>
 
+      {/* Separator pip */}
+      <div style={{ width: 1, height: 12, background: T.border, flexShrink: 0 }} />
+
+      {/* Progress bar + counters — visible while running */}
       {isRunning && (
         <>
           <div
             style={{
-              width: 120,
+              width: 140,
               height: 3,
-              background: T.surface3,
+              background: T.surface4,
+              borderRadius: 999,
               overflow: 'hidden',
+              flexShrink: 0,
+              boxShadow: `inset 0 1px 2px rgba(0,0,0,0.4)`,
             }}
           >
             <div
               style={{
                 width: `${Math.round(overallProgress * 100)}%`,
                 height: '100%',
-                background: T.cyan,
+                background: `linear-gradient(90deg, ${T.amber}, ${BRAND_TEAL})`,
+                boxShadow: `0 0 8px ${BRAND_TEAL}aa, 0 0 3px ${BRAND_TEAL}`,
                 transition: 'width 0.3s ease',
+                borderRadius: 999,
               }}
             />
           </div>
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec }}>
+          <span
+            style={{
+              fontFamily: FCODE,
+              fontSize: FS.xxs,
+              color: BRAND_TEAL,
+              letterSpacing: '0.06em',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
             {Math.round(overallProgress * 100)}%
           </span>
-
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
+          <span
+            style={{
+              fontFamily: FCODE,
+              fontSize: FS.xxs,
+              color: T.sec,
+              letterSpacing: '0.06em',
+              fontVariantNumeric: 'tabular-nums',
+              opacity: 0.7,
+            }}
+          >
             {formatTime(elapsed)}
           </span>
-
           {eta != null && eta > 0 && (
-            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
+            <span
+              style={{
+                fontFamily: FCODE,
+                fontSize: FS.xxs,
+                color: T.dim,
+                letterSpacing: '0.06em',
+              }}
+            >
               ETA {formatTime(Math.round(eta))}
             </span>
           )}
@@ -87,36 +163,88 @@ export default function StatusBar() {
 
       <div style={{ flex: 1 }} />
 
+      {/* Hardware readout */}
       {!hardwareLoading && hardware && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: 0.8 }} title={`VRAM: ${hardware.max_vram_gb}GB, Max Model: ${hardware.max_model_size}`}>
-          <Cpu size={12} color={hardware.gpu_available ? T.green : T.dim} />
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.text }}>
-            {hardware.gpu_backend !== 'none' ? hardware.gpu_backend.toUpperCase() : 'CPU'} • {hardware.usable_memory_gb}GB RAM
-          </span>
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.cyan, padding: '1px 4px', background: `${T.cyan}15`, borderRadius: 2 }}>
-            UP TO {hardware.max_model_size.toUpperCase()}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '2px 8px',
+            borderRadius: 5,
+            background: `${T.surface3}88`,
+            border: `0.5px solid ${T.border}`,
+          }}
+          title={`VRAM ${hardware.max_vram_gb}GB • max ${hardware.max_model_size}`}
+        >
+          <Cpu size={10} color={hardware.gpu_available ? T.green : T.dim} />
+          <span
+            style={{
+              fontFamily: FCODE,
+              fontSize: FS.xxs,
+              color: hardware.gpu_available ? T.sec : T.dim,
+              letterSpacing: '0.06em',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {hardware.gpu_backend !== 'none' ? hardware.gpu_backend.toUpperCase() : 'CPU'}
+            {' · '}
+            {hardware.usable_memory_gb}
+            <span style={{ opacity: 0.6 }}>GB</span>
           </span>
         </div>
       )}
 
-      <NotificationBell />
+      {/* Local connection indicator */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '1px 6px',
+          borderRadius: 5,
+          background: `${BRAND_TEAL}12`,
+          border: `0.5px solid ${BRAND_TEAL}35`,
+        }}
+      >
+        <Radio size={9} color={BRAND_TEAL} />
+        <span
+          style={{
+            fontFamily: F,
+            fontSize: FS.xxs,
+            color: BRAND_TEAL,
+            letterSpacing: '0.10em',
+            fontWeight: 700,
+          }}
+        >
+          LOCAL
+        </span>
+      </div>
 
+      {/* Demo badge */}
       {demoMode && (
         <span
           style={{
-            fontFamily: F, fontSize: FS.xxs, fontWeight: 900,
-            letterSpacing: '0.1em', color: T.amber,
-            background: `${T.amber}15`, border: `1px solid ${T.amber}30`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
             padding: '1px 6px',
+            borderRadius: 5,
+            background: `${T.amber}1a`,
+            border: `0.5px solid ${T.amber}50`,
+            color: T.amber,
+            fontFamily: F,
+            fontSize: FS.xxs,
+            letterSpacing: '0.08em',
+            fontWeight: 600,
           }}
         >
+          <Sparkles size={9} />
           DEMO
         </span>
       )}
 
-      <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
-        {demoMode ? 'DEMO MODE' : 'LOCAL MODE'}
-      </span>
-    </div>
+      <NotificationBell />
+    </footer>
   )
 }

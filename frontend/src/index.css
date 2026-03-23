@@ -3,60 +3,85 @@
 @tailwind utilities;
 
 @layer base {
-
   *,
   *::before,
   *::after {
     box-sizing: border-box;
-    border-radius: 0 !important;
   }
 
   :root {
-    --bg: #000000;
-    --text: #FFFFFF;
-    --sec: #b5b5b5;
-    --dim: #666666;
-    --surface0: #030303;
-    --surface1: #040404;
-    --border: #111111;
-    --cyan: #4af6c3;
-    --scrollbar-thumb: rgba(255, 255, 255, 0.08);
-    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.15);
-    --select-bg: #050505;
-    --select-color: #b5b5b5;
+    /* Bioluminescent lab defaults — deep ink, vivid saturated accents */
+    --bg:           #060709;
+    --bg-alt:       #090C11;
+    --text:         #F2F4F8;
+    --sec:          #C4CDDE;
+    --dim:          #7A8799;
+    --surface0:     #0B0D13;
+    --surface1:     #0F1319;
+    --surface2:     #141922;
+    --surface3:     #1B2130;
+    --surface4:     #222A3C;
+    --surface5:     #2C3649;
+    --surface6:     #384557;
+    --border:       #252E3C;
+    --border-hi:    #374659;
+    --brand-teal:    #2FFCC8;
+    --cyan:          #2FFCC8;
+    --hue-glow:      #2FFCC8;
+    --hue-secondary: #A87EFF;
+    --accent-glow:  rgba(47, 252, 200, 0.28);
+    --shadow:             rgba(0,0,0,0.55);
+    --shadow-heavy:       rgba(0,0,0,0.72);
+    --shadow-light:       rgba(20,26,38,0.22);
+    --scrollbar-thumb:       rgba(206,214,229,0.15);
+    --scrollbar-thumb-hover: rgba(206,214,229,0.28);
+    --select-bg:    #171D27;
+    --select-color: #F0F2F5;
   }
 
   html,
-  body {
+  body,
+  #root {
     margin: 0;
     padding: 0;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
-    background: var(--bg);
+    background:
+      radial-gradient(ellipse at 8% 8%,  color-mix(in srgb, var(--hue-secondary) 22%, transparent), transparent 38%),
+      radial-gradient(ellipse at 90% 14%, color-mix(in srgb, var(--hue-glow) 18%, transparent),      transparent 42%),
+      radial-gradient(ellipse at 46% 96%, rgba(255,190,69,0.10), transparent 46%),
+      linear-gradient(180deg, var(--bg-alt) 0%, var(--bg) 100%);
     color: var(--sec);
-    font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-    transition: background 0.25s ease, color 0.25s ease;
+    font-family: 'IBM Plex Sans', 'Inter', 'Segoe UI', sans-serif;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
   button,
   select,
-  input {
-    cursor: pointer !important;
+  input,
+  textarea {
+    color: inherit;
+    font: inherit;
   }
 
-  /* Visible focus indicator for keyboard navigation */
   :focus-visible {
-    outline: 2px solid var(--cyan);
+    outline: 1.5px solid var(--cyan);
     outline-offset: 2px;
   }
 
-  /* Remove default focus for mouse users */
   :focus:not(:focus-visible) {
     outline: none;
   }
 
+  ::selection {
+    background: color-mix(in srgb, var(--cyan) 35%, transparent);
+    color: var(--text);
+  }
+
   ::-webkit-scrollbar {
-    width: 3px;
-    height: 3px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
@@ -65,11 +90,15 @@
 
   ::-webkit-scrollbar-thumb {
     background: var(--scrollbar-thumb);
-    border-radius: 0;
+    border-radius: 999px;
+    border: 1.5px solid transparent;
+    background-clip: content-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: var(--scrollbar-thumb-hover);
+    border: 1.5px solid transparent;
+    background-clip: content-box;
   }
 
   select option {
@@ -78,433 +107,305 @@
   }
 }
 
-/* ── Base keyframes ── */
+/* ─── Keyframes ─────────────────────────────────────────────── */
 
-@keyframes fadeSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Ambient field */
+@keyframes nebula-breathe {
+  0%, 100% { opacity: 0.70; transform: scale(1);    }
+  50%       { opacity: 1.00; transform: scale(1.04); }
 }
 
-@keyframes blink {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0;
-  }
+@keyframes nebula-pulse {
+  0%, 100% { opacity: 0.60; }
+  50%       { opacity: 1.00; }
 }
 
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.33);
-    opacity: 0.8;
-  }
-
-  80%,
-  100% {
-    opacity: 0;
-    transform: scale(2);
-  }
+@keyframes star-drift {
+  0%   { transform: translateY(0px);  opacity: 0.35; }
+  50%  { opacity: 0.85; }
+  100% { transform: translateY(-9px); opacity: 0.35; }
 }
 
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(200%);
-  }
+/* Screensaver */
+@keyframes screensaver-void-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 1.00; }
 }
 
-@keyframes progressPulse {
-  0%, 100% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 1;
-  }
+@keyframes screensaver-ring-orbit {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(360deg); }
 }
 
-@keyframes pulse {
-  0%, 100% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 1;
-  }
+@keyframes screensaver-ring-orbit-rev {
+  from { transform: rotate(0deg);    }
+  to   { transform: rotate(-360deg); }
 }
 
-@keyframes scanline-move {
-  0% {
-    background-position: 0 0;
-  }
-
-  100% {
-    background-position: 0 4px;
-  }
+@keyframes screensaver-logo-breathe {
+  0%, 100% { transform: scale(0.97); filter: drop-shadow(0 0 16px rgba(62,232,196,0.15)); }
+  50%       { transform: scale(1.03); filter: drop-shadow(0 0 32px rgba(62,232,196,0.30)); }
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
+@keyframes idle-glow-ring {
+  0%   { transform: scale(0.88); opacity: 0;    }
+  40%  { opacity: 0.18; }
+  100% { transform: scale(1.14); opacity: 0;    }
 }
 
-.animate-fadeSlideUp {
-  animation: fadeSlideUp 0.2s ease forwards;
+@keyframes particle-float {
+  0%   { transform: translateY(0px) translateX(0px);   opacity: 0;    }
+  15%  { opacity: 1;    }
+  85%  { opacity: 0.7;  }
+  100% { transform: translateY(-120vh) translateX(18px); opacity: 0; }
 }
 
-/* ── Enhanced animations ── */
-
-@keyframes glow-pulse {
-
-  0%,
-  100% {
-    opacity: 0.4;
-    filter: brightness(1);
-  }
-
-  50% {
-    opacity: 1;
-    filter: brightness(1.3);
-  }
-}
-
-@keyframes gradient-flow {
-  0% {
-    background-position: 0% 50%;
-  }
-
-  50% {
-    background-position: 100% 50%;
-  }
-
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-@keyframes float-y {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-4px);
-  }
-}
-
-@keyframes float-subtle {
-
-  0%,
-  100% {
-    transform: translateY(0) translateX(0);
-  }
-
-  25% {
-    transform: translateY(-2px) translateX(1px);
-  }
-
-  50% {
-    transform: translateY(-3px) translateX(0);
-  }
-
-  75% {
-    transform: translateY(-1px) translateX(-1px);
-  }
+/* Grid perspective */
+@keyframes grid-recede {
+  from { background-position: center 0px;   }
+  to   { background-position: center 36px;  }
 }
 
 @keyframes grid-scroll {
-  0% {
-    transform: translateY(0);
-  }
-
-  100% {
-    transform: translateY(16px);
-  }
+  from { background-position: 0 0;    }
+  to   { background-position: 0 32px; }
 }
 
-@keyframes border-trace {
-  0% {
-    background-position: 0% 0%;
-  }
-
-  100% {
-    background-position: 200% 0%;
-  }
+/* General purpose */
+@keyframes pulse-ring {
+  0%   { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(2);   opacity: 0;   }
 }
 
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+@keyframes shimmer {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(220%);  }
 }
 
-@keyframes fade-in-scale {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+@keyframes pulse {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 1.00; }
 }
 
-@keyframes error-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7), 0 8px 32px rgba(239, 68, 68, 0.6);
-    border-color: rgba(239, 68, 68, 1);
-  }
-
-  50% {
-    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0), 0 8px 32px rgba(239, 68, 68, 0.2);
-    border-color: rgba(239, 68, 68, 0.5);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0), 0 8px 32px rgba(239, 68, 68, 0.6);
-    border-color: rgba(239, 68, 68, 1);
-  }
+@keyframes spin {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(360deg); }
 }
 
-.error-pulse {
-  animation: error-pulse 1s ease-out infinite;
-}
-
-@keyframes slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slide-in-left {
-  from {
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes logo-glow {
-
-  0%,
-  100% {
-    filter: drop-shadow(0 0 2px rgba(74, 246, 195, 0.0));
-  }
-
-  50% {
-    filter: drop-shadow(0 0 8px rgba(74, 246, 195, 0.4));
-  }
-}
-
-@keyframes accent-line-flow {
-  0% {
-    transform: translateX(-100%);
-  }
-
-  100% {
-    transform: translateX(200%);
-  }
+@keyframes scanline-move {
+  0%   { background-position: 0 0px; }
+  100% { background-position: 0 5px; }
 }
 
 @keyframes particle-drift {
-  0% {
-    transform: translateY(0) translateX(0);
-    opacity: 0;
-  }
-
-  10% {
-    opacity: 0.6;
-  }
-
-  90% {
-    opacity: 0.6;
-  }
-
-  100% {
-    transform: translateY(-80px) translateX(20px);
-    opacity: 0;
-  }
+  0%   { transform: translateY(0) translateX(0);      opacity: 0;   }
+  20%  { opacity: 1;   }
+  80%  { opacity: 0.8; }
+  100% { transform: translateY(-110vh) translateX(20px); opacity: 0; }
 }
 
-@keyframes status-pulse {
-
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 currentColor;
-  }
-
-  50% {
-    box-shadow: 0 0 6px 2px currentColor;
-  }
+@keyframes edge-flow {
+  to { stroke-dashoffset: -16; }
 }
 
-/* 3D perspective card hover */
-.perspective-container {
-  perspective: 800px;
-  transform-style: preserve-3d;
+@keyframes view-enter {
+  0%   { opacity: 0; transform: translateY(12px) scale(0.994); }
+  100% { opacity: 1; transform: translateY(0px)  scale(1);     }
 }
 
-.perspective-card {
-  transform-style: preserve-3d;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  will-change: transform;
-}
+/* ─── Utility classes ──────────────────────────────────────── */
 
-.perspective-card:hover {
-  transform: translateZ(8px) rotateX(1deg) rotateY(-1deg);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(74, 246, 195, 0.06);
-}
+.ring-pulse  { animation: pulse 1.8s ease-in-out infinite; }
+.error-pulse { animation: pulse 0.9s ease-in-out infinite; }
 
-/* Animated gradient border */
-.animated-border::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  background: linear-gradient(90deg, transparent, #4af6c320, transparent);
-  background-size: 200% 100%;
-  animation: border-trace 3s linear infinite;
-}
-
-/* Hover glow on interactive elements */
-.hover-glow {
-  transition: box-shadow 0.25s ease, border-color 0.25s ease;
-}
-
-.hover-glow:hover {
-  box-shadow: 0 0 16px rgba(74, 246, 195, 0.08), inset 0 0 24px rgba(0, 0, 0, 0.3);
-}
-
-/* Stagger animation helper classes */
-.stagger-item {
-  animation: fade-in-up 0.3s ease both;
-}
-
-.stagger-item:nth-child(1) {
-  animation-delay: 0s;
-}
-
-.stagger-item:nth-child(2) {
-  animation-delay: 0.04s;
-}
-
-.stagger-item:nth-child(3) {
-  animation-delay: 0.08s;
-}
-
-.stagger-item:nth-child(4) {
-  animation-delay: 0.12s;
-}
-
-.stagger-item:nth-child(5) {
-  animation-delay: 0.16s;
-}
-
-.stagger-item:nth-child(6) {
-  animation-delay: 0.20s;
-}
-
-.stagger-item:nth-child(7) {
-  animation-delay: 0.24s;
-}
-
-.stagger-item:nth-child(8) {
-  animation-delay: 0.28s;
-}
-
-.stagger-item:nth-child(9) {
-  animation-delay: 0.32s;
-}
-
-.stagger-item:nth-child(10) {
-  animation-delay: 0.36s;
-}
-
-/* View enter transition */
 .view-enter {
-  animation: fade-in-up 0.25s ease-out both;
+  animation: view-enter 280ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Splash screen pulse */
-@keyframes splash-pulse {
+/* ─── React Flow overrides ─────────────────────────────────── */
 
-  0%,
-  100% {
-    opacity: 0.7;
-    filter: drop-shadow(0 0 4px rgba(74, 246, 195, 0.0));
+.react-flow__edge-path {
+  transition: stroke 180ms ease, stroke-width 180ms ease, opacity 180ms ease;
+  filter: none;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--cyan) 50%, transparent));
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5 6;
+  animation: edge-flow 1s linear infinite;
+}
+
+/* ─── Final UI upgrade — global surface system ─────────────── */
+
+/* Premium glass panels — every surface card */
+.bp-panel {
+  background: linear-gradient(145deg, var(--surface2)ee 0%, var(--surface1)cc 100%);
+  border: 1px solid var(--border-hi);
+  box-shadow:
+    0 0 0 1px var(--brand-teal)0a,
+    0 8px 32px rgba(0,0,0,0.48),
+    0 2px 8px rgba(0,0,0,0.32),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  border-radius: 12px;
+  backdrop-filter: blur(16px);
+}
+
+/* Active glow ring — used on focused inputs, selected nodes, active surfaces */
+.bp-glow-ring {
+  box-shadow:
+    0 0 0 1px var(--cyan)55,
+    0 0 12px var(--cyan)28,
+    0 0 24px var(--cyan)14;
+}
+
+/* Brand dot glow — referenced in logo framing */
+.bp-brand-glow {
+  box-shadow:
+    0 0 0 1px var(--brand-teal)40,
+    0 0 16px var(--brand-teal)35,
+    0 0 32px var(--brand-teal)18;
+}
+
+/* ─── Instrument panel typography ──────────────────────────── */
+
+.bp-label-caps {
+  font-family: 'IBM Plex Sans', 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.bp-mono-data {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sec);
+}
+
+/* ─── Enhanced interactive button states ───────────────────── */
+
+/* Ghost button base */
+.bp-btn {
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-family: 'IBM Plex Sans', 'Inter', sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease,
+    box-shadow 0.14s ease,
+    color 0.14s ease;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--sec);
+}
+
+.bp-btn:hover {
+  background: var(--surface3);
+  border-color: var(--border-hi);
+  color: var(--text);
+}
+
+.bp-btn:active {
+  background: var(--surface4);
+  transform: translateY(0.5px);
+}
+
+/* Primary accent button */
+.bp-btn-primary {
+  background: linear-gradient(135deg, var(--cyan)22 0%, var(--cyan)10 100%);
+  border-color: var(--cyan)55;
+  color: var(--cyan);
+}
+
+.bp-btn-primary:hover {
+  background: linear-gradient(135deg, var(--cyan)35 0%, var(--cyan)18 100%);
+  border-color: var(--cyan)80;
+  box-shadow: 0 0 16px var(--cyan)28, 0 0 4px var(--cyan)40;
+}
+
+/* ─── Improved node card depth ──────────────────────────────── */
+
+.react-flow__node {
+  filter: drop-shadow(0 4px 16px rgba(0,0,0,0.50));
+  transition: filter 0.18s ease;
+}
+
+.react-flow__node:hover {
+  filter: drop-shadow(0 6px 24px rgba(0,0,0,0.62)) drop-shadow(0 0 8px var(--brand-teal)1a);
+}
+
+.react-flow__node.selected {
+  filter:
+    drop-shadow(0 6px 24px rgba(0,0,0,0.62))
+    drop-shadow(0 0 16px var(--cyan)35);
+}
+
+/* ─── Pipeline canvas grid ──────────────────────────────────── */
+
+.react-flow__background {
+  opacity: 0.55 !important;
+}
+
+/* ─── Sidebar nav shimmer on active item ────────────────────── */
+
+@keyframes nav-active-shimmer {
+  0%   { transform: translateX(-100%); opacity: 0;   }
+  50%  { opacity: 0.6; }
+  100% { transform: translateX(200%);  opacity: 0;   }
+}
+
+/* ─── Data table and result row hover ──────────────────────── */
+
+.bp-row-hover:hover {
+  background: color-mix(in srgb, var(--cyan) 5%, var(--surface2));
+  border-color: var(--border-hi);
+}
+
+/* ─── Status pill variants ──────────────────────────────────── */
+
+.bp-status-running  { color: #FFBE45; background: rgba(255,190,69,0.12);  border: 1px solid rgba(255,190,69,0.28);  }
+.bp-status-complete { color: #3EF07A; background: rgba(62,240,122,0.10);  border: 1px solid rgba(62,240,122,0.26);  }
+.bp-status-failed   { color: #FF5E72; background: rgba(255,94,114,0.10);  border: 1px solid rgba(255,94,114,0.26);  }
+.bp-status-pending  { color: #7A8799; background: rgba(122,135,153,0.10); border: 1px solid rgba(122,135,153,0.22); }
+
+/* ─── Tooltip polish ────────────────────────────────────────── */
+
+.bp-tooltip {
+  background: var(--surface4);
+  border: 1px solid var(--border-hi);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.06) inset;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--sec);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+/* ─── Screensaver upgrade ───────────────────────────────────── */
+
+@keyframes screensaver-logo-breathe {
+  0%, 100% {
+    transform: scale(0.97);
+    filter: drop-shadow(0 0 20px rgba(47,252,200,0.30)) drop-shadow(0 0 60px rgba(47,252,200,0.12));
   }
-
   50% {
-    opacity: 1;
-    filter: drop-shadow(0 0 20px rgba(74, 246, 195, 0.5));
+    transform: scale(1.04);
+    filter: drop-shadow(0 0 40px rgba(47,252,200,0.55)) drop-shadow(0 0 80px rgba(47,252,200,0.25));
   }
 }
 
-/* ── Inheritance overlay: flowing-dot edge animation ── */
-
-@keyframes inheritance-flow {
-  from { stroke-dashoffset: 24; }
-  to { stroke-dashoffset: 0; }
-}
-
-.react-flow__edge.inheritance-edge path.react-flow__edge-path {
-  stroke-dasharray: 6 4;
-  animation: inheritance-flow 0.8s linear infinite;
-}
-
-/* Reduced motion — respect user preferences */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
-  .react-flow__edge.animated path {
-    animation: none !important;
-  }
-}
-
-/* Smooth canvas grid animation */
-.animated-grid-bg {
-  background-image:
-    linear-gradient(rgba(74, 246, 195, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(74, 246, 195, 0.03) 1px, transparent 1px);
-  background-size: 16px 16px;
-  animation: grid-scroll 4s linear infinite;
+@keyframes idle-glow-ring {
+  0%   { transform: scale(0.85); opacity: 0;    }
+  35%  { opacity: 0.30; }
+  100% { transform: scale(1.18); opacity: 0;    }
 }
