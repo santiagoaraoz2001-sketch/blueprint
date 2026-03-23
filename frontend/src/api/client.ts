@@ -8,6 +8,43 @@ const MAX_RETRIES = 3
 /** Base delay for retry backoff (ms) */
 const RETRY_BASE_DELAY_MS = 1_000
 
+// ---------------------------------------------------------------------------
+// Circuit breaker — prevents retry storms when the backend is unavailable.
+// After a network failure (connection refused / fetch error), all subsequent
+// requests fail immediately until a lightweight health probe succeeds.
+// ---------------------------------------------------------------------------
+let _backendDown = false
+let _healthProbeRunning = false
+
+function _startHealthProbe() {
+  if (_healthProbeRunning) return
+  _healthProbeRunning = true
+
+  const probe = () => {
+    fetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(5_000) })
+      .then((r) => {
+        if (r.ok) {
+          _backendDown = false
+          _healthProbeRunning = false
+          return
+        }
+        setTimeout(probe, 3_000)
+      })
+      .catch(() => {
+        setTimeout(probe, 3_000)
+      })
+  }
+  // First probe after a short delay
+  setTimeout(probe, 2_000)
+}
+
+function _markBackendDown() {
+  if (!_backendDown) {
+    _backendDown = true
+    _startHealthProbe()
+  }
+}
+
 /** Human-readable error messages for common HTTP status codes */
 const HTTP_ERROR_MESSAGES: Record<number, string> = {
   400: 'Bad request \u2014 the server could not understand the request',
@@ -69,6 +106,11 @@ interface RequestOptions extends RequestInit {
 async function request<T>(path: string, options?: RequestOptions): Promise<T> {
   const { retries = MAX_RETRIES, timeoutMs = DEFAULT_TIMEOUT_MS, signal: externalSignal, ...fetchOptions } = options || {}
 
+  // Circuit breaker: fail fast when backend is known to be down
+  if (_backendDown) {
+    throw new ApiError('Backend is unavailable \u2014 waiting for it to come back online', 503)
+  }
+
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
@@ -96,11 +138,22 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
 
     if (!res.ok) {
       const error = await res.text().catch(() => 'Unknown error')
-      // Retry on 5xx server errors
+      // 502/503 from the proxy means the backend process is unreachable —
+      // trip the circuit breaker and fail fast instead of retrying.
+      if (res.status === 502 || res.status === 503) {
+        _markBackendDown()
+        throw new ApiError(formatHttpError(res.status, error), res.status)
+      }
+      // Retry on other 5xx server errors (real application errors)
       if (res.status >= 500 && retries > 0) {
         const delay = RETRY_BASE_DELAY_MS * (MAX_RETRIES - retries + 1)
         await new Promise((r) => setTimeout(r, delay))
         return request<T>(path, { ...fetchOptions, retries: retries - 1, timeoutMs, signal: externalSignal })
+      }
+      // All retries exhausted on 5xx — backend is likely down (proxy wraps
+      // connection-refused as 500). Trip the circuit breaker.
+      if (res.status >= 500) {
+        _markBackendDown()
       }
       throw new ApiError(formatHttpError(res.status, error), res.status)
     }
@@ -122,7 +175,8 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
     if (e instanceof ApiError) {
       throw e
     }
-    // Wrap raw network errors with a human-readable message
+    // Network-level failure (connection refused, DNS, etc.) — trip circuit breaker
+    _markBackendDown()
     throw formatNetworkError(e)
   } finally {
     clearTimeout(timeout)
@@ -136,6 +190,11 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
 export interface ApiRequestOptions {
   timeoutMs?: number
   signal?: AbortSignal
+}
+
+/** Returns true when the circuit breaker has tripped (backend unreachable). */
+export function isBackendDown(): boolean {
+  return _backendDown
 }
 
 export const api = {
