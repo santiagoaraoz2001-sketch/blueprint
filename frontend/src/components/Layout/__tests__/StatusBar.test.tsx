@@ -36,7 +36,8 @@ vi.mock('@/stores/settingsStore', () => {
 describe('StatusBar', () => {
   it('shows running status and progress details', () => {
     render(<StatusBar />)
-    expect(screen.getByText('Running')).toBeInTheDocument()
+    // Status label is now uppercase "RUNNING"
+    expect(screen.getByText('RUNNING')).toBeInTheDocument()
     expect(screen.getByText('45%')).toBeInTheDocument()
     expect(screen.getByTestId('bell')).toBeInTheDocument()
   })

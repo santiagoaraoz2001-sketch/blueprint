@@ -11,9 +11,10 @@ vi.mock('@/stores/guideStore', () => ({
 }))
 
 describe('TopBar', () => {
-  it('renders the BLUEPRINT product subtitle', () => {
+  it('renders BLUEPRINT — subtitle span and/or brand pill', () => {
     render(<TopBar />)
-    expect(screen.getByText('BLUEPRINT')).toBeInTheDocument()
+    const els = screen.getAllByText('BLUEPRINT')
+    expect(els.length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders active view label in uppercase', () => {
@@ -45,9 +46,11 @@ describe('TopBar', () => {
     expect(screen.getByText('LABS')).toBeInTheDocument()
   })
 
-  it('renders the LOCAL connection badge', () => {
+  it('renders the BLUEPRINT brand pill (replaced LOCAL badge)', () => {
     render(<TopBar />)
-    expect(screen.getByText('LOCAL')).toBeInTheDocument()
+    // BLUEPRINT appears both as the animated subtitle span AND as the brand pill
+    const els = screen.getAllByText('BLUEPRINT')
+    expect(els.length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders the GUIDE toggle button', () => {

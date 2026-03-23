@@ -1,4 +1,4 @@
-import { T, F, FD } from '@/lib/design-tokens'
+import { T, F, FD, BRAND_TEAL } from '@/lib/design-tokens'
 import { useUIStore } from '@/stores/uiStore'
 import { useGuideStore } from '@/stores/guideStore'
 import { motion } from 'framer-motion'
@@ -99,9 +99,9 @@ export default function TopBar() {
             <motion.div
               animate={{
                 filter: [
-                  'drop-shadow(0 0 2px rgba(74, 246, 195, 0))',
-                  'drop-shadow(0 0 8px rgba(74, 246, 195, 0.4))',
-                  'drop-shadow(0 0 2px rgba(74, 246, 195, 0))',
+                  `drop-shadow(0 0 3px ${BRAND_TEAL}00)`,
+                  `drop-shadow(0 0 12px ${BRAND_TEAL}88) drop-shadow(0 0 24px ${BRAND_TEAL}44)`,
+                  `drop-shadow(0 0 3px ${BRAND_TEAL}00)`,
                 ],
               }}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
@@ -113,10 +113,10 @@ export default function TopBar() {
                 style={{ height: '100%', width: 'auto' }}
               >
                 <g textRendering="geometricPrecision" shapeRendering="geometricPrecision">
-                  {/* Logomark */}
+                  {/* Logomark — dot is BRAND_TEAL, always, unconditionally */}
                   <g transform="translate(0, 20)">
                     <path fill={T.text} d="M 0,0 H 120 V 120 H 96 V 24 H 0 Z" />
-                    <circle fill={T.cyan} cx="36" cy="84" r="36" />
+                    <circle fill={BRAND_TEAL} cx="36" cy="84" r="36" />
                   </g>
                   {/* Wordmark */}
                   <g transform="translate(160, 0)">
@@ -154,40 +154,40 @@ export default function TopBar() {
             </motion.span>
           </div>
 
-          {/* Connection badge */}
+          {/* Brand version pip — clean, no redundant LOCAL badge (moved to StatusBar) */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 4,
-              background: `${T.cyan}12`,
-              border: `1px solid ${T.cyan}35`,
-              padding: '2px 6px',
+              background: `${BRAND_TEAL}0e`,
+              border: `1px solid ${BRAND_TEAL}28`,
+              padding: '2px 7px',
+              borderRadius: 4,
               flexShrink: 0,
               ...noDragStyle,
             }}
           >
-            <div style={{ position: 'relative', width: 5, height: 5, flexShrink: 0 }}>
-              <div
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: '50%',
-                  background: T.cyan,
-                }}
-              />
-            </div>
+            <div
+              style={{
+                width: 4,
+                height: 4,
+                borderRadius: '50%',
+                background: BRAND_TEAL,
+                boxShadow: `0 0 5px ${BRAND_TEAL}cc`,
+              }}
+            />
             <span
               style={{
                 fontSize: 6.5,
-                color: T.cyan,
+                color: BRAND_TEAL,
                 fontFamily: F,
                 fontWeight: 900,
-                letterSpacing: '0.1em',
+                letterSpacing: '0.12em',
                 lineHeight: 1,
               }}
             >
-              LOCAL
+              BLUEPRINT
             </span>
           </div>
         </div>

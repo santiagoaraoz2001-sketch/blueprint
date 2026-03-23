@@ -1,9 +1,9 @@
-import { T, F, FS, FCODE } from '@/lib/design-tokens'
+import { T, F, FS, FCODE, BRAND_TEAL } from '@/lib/design-tokens'
 import { useRunStore }      from '@/stores/runStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { Circle, Cpu, Sparkles } from 'lucide-react'
+import { Cpu, Sparkles, Radio } from 'lucide-react'
 import NotificationBell from './NotificationBell'
-import { useEffect }    from 'react'
+import { useEffect } from 'react'
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -11,91 +11,114 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+// Pulsing dot — instrument-panel style live indicator
+function LiveDot({ color, pulse = false }: { color: string; pulse?: boolean }) {
+  return (
+    <span
+      style={{
+        position: 'relative',
+        display: 'inline-flex',
+        width: 7,
+        height: 7,
+        flexShrink: 0,
+      }}
+    >
+      {pulse && (
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '50%',
+            background: color,
+            opacity: 0.5,
+            animation: 'pulse-ring 1.4s ease-out infinite',
+          }}
+        />
+      )}
+      <span
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background: color,
+          boxShadow: `0 0 6px ${color}cc`,
+          display: 'block',
+        }}
+      />
+    </span>
+  )
+}
+
 export default function StatusBar() {
   const { status, overallProgress, elapsed, eta } = useRunStore()
   const { demoMode, hardware, hardwareLoading, fetchHardware } = useSettingsStore()
-  const isRunning = status === 'running'
+  const isRunning  = status === 'running'
+  const isComplete = status === 'complete'
+  const isFailed   = status === 'failed'
 
-  useEffect(() => {
-    fetchHardware()
-  }, [fetchHardware])
+  useEffect(() => { fetchHardware() }, [fetchHardware])
+
+  const dotColor = isRunning ? T.amber : isFailed ? T.red : isComplete ? T.green : BRAND_TEAL
+  const statusLabel = isRunning ? 'RUNNING' : isComplete ? 'COMPLETE' : isFailed ? 'FAILED' : 'READY'
 
   return (
     <footer
       style={{
         height: 28,
-        background: `linear-gradient(180deg, ${T.surface1}f4 0%, ${T.surface0}f2 100%)`,
-        borderTop: `0.5px solid ${T.border}`,
+        background: `linear-gradient(180deg, ${T.surface2}f6 0%, ${T.surface0}f4 100%)`,
+        borderTop: `1px solid ${T.border}`,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 -1px 0 rgba(0,0,0,0.3)`,
         display: 'flex',
         alignItems: 'center',
-        padding: '0 12px',
-        gap: 10,
+        padding: '0 14px',
+        gap: 12,
         backdropFilter: 'blur(10px)',
       }}
     >
-      {/* Status dot + label */}
+      {/* System status — instrument panel dot + label */}
       <div
-        style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         role="status"
         aria-live="polite"
       >
-        <Circle
-          size={5}
-          fill={
-            isRunning
-              ? T.amber
-              : status === 'failed'
-                ? T.red
-                : T.green
-          }
-          color={
-            isRunning
-              ? T.amber
-              : status === 'failed'
-                ? T.red
-                : T.green
-          }
-        />
+        <LiveDot color={dotColor} pulse={isRunning} />
         <span
           style={{
             fontFamily: F,
             fontSize: FS.xxs,
-            color: T.dim,
-            letterSpacing: '0.10em',
-            textTransform: 'uppercase',
+            color: isRunning ? T.amber : isComplete ? T.green : isFailed ? T.red : T.dim,
+            letterSpacing: '0.14em',
+            fontWeight: 700,
           }}
         >
-          {isRunning
-            ? 'Running'
-            : status === 'complete'
-              ? 'Complete'
-              : status === 'failed'
-                ? 'Failed'
-                : 'Ready'}
+          {statusLabel}
         </span>
       </div>
 
-      {/* Progress bar + counters */}
+      {/* Separator pip */}
+      <div style={{ width: 1, height: 12, background: T.border, flexShrink: 0 }} />
+
+      {/* Progress bar + counters — visible while running */}
       {isRunning && (
         <>
-          {/* Refined 1.5px progress bar with glow fill */}
           <div
             style={{
-              width: 128,
-              height: 2,
+              width: 140,
+              height: 3,
               background: T.surface4,
               borderRadius: 999,
               overflow: 'hidden',
               flexShrink: 0,
+              boxShadow: `inset 0 1px 2px rgba(0,0,0,0.4)`,
             }}
           >
             <div
               style={{
                 width: `${Math.round(overallProgress * 100)}%`,
                 height: '100%',
-                background: `linear-gradient(90deg, ${T.amber}, ${T.cyan})`,
-                boxShadow: `0 0 6px ${T.cyan}88`,
-                transition: 'width 0.28s ease',
+                background: `linear-gradient(90deg, ${T.amber}, ${BRAND_TEAL})`,
+                boxShadow: `0 0 8px ${BRAND_TEAL}aa, 0 0 3px ${BRAND_TEAL}`,
+                transition: 'width 0.3s ease',
                 borderRadius: 999,
               }}
             />
@@ -104,8 +127,9 @@ export default function StatusBar() {
             style={{
               fontFamily: FCODE,
               fontSize: FS.xxs,
-              color: T.cyan,
-              letterSpacing: '0.04em',
+              color: BRAND_TEAL,
+              letterSpacing: '0.06em',
+              fontVariantNumeric: 'tabular-nums',
             }}
           >
             {Math.round(overallProgress * 100)}%
@@ -114,8 +138,10 @@ export default function StatusBar() {
             style={{
               fontFamily: FCODE,
               fontSize: FS.xxs,
-              color: T.dim,
-              letterSpacing: '0.04em',
+              color: T.sec,
+              letterSpacing: '0.06em',
+              fontVariantNumeric: 'tabular-nums',
+              opacity: 0.7,
             }}
           >
             {formatTime(elapsed)}
@@ -126,7 +152,7 @@ export default function StatusBar() {
                 fontFamily: FCODE,
                 fontSize: FS.xxs,
                 color: T.dim,
-                letterSpacing: '0.04em',
+                letterSpacing: '0.06em',
               }}
             >
               ETA {formatTime(Math.round(eta))}
@@ -137,29 +163,63 @@ export default function StatusBar() {
 
       <div style={{ flex: 1 }} />
 
-      {/* Hardware info */}
+      {/* Hardware readout */}
       {!hardwareLoading && hardware && (
         <div
-          style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '2px 8px',
+            borderRadius: 5,
+            background: `${T.surface3}88`,
+            border: `0.5px solid ${T.border}`,
+          }}
           title={`VRAM ${hardware.max_vram_gb}GB • max ${hardware.max_model_size}`}
         >
-          <Cpu size={11} color={hardware.gpu_available ? T.green : T.dim} />
+          <Cpu size={10} color={hardware.gpu_available ? T.green : T.dim} />
           <span
             style={{
               fontFamily: FCODE,
               fontSize: FS.xxs,
-              color: T.sec,
-              letterSpacing: '0.04em',
-              opacity: 0.75,
+              color: hardware.gpu_available ? T.sec : T.dim,
+              letterSpacing: '0.06em',
+              fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {hardware.gpu_backend !== 'none'
-              ? hardware.gpu_backend.toUpperCase()
-              : 'CPU'}{' '}
-            · {hardware.usable_memory_gb}GB
+            {hardware.gpu_backend !== 'none' ? hardware.gpu_backend.toUpperCase() : 'CPU'}
+            {' · '}
+            {hardware.usable_memory_gb}
+            <span style={{ opacity: 0.6 }}>GB</span>
           </span>
         </div>
       )}
+
+      {/* Local connection indicator */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '1px 6px',
+          borderRadius: 5,
+          background: `${BRAND_TEAL}12`,
+          border: `0.5px solid ${BRAND_TEAL}35`,
+        }}
+      >
+        <Radio size={9} color={BRAND_TEAL} />
+        <span
+          style={{
+            fontFamily: F,
+            fontSize: FS.xxs,
+            color: BRAND_TEAL,
+            letterSpacing: '0.10em',
+            fontWeight: 700,
+          }}
+        >
+          LOCAL
+        </span>
+      </div>
 
       {/* Demo badge */}
       {demoMode && (
@@ -169,17 +229,18 @@ export default function StatusBar() {
             alignItems: 'center',
             gap: 3,
             padding: '1px 6px',
-            borderRadius: 999,
+            borderRadius: 5,
             background: `${T.amber}1a`,
-            border: `0.5px solid ${T.amber}45`,
+            border: `0.5px solid ${T.amber}50`,
             color: T.amber,
             fontFamily: F,
             fontSize: FS.xxs,
-            letterSpacing: '0.06em',
+            letterSpacing: '0.08em',
+            fontWeight: 600,
           }}
         >
           <Sparkles size={9} />
-          Demo
+          DEMO
         </span>
       )}
 

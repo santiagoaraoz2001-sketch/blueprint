@@ -1,4 +1,4 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { T, F, FS, BRAND_TEAL } from '@/lib/design-tokens'
 import { useUIStore, type View } from '@/stores/uiStore'
 import { useProjectStore } from '@/stores/projectStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -179,18 +179,20 @@ export default function Sidebar() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 9,
-                      padding: sidebarCollapsed ? '9px 0' : '8px 10px 8px 12px',
+                      padding: sidebarCollapsed ? '9px 0' : '8px 10px 8px 14px',
                       justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                       borderRadius: 9,
-                      border: 'none',
+                      border: active ? `1px solid ${T.cyan}30` : '1px solid transparent',
                       marginBottom: 3,
                       position: 'relative',
+                      overflow: 'hidden',
                       background: active
-                        ? `color-mix(in srgb, var(--hue-glow) 9%, transparent)`
+                        ? `linear-gradient(135deg, ${T.cyan}18 0%, ${T.cyan}08 100%)`
                         : 'transparent',
+                      boxShadow: active ? `0 0 12px ${T.cyan}14, inset 0 1px 0 ${T.cyan}18` : 'none',
                       color: active ? T.text : T.dim,
                       cursor: 'pointer',
-                      transition: 'background 0.14s ease, color 0.14s ease',
+                      transition: 'all 0.16s ease',
                       fontFamily: F,
                       fontSize: FS.sm,
                       letterSpacing: '0.03em',
@@ -210,23 +212,36 @@ export default function Sidebar() {
                   >
                     {/* Active left-bar indicator */}
                     {active && !sidebarCollapsed && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: 3,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          width: 2,
-                          height: 18,
-                          borderRadius: 999,
-                          background: `var(--hue-glow)`,
-                          opacity: 0.80,
-                        }}
-                      />
+                      <>
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: 3,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: 2.5,
+                            height: 20,
+                            borderRadius: 999,
+                            background: BRAND_TEAL,
+                            boxShadow: `0 0 8px ${BRAND_TEAL}88, 0 0 16px ${BRAND_TEAL}44`,
+                          }}
+                        />
+                        {/* Shimmer sweep on active item */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            borderRadius: 9,
+                            background: `linear-gradient(90deg, transparent 0%, ${T.cyan}18 50%, transparent 100%)`,
+                            animation: 'nav-active-shimmer 3s ease-in-out infinite',
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      </>
                     )}
                     <Icon
                       size={14}
-                      color={active ? T.cyan : T.dim}
+                      color={active ? BRAND_TEAL : T.dim}
                       style={{ flexShrink: 0 }}
                     />
                     {!sidebarCollapsed && (

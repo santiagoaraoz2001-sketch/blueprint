@@ -154,10 +154,13 @@ function blendHex(base: string, overlay: string, ratio = 0.5) {
   )
 }
 
-function getAdaptiveAccent(theme: ThemeTokens, accentColor: AccentColor, view: View): string {
-  const userAccent = theme[ACCENT_BY_NAME[accentColor]] as string
-  const viewAccent = theme[(VIEW_ACCENT_MAP[view] || 'teal') as keyof ThemeTokens] as string
-  return blendHex(viewAccent, userAccent, 0.42)
+// Specific Labs brand teal — fixed, immutable, used ONLY for the logo dot.
+// Never change this to an adaptive or user-selectable value.
+export const BRAND_TEAL = '#2FFCC8'
+
+function getUserAccent(theme: ThemeTokens, accentColor: AccentColor): string {
+  // Direct user selection — no view blending. Clean, strong, unambiguous.
+  return theme[ACCENT_BY_NAME[accentColor]] as string
 }
 
 function getActiveTheme() {
@@ -168,7 +171,7 @@ function getActiveTheme() {
   const view = typeof (useUIStore as any).getState === 'function'
     ? ((useUIStore as any).getState().activeView as View)
     : 'research'
-  const accent = getAdaptiveAccent(theme, settings.accentColor, view)
+  const accent = getUserAccent(theme, settings.accentColor)
   return { theme, accent, view }
 }
 
@@ -297,7 +300,8 @@ export function injectThemeCSSVars(mode: ThemeMode, view?: View) {
   const activeView = view ?? (typeof (useUIStore as any).getState === 'function'
     ? ((useUIStore as any).getState().activeView as View)
     : 'research')
-  const activeAccent   = getAdaptiveAccent(t, accentColor, activeView)
+  // Direct user accent — no view blending
+  const activeAccent   = getUserAccent(t, accentColor)
   const secondaryHue   = t[(VIEW_ACCENT_MAP[activeView] || 'purple') as keyof ThemeTokens] as string
 
   const root = document.documentElement
@@ -328,4 +332,6 @@ export function injectThemeCSSVars(mode: ThemeMode, view?: View) {
   root.style.setProperty('--scrollbar-thumb-hover', mode === 'light' ? 'rgba(35,52,79,0.32)' : 'rgba(206,214,229,0.28)')
   root.style.setProperty('--select-bg',    mode === 'light' ? '#FFFFFF' : t.surface3)
   root.style.setProperty('--select-color', t.text)
+  // Brand teal — immutable, always injected regardless of user accent choice
+  root.style.setProperty('--brand-teal', BRAND_TEAL)
 }
