@@ -4,7 +4,7 @@ import { getBlockDefinition, getFileFormatWarning, type ConfigField, type Connec
 import { usePresetStore } from '@/stores/presetStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getIcon } from '@/lib/icon-utils'
-import { Trash2, X, Save, ChevronDown, ChevronRight, AlertTriangle, GitBranch, FolderOpen, Search, Copy, ClipboardPaste, RotateCcw, Info, Zap, ArrowRight, Plus } from 'lucide-react'
+import { Trash2, X, Save, ChevronDown, ChevronRight, AlertTriangle, GitBranch, FolderOpen, Search, Copy, ClipboardPaste, RotateCcw, Info, Zap, ArrowRight, Plus, Play, Loader2 } from 'lucide-react'
 import type { Node } from '@xyflow/react'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { api } from '@/api/client'
@@ -229,6 +229,38 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
     }
     return models
   }, [frameworkData])
+
+  // Ollama status — only check when we have model fields and Ollama has models
+  const ollamaFramework = frameworkData.find((d: any) => d.id === 'ollama')
+  const ollamaHasModels = (ollamaFramework?.models?.length ?? 0) > 0
+  const ollamaAvailable = ollamaFramework?.available ?? false
+  const [ollamaRunning, setOllamaRunning] = useState<boolean | null>(null)
+  const [ollamaStarting, setOllamaStarting] = useState(false)
+
+  useEffect(() => {
+    if (ollamaHasModels) {
+      fetch('/api/models/ollama/status')
+        .then(r => r.json())
+        .then(d => setOllamaRunning(d.running))
+        .catch(() => setOllamaRunning(false))
+    }
+  }, [ollamaHasModels])
+
+  const handleStartOllama = useCallback(async () => {
+    if (ollamaStarting) return
+    setOllamaStarting(true)
+    try {
+      const resp = await fetch('/api/models/ollama/start', { method: 'POST' })
+      const data = await resp.json()
+      if (data.status === 'running' || data.status === 'already_running') {
+        setOllamaRunning(true)
+        // Refresh framework data
+        const fresh = await api.get<any[]>('/system/models')
+        if (Array.isArray(fresh)) setFrameworkData(fresh)
+      }
+    } catch { /* ignore */ }
+    setOllamaStarting(false)
+  }, [ollamaStarting])
 
   // Filter config fields by depends_on and enrich model fields with auto-detected options
   const displayFields = def?.configFields
@@ -711,6 +743,53 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
 
         {/* Preset selector */}
         {def && <PresetSelector blockType={def.type} nodeId={node.id} currentConfig={node.data.config} />}
+
+        {/* Ollama not-running banner */}
+        {hasModelFields && ollamaHasModels && ollamaRunning === false && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 8px',
+              marginBottom: 4,
+              background: `${T.amber}10`,
+              border: `1px solid ${T.amber}25`,
+            }}
+          >
+            <AlertTriangle size={11} color={T.amber} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1, fontFamily: F, fontSize: FS.xxs, color: T.amber }}>
+              Ollama has {ollamaFramework.models.length} model{ollamaFramework.models.length > 1 ? 's' : ''} installed but is not running
+            </span>
+            <button
+              type="button"
+              onClick={handleStartOllama}
+              disabled={ollamaStarting}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '2px 8px',
+                background: `${T.green}20`,
+                border: `1px solid ${T.green}40`,
+                color: T.green,
+                fontFamily: F,
+                fontSize: FS.xxs,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase' as const,
+                cursor: ollamaStarting ? 'wait' : 'pointer',
+                whiteSpace: 'nowrap' as const,
+              }}
+            >
+              {ollamaStarting ? (
+                <><Loader2 size={9} style={{ animation: 'spin 1s linear infinite' }} /> Starting...</>
+              ) : (
+                <><Play size={8} /> Start Ollama</>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* Grouped config fields */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

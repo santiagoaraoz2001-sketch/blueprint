@@ -97,6 +97,63 @@ def trigger_scan():
     return {"count": len(models), "models": models}
 
 
+@router.get("/ollama/status")
+def ollama_status():
+    """Check whether the Ollama server is currently running."""
+    import urllib.request
+    try:
+        urllib.request.urlopen(f"{OLLAMA_URL}", timeout=1)
+        return {"running": True}
+    except Exception:
+        return {"running": False}
+
+
+@router.post("/ollama/start")
+def ollama_start():
+    """Start the Ollama server if it is not already running."""
+    import shutil
+    import subprocess
+    import time
+    import urllib.request
+
+    # Check if already running
+    try:
+        urllib.request.urlopen(f"{OLLAMA_URL}", timeout=1)
+        return {"status": "already_running"}
+    except Exception:
+        pass
+
+    # Find ollama binary
+    ollama_bin = shutil.which("ollama")
+    if not ollama_bin:
+        raise HTTPException(404, "Ollama binary not found on PATH. Install from https://ollama.com")
+
+    # Launch detached process
+    try:
+        subprocess.Popen(
+            [ollama_bin, "serve"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError as exc:
+        raise HTTPException(500, f"Failed to start Ollama: {exc}")
+
+    # Poll for readiness (up to 10s)
+    for _ in range(20):
+        time.sleep(0.5)
+        try:
+            urllib.request.urlopen(f"{OLLAMA_URL}", timeout=1)
+            # Invalidate discovery cache so next fetch sees running state
+            from ..services.model_discovery import invalidate_cache
+            invalidate_cache()
+            return {"status": "running"}
+        except Exception:
+            continue
+
+    return {"status": "failed", "error": "Ollama started but did not respond within 10 seconds"}
+
+
 class InferenceRequest(BaseModel):
     prompt: str = Field(max_length=100000)
     max_tokens: int = Field(default=100, ge=1, le=32768)
