@@ -4,27 +4,27 @@ import { useGuideStore } from '@/stores/guideStore'
 import { motion } from 'framer-motion'
 import { Command, Compass, PanelTop } from 'lucide-react'
 
-const dragStyle = { WebkitAppRegion: 'drag' } as React.CSSProperties
+const dragStyle   = { WebkitAppRegion: 'drag'    } as React.CSSProperties
 const noDragStyle = { WebkitAppRegion: 'no-drag' } as React.CSSProperties
-const isElectron = !!(window as any).blueprint?.isElectron
+const isElectron  = !!(window as any).blueprint?.isElectron
 
 const viewLabels: Record<string, string> = {
-  dashboard: 'Projects',
-  editor: 'Build',
-  results: 'Analyze',
-  datasets: 'Datasets',
-  marketplace: 'Blocks',
-  settings: 'Settings',
-  paper: 'Write',
-  help: 'Help',
-  monitor: 'Mission Control',
-  research: 'Research',
+  dashboard:  'Projects',
+  editor:     'Build',
+  results:    'Analyze',
+  datasets:   'Datasets',
+  marketplace:'Blocks',
+  settings:   'Settings',
+  paper:      'Write',
+  help:       'Help',
+  monitor:    'Mission Control',
+  research:   'Research',
 }
 
 export default function TopBar() {
   const { activeView } = useUIStore()
-  const guideActive = useGuideStore((s) => s.guideActive)
-  const toggleGuide = useGuideStore((s) => s.toggleGuide)
+  const guideActive  = useGuideStore((s) => s.guideActive)
+  const toggleGuide  = useGuideStore((s) => s.toggleGuide)
 
   return (
     <header
@@ -33,33 +33,33 @@ export default function TopBar() {
         zIndex: 40,
         overflow: 'visible',
         position: 'relative',
-        background: `linear-gradient(180deg, ${T.surface3}f0 0%, ${T.surface1}e8 100%)`,
-        borderBottom: `1px solid ${T.borderHi}`,
+        background: `linear-gradient(180deg, ${T.surface2}f2 0%, ${T.surface1}ee 100%)`,
+        borderBottom: `0.5px solid ${T.border}`,
         boxShadow: ELEVATION.panel,
         ...dragStyle,
       }}
     >
+      {/* Hairline accent sweep at very top */}
       <div
         style={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 1,
-          background: `linear-gradient(90deg, transparent 0%, var(--hue-glow) 28%, var(--hue-secondary) 72%, transparent 100%)`,
+          top: 0, left: 0, right: 0,
+          height: '0.5px',
+          background: `linear-gradient(90deg, transparent 0%, var(--hue-glow) 30%, var(--hue-secondary) 70%, transparent 100%)`,
+          opacity: 0.65,
           pointerEvents: 'none',
           overflow: 'hidden',
         }}
       >
+        {/* Slow shimmer sweep */}
         <motion.div
           animate={{ x: ['-100%', '200%'] }}
-          transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
           style={{
             position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '40%',
-            height: 1,
+            top: 0, left: 0,
+            width: '35%',
+            height: '0.5px',
             background: `linear-gradient(90deg, transparent, ${T.cyan}, transparent)`,
             pointerEvents: 'none',
           }}
@@ -70,108 +70,168 @@ export default function TopBar() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          padding: isElectron ? '8px 14px 8px 80px' : '8px 14px',
-          height: 54,
-          gap: 12,
+          padding: isElectron ? '0 14px 0 80px' : '0 14px',
+          height: 46,
+          gap: 10,
         }}
       >
+        {/* ── Exact original logotype, new framing only ── */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
+            gap: 0,
             flexShrink: 0,
-            border: `1px solid ${T.border}`,
-            background: `${T.surface2}e8`,
-            borderRadius: 12,
-            padding: '6px 10px',
-            boxShadow: `0 0 24px ${T.cyan}20`,
+            position: 'relative',
             ...noDragStyle,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', height: 30 }}>
+          {/* Left vertical accent bar */}
+          <div
+            style={{
+              width: 2,
+              height: 18,
+              borderRadius: 999,
+              background: `var(--hue-glow)`,
+              opacity: 0.45,
+              marginRight: 10,
+              flexShrink: 0,
+            }}
+          />
+
+          <div style={{ display: 'flex', alignItems: 'center', height: 26 }}>
+            {/* Organic breathing glow — not harsh pulse */}
             <motion.div
               animate={{
                 filter: [
-                  'drop-shadow(0 0 2px rgba(80, 216, 192, 0))',
-                  'drop-shadow(0 0 8px rgba(80, 216, 192, 0.32))',
-                  'drop-shadow(0 0 2px rgba(80, 216, 192, 0))',
+                  `drop-shadow(0 0 0px rgba(62,232,196,0))`,
+                  `drop-shadow(0 0 7px rgba(62,232,196,0.28))`,
+                  `drop-shadow(0 0 0px rgba(62,232,196,0))`,
                 ],
               }}
-              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
               style={{ display: 'flex', alignItems: 'center', height: '100%' }}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 160" style={{ height: '100%', width: 'auto' }}>
+              {/*
+                EXACT original logotype SVG — geometry immutable.
+                viewBox="0 0 760 160", same path, same circle, same text groups.
+                Only the container/framing around it has changed.
+              */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 760 160"
+                style={{ height: '100%', width: 'auto' }}
+                aria-label="Specific Labs — Blueprint"
+              >
                 <g textRendering="geometricPrecision" shapeRendering="geometricPrecision">
                   <g transform="translate(0, 20)">
                     <path fill={T.text} d="M 0,0 H 120 V 120 H 96 V 24 H 0 Z" />
                     <circle fill={T.cyan} cx="36" cy="84" r="36" />
                   </g>
                   <g transform="translate(160, 0)">
-                    <text x="-3" y="70" style={{ fontFamily: FD, fontWeight: 700, fontSize: 72, letterSpacing: '0.4em', fill: T.text }}>SPECIFIC</text>
-                    <text x="0" y="140" style={{ fontFamily: FD, fontWeight: 500, fontSize: 72, letterSpacing: '0.4em', fill: T.text }}>LABS</text>
+                    <text
+                      x="-3" y="70"
+                      style={{
+                        fontFamily: FD,
+                        fontWeight: 700,
+                        fontSize: 72,
+                        letterSpacing: '0.4em',
+                        fill: T.text,
+                      }}
+                    >
+                      SPECIFIC
+                    </text>
+                    <text
+                      x="0" y="140"
+                      style={{
+                        fontFamily: FD,
+                        fontWeight: 500,
+                        fontSize: 72,
+                        letterSpacing: '0.4em',
+                        fill: T.text,
+                      }}
+                    >
+                      LABS
+                    </text>
                   </g>
                 </g>
               </svg>
             </motion.div>
           </div>
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-            Blueprint
-          </span>
         </div>
 
         <div style={{ flex: 1 }} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${T.border}`, background: `${T.surface2}d8`, borderRadius: 999, padding: '6px 10px', ...noDragStyle }}>
-          <Compass size={14} color={T.cyan} />
-          <span style={{ fontFamily: F, fontSize: FS.xs, letterSpacing: '0.06em', color: T.text }}>
+        {/* Active view breadcrumb */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            borderRadius: 999,
+            padding: '5px 10px',
+            background: `${T.surface3}cc`,
+            border: `0.5px solid ${T.border}`,
+            ...noDragStyle,
+          }}
+        >
+          <Compass size={12} color={T.cyan} />
+          <span
+            style={{
+              fontFamily: F,
+              fontSize: FS.xs,
+              letterSpacing: '0.05em',
+              color: T.sec,
+            }}
+          >
             {viewLabels[activeView] || activeView}
           </span>
         </div>
 
+        {/* Guide toggle */}
         <button
           onClick={toggleGuide}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
-            borderRadius: 10,
-            padding: '6px 10px',
-            background: guideActive ? `${T.cyan}22` : `${T.surface3}cc`,
-            border: `1px solid ${guideActive ? `${T.cyan}66` : T.border}`,
+            gap: 5,
+            borderRadius: 8,
+            padding: '5px 9px',
+            background: guideActive ? `${T.cyan}1e` : `${T.surface3}bb`,
+            border: `0.5px solid ${guideActive ? `${T.cyan}55` : T.border}`,
             color: guideActive ? T.cyan : T.dim,
             fontFamily: F,
             fontSize: FS.xs,
-            letterSpacing: '0.06em',
+            letterSpacing: '0.05em',
             cursor: 'pointer',
+            transition: 'all 0.16s ease',
             ...noDragStyle,
           }}
         >
-          <PanelTop size={12} />
+          <PanelTop size={11} />
           Guide
         </button>
 
-        <motion.div
-          initial={false}
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2.5, repeat: Infinity }}
+        {/* Cmd+K hint — static, reveals on hover */}
+        <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
-            borderRadius: 10,
-            padding: '6px 10px',
-            border: `1px solid ${T.border}`,
-            background: `${T.surface3}cc`,
+            gap: 5,
+            borderRadius: 8,
+            padding: '5px 9px',
+            border: `0.5px solid ${T.border}`,
+            background: `${T.surface3}88`,
             color: T.dim,
             fontFamily: F,
             fontSize: FS.xs,
+            userSelect: 'none',
             ...noDragStyle,
           }}
         >
-          <Command size={12} />
-          Cmd/Ctrl+K
-        </motion.div>
+          <Command size={11} />
+          <span style={{ fontFamily: "'JetBrains Mono','SF Mono',monospace", fontSize: FS.xxs }}>K</span>
+        </div>
       </div>
     </header>
   )

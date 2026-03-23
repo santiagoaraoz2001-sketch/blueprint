@@ -10,26 +10,32 @@
   }
 
   :root {
-    --bg: #0b0e13;
-    --bg-alt: #111722;
-    --text: #f8f9ff;
-    --sec: #ced6e5;
-    --dim: #8c98b2;
-    --surface0: #0f1520;
-    --surface1: #131c2a;
-    --surface2: #172131;
-    --border: #27334a;
-    --border-hi: #3a4a67;
-    --cyan: #49d9cb;
-    --hue-glow: #49d9cb;
-    --hue-secondary: #a991eb;
-    --shadow: rgba(6, 8, 14, 0.35);
-    --shadow-heavy: rgba(5, 7, 12, 0.62);
-    --shadow-light: rgba(22, 28, 41, 0.2);
-    --scrollbar-thumb: rgba(206, 214, 229, 0.18);
-    --scrollbar-thumb-hover: rgba(206, 214, 229, 0.32);
-    --select-bg: #1d283c;
-    --select-color: #f8f9ff;
+    /* Bioluminescent lab defaults — deep ink, luminous mineral accents */
+    --bg:           #050608;
+    --bg-alt:       #080A0D;
+    --text:         #F0F2F5;
+    --sec:          #B8C0CE;
+    --dim:          #6E7888;
+    --surface0:     #090B0F;
+    --surface1:     #0D1016;
+    --surface2:     #11161E;
+    --surface3:     #171D27;
+    --surface4:     #1E2632;
+    --surface5:     #26303F;
+    --surface6:     #2F3B4E;
+    --border:       #1F2630;
+    --border-hi:    #2C3644;
+    --cyan:         #3EE8C4;
+    --hue-glow:     #3EE8C4;
+    --hue-secondary: #9880E8;
+    --accent-glow:  rgba(62, 232, 196, 0.20);
+    --shadow:             rgba(0,0,0,0.55);
+    --shadow-heavy:       rgba(0,0,0,0.72);
+    --shadow-light:       rgba(20,26,38,0.22);
+    --scrollbar-thumb:       rgba(206,214,229,0.15);
+    --scrollbar-thumb-hover: rgba(206,214,229,0.28);
+    --select-bg:    #171D27;
+    --select-color: #F0F2F5;
   }
 
   html,
@@ -41,13 +47,13 @@
     height: 100%;
     overflow: hidden;
     background:
-      radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--hue-secondary) 16%, transparent), transparent 38%),
-      radial-gradient(circle at 86% 18%, color-mix(in srgb, var(--hue-glow) 14%, transparent), transparent 42%),
-      radial-gradient(circle at 40% 100%, rgba(227, 178, 106, 0.08), transparent 45%),
+      radial-gradient(ellipse at 8% 8%,  color-mix(in srgb, var(--hue-secondary) 12%, transparent), transparent 36%),
+      radial-gradient(ellipse at 90% 14%, color-mix(in srgb, var(--hue-glow) 10%, transparent),      transparent 40%),
+      radial-gradient(ellipse at 46% 96%, rgba(232,168,74,0.06), transparent 44%),
       linear-gradient(180deg, var(--bg-alt) 0%, var(--bg) 100%);
     color: var(--sec);
     font-family: 'IBM Plex Sans', 'Inter', 'Segoe UI', sans-serif;
-    transition: background 0.25s ease, color 0.25s ease;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
   button,
@@ -59,7 +65,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--cyan);
+    outline: 1.5px solid var(--cyan);
     outline-offset: 2px;
   }
 
@@ -68,13 +74,13 @@
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--cyan) 40%, transparent);
+    background: color-mix(in srgb, var(--cyan) 35%, transparent);
     color: var(--text);
   }
 
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
@@ -84,13 +90,13 @@
   ::-webkit-scrollbar-thumb {
     background: var(--scrollbar-thumb);
     border-radius: 999px;
-    border: 2px solid transparent;
+    border: 1.5px solid transparent;
     background-clip: content-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: var(--scrollbar-thumb-hover);
-    border: 2px solid transparent;
+    border: 1.5px solid transparent;
     background-clip: content-box;
   }
 
@@ -100,127 +106,131 @@
   }
 }
 
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.6);
-    opacity: 0.8;
-  }
+/* ─── Keyframes ─────────────────────────────────────────────── */
 
-  100% {
-    transform: scale(2);
-    opacity: 0;
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    transform: translateX(-120%);
-  }
-
-  100% {
-    transform: translateX(220%);
-  }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.65;
-  }
-
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes scanline-move {
-  0% {
-    background-position: 0 0;
-  }
-
-  100% {
-    background-position: 0 5px;
-  }
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes particle-drift {
-  0% {
-    transform: translateY(0) translateX(0);
-    opacity: 0;
-  }
-
-  20% {
-    opacity: 1;
-  }
-
-  80% {
-    opacity: 0.8;
-  }
-
-  100% {
-    transform: translateY(-110vh) translateX(20px);
-    opacity: 0;
-  }
+/* Ambient field */
+@keyframes nebula-breathe {
+  0%, 100% { opacity: 0.70; transform: scale(1);    }
+  50%       { opacity: 1.00; transform: scale(1.04); }
 }
 
 @keyframes nebula-pulse {
-  0%,
-  100% {
-    opacity: 0.65;
-  }
+  0%, 100% { opacity: 0.60; }
+  50%       { opacity: 1.00; }
+}
 
-  50% {
-    opacity: 1;
-  }
+@keyframes star-drift {
+  0%   { transform: translateY(0px);  opacity: 0.35; }
+  50%  { opacity: 0.85; }
+  100% { transform: translateY(-9px); opacity: 0.35; }
+}
+
+/* Screensaver */
+@keyframes screensaver-void-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 1.00; }
+}
+
+@keyframes screensaver-ring-orbit {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes screensaver-ring-orbit-rev {
+  from { transform: rotate(0deg);    }
+  to   { transform: rotate(-360deg); }
+}
+
+@keyframes screensaver-logo-breathe {
+  0%, 100% { transform: scale(0.97); filter: drop-shadow(0 0 16px rgba(62,232,196,0.15)); }
+  50%       { transform: scale(1.03); filter: drop-shadow(0 0 32px rgba(62,232,196,0.30)); }
+}
+
+@keyframes idle-glow-ring {
+  0%   { transform: scale(0.88); opacity: 0;    }
+  40%  { opacity: 0.18; }
+  100% { transform: scale(1.14); opacity: 0;    }
+}
+
+@keyframes particle-float {
+  0%   { transform: translateY(0px) translateX(0px);   opacity: 0;    }
+  15%  { opacity: 1;    }
+  85%  { opacity: 0.7;  }
+  100% { transform: translateY(-120vh) translateX(18px); opacity: 0; }
+}
+
+/* Grid perspective */
+@keyframes grid-recede {
+  from { background-position: center 0px;   }
+  to   { background-position: center 36px;  }
+}
+
+@keyframes grid-scroll {
+  from { background-position: 0 0;    }
+  to   { background-position: 0 32px; }
+}
+
+/* General purpose */
+@keyframes pulse-ring {
+  0%   { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(2);   opacity: 0;   }
+}
+
+@keyframes shimmer {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(220%);  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 1.00; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes scanline-move {
+  0%   { background-position: 0 0px; }
+  100% { background-position: 0 5px; }
+}
+
+@keyframes particle-drift {
+  0%   { transform: translateY(0) translateX(0);      opacity: 0;   }
+  20%  { opacity: 1;   }
+  80%  { opacity: 0.8; }
+  100% { transform: translateY(-110vh) translateX(20px); opacity: 0; }
 }
 
 @keyframes edge-flow {
-  to {
-    stroke-dashoffset: -18;
-  }
-}
-
-.ring-pulse {
-  animation: pulse 1.8s ease-in-out infinite;
-}
-
-.error-pulse {
-  animation: pulse 0.9s ease-in-out infinite;
-}
-
-.view-enter {
-  animation: view-enter 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  to { stroke-dashoffset: -16; }
 }
 
 @keyframes view-enter {
-  0% {
-    opacity: 0;
-    transform: translateY(8px) scale(0.995);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  0%   { opacity: 0; transform: translateY(12px) scale(0.994); }
+  100% { opacity: 1; transform: translateY(0px)  scale(1);     }
 }
+
+/* ─── Utility classes ──────────────────────────────────────── */
+
+.ring-pulse  { animation: pulse 1.8s ease-in-out infinite; }
+.error-pulse { animation: pulse 0.9s ease-in-out infinite; }
+
+.view-enter {
+  animation: view-enter 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── React Flow overrides ─────────────────────────────────── */
 
 .react-flow__edge-path {
   transition: stroke 180ms ease, stroke-width 180ms ease, opacity 180ms ease;
+  filter: none;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke-width: 3;
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--cyan) 50%, transparent));
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--cyan) 50%, transparent));
 }
 
 .react-flow__edge.animated .react-flow__edge-path {

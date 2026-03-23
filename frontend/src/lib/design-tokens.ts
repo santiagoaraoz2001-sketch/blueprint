@@ -36,96 +36,98 @@ export interface ThemeTokens {
   shadowLight: string
 }
 
+// Bioluminescent lab palette — deep organic ink with luminous mineral accents
 const DARK: ThemeTokens = {
-  bg: '#07080B',
-  bgAlt: '#0B0D11',
-  surface: 'rgba(17,18,24,0.9)',
-  raised: '#14161D',
-  border: '#2C313B',
-  borderHi: '#434B58',
-  text: '#F4F5F8',
-  sec: '#C8CCD5',
-  dim: '#8D95A4',
-  muted: '#1D2029',
-  surface0: '#0D0F14',
-  surface1: '#11141B',
-  surface2: '#171A23',
-  surface3: '#1E232E',
-  surface4: '#252B38',
-  surface5: '#2D3544',
-  surface6: '#364154',
-  cyan: '#50D8C0',
-  green: '#67D57A',
-  amber: '#E3B26A',
-  yellow: '#E9D177',
-  orange: '#E08A62',
-  red: '#E37B83',
-  blue: '#7897E6',
-  purple: '#A991EB',
-  pink: '#DD8FC0',
-  teal: '#52C6D0',
-  shadow: 'rgba(0,0,0,0.45)',
-  shadowHeavy: 'rgba(0,0,0,0.68)',
-  shadowLight: 'rgba(32,36,46,0.24)',
+  bg:       '#050608',
+  bgAlt:    '#080A0D',
+  surface:  'rgba(14,17,22,0.92)',
+  raised:   '#10141A',
+  border:   '#1F2630',
+  borderHi: '#2C3644',
+  text:     '#F0F2F5',
+  sec:      '#B8C0CE',
+  dim:      '#6E7888',
+  muted:    '#181C24',
+  surface0: '#090B0F',
+  surface1: '#0D1016',
+  surface2: '#11161E',
+  surface3: '#171D27',
+  surface4: '#1E2632',
+  surface5: '#26303F',
+  surface6: '#2F3B4E',
+  // Organic luminous accents — bioluminescent mineral, not neon
+  cyan:   '#3EE8C4',
+  green:  '#52D975',
+  amber:  '#E8A84A',
+  yellow: '#E8D05A',
+  orange: '#DE7B4F',
+  red:    '#E06070',
+  blue:   '#628CE8',
+  purple: '#9880E8',
+  pink:   '#D87CB8',
+  teal:   '#48C8D8',
+  shadow:      'rgba(0,0,0,0.55)',
+  shadowHeavy: 'rgba(0,0,0,0.72)',
+  shadowLight: 'rgba(20,26,38,0.22)',
 }
 
 const LIGHT: ThemeTokens = {
-  bg: '#F5F5F7',
-  bgAlt: '#ECECF1',
-  surface: 'rgba(255,255,255,0.92)',
-  raised: '#FFFFFF',
-  border: '#D9DCE3',
-  borderHi: '#C4CAD6',
-  text: '#1F2430',
-  sec: '#3B465A',
-  dim: '#6D778B',
-  muted: '#ECEFF5',
-  surface0: '#FCFCFE',
-  surface1: '#F6F7FB',
-  surface2: '#EFF2F8',
-  surface3: '#E8EDF6',
-  surface4: '#DEE5F2',
-  surface5: '#D3DDEF',
-  surface6: '#C9D7EC',
-  cyan: '#0D8B74',
-  green: '#2F8B46',
-  amber: '#A96B22',
-  yellow: '#9F8119',
-  orange: '#B4572A',
-  red: '#AF3543',
-  blue: '#2F56B7',
-  purple: '#6342B8',
-  pink: '#A43C71',
-  teal: '#117E88',
-  shadow: 'rgba(36,49,74,0.14)',
-  shadowHeavy: 'rgba(31,42,62,0.22)',
-  shadowLight: 'rgba(67,89,125,0.09)',
+  bg:       '#F2F4F7',
+  bgAlt:    '#EAEDF2',
+  surface:  'rgba(255,255,255,0.94)',
+  raised:   '#FFFFFF',
+  border:   '#D6DAE3',
+  borderHi: '#C0C9D8',
+  text:     '#1A2130',
+  sec:      '#374459',
+  dim:      '#667080',
+  muted:    '#E8ECF4',
+  surface0: '#FAFBFE',
+  surface1: '#F4F6FB',
+  surface2: '#EDF1F8',
+  surface3: '#E5EBF6',
+  surface4: '#DAE3F2',
+  surface5: '#CFDBEE',
+  surface6: '#C4D2EA',
+  cyan:   '#0A8870',
+  green:  '#2B8A42',
+  amber:  '#A5681E',
+  yellow: '#9B7D14',
+  orange: '#B0521E',
+  red:    '#AA2F3E',
+  blue:   '#2B52B4',
+  purple: '#5F3EB5',
+  pink:   '#A03870',
+  teal:   '#0F7B84',
+  shadow:      'rgba(26,40,64,0.13)',
+  shadowHeavy: 'rgba(20,34,56,0.20)',
+  shadowLight: 'rgba(58,80,118,0.08)',
 }
 
 const ACCENT_BY_NAME: Record<AccentColor, keyof ThemeTokens> = {
-  cyan: 'cyan',
+  cyan:   'cyan',
   orange: 'orange',
-  green: 'green',
-  blue: 'blue',
+  green:  'green',
+  blue:   'blue',
   purple: 'purple',
-  pink: 'pink',
+  pink:   'pink',
 }
 
 const VIEW_ACCENT_MAP: Partial<Record<View, keyof ThemeTokens>> = {
-  research: 'teal',
-  dashboard: 'amber',
-  editor: 'teal',
-  monitor: 'green',
-  output: 'orange',
-  results: 'pink',
+  research:      'teal',
+  dashboard:     'amber',
+  editor:        'teal',
+  monitor:       'green',
+  output:        'orange',
+  results:       'pink',
   visualization: 'purple',
-  paper: 'amber',
-  settings: 'purple',
-  help: 'teal',
-  data: 'green',
-  datasets: 'orange',
-  marketplace: 'teal',
-  workshop: 'pink',
+  paper:         'amber',
+  settings:      'purple',
+  help:          'teal',
+  data:          'green',
+  datasets:      'orange',
+  marketplace:   'teal',
+  workshop:      'pink',
 }
 
 function hexToRgb(hex: string) {
@@ -145,10 +147,11 @@ function rgbToHex(r: number, g: number, b: number) {
 function blendHex(base: string, overlay: string, ratio = 0.5) {
   const a = hexToRgb(base)
   const b = hexToRgb(overlay)
-  const r = a.r * (1 - ratio) + b.r * ratio
-  const g = a.g * (1 - ratio) + b.g * ratio
-  const bl = a.b * (1 - ratio) + b.b * ratio
-  return rgbToHex(r, g, bl)
+  return rgbToHex(
+    a.r * (1 - ratio) + b.r * ratio,
+    a.g * (1 - ratio) + b.g * ratio,
+    a.b * (1 - ratio) + b.b * ratio,
+  )
 }
 
 function getAdaptiveAccent(theme: ThemeTokens, accentColor: AccentColor, view: View): string {
@@ -181,19 +184,19 @@ export const T: ThemeTokens = new Proxy(DARK, {
   },
 })
 
-export const F = "'IBM Plex Sans','Inter','Segoe UI',sans-serif"
+export const F     = "'IBM Plex Sans','Inter','Segoe UI',sans-serif"
 export const FCODE = "'JetBrains Mono','SF Mono','Fira Code',monospace"
 
 const FS_BASE = {
   xxs: 10,
-  xs: 11,
-  sm: 12,
-  md: 13,
-  lg: 15,
-  xl: 17,
+  xs:  11,
+  sm:  12,
+  md:  13,
+  lg:  15,
+  xl:  17,
   xxl: 20,
-  h3: 23,
-  h2: 28,
+  h3:  23,
+  h2:  28,
 }
 
 export type FontSizeTokens = typeof FS_BASE
@@ -212,60 +215,75 @@ export const FS: FontSizeTokens = new Proxy(FS_BASE, {
 export const FD = "'Sora','Avenir Next','Segoe UI',sans-serif"
 
 export const MOTION = {
-  fast: 0.16,
-  base: 0.24,
-  slow: 0.38,
+  fast:   0.16,
+  base:   0.24,
+  slow:   0.38,
   spring: { type: 'spring' as const, stiffness: 260, damping: 26 },
-  ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
+  ease:   [0.16, 1, 0.3, 1] as [number, number, number, number],
 }
 
 export const ELEVATION = {
-  panel: `0 12px 30px ${T.shadow}, inset 0 1px 0 rgba(255,255,255,0.06)`,
-  floating: `0 22px 42px ${T.shadowHeavy}, inset 0 1px 0 rgba(255,255,255,0.08)`,
-  glow: (color: string) => `0 0 0 1px ${color}35, 0 0 24px ${color}28`,
+  panel:    `0 8px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05)`,
+  floating: `0 18px 40px rgba(0,0,0,0.65), 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)`,
+  glow:     (color: string) => `0 0 0 1px ${color}30, 0 0 20px ${color}22, 0 0 40px ${color}10`,
+}
+
+// Multi-layer glow recipes for bioluminescent accents
+export const GLOW = {
+  soft:   (c: string) => `0 0 12px ${c}18, 0 0 4px ${c}22`,
+  medium: (c: string) => `0 0 20px ${c}28, 0 0 8px ${c}35, 0 0 2px ${c}50`,
+  hard:   (c: string) => `0 0 30px ${c}40, 0 0 12px ${c}55, 0 0 4px ${c}70`,
+  accent: (c: string) => `0 0 0 1px ${c}28, 0 0 16px ${c}25, 0 0 32px ${c}12`,
+}
+
+// Depth shadow recipes tuned for the deep-ink palette
+export const DEPTH = {
+  card:  `0 4px 16px rgba(0,0,0,0.48), 0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)`,
+  float: `0 16px 48px rgba(0,0,0,0.62), 0 6px 16px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.06)`,
+  modal: `0 32px 80px rgba(0,0,0,0.72), 0 12px 28px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.08)`,
 }
 
 export const CONNECTOR_COLORS: Record<string, string> = {
-  dataset: '#5FB8E8',
-  text: '#7B9BE3',
-  model: '#B29CEA',
-  config: '#E08A62',
-  metrics: '#67D57A',
-  embedding: '#DD8FC0',
-  artifact: '#52C6D0',
-  agent: '#E37B83',
-  llm: '#E3B26A',
-  any: '#E9D177',
-  data: '#5FB8E8',
-  external: '#5FB8E8',
-  training: '#B29CEA',
-  intervention: '#E9D177',
+  dataset:      '#5FB8E8',
+  text:         '#7B9BE3',
+  model:        '#B29CEA',
+  config:       '#DE7B4F',
+  metrics:      '#52D975',
+  embedding:    '#D87CB8',
+  artifact:     '#48C8D8',
+  agent:        '#E06070',
+  llm:          '#E8A84A',
+  any:          '#E8D05A',
+  data:         '#5FB8E8',
+  external:     '#5FB8E8',
+  training:     '#B29CEA',
+  intervention: '#E8D05A',
 }
 
 export const CATEGORY_COLORS: Record<string, string> = {
-  external: '#DFA074',
-  data: '#6BBAD9',
-  model: '#A991EB',
-  training: '#7B9BE3',
-  metrics: '#70D68B',
-  embedding: '#DD8FC0',
-  utilities: '#9DA7BC',
-  agents: '#E37B83',
-  interventions: '#E9D177',
-  inference: '#96D588',
-  endpoints: '#62C6B4',
+  external:      '#DE9A68',
+  data:          '#62B8D9',
+  model:         '#9880E8',
+  training:      '#7B9BE3',
+  metrics:       '#65D68B',
+  embedding:     '#D87CB8',
+  utilities:     '#98A4B8',
+  agents:        '#E06070',
+  interventions: '#E8D05A',
+  inference:     '#8FD07A',
+  endpoints:     '#56C4B0',
 }
 
 export const STATUS_COLORS: Record<string, string> = {
-  planning: '#E3B26A',
-  active: '#50D8C0',
-  complete: '#67D57A',
-  paused: '#E9D177',
-  failed: '#E37B83',
-  running: '#E3B26A',
-  pending: '#8D95A4',
-  idle: '#8D95A4',
-  cancelled: '#E08A62',
+  planning:  '#E8A84A',
+  active:    '#3EE8C4',
+  complete:  '#52D975',
+  paused:    '#E8D05A',
+  failed:    '#E06070',
+  running:   '#E8A84A',
+  pending:   '#6E7888',
+  idle:      '#6E7888',
+  cancelled: '#DE7B4F',
 }
 
 export function injectThemeCSSVars(mode: ThemeMode, view?: View) {
@@ -276,28 +294,35 @@ export function injectThemeCSSVars(mode: ThemeMode, view?: View) {
   const activeView = view ?? (typeof (useUIStore as any).getState === 'function'
     ? ((useUIStore as any).getState().activeView as View)
     : 'research')
-  const activeAccent = getAdaptiveAccent(t, accentColor, activeView)
-  const secondaryHue = t[(VIEW_ACCENT_MAP[activeView] || 'purple') as keyof ThemeTokens] as string
+  const activeAccent   = getAdaptiveAccent(t, accentColor, activeView)
+  const secondaryHue   = t[(VIEW_ACCENT_MAP[activeView] || 'purple') as keyof ThemeTokens] as string
 
   const root = document.documentElement
-  root.style.setProperty('--bg', t.bg)
-  root.style.setProperty('--bg-alt', t.bgAlt)
-  root.style.setProperty('--text', t.text)
-  root.style.setProperty('--sec', t.sec)
-  root.style.setProperty('--dim', t.dim)
-  root.style.setProperty('--surface0', t.surface0)
-  root.style.setProperty('--surface1', t.surface1)
-  root.style.setProperty('--surface2', t.surface2)
-  root.style.setProperty('--border', t.border)
-  root.style.setProperty('--border-hi', t.borderHi)
-  root.style.setProperty('--cyan', activeAccent)
-  root.style.setProperty('--hue-glow', activeAccent)
+  root.style.setProperty('--bg',           t.bg)
+  root.style.setProperty('--bg-alt',       t.bgAlt)
+  root.style.setProperty('--text',         t.text)
+  root.style.setProperty('--sec',          t.sec)
+  root.style.setProperty('--dim',          t.dim)
+  root.style.setProperty('--surface0',     t.surface0)
+  root.style.setProperty('--surface1',     t.surface1)
+  root.style.setProperty('--surface2',     t.surface2)
+  root.style.setProperty('--surface3',     t.surface3)
+  root.style.setProperty('--surface4',     t.surface4)
+  root.style.setProperty('--surface5',     t.surface5)
+  root.style.setProperty('--surface6',     t.surface6)
+  root.style.setProperty('--border',       t.border)
+  root.style.setProperty('--border-hi',    t.borderHi)
+  root.style.setProperty('--cyan',         activeAccent)
+  root.style.setProperty('--hue-glow',     activeAccent)
   root.style.setProperty('--hue-secondary', secondaryHue)
-  root.style.setProperty('--shadow', t.shadow)
-  root.style.setProperty('--shadow-heavy', t.shadowHeavy)
-  root.style.setProperty('--shadow-light', t.shadowLight)
-  root.style.setProperty('--scrollbar-thumb', mode === 'light' ? 'rgba(35,52,79,0.22)' : 'rgba(206,214,229,0.18)')
-  root.style.setProperty('--scrollbar-thumb-hover', mode === 'light' ? 'rgba(35,52,79,0.34)' : 'rgba(206,214,229,0.32)')
-  root.style.setProperty('--select-bg', mode === 'light' ? '#FFFFFF' : '#1E232E')
+  // Accent glow at 20% opacity for ambient fill
+  const rgb = hexToRgb(activeAccent)
+  root.style.setProperty('--accent-glow',  `rgba(${rgb.r},${rgb.g},${rgb.b},0.20)`)
+  root.style.setProperty('--shadow',             t.shadow)
+  root.style.setProperty('--shadow-heavy',       t.shadowHeavy)
+  root.style.setProperty('--shadow-light',       t.shadowLight)
+  root.style.setProperty('--scrollbar-thumb',       mode === 'light' ? 'rgba(35,52,79,0.20)' : 'rgba(206,214,229,0.15)')
+  root.style.setProperty('--scrollbar-thumb-hover', mode === 'light' ? 'rgba(35,52,79,0.32)' : 'rgba(206,214,229,0.28)')
+  root.style.setProperty('--select-bg',    mode === 'light' ? '#FFFFFF' : t.surface3)
   root.style.setProperty('--select-color', t.text)
 }
