@@ -51,7 +51,7 @@ A local-first ML experiment workbench for building, running, and analyzing machi
 ## Quick Start
 
 ```bash
-git clone https://github.com/specific-labs/blueprint.git
+git clone https://github.com/santiagoaraoz2001-sketch/blueprint
 cd blueprint
 ./launch.sh
 ```
