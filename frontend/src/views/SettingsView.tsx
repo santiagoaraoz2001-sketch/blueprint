@@ -977,7 +977,7 @@ export default function SettingsView() {
 /* ── Workspace Section ──────────────────────────────────────────── */
 
 function WorkspaceSection() {
-  const { settings, status, loading, fetchSettings, updateSettings, fetchStatus, openInFinder, initialize } = useWorkspaceStore()
+  const { settings, status, fetchSettings, updateSettings, fetchStatus, openInFinder, initialize } = useWorkspaceStore()
   const [browsing, setBrowsing] = useState(false)
 
   useEffect(() => {
