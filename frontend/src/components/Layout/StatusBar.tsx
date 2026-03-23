@@ -1,7 +1,7 @@
 import { T, F, FS } from '@/lib/design-tokens'
 import { useRunStore } from '@/stores/runStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { Circle, Cpu } from 'lucide-react'
+import { Circle, Cpu, Sparkles } from 'lucide-react'
 import NotificationBell from './NotificationBell'
 import { useEffect } from 'react'
 
@@ -21,102 +21,61 @@ export default function StatusBar() {
   }, [fetchHardware])
 
   return (
-    <div
+    <footer
       style={{
-        height: 24,
-        background: T.surface1,
+        height: 30,
+        background: `linear-gradient(180deg, ${T.surface1}f0 0%, ${T.surface0}ef 100%)`,
         borderTop: `1px solid ${T.border}`,
         display: 'flex',
         alignItems: 'center',
         padding: '0 12px',
         gap: 12,
+        backdropFilter: 'blur(8px)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }} role="status" aria-live="polite">
-        <Circle
-          size={4}
-          fill={isRunning ? T.cyan : status === 'failed' ? T.red : T.green}
-          color={isRunning ? T.cyan : status === 'failed' ? T.red : T.green}
-          aria-hidden="true"
-        />
-        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.1em', fontWeight: 900 }}>
-          {isRunning
-            ? 'RUNNING'
-            : status === 'complete'
-              ? 'COMPLETE'
-              : status === 'failed'
-                ? 'FAILED'
-                : 'READY'}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} role="status" aria-live="polite">
+        <Circle size={6} fill={isRunning ? T.amber : status === 'failed' ? T.red : T.green} color={isRunning ? T.amber : status === 'failed' ? T.red : T.green} />
+        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          {isRunning ? 'Running' : status === 'complete' ? 'Complete' : status === 'failed' ? 'Failed' : 'Ready'}
         </span>
       </div>
 
       {isRunning && (
         <>
-          <div
-            style={{
-              width: 120,
-              height: 3,
-              background: T.surface3,
-              overflow: 'hidden',
-            }}
-          >
+          <div style={{ width: 140, height: 5, background: T.surface3, borderRadius: 999, overflow: 'hidden' }}>
             <div
               style={{
                 width: `${Math.round(overallProgress * 100)}%`,
                 height: '100%',
-                background: T.cyan,
-                transition: 'width 0.3s ease',
+                background: `linear-gradient(90deg, ${T.amber}, ${T.cyan})`,
+                transition: 'width 0.25s ease',
               }}
             />
           </div>
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec }}>
-            {Math.round(overallProgress * 100)}%
-          </span>
-
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
-            {formatTime(elapsed)}
-          </span>
-
-          {eta != null && eta > 0 && (
-            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
-              ETA {formatTime(Math.round(eta))}
-            </span>
-          )}
+          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.cyan }}>{Math.round(overallProgress * 100)}%</span>
+          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>{formatTime(elapsed)}</span>
+          {eta != null && eta > 0 && <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>ETA {formatTime(Math.round(eta))}</span>}
         </>
       )}
 
       <div style={{ flex: 1 }} />
 
       {!hardwareLoading && hardware && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: 0.8 }} title={`VRAM: ${hardware.max_vram_gb}GB, Max Model: ${hardware.max_model_size}`}>
-          <Cpu size={12} color={hardware.gpu_available ? T.green : T.dim} />
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.text }}>
-            {hardware.gpu_backend !== 'none' ? hardware.gpu_backend.toUpperCase() : 'CPU'} • {hardware.usable_memory_gb}GB RAM
-          </span>
-          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.cyan, padding: '1px 4px', background: `${T.cyan}15`, borderRadius: 2 }}>
-            UP TO {hardware.max_model_size.toUpperCase()}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }} title={`VRAM ${hardware.max_vram_gb}GB • max ${hardware.max_model_size}`}>
+          <Cpu size={13} color={hardware.gpu_available ? T.green : T.dim} />
+          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec }}>
+            {hardware.gpu_backend !== 'none' ? hardware.gpu_backend.toUpperCase() : 'CPU'} • {hardware.usable_memory_gb}GB
           </span>
         </div>
       )}
 
-      <NotificationBell />
-
       {demoMode && (
-        <span
-          style={{
-            fontFamily: F, fontSize: FS.xxs, fontWeight: 900,
-            letterSpacing: '0.1em', color: T.amber,
-            background: `${T.amber}15`, border: `1px solid ${T.amber}30`,
-            padding: '1px 6px',
-          }}
-        >
-          DEMO
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 999, background: `${T.amber}1d`, border: `1px solid ${T.amber}4f`, color: T.amber, fontFamily: F, fontSize: FS.xxs }}>
+          <Sparkles size={10} /> Demo
         </span>
       )}
 
-      <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
-        {demoMode ? 'DEMO MODE' : 'LOCAL MODE'}
-      </span>
-    </div>
+      <NotificationBell />
+    </footer>
   )
 }

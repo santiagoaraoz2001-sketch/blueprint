@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useState } from 'react'
 import { Handle, Position, useStore } from '@xyflow/react'
-import { T, F, FS } from '@/lib/design-tokens'
+import { T, F, FS, ELEVATION } from '@/lib/design-tokens'
 import { getBlockDefinition, getPortColor, computeBlockWidth } from '@/lib/block-registry'
 import { getIcon } from '@/lib/icon-utils'
 import ProgressBar from '@/components/shared/ProgressBar'
@@ -118,7 +118,7 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
         width: blockWidth,
         background: `linear-gradient(145deg, ${T.surface2} 0%, ${T.surface1} 100%)`,
         backdropFilter: 'blur(16px)',
-        borderRadius: 8,
+        borderRadius: 14,
         border: `1px solid ${
           rerunBorderColor
             ? rerunBorderColor
@@ -134,8 +134,8 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
               : selected
                 ? `0 0 0 1px ${accent}40, 0 8px 32px ${T.shadowHeavy}`
                 : isHovered
-                  ? `0 8px 24px ${T.shadow}, inset 0 1px 0 rgba(255,255,255,0.05)`
-                  : `0 4px 12px ${T.shadow}`,
+                  ? `0 8px 24px ${T.shadow}, inset 0 1px 0 rgba(255,255,255,0.08)`
+                  : ELEVATION.panel,
         position: 'relative',
         overflow: 'visible',
         zIndex: selected || isErrorFocused ? 10 : isHovered ? 5 : 1,
@@ -154,7 +154,7 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
           opacity: isHovered || selected ? 1 : 0.6,
           transition: 'opacity 0.2s',
           boxShadow: `0 0 8px ${accent}40`,
-          borderRadius: '8px 8px 0 0',
+          borderRadius: '14px 14px 0 0',
         }}
       />
 
@@ -263,7 +263,7 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
             height: 60,
             background: `radial-gradient(100% 100% at 50% 0%, ${accent}15 0%, transparent 100%)`,
             pointerEvents: 'none',
-            borderRadius: '8px 8px 0 0',
+            borderRadius: '14px 14px 0 0',
           }}
         />
       )}

@@ -10,7 +10,7 @@ import {
   BackgroundVariant,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { T, F, FD, FS } from '@/lib/design-tokens'
+import { T, F, FD, FS, ELEVATION } from '@/lib/design-tokens'
 import { LayoutTemplate, Sparkles as SparklesIcon, Search as SearchIcon } from 'lucide-react'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -490,8 +490,11 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
         height: '100%',
         position: 'relative',
         overflow: 'hidden',
-        transition: 'box-shadow 0.2s',
-        boxShadow: isDragOver ? `inset 0 0 0 2px ${T.cyan}60, inset 0 0 40px ${T.cyan}10` : 'none',
+        border: `1px solid ${T.border}`,
+        borderRadius: 16,
+        transition: 'box-shadow 0.2s, border-color 0.2s',
+        boxShadow: isDragOver ? `inset 0 0 0 2px ${T.cyan}60, inset 0 0 60px ${T.cyan}12, ${ELEVATION.floating}` : ELEVATION.panel,
+        background: `linear-gradient(180deg, ${T.surface1}f0 0%, ${T.surface0}e8 100%)`,
       }}
     >
       <QuickPalette
@@ -513,6 +516,18 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
       />
 
       <InheritanceOverlay />
+
+      {/* Atmospheric underlay */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 0,
+          background:
+            `radial-gradient(circle at 15% 15%, ${T.blue}22 0%, transparent 34%), radial-gradient(circle at 83% 22%, ${T.cyan}20 0%, transparent 36%), radial-gradient(circle at 52% 85%, ${T.purple}20 0%, transparent 40%)`,
+        }}
+      />
 
       {/* 3D perspective grid underlay */}
       <div
@@ -668,16 +683,17 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
         selectionOnDrag
       >
         <Background
-          color={`${T.border}`}
-          gap={16}
+          color={`${T.borderHi}77`}
+          gap={20}
           size={1}
           variant={BackgroundVariant.Dots}
         />
         <Controls
           style={{
-            background: T.surface2,
-            border: `1px solid ${T.border}`,
-            borderRadius: 0,
+            background: `${T.surface2}d8`,
+            border: `1px solid ${T.borderHi}`,
+            borderRadius: 12,
+            boxShadow: ELEVATION.panel,
           }}
         />
         <MiniMap
@@ -686,9 +702,10 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
           }}
           maskColor={T.shadowHeavy}
           style={{
-            background: T.surface1,
-            border: `1px solid ${T.border}`,
-            borderRadius: 0,
+            background: `${T.surface1}de`,
+            border: `1px solid ${T.borderHi}`,
+            borderRadius: 12,
+            boxShadow: ELEVATION.panel,
           }}
         />
       </ReactFlow>

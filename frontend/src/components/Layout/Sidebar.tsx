@@ -23,214 +23,184 @@ import {
   Activity,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { motion } from 'framer-motion'
 
-// Injected at build time by vite.config.ts define
 const APP_VERSION: string = __APP_VERSION__
 
 interface NavItem {
   id: View
   label: string
   icon: LucideIcon
+  group: 'build' | 'run' | 'analyze' | 'write' | 'system'
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'research', label: 'Research', icon: Home },
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'editor', label: 'Pipelines', icon: GitBranch },
-  { id: 'datasets', label: 'Datasets', icon: Database },
-  { id: 'data', label: 'Data', icon: Table2 },
-  { id: 'marketplace', label: 'Blocks', icon: Blocks },
-  { id: 'workshop', label: 'Workshop', icon: Wrench },
-  { id: 'monitor', label: 'Monitor', icon: Activity },
-  { id: 'output', label: 'Outputs', icon: Terminal },
-  { id: 'results', label: 'Results', icon: BarChart3 },
-  { id: 'visualization', label: 'Charts', icon: LineChart },
-  { id: 'paper', label: 'Paper', icon: FileText },
-  { id: 'settings', label: 'Settings', icon: Settings },
-  { id: 'help', label: 'Help', icon: HelpCircle },
+  { id: 'research', label: 'Workspace', icon: Home, group: 'build' },
+  { id: 'dashboard', label: 'Projects', icon: LayoutDashboard, group: 'build' },
+  { id: 'editor', label: 'Pipeline', icon: GitBranch, group: 'build' },
+  { id: 'datasets', label: 'Datasets', icon: Database, group: 'build' },
+  { id: 'marketplace', label: 'Blocks', icon: Blocks, group: 'build' },
+  { id: 'monitor', label: 'Mission', icon: Activity, group: 'run' },
+  { id: 'output', label: 'Outputs', icon: Terminal, group: 'run' },
+  { id: 'results', label: 'Results', icon: BarChart3, group: 'analyze' },
+  { id: 'data', label: 'Data Grid', icon: Table2, group: 'analyze' },
+  { id: 'visualization', label: 'Charts', icon: LineChart, group: 'analyze' },
+  { id: 'paper', label: 'Paper', icon: FileText, group: 'write' },
+  { id: 'workshop', label: 'Workshop', icon: Wrench, group: 'write' },
+  { id: 'settings', label: 'Settings', icon: Settings, group: 'system' },
+  { id: 'help', label: 'Help', icon: HelpCircle, group: 'system' },
 ]
 
 const SIMPLE_HIDDEN_VIEWS: Set<View> = new Set(['paper', 'workshop'])
+const GROUP_LABELS: Record<NavItem['group'], string> = {
+  build: 'Build',
+  run: 'Run',
+  analyze: 'Analyze',
+  write: 'Write',
+  system: 'System',
+}
 
 export default function Sidebar() {
   const { activeView, setView, sidebarCollapsed, toggleSidebar, selectedProjectId } = useUIStore()
   const projects = useProjectStore((s) => s.projects)
   const features = useSettingsStore((s) => s.features)
   const isSimple = useIsSimpleMode()
-  const width = sidebarCollapsed ? 48 : 180
+  const width = sidebarCollapsed ? 64 : 236
 
   const activeProject = projects.find((p) => p.id === selectedProjectId)
+  const navItems = (isSimple ? NAV_ITEMS.filter((item) => !SIMPLE_HIDDEN_VIEWS.has(item.id)) : NAV_ITEMS).filter(
+    (item) => item.id !== 'marketplace' || features?.marketplace,
+  )
 
   return (
-    <div
+    <aside
       style={{
         width,
         minWidth: width,
         height: '100%',
-        background: T.surface1,
+        background: `linear-gradient(180deg, ${T.surface1}ee 0%, ${T.surface0}d8 100%)`,
         borderRight: `1px solid ${T.border}`,
         display: 'flex',
         flexDirection: 'column',
-        transition: 'width 0.15s ease',
         overflow: 'hidden',
+        transition: 'width 0.2s ease',
+        backdropFilter: 'blur(12px)',
       }}
     >
-      {/* Collapse / Expand toggle */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: sidebarCollapsed ? 'center' : 'flex-end',
-          padding: sidebarCollapsed ? '8px 0' : '8px 8px',
-          borderBottom: `1px solid ${T.border}`,
-        }}
-      >
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', padding: '12px 10px 8px', borderBottom: `1px solid ${T.border}` }}>
+        {!sidebarCollapsed && (
+          <span style={{ fontFamily: F, fontSize: FS.xs, color: T.dim, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            Navigation
+          </span>
+        )}
+        <button
           onClick={toggleSidebar}
           aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 28,
-            height: 28,
-            background: 'none',
-            border: `1px solid ${T.border}`,
-            borderRadius: 6,
-            color: T.dim,
+            width: 30,
+            height: 30,
+            borderRadius: 9,
+            border: `1px solid ${T.borderHi}`,
+            background: `${T.surface2}cc`,
+            color: T.sec,
             cursor: 'pointer',
-            transition: 'color 0.15s, border-color 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = T.text
-            e.currentTarget.style.borderColor = T.borderHi
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = T.dim
-            e.currentTarget.style.borderColor = T.border
+            display: 'grid',
+            placeItems: 'center',
           }}
         >
           {sidebarCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-        </motion.button>
+        </button>
       </div>
 
-      <nav style={{ flex: 1, paddingTop: 6 }}>
-        {(isSimple ? NAV_ITEMS.filter((item) => !SIMPLE_HIDDEN_VIEWS.has(item.id)) : NAV_ITEMS)
-          .filter((item) => item.id !== 'marketplace' || features?.marketplace)
-          .map((item, index) => {
-          const active = activeView === item.id || (item.id === 'research' && activeView === 'research-detail')
-          const Icon = item.icon
-          return (
-            <motion.button
-              key={item.id}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.06, duration: 0.3 }}
-              whileHover={{ scale: 1.02, x: 3 }}
-              onClick={() => setView(item.id)}
-              aria-label={item.label}
-              aria-current={active ? 'page' : undefined}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                width: '100%',
-                padding: sidebarCollapsed ? '9px 0' : '9px 12px',
-                justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                background: active ? `${T.cyan}08` : 'transparent',
-                border: 'none',
-                borderLeft: active ? `2px solid ${T.cyan}` : '2px solid transparent',
-                color: active ? T.text : T.dim,
-                fontFamily: F,
-                fontSize: FS.sm,
-                fontWeight: active ? 900 : 500,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                transition: 'all 0.15s ease',
-                position: 'relative',
-                cursor: 'pointer',
-                boxShadow: active
-                  ? `0 0 8px ${T.cyan}30, inset 0 0 4px ${T.cyan}15`
-                  : 'none',
-                animation: active ? 'sidebar-active-glow 2.5s ease-in-out infinite' : 'none',
-              }}
-              onMouseEnter={(e) => {
-                if (!active) {
-                  e.currentTarget.style.background = T.surface2
-                  e.currentTarget.style.color = T.sec
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!active) {
-                  e.currentTarget.style.background = 'transparent'
-                  e.currentTarget.style.color = T.dim
-                }
-              }}
-            >
-              <Icon size={13} strokeWidth={active ? 2.5 : 1.5} />
-              {!sidebarCollapsed && <span>{item.label}</span>}
+      <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 12px' }}>
+        {(['build', 'run', 'analyze', 'write', 'system'] as NavItem['group'][]).map((group) => {
+          const items = navItems.filter((item) => item.group === group)
+          if (items.length === 0) return null
 
-              {/* Injected keyframes for active glow pulse */}
-              {active && (
-                <style>{`
-                  @keyframes sidebar-active-glow {
-                    0%, 100% { box-shadow: 0 0 6px ${T.cyan}20, inset 0 0 3px ${T.cyan}10; }
-                    50% { box-shadow: 0 0 12px ${T.cyan}40, inset 0 0 6px ${T.cyan}25; }
-                  }
-                `}</style>
+          return (
+            <div key={group} style={{ marginBottom: 10 }}>
+              {!sidebarCollapsed && (
+                <div style={{ padding: '6px 10px', fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.09em', textTransform: 'uppercase' }}>
+                  {GROUP_LABELS[group]}
+                </div>
               )}
-            </motion.button>
+              {items.map((item) => {
+                const active = activeView === item.id || (item.id === 'research' && activeView === 'research-detail')
+                const Icon = item.icon
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setView(item.id)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: sidebarCollapsed ? '10px 0' : '10px 12px',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      borderRadius: 10,
+                      border: `1px solid ${active ? `${T.cyan}66` : 'transparent'}`,
+                      marginBottom: 4,
+                      background: active ? `${T.cyan}1c` : 'transparent',
+                      color: active ? T.text : T.dim,
+                      cursor: 'pointer',
+                      transition: 'all 0.16s ease',
+                      fontFamily: F,
+                      fontSize: FS.sm,
+                      letterSpacing: '0.04em',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!active) {
+                        e.currentTarget.style.background = `${T.surface2}cc`
+                        e.currentTarget.style.color = T.sec
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active) {
+                        e.currentTarget.style.background = 'transparent'
+                        e.currentTarget.style.color = T.dim
+                      }
+                    }}
+                  >
+                    <Icon size={15} />
+                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  </button>
+                )
+              })}
+            </div>
           )
         })}
       </nav>
 
-      {/* Active Project Indicator */}
       <div
         role="button"
         tabIndex={0}
-        aria-label={activeProject ? `Active project: ${activeProject.name}` : 'No active project'}
         onClick={() => setView('dashboard')}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setView('dashboard') }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') setView('dashboard')
+        }}
         style={{
-          padding: sidebarCollapsed ? '8px 4px' : '8px 12px',
           borderTop: `1px solid ${T.border}`,
-          cursor: 'pointer',
+          borderBottom: `1px solid ${T.border}`,
+          padding: sidebarCollapsed ? '10px 4px' : '10px 12px',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
           gap: 8,
-          transition: 'background 0.15s ease',
+          cursor: 'pointer',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = T.surface2 }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
       >
-        <FolderOpen size={12} color={activeProject ? T.cyan : T.dim} />
+        <FolderOpen size={13} color={activeProject ? T.cyan : T.dim} />
         {!sidebarCollapsed && (
-          <span style={{
-            fontFamily: F, fontSize: FS.xxs, color: activeProject ? T.sec : T.dim,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            flex: 1, letterSpacing: '0.04em',
-          }}>
-            {activeProject ? activeProject.name : 'No project'}
+          <span style={{ fontFamily: F, fontSize: FS.xs, color: activeProject ? T.sec : T.dim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {activeProject?.name || 'No project selected'}
           </span>
         )}
       </div>
 
-      {/* Version */}
-      <div
-        style={{
-          padding: sidebarCollapsed ? '8px 0' : '8px 14px',
-          textAlign: sidebarCollapsed ? 'center' : 'left',
-          borderTop: `1px solid ${T.border}`,
-        }}
-      >
-        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.06em' }}>
-          {sidebarCollapsed ? `v${APP_VERSION.split('.').slice(0, 2).join('.')}` : `v${APP_VERSION}`}
-        </span>
+      <div style={{ padding: sidebarCollapsed ? '10px 0' : '10px 12px', textAlign: sidebarCollapsed ? 'center' : 'left' }}>
+        <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.06em' }}>v{APP_VERSION}</span>
       </div>
-    </div>
+    </aside>
   )
 }
