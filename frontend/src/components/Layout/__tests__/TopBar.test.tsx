@@ -13,7 +13,7 @@ vi.mock('@/stores/guideStore', () => ({
 describe('TopBar', () => {
   it('renders app brand and active view label', () => {
     render(<TopBar />)
-    expect(screen.getByText('BLUEPRINT')).toBeInTheDocument()
+    expect(screen.getByText('Blueprint')).toBeInTheDocument()
     expect(screen.getByText('Build')).toBeInTheDocument()
   })
 })

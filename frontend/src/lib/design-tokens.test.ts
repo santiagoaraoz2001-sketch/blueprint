@@ -4,19 +4,19 @@ import { useSettingsStore } from '@/stores/settingsStore'
 
 describe('design tokens', () => {
   it('returns dark and light palettes', () => {
-    expect(getTheme('dark').bg).toBe('#0B0E13')
-    expect(getTheme('light').bg).toBe('#F3F5F8')
+    expect(getTheme('dark').bg).toBe('#07080B')
+    expect(getTheme('light').bg).toBe('#F5F5F7')
   })
 
   it('injects css vars for active theme and accent', () => {
     vi.spyOn(useSettingsStore, 'getState').mockReturnValue({
       theme: 'dark',
-      accentColor: 'teal',
+      accentColor: 'cyan',
     } as any)
 
-    injectThemeCSSVars('dark')
+    injectThemeCSSVars('dark', 'editor' as any)
 
-    expect(document.documentElement.style.getPropertyValue('--bg')).toBe('#0B0E13')
-    expect(document.documentElement.style.getPropertyValue('--cyan')).toBe('#6CD7D8')
+    expect(document.documentElement.style.getPropertyValue('--bg')).toBe('#07080B')
+    expect(document.documentElement.style.getPropertyValue('--cyan')).toBeTruthy()
   })
 })

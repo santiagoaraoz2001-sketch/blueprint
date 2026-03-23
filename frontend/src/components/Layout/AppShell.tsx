@@ -48,7 +48,7 @@ function AmbientNebula() {
           position: 'absolute',
           inset: 0,
           background:
-            'radial-gradient(circle at 12% 14%, rgba(111,178,255,0.18), transparent 38%), radial-gradient(circle at 88% 12%, rgba(73,217,203,0.16), transparent 42%), radial-gradient(circle at 50% 82%, rgba(228,147,198,0.14), transparent 46%)',
+            'radial-gradient(circle at 12% 14%, color-mix(in srgb, var(--hue-secondary) 22%, transparent), transparent 40%), radial-gradient(circle at 86% 12%, color-mix(in srgb, var(--hue-glow) 20%, transparent), transparent 42%), radial-gradient(circle at 50% 82%, rgba(221,143,192,0.13), transparent 46%)',
           animation: 'nebula-pulse 8s ease-in-out infinite',
         }}
       />

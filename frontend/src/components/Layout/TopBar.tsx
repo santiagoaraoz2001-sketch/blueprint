@@ -31,10 +31,10 @@ export default function TopBar() {
       style={{
         flexShrink: 0,
         zIndex: 40,
+        overflow: 'visible',
         position: 'relative',
-        background: `linear-gradient(180deg, ${T.surface2}ee 0%, ${T.surface1}d8 100%)`,
-        borderBottom: `1px solid ${T.border}`,
-        backdropFilter: 'blur(14px)',
+        background: `linear-gradient(180deg, ${T.surface3}f0 0%, ${T.surface1}e8 100%)`,
+        borderBottom: `1px solid ${T.borderHi}`,
         boxShadow: ELEVATION.panel,
         ...dragStyle,
       }}
@@ -42,57 +42,87 @@ export default function TopBar() {
       <div
         style={{
           position: 'absolute',
-          inset: 0,
-          background:
-            'linear-gradient(90deg, transparent 0%, rgba(73,217,203,0.15) 35%, rgba(111,178,255,0.18) 62%, transparent 100%)',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 1,
+          background: `linear-gradient(90deg, transparent 0%, var(--hue-glow) 28%, var(--hue-secondary) 72%, transparent 100%)`,
           pointerEvents: 'none',
+          overflow: 'hidden',
         }}
-      />
+      >
+        <motion.div
+          animate={{ x: ['-100%', '200%'] }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '40%',
+            height: 1,
+            background: `linear-gradient(90deg, transparent, ${T.cyan}, transparent)`,
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
+
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          padding: isElectron ? '10px 16px 10px 84px' : '10px 16px',
+          padding: isElectron ? '8px 14px 8px 80px' : '8px 14px',
+          height: 54,
           gap: 12,
-          position: 'relative',
-          zIndex: 1,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, ...noDragStyle }}>
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 9,
-              background: `radial-gradient(circle at 28% 28%, ${T.cyan}, ${T.blue})`,
-              boxShadow: `0 0 24px ${T.cyan}66`,
-            }}
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
-            <span style={{ fontFamily: FD, fontSize: FS.md, color: T.text, fontWeight: 600, letterSpacing: '0.04em' }}>
-              BLUEPRINT
-            </span>
-            <span style={{ fontFamily: F, fontSize: FS.xs, color: T.dim, letterSpacing: '0.08em' }}>
-              local-first ml instrument
-            </span>
-          </div>
-        </div>
-
-        <div style={{ flex: 1 }} />
-
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            border: `1px solid ${T.borderHi}`,
-            background: `${T.surface2}cc`,
-            borderRadius: 999,
+            gap: 10,
+            flexShrink: 0,
+            border: `1px solid ${T.border}`,
+            background: `${T.surface2}e8`,
+            borderRadius: 12,
             padding: '6px 10px',
-            color: T.sec,
+            boxShadow: `0 0 24px ${T.cyan}20`,
             ...noDragStyle,
           }}
         >
+          <div style={{ display: 'flex', alignItems: 'center', height: 30 }}>
+            <motion.div
+              animate={{
+                filter: [
+                  'drop-shadow(0 0 2px rgba(80, 216, 192, 0))',
+                  'drop-shadow(0 0 8px rgba(80, 216, 192, 0.32))',
+                  'drop-shadow(0 0 2px rgba(80, 216, 192, 0))',
+                ],
+              }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ display: 'flex', alignItems: 'center', height: '100%' }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 160" style={{ height: '100%', width: 'auto' }}>
+                <g textRendering="geometricPrecision" shapeRendering="geometricPrecision">
+                  <g transform="translate(0, 20)">
+                    <path fill={T.text} d="M 0,0 H 120 V 120 H 96 V 24 H 0 Z" />
+                    <circle fill={T.cyan} cx="36" cy="84" r="36" />
+                  </g>
+                  <g transform="translate(160, 0)">
+                    <text x="-3" y="70" style={{ fontFamily: FD, fontWeight: 700, fontSize: 72, letterSpacing: '0.4em', fill: T.text }}>SPECIFIC</text>
+                    <text x="0" y="140" style={{ fontFamily: FD, fontWeight: 500, fontSize: 72, letterSpacing: '0.4em', fill: T.text }}>LABS</text>
+                  </g>
+                </g>
+              </svg>
+            </motion.div>
+          </div>
+          <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            Blueprint
+          </span>
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${T.border}`, background: `${T.surface2}d8`, borderRadius: 999, padding: '6px 10px', ...noDragStyle }}>
           <Compass size={14} color={T.cyan} />
           <span style={{ fontFamily: F, fontSize: FS.xs, letterSpacing: '0.06em', color: T.text }}>
             {viewLabels[activeView] || activeView}

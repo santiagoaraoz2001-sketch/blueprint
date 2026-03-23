@@ -118,8 +118,8 @@ export default function App() {
 
   // Inject CSS variables whenever theme changes
   useEffect(() => {
-    injectThemeCSSVars(theme)
-  }, [theme])
+    injectThemeCSSVars(theme, activeView)
+  }, [theme, activeView])
 
   // Handle URL params for monitor popout and deep linking
   useEffect(() => {

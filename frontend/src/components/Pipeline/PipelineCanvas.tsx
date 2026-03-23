@@ -525,7 +525,7 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
           pointerEvents: 'none',
           zIndex: 0,
           background:
-            `radial-gradient(circle at 15% 15%, ${T.blue}22 0%, transparent 34%), radial-gradient(circle at 83% 22%, ${T.cyan}20 0%, transparent 36%), radial-gradient(circle at 52% 85%, ${T.purple}20 0%, transparent 40%)`,
+            `radial-gradient(circle at 15% 15%, ${T.purple}1f 0%, transparent 34%), radial-gradient(circle at 83% 22%, ${T.cyan}1d 0%, transparent 36%), radial-gradient(circle at 52% 85%, ${T.amber}19 0%, transparent 40%)`,
         }}
       />
 
