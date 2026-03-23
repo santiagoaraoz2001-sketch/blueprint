@@ -825,7 +825,7 @@ function ConnectorDetailPopup({
 }) {
   const color = CONNECTOR_COLORS[connectorType] || T.dim
   const desc = CONNECTOR_DESCRIPTIONS[connectorType]
-  if (!desc) { onClose(); return null }
+  if (!desc) return null
 
   // Find blocks that use this connector type as input or output
   const inputBlocks = BLOCK_REGISTRY.filter(b => !b.deprecated && b.inputs.some(p => p.dataType === connectorType))

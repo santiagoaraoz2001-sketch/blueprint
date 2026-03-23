@@ -13,7 +13,7 @@ import ValidationPanel from '@/components/Pipeline/ValidationPanel'
 import PipelineTabBar from '@/components/Pipeline/PipelineTabBar'
 import { validatePipelineClient, type DiagnosticReport } from '@/lib/pipeline-validator'
 import PipelineMonitor, { type MonitorBlock } from '@/components/Pipeline/PipelineMonitor'
-import { Save, Download, Upload, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp } from 'lucide-react'
+import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp } from 'lucide-react'
 import TemplateGallery from '@/components/Pipeline/TemplateGallery'
 import ToolbarDropdown from '@/components/Pipeline/ToolbarDropdown'
 import MissionController from '@/components/Mission/MissionController'
@@ -118,7 +118,16 @@ export default function PipelineEditorView() {
     }
   }, [runStatus, activeTabId, updateTabRunStatus])
 
-  // Keyboard shortcuts (Undo/Redo)
+  const handleSave = useCallback(async () => {
+    try {
+      await savePipeline()
+      toast.success('Pipeline saved')
+    } catch {
+      toast.error('Failed to save pipeline')
+    }
+  }, [savePipeline])
+
+  // Keyboard shortcuts (Undo/Redo/Save)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if user is typing in an input/textarea
@@ -141,16 +150,7 @@ export default function PipelineEditorView() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [undo, redo])
-
-  const handleSave = async () => {
-    try {
-      await savePipeline()
-      toast.success('Pipeline saved')
-    } catch {
-      toast.error('Failed to save pipeline')
-    }
-  }
+  }, [undo, redo, handleSave])
 
   const handleImport = useCallback(() => {
     fileInputRef.current?.click()

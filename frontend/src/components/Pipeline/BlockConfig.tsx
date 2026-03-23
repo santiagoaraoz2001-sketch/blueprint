@@ -8,7 +8,7 @@ import { Trash2, X, Save, ChevronDown, ChevronRight, AlertTriangle, GitBranch, F
 import type { Node } from '@xyflow/react'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { api } from '@/api/client'
-import RecommendedBlocks, { computeRecommendations, type Recommendation } from './RecommendedBlocks'
+import RecommendedBlocks, { computeRecommendations } from './RecommendedBlocks'
 import { useIsSimpleMode } from '@/hooks/useIsSimpleMode'
 import InheritedFieldBadge from './InheritedFieldBadge'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'

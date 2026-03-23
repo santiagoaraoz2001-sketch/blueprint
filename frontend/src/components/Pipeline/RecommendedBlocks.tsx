@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { T, F, FS } from '@/lib/design-tokens'
-import { BLOCK_REGISTRY, type BlockDefinition, isPortCompatible, getPortNames, findBestInputPort } from '@/lib/block-registry'
+import { BLOCK_REGISTRY, type BlockDefinition, isPortCompatible, getPortNames } from '@/lib/block-registry'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { getIcon } from '@/lib/icon-utils'
 import { Sparkles, Plus, Lightbulb, ArrowDownToLine, ArrowUpFromLine, Zap } from 'lucide-react'
