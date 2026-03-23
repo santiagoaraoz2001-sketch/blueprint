@@ -10,6 +10,7 @@ CUSTOM_BLOCKS_DIR = BASE_DIR / "custom_blocks"
 PIPELINES_DIR = BASE_DIR / "pipelines"
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
 SNAPSHOTS_DIR = BASE_DIR / "snapshots"
+DATASETS_DIR = BASE_DIR / "datasets"
 
 # Built-in blocks shipped with the app
 BUILTIN_BLOCKS_DIR = Path(__file__).parent.parent / "blocks"
@@ -25,5 +26,5 @@ ENABLE_MARKETPLACE = os.environ.get("BLUEPRINT_ENABLE_MARKETPLACE", "false").low
 
 # Ensure all directories exist
 def ensure_dirs():
-    for d in [BASE_DIR, MLFLOW_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR, PIPELINES_DIR, ARTIFACTS_DIR, SNAPSHOTS_DIR]:
+    for d in [BASE_DIR, MLFLOW_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR, PIPELINES_DIR, ARTIFACTS_DIR, SNAPSHOTS_DIR, DATASETS_DIR]:
         d.mkdir(parents=True, exist_ok=True)

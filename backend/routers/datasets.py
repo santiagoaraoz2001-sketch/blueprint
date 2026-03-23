@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.dataset import Dataset
 from ..schemas.dataset import DatasetCreate, DatasetResponse
-from ..config import SNAPSHOTS_DIR
+from ..config import DATASETS_DIR, SNAPSHOTS_DIR
 
 _logger = logging.getLogger("blueprint.datasets")
 
@@ -47,6 +47,113 @@ def register_dataset(data: DatasetCreate, db: Session = Depends(get_db)):
     db.add(dataset)
     db.commit()
     db.refresh(dataset)
+    return dataset
+
+
+# ---------------------------------------------------------------------------
+# HuggingFace dataset import
+# ---------------------------------------------------------------------------
+
+class HFDatasetImportRequest(BaseModel):
+    dataset_id: str
+    subset: str = ""
+    split: str = "train"
+    max_samples: int = 0
+    tags: list[str] = []
+
+
+@router.post("/import/huggingface", response_model=DatasetResponse, status_code=201)
+def import_huggingface_dataset(
+    req: HFDatasetImportRequest,
+    db: Session = Depends(get_db),
+):
+    """Download a dataset from HuggingFace Hub and register it locally."""
+
+    if not req.dataset_id or "/" not in req.dataset_id:
+        raise HTTPException(400, "dataset_id must be in 'org/name' format (e.g. 'stanfordnlp/imdb')")
+
+    # Check for duplicate import
+    split_tag = f"split:{req.split}"
+    subset_tag = f"subset:{req.subset}" if req.subset else ""
+    existing = (
+        db.query(Dataset)
+        .filter(Dataset.source == "huggingface", Dataset.name == req.dataset_id)
+        .all()
+    )
+    for ds in existing:
+        tags = ds.tags or []
+        if split_tag in tags and (not req.subset or subset_tag in tags):
+            _logger.info("Dataset %s (split=%s) already imported, returning existing", req.dataset_id, req.split)
+            return ds
+
+    # Sanitize dataset_id for use as directory name
+    safe_name = req.dataset_id.replace("/", "--")
+    split_suffix = req.split or "train"
+    if req.subset:
+        split_suffix = f"{req.subset}_{split_suffix}"
+    save_dir = DATASETS_DIR / "hf" / safe_name
+    save_dir.mkdir(parents=True, exist_ok=True)
+    save_path = save_dir / f"{split_suffix}.json"
+
+    try:
+        from datasets import load_dataset
+    except ImportError:
+        raise HTTPException(
+            500,
+            "The 'datasets' library is required for HuggingFace imports. "
+            "Install it with: pip install datasets",
+        )
+
+    _logger.info("Importing HF dataset %s (split=%s, subset=%s)", req.dataset_id, req.split, req.subset)
+
+    try:
+        load_kwargs: dict[str, Any] = {
+            "path": req.dataset_id,
+            "split": req.split or "train",
+        }
+        if req.subset:
+            load_kwargs["name"] = req.subset
+
+        ds_hf = load_dataset(**load_kwargs)
+
+        if req.max_samples and req.max_samples > 0:
+            ds_hf = ds_hf.select(range(min(req.max_samples, len(ds_hf))))
+
+        rows = [dict(row) for row in ds_hf]
+        with open(save_path, "w") as f:
+            json.dump(rows, f, default=str)
+
+        row_count = len(rows)
+        col_names = list(rows[0].keys()) if rows else []
+        size_bytes = save_path.stat().st_size
+
+    except Exception as exc:
+        _logger.error("HF dataset import failed for %s: %s", req.dataset_id, exc)
+        raise HTTPException(500, f"Failed to download dataset: {exc}")
+
+    # Build tags
+    import_tags = ["huggingface", split_tag]
+    if req.subset:
+        import_tags.append(subset_tag)
+    import_tags.extend(req.tags)
+
+    dataset = Dataset(
+        id=str(uuid.uuid4()),
+        name=req.dataset_id,
+        source="huggingface",
+        source_path=str(save_path),
+        description=f"Imported from HuggingFace Hub: {req.dataset_id} (split={req.split})",
+        row_count=row_count,
+        size_bytes=size_bytes,
+        column_count=len(col_names),
+        columns=col_names,
+        tags=import_tags,
+    )
+    db.add(dataset)
+    db.commit()
+    db.refresh(dataset)
+
+    _logger.info("Imported HF dataset %s: %d rows, %d bytes", req.dataset_id, row_count, size_bytes)
     return dataset
 
 

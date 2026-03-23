@@ -191,7 +191,7 @@ def register_block_artifacts(
                 file_path=file_path,
                 size_bytes=size_bytes,
                 hash=file_hash,
-                metadata={},
+                metadata_={},
                 created_at=datetime.now(timezone.utc),
             )
             db.add(artifact)

@@ -18,7 +18,7 @@ class Artifact(Base):
     size_bytes = Column(Integer, default=0)
     hash = Column(String, nullable=True)  # SHA-256
 
-    metadata = Column(JSON, default=dict)
+    metadata_ = Column("metadata", JSON, default=dict)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
