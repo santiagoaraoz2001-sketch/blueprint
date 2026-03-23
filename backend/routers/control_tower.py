@@ -40,7 +40,7 @@ def write_heartbeat():
     lock_file.write_text(json.dumps({
         "pid": os.getpid(),
         "timestamp": time.time(),
-        "version": "0.1.0",
+        "version": "0.2.0",
         "service": "blueprint"
     }))
     return {"status": "ok"}

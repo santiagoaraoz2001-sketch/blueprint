@@ -10,13 +10,31 @@ A local-first ML experiment workbench for building, running, and analyzing machi
 
 ## Features
 
-- **Visual Pipeline Editor** — Drag-and-drop canvas powered by React Flow to design ML workflows
-- **20+ Block Types** — Data loaders, transformers, model trainers, evaluators, exporters, and more
-- **Real-Time Execution Monitoring** — Watch your pipeline run step by step with live status and logs
+- **Visual Pipeline Editor** — Drag-and-drop canvas powered by React Flow to design ML workflows with real-time validation
+- **118 ML Blocks** across 9 categories — data, training, inference, evaluation, agents, flow control, merge, output, and endpoints
+- **Real-Time Execution Monitoring** — Watch pipelines run step by step with live status, logs, and a Control Tower dashboard
 - **Model Hub** — Browse and pull models from Hugging Face, Ollama, and local sources
 - **Results & Metrics Dashboard** — Interactive charts and tables for accuracy, loss, confusion matrices, and custom metrics
+- **Config Inheritance** — Block configurations cascade through pipelines with override support
+- **GPU Acceleration** — MPS/Metal support on macOS for on-device ML
+- **Artifact Registry** — Track and browse outputs across pipeline runs
+- **HuggingFace Integration** — Import datasets via Chrome extension, push models to the Hub
 - **Paper Writing Tool** — Draft experiment write-ups alongside your results
 - **Local-First** — Runs entirely on your machine with support for Ollama and MLX for local LLM inference
+
+### Block Categories
+
+| Category | Blocks | Examples |
+|----------|--------|----------|
+| Data | 34 | HuggingFace loader, dataset builder, splitter, augmentation, synthetic data generation |
+| Evaluation | 24 | LM-Eval Harness, MMLU, toxicity, bias/fairness, RAG eval, A/B testing |
+| Inference | 18 | LLM inference, chat completion, embeddings, RAG pipeline, model router |
+| Flow | 17 | Quality gates, human review, conditional branching, loops, parallel fan-out |
+| Training | 12 | LoRA, QLoRA, DPO, RLHF/PPO, distillation, hyperparameter sweeps |
+| Agents | 9 | Multi-agent debate, chain-of-thought, code agent, retrieval agent, orchestrator |
+| Endpoints | 8 | API publisher, HF Hub push, webhook trigger, database writer |
+| Output | 5 | CSV/JSON/Parquet/YAML export, report generator, model card writer |
+| Merge | 5 | SLERP, TIES, DARE, Mergekit, Frankenmerge |
 
 ---
 
@@ -89,28 +107,35 @@ Produces platform-specific installers in `frontend/out/make/`.
 ```
 blueprint/
 ├── launch.sh               # One-command launcher
-├── backend/                # FastAPI backend
+├── backend/                # FastAPI backend (22 routers, 14-module execution engine)
 │   ├── main.py             # Application entry point
-│   ├── models/             # SQLAlchemy models
+│   ├── models/             # SQLAlchemy models (11 tables)
 │   ├── routers/            # API route handlers
 │   ├── engine/             # Pipeline execution engine
-│   ├── services/           # Business logic
+│   ├── services/           # Business logic & LLM block generation
+│   ├── connectors/         # HuggingFace, Jupyter, W&B integrations
+│   ├── plugins/            # Plugin system
 │   ├── alembic/            # Database migrations
 │   └── requirements.txt
 ├── frontend/               # React + Vite frontend
 │   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── stores/         # Zustand state stores
-│   │   ├── pages/          # Top-level page views
+│   │   ├── components/     # React components (18 modules)
+│   │   ├── views/          # Page views (20 views)
+│   │   ├── stores/         # Zustand state stores (23 stores)
 │   │   └── lib/            # Block registry, utilities
 │   ├── electron/           # Electron main process
 │   └── package.json
-├── blocks/                 # ML block implementations
-│   ├── training/           # LoRA, QLoRA, DPO, full fine-tuning
-│   ├── merge/              # SLERP, TIES, DARE, mergekit
-│   ├── evaluation/         # lm-eval harness, MMLU
-│   ├── data/               # Loaders, tokenizers, splitters
-│   └── ...                 # 20+ block categories
+├── blocks/                 # 118 ML block implementations
+│   ├── training/           # LoRA, QLoRA, DPO, full fine-tuning, RLHF
+│   ├── merge/              # SLERP, TIES, DARE, Mergekit
+│   ├── evaluation/         # LM-Eval Harness, MMLU, bias/fairness
+│   ├── inference/          # LLM inference, RAG, embeddings
+│   ├── agents/             # Multi-agent, chain-of-thought, orchestrator
+│   ├── data/               # Loaders, splitters, augmentation, builders
+│   ├── flow/               # Gates, branching, loops, parallel execution
+│   ├── output/             # Export, reports, model cards
+│   └── endpoints/          # API publish, HF Hub push, webhooks
+├── extensions/             # Chrome extension for HuggingFace import
 └── README.md
 ```
 
@@ -120,14 +145,16 @@ blueprint/
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | React 18, TypeScript, Vite |
+| Frontend | React 18, TypeScript 5.7, Vite 6 |
 | State Management | Zustand |
 | Pipeline Canvas | React Flow |
 | Charts | Recharts |
 | Code Editor | Monaco Editor |
 | Animations | Framer Motion |
-| Backend | FastAPI, SQLAlchemy, SQLite |
+| Styling | Tailwind CSS |
+| Backend | FastAPI, SQLAlchemy 2.0, SQLite (WAL mode) |
 | Desktop | Electron 34 |
+| Data Fetching | TanStack React Query |
 
 ---
 
