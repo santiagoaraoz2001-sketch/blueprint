@@ -716,7 +716,7 @@ function BlockItem({
 }
 
 /* ── Category descriptions for detail popup ── */
-const CATEGORY_DESCRIPTIONS: Record<string, { summary: string; connectorNote: string }> = {
+export const CATEGORY_DESCRIPTIONS: Record<string, { summary: string; connectorNote: string }> = {
   external:      { summary: 'Source blocks that ingest data from the outside world — APIs, files, databases, HuggingFace Hub, and web scraping.',         connectorNote: 'Produces dataset, text, model, or config connectors depending on the source type.' },
   data:          { summary: 'Transform blocks for data manipulation — filtering, splitting, chunking, augmenting, and previewing datasets.',             connectorNote: 'Primarily uses dataset and text connectors for structured and unstructured data.' },
   model:         { summary: 'Model ops blocks — loading, selecting, merging (SLERP/DARE/TIES), quantizing, and packaging model weights.',                  connectorNote: 'Uses model connectors for weights and adapters, dataset for batch I/O.' },
