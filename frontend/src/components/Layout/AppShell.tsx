@@ -40,36 +40,36 @@ function seedStars() {
     id: i, tier: 'micro' as const,
     left: `${rand() * 100}%`, top: `${rand() * 100}%`,
     delay: rand() * 8, duration: 9 + rand() * 9,
-    size: 0.8 + rand() * 0.5,
-    color: rand() > 0.85
-      ? `rgba(62,232,196,${0.35 + rand() * 0.35})`
-      : `rgba(240,242,245,${0.30 + rand() * 0.45})`,
+    size: 0.9 + rand() * 0.6,
+    color: rand() > 0.80
+      ? `rgba(47,252,200,${0.50 + rand() * 0.40})`
+      : `rgba(242,244,248,${0.45 + rand() * 0.45})`,
   }))
 
   const small  = Array.from({ length: 14 }, (_, i) => ({
     id: 100 + i, tier: 'small' as const,
     left: `${rand() * 100}%`, top: `${rand() * 100}%`,
     delay: rand() * 7, duration: 12 + rand() * 10,
-    size: 1.2 + rand() * 0.9,
-    color: rand() > 0.7
-      ? `rgba(152,128,232,${0.3 + rand() * 0.35})`
-      : rand() > 0.4
-        ? `rgba(62,232,196,${0.25 + rand() * 0.30})`
-        : `rgba(240,242,245,${0.35 + rand() * 0.40})`,
+    size: 1.3 + rand() * 1.0,
+    color: rand() > 0.65
+      ? `rgba(168,126,255,${0.55 + rand() * 0.35})`
+      : rand() > 0.35
+        ? `rgba(47,252,200,${0.50 + rand() * 0.40})`
+        : `rgba(242,244,248,${0.55 + rand() * 0.35})`,
   }))
 
   const medium = Array.from({ length: 6 }, (_, i) => ({
     id: 200 + i, tier: 'medium' as const,
     left: `${rand() * 100}%`, top: `${rand() * 100}%`,
     delay: rand() * 6, duration: 14 + rand() * 12,
-    size: 2.0 + rand() * 1.5,
+    size: 2.2 + rand() * 1.8,
     color: [
-      'rgba(62,232,196,0.65)',
-      'rgba(152,128,232,0.55)',
-      'rgba(232,168,74,0.50)',
-      'rgba(216,124,184,0.50)',
-      'rgba(72,200,216,0.55)',
-      'rgba(240,242,245,0.65)',
+      'rgba(47,252,200,0.88)',
+      'rgba(168,126,255,0.80)',
+      'rgba(255,190,69,0.78)',
+      'rgba(240,112,200,0.78)',
+      'rgba(53,216,240,0.82)',
+      'rgba(242,244,248,0.90)',
     ][i % 6],
   }))
 
@@ -91,11 +91,11 @@ function AmbientField() {
           inset: 0,
           animation: 'nebula-breathe 18s ease-in-out infinite',
           background: `
-            radial-gradient(ellipse 62% 48% at  8% 10%, color-mix(in srgb, var(--hue-secondary) 10%, transparent), transparent 100%),
-            radial-gradient(ellipse 54% 42% at 90% 12%, color-mix(in srgb, var(--hue-glow)       9%, transparent), transparent 100%),
-            radial-gradient(ellipse 44% 40% at 50% 88%, rgba(232,168,74,0.05), transparent 100%),
-            radial-gradient(ellipse 30% 32% at  2% 54%, color-mix(in srgb, var(--hue-glow) 5%, transparent), transparent 100%),
-            radial-gradient(ellipse 90% 40% at 50% 50%, rgba(0,0,0,0.28), transparent 100%)
+            radial-gradient(ellipse 62% 52% at  8% 10%, color-mix(in srgb, var(--hue-secondary) 20%, transparent), transparent 100%),
+            radial-gradient(ellipse 54% 46% at 90% 12%, color-mix(in srgb, var(--hue-glow)      18%, transparent), transparent 100%),
+            radial-gradient(ellipse 44% 40% at 50% 88%, rgba(255,190,69,0.10),                   transparent 100%),
+            radial-gradient(ellipse 30% 32% at  2% 54%, color-mix(in srgb, var(--hue-glow) 10%, transparent), transparent 100%),
+            radial-gradient(ellipse 90% 40% at 50% 50%, rgba(0,0,0,0.22),                        transparent 100%)
           `,
         }}
       />
@@ -116,7 +116,7 @@ function AmbientField() {
               ? `star-drift ${s.duration}s ${s.delay}s ease-in-out infinite`
               : `pulse ${s.duration}s ${s.delay}s ease-in-out infinite`,
             ...(s.tier === 'medium'
-              ? { boxShadow: `0 0 ${s.size * 2.5}px ${s.color}` }
+              ? { boxShadow: `0 0 ${s.size * 4}px ${s.color}, 0 0 ${s.size * 8}px ${s.color}44` }
               : {}),
           }}
         />

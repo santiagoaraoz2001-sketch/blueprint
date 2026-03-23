@@ -4,8 +4,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 
 describe('design tokens', () => {
   it('returns dark and light palettes with bioluminescent values', () => {
-    // New deep-ink dark palette
-    expect(getTheme('dark').bg).toBe('#050608')
+    expect(getTheme('dark').bg).toBe('#060709')
     expect(getTheme('light').bg).toBe('#F2F4F7')
   })
 
@@ -23,7 +22,7 @@ describe('design tokens', () => {
 
     injectThemeCSSVars('dark', 'editor' as any)
 
-    expect(document.documentElement.style.getPropertyValue('--bg')).toBe('#050608')
+    expect(document.documentElement.style.getPropertyValue('--bg')).toBe('#060709')
     expect(document.documentElement.style.getPropertyValue('--cyan')).toBeTruthy()
     expect(document.documentElement.style.getPropertyValue('--accent-glow')).toBeTruthy()
     expect(document.documentElement.style.getPropertyValue('--surface3')).toBeTruthy()

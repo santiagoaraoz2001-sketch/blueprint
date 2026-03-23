@@ -29,14 +29,14 @@ function seedParticles(n: number) {
     return (seed >>> 0) / 0xFFFFFFFF
   }
   const accentColors = [
-    'rgba(62,232,196,VAL)',    // teal
-    'rgba(152,128,232,VAL)',   // purple
-    'rgba(232,168,74,VAL)',    // amber
-    'rgba(216,124,184,VAL)',   // pink
-    'rgba(82,217,117,VAL)',    // green
-    'rgba(240,242,245,VAL)',   // white
-    'rgba(240,242,245,VAL)',   // white (more common)
-    'rgba(240,242,245,VAL)',   // white
+    'rgba(47,252,200,VAL)',    // vivid teal
+    'rgba(168,126,255,VAL)',   // vivid purple
+    'rgba(255,190,69,VAL)',    // vivid amber
+    'rgba(240,112,200,VAL)',   // vivid pink
+    'rgba(62,240,122,VAL)',    // vivid green
+    'rgba(53,216,240,VAL)',    // vivid cyan-blue
+    'rgba(242,244,248,VAL)',   // white
+    'rgba(242,244,248,VAL)',   // white (more common)
   ]
   return Array.from({ length: n }, (_, i) => {
     const col = accentColors[i % accentColors.length]
@@ -135,11 +135,11 @@ export default function Screensaver() {
               inset: 0,
               animation: 'screensaver-void-pulse 22s ease-in-out infinite',
               background: `
-                radial-gradient(ellipse 70% 52% at 12% 14%, rgba(62,232,196,0.07)  0%, transparent 100%),
-                radial-gradient(ellipse 60% 46% at 88% 10%, rgba(152,128,232,0.06) 0%, transparent 100%),
-                radial-gradient(ellipse 50% 44% at 52% 92%, rgba(232,168,74,0.05)  0%, transparent 100%),
-                radial-gradient(ellipse 40% 38% at  4% 60%, rgba(62,232,196,0.04)  0%, transparent 100%),
-                radial-gradient(ellipse 80% 32% at 50% 50%, rgba(0,0,0,0.35)       0%, transparent 100%)
+                radial-gradient(ellipse 70% 52% at 12% 14%, rgba(47,252,200,0.16)  0%, transparent 100%),
+                radial-gradient(ellipse 60% 46% at 88% 10%, rgba(168,126,255,0.14) 0%, transparent 100%),
+                radial-gradient(ellipse 50% 44% at 52% 92%, rgba(255,190,69,0.11)  0%, transparent 100%),
+                radial-gradient(ellipse 40% 38% at  4% 60%, rgba(47,252,200,0.09)  0%, transparent 100%),
+                radial-gradient(ellipse 80% 32% at 50% 50%, rgba(0,0,0,0.28)       0%, transparent 100%)
               `,
             }}
           />
@@ -150,8 +150,8 @@ export default function Screensaver() {
               position: 'absolute',
               inset: 0,
               backgroundImage: `
-                linear-gradient(rgba(62,232,196,0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(62,232,196,0.03) 1px, transparent 1px)
+                linear-gradient(rgba(47,252,200,0.07) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(47,252,200,0.07) 1px, transparent 1px)
               `,
               backgroundSize: '36px 36px',
               animation: 'grid-recede 4s linear infinite',

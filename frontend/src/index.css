@@ -10,25 +10,25 @@
   }
 
   :root {
-    /* Bioluminescent lab defaults — deep ink, luminous mineral accents */
-    --bg:           #050608;
-    --bg-alt:       #080A0D;
-    --text:         #F0F2F5;
-    --sec:          #B8C0CE;
-    --dim:          #6E7888;
-    --surface0:     #090B0F;
-    --surface1:     #0D1016;
-    --surface2:     #11161E;
-    --surface3:     #171D27;
-    --surface4:     #1E2632;
-    --surface5:     #26303F;
-    --surface6:     #2F3B4E;
-    --border:       #1F2630;
-    --border-hi:    #2C3644;
-    --cyan:         #3EE8C4;
-    --hue-glow:     #3EE8C4;
-    --hue-secondary: #9880E8;
-    --accent-glow:  rgba(62, 232, 196, 0.20);
+    /* Bioluminescent lab defaults — deep ink, vivid saturated accents */
+    --bg:           #060709;
+    --bg-alt:       #090C11;
+    --text:         #F2F4F8;
+    --sec:          #C4CDDE;
+    --dim:          #7A8799;
+    --surface0:     #0B0D13;
+    --surface1:     #0F1319;
+    --surface2:     #141922;
+    --surface3:     #1B2130;
+    --surface4:     #222A3C;
+    --surface5:     #2C3649;
+    --surface6:     #384557;
+    --border:       #252E3C;
+    --border-hi:    #374659;
+    --cyan:         #2FFCC8;
+    --hue-glow:     #2FFCC8;
+    --hue-secondary: #A87EFF;
+    --accent-glow:  rgba(47, 252, 200, 0.28);
     --shadow:             rgba(0,0,0,0.55);
     --shadow-heavy:       rgba(0,0,0,0.72);
     --shadow-light:       rgba(20,26,38,0.22);
@@ -47,9 +47,9 @@
     height: 100%;
     overflow: hidden;
     background:
-      radial-gradient(ellipse at 8% 8%,  color-mix(in srgb, var(--hue-secondary) 12%, transparent), transparent 36%),
-      radial-gradient(ellipse at 90% 14%, color-mix(in srgb, var(--hue-glow) 10%, transparent),      transparent 40%),
-      radial-gradient(ellipse at 46% 96%, rgba(232,168,74,0.06), transparent 44%),
+      radial-gradient(ellipse at 8% 8%,  color-mix(in srgb, var(--hue-secondary) 22%, transparent), transparent 38%),
+      radial-gradient(ellipse at 90% 14%, color-mix(in srgb, var(--hue-glow) 18%, transparent),      transparent 42%),
+      radial-gradient(ellipse at 46% 96%, rgba(255,190,69,0.10), transparent 46%),
       linear-gradient(180deg, var(--bg-alt) 0%, var(--bg) 100%);
     color: var(--sec);
     font-family: 'IBM Plex Sans', 'Inter', 'Segoe UI', sans-serif;
