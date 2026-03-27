@@ -1,0 +1,39 @@
+{
+  "_generated": "2026-03-27T23:28:07Z",
+  "_generator": "scripts/generate_repo_facts.py",
+  "blocks": {
+    "total": 119,
+    "categories": [
+      "agents",
+      "data",
+      "endpoints",
+      "evaluation",
+      "flow",
+      "inference",
+      "merge",
+      "output",
+      "training"
+    ],
+    "by_category": {
+      "agents": 9,
+      "data": 27,
+      "endpoints": 8,
+      "evaluation": 17,
+      "flow": 18,
+      "inference": 18,
+      "merge": 5,
+      "output": 5,
+      "training": 12
+    }
+  },
+  "backend": {
+    "router_count": 21,
+    "model_count": 10
+  },
+  "test_file_count": 15,
+  "supported_platforms": [
+    "Linux",
+    "Windows",
+    "macOS"
+  ]
+}
