@@ -439,7 +439,7 @@ def run_block_test(
         emit(_box_line("Validation .......... FAIL"))
         emit(_box_empty())
         emit(_box_line(f"{type(e).__name__}: {e}"))
-        if e.field:
+        if getattr(e, "field", None):
             emit(_box_line(f"Field: {e.field}"))
         emit(_box_line(f"Recoverable: {'Yes' if e.recoverable else 'No'}"))
         emit(_box_bottom())
@@ -658,7 +658,7 @@ def _execute_block(
         emit(_box_line(f"Execution ........... FAIL ({elapsed:.1f}s)"))
         emit(_box_sep())
         emit(_box_line(f"{type(e).__name__}: {e}"))
-        if e.field:
+        if getattr(e, "field", None):
             emit(_box_line(f"Field: {e.field}"))
         emit(_box_line(f"Recoverable: {'Yes' if e.recoverable else 'No'}"))
         emit(_box_bottom())

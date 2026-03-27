@@ -17,6 +17,14 @@ from pathlib import Path
 
 import pytest
 
+def _has_torch() -> bool:
+    try:
+        import torch  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 # Ensure project root is on path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -838,6 +846,10 @@ class TestBlockRunnerIntegration:
         )
         assert exit_code == 1
 
+    @pytest.mark.skipif(
+        not _has_torch(),
+        reason="torch not installed (optional ML dependency)",
+    )
     def test_ballast_with_fixture_succeeds(self):
         """Ballast training in fallback mode should succeed."""
         from backend.tests.block_runner import run_block_test
