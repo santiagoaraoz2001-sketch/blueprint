@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { T, F, FD, FS, getTheme } from '@/lib/design-tokens'
 import { playSound } from '@/lib/audio'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
-import { FolderOpen, RefreshCw, ExternalLink } from 'lucide-react'
+import { FolderOpen, RefreshCw, ExternalLink, Sliders } from 'lucide-react'
 import {
   useSettingsStore,
   FONT_MAP,
@@ -685,6 +685,47 @@ export default function SettingsView() {
                   active={theme === 'light'}
                   onClick={() => setTheme('light')}
                 />
+                {/* System preference — auto-detect */}
+                <button
+                  onClick={() => setTheme('system')}
+                  style={{
+                    flex: 1,
+                    padding: 0,
+                    border: theme === 'system' ? `1px solid ${T.cyan}` : `1px solid ${T.border}`,
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    boxShadow: theme === 'system' ? `0 0 8px ${T.cyan}30` : 'none',
+                    transition: 'all 0.15s ease',
+                    borderRadius: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <div style={{ background: T.bg, padding: 8, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontFamily: F, fontSize: FS.lg, color: T.dim }}>AUTO</span>
+                  </div>
+                  <div
+                    style={{
+                      padding: '5px 0',
+                      background: theme === 'system' ? `${T.cyan}10` : T.surface2,
+                      borderTop: `1px solid ${theme === 'system' ? T.cyan : T.border}`,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: F,
+                        fontSize: FS.xxs,
+                        fontWeight: 900,
+                        letterSpacing: '0.12em',
+                        textTransform: 'uppercase',
+                        color: theme === 'system' ? T.cyan : T.dim,
+                      }}
+                    >
+                      SYSTEM
+                    </span>
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -694,7 +735,10 @@ export default function SettingsView() {
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {ACCENT_COLORS.map((color) => {
                   const active = accentColor === color.id
-                  const hex = (getTheme(theme) as any)[color.token]
+                  const resolvedMode = theme === 'system'
+                    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                    : theme
+                  const hex = (getTheme(resolvedMode) as any)[color.token]
                   return (
                     <button
                       key={color.id}
@@ -979,6 +1023,7 @@ export default function SettingsView() {
 function WorkspaceSection() {
   const { settings, status, fetchSettings, updateSettings, fetchStatus, openInFinder, initialize } = useWorkspaceStore()
   const [browsing, setBrowsing] = useState(false)
+  const [showWorkspaceConfig, setShowWorkspaceConfig] = useState(false)
 
   useEffect(() => {
     fetchSettings()
@@ -1201,8 +1246,44 @@ function WorkspaceSection() {
               </button>
             </div>
           </div>
+
+          {/* Pipeline Config Overrides */}
+          <div style={{ marginTop: 16 }}>
+            <label style={labelStyle}>PIPELINE CONFIG OVERRIDES</label>
+            <button
+              onClick={() => setShowWorkspaceConfig(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 14px', background: `${T.cyan}10`,
+                border: `1px solid ${T.cyan}28`, borderRadius: 6,
+                color: T.cyan, fontFamily: F, fontSize: FS.xs, cursor: 'pointer',
+              }}
+            >
+              <Sliders size={12} />
+              Manage Workspace Config
+            </button>
+            <span style={descStyle}>
+              Set config overrides applied to all pipelines (e.g. seed, temperature)
+            </span>
+          </div>
+
+          {showWorkspaceConfig && (
+            <WorkspaceConfigPanel onClose={() => setShowWorkspaceConfig(false)} />
+          )}
         </>
       )}
     </motion.div>
   )
+}
+
+// Lazy-load the WorkspaceConfig panel
+function WorkspaceConfigPanel({ onClose }: { onClose: () => void }) {
+  const [Component, setComponent] = useState<React.ComponentType<{ onClose: () => void }> | null>(null)
+  useEffect(() => {
+    import('@/components/Config/WorkspaceConfig').then((mod) => {
+      setComponent(() => mod.default)
+    })
+  }, [])
+  if (!Component) return null
+  return <Component onClose={onClose} />
 }

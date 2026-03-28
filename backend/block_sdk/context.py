@@ -95,11 +95,44 @@ class BlockContext:
         if self._progress_callback:
             self._progress_callback(current, total)
 
-    def log_message(self, msg: str):
-        """Log a message that appears in the block's live log panel."""
+    # Valid severity levels for log messages.
+    _SEVERITIES = frozenset(("debug", "info", "warn", "error"))
+
+    def log_message(self, msg: str, *, severity: Optional[str] = None):
+        """Log a message that appears in the block's live log panel.
+
+        Args:
+            msg: The log message text.
+            severity: Optional explicit severity — one of 'debug', 'info',
+                'warn', 'error'. When omitted (the default), the executor
+                infers severity from message prefix heuristics. Providing
+                an explicit level bypasses heuristic detection entirely.
+
+        Backward compatibility: existing blocks that call
+        ``ctx.log_message("hello")`` without a severity keyword continue
+        to work unchanged.
+        """
+        if severity is not None and severity not in self._SEVERITIES:
+            severity = None  # silently ignore invalid levels
         if self._message_callback:
-            self._message_callback(msg)
+            self._message_callback(msg, severity)
         print(msg)
+
+    def log_info(self, msg: str):
+        """Log an informational message (severity=info)."""
+        self.log_message(msg, severity="info")
+
+    def log_warn(self, msg: str):
+        """Log a warning message (severity=warn)."""
+        self.log_message(msg, severity="warn")
+
+    def log_error(self, msg: str):
+        """Log an error message (severity=error)."""
+        self.log_message(msg, severity="error")
+
+    def log_debug(self, msg: str):
+        """Log a debug message (severity=debug)."""
+        self.log_message(msg, severity="debug")
 
     def log_metric(self, name: str, value: float, step: Optional[int] = None):
         """Log a metric (forwarded to MLflow)."""

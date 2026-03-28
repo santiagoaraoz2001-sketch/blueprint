@@ -1,13 +1,157 @@
+import copy
+import json
 import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, JSONResponse, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from typing import Any, Literal
 
+from ..config import SNAPSHOTS_DIR
 from ..database import get_db
 from ..models.pipeline import Pipeline
-from ..schemas.pipeline import PipelineCreate, PipelineUpdate, PipelineResponse
+from ..schemas.pipeline import PipelineCreate, PipelineUpdate, PipelineHistoryUpdate, PipelineResponse, CloneAsVariantRequest
 
 router = APIRouter(prefix="/api/pipelines", tags=["pipelines"])
+
+
+# ── Config Diff Engine ───────────────────────────────────────────────
+
+def _compute_config_diff(
+    source_definition: dict,
+    variant_definition: dict,
+    source_pipeline_id: str,
+    source_pipeline_name: str,
+) -> dict:
+    """Compute a comprehensive config diff between a source and variant pipeline.
+
+    Handles:
+    - Modified configs (same node ID, different config values)
+    - Added nodes (present in variant but absent in source)
+    - Removed nodes (present in source but absent in variant)
+    - Fuzzy matching: when a node ID changes but block_type + label match,
+      the node is treated as "moved" and its configs are still diffed.
+    """
+    source_nodes_list = source_definition.get("nodes", [])
+    variant_nodes_list = variant_definition.get("nodes", [])
+
+    source_by_id = {n.get("id"): n for n in source_nodes_list}
+    variant_by_id = {n.get("id"): n for n in variant_nodes_list}
+
+    source_ids = set(source_by_id.keys())
+    variant_ids = set(variant_by_id.keys())
+
+    # Phase 1: Direct ID matches
+    matched_source_ids: set[str] = set()
+    matched_variant_ids: set[str] = set()
+    id_matches: list[tuple[str, str]] = []  # (source_id, variant_id)
+
+    for nid in source_ids & variant_ids:
+        id_matches.append((nid, nid))
+        matched_source_ids.add(nid)
+        matched_variant_ids.add(nid)
+
+    # Phase 2: Fuzzy matching for unmatched nodes by (block_type, label)
+    unmatched_source = source_ids - matched_source_ids
+    unmatched_variant = variant_ids - matched_variant_ids
+
+    if unmatched_source and unmatched_variant:
+        # Build signature -> node_id maps for unmatched nodes
+        source_sigs: dict[tuple[str, str], str] = {}
+        for sid in unmatched_source:
+            sn = source_by_id[sid]
+            sig = (
+                sn.get("data", {}).get("type", ""),
+                sn.get("data", {}).get("label", ""),
+            )
+            # Only use first match per signature to avoid ambiguity
+            if sig not in source_sigs:
+                source_sigs[sig] = sid
+
+        for vid in list(unmatched_variant):
+            vn = variant_by_id[vid]
+            sig = (
+                vn.get("data", {}).get("type", ""),
+                vn.get("data", {}).get("label", ""),
+            )
+            if sig in source_sigs:
+                sid = source_sigs.pop(sig)
+                id_matches.append((sid, vid))
+                matched_source_ids.add(sid)
+                matched_variant_ids.add(vid)
+
+    # Phase 3: Compute per-field diffs for matched pairs
+    changed_keys: dict[str, dict[str, dict]] = {}
+    total_count = 0
+    inherited_count = 0
+
+    for source_id, variant_id in id_matches:
+        source_config = source_by_id[source_id].get("data", {}).get("config", {})
+        variant_config = variant_by_id[variant_id].get("data", {}).get("config", {})
+        all_keys = set(source_config.keys()) | set(variant_config.keys())
+
+        for key in all_keys:
+            total_count += 1
+            source_val = source_config.get(key)
+            variant_val = variant_config.get(key)
+            if source_val != variant_val:
+                if variant_id not in changed_keys:
+                    changed_keys[variant_id] = {}
+                changed_keys[variant_id][key] = {
+                    "source": source_val,
+                    "current": variant_val,
+                }
+            else:
+                inherited_count += 1
+
+    # Phase 4: Track structural changes (added/removed nodes)
+    added_node_ids = list(variant_ids - matched_variant_ids)
+    removed_node_ids = list(source_ids - matched_source_ids)
+
+    # Count configs in added nodes as "all changed" (no source to inherit from)
+    for vid in added_node_ids:
+        vn = variant_by_id[vid]
+        variant_config = vn.get("data", {}).get("config", {})
+        if variant_config:
+            changed_keys[vid] = {
+                key: {"source": None, "current": val}
+                for key, val in variant_config.items()
+            }
+            total_count += len(variant_config)
+
+    changed_count = total_count - inherited_count
+
+    return {
+        "source_pipeline_id": source_pipeline_id,
+        "source_pipeline_name": source_pipeline_name,
+        "changed_keys": changed_keys,
+        "inherited_count": inherited_count,
+        "total_count": total_count,
+        "changed_count": changed_count,
+        "added_nodes": [
+            {
+                "id": vid,
+                "type": variant_by_id[vid].get("data", {}).get("type", ""),
+                "label": variant_by_id[vid].get("data", {}).get("label", ""),
+            }
+            for vid in added_node_ids
+        ],
+        "removed_nodes": [
+            {
+                "id": sid,
+                "type": source_by_id[sid].get("data", {}).get("type", ""),
+                "label": source_by_id[sid].get("data", {}).get("label", ""),
+            }
+            for sid in removed_node_ids
+        ],
+    }
+
+
+class ExportRequest(BaseModel):
+    format: Literal["python", "jupyter"] = "python"
+    bundle: bool = False
 
 
 @router.get("", response_model=list[PipelineResponse])
@@ -42,6 +186,18 @@ def update_pipeline(pipeline_id: str, data: PipelineUpdate, db: Session = Depend
         raise HTTPException(404, "Pipeline not found")
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(pipeline, key, value)
+
+    # Auto-recompute config diff if this is a variant and definition changed
+    if pipeline.source_pipeline_id and data.definition is not None:
+        source = db.query(Pipeline).filter(Pipeline.id == pipeline.source_pipeline_id).first()
+        if source:
+            pipeline.config_diff = _compute_config_diff(
+                source_definition=source.definition or {},
+                variant_definition=pipeline.definition or {},
+                source_pipeline_id=pipeline.source_pipeline_id,
+                source_pipeline_name=source.name,
+            )
+
     db.commit()
     db.refresh(pipeline)
     return pipeline
@@ -54,6 +210,178 @@ def delete_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "Pipeline not found")
     db.delete(pipeline)
     db.commit()
+
+
+class HistorySnapshotPayload(BaseModel):
+    """Full history snapshots (for SNAPSHOTS_DIR file)."""
+    history_snapshots: str  # JSON-encoded full history with nodes/edges
+
+
+@router.put("/{pipeline_id}/history", status_code=204)
+def update_pipeline_history(pipeline_id: str, data: PipelineHistoryUpdate, db: Session = Depends(get_db)):
+    """Persist lightweight history metadata in the DB column."""
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+    pipeline.history_json = data.history_json
+    db.commit()
+
+
+@router.post("/{pipeline_id}/history", status_code=204)
+def update_pipeline_history_post(pipeline_id: str, data: PipelineHistoryUpdate, db: Session = Depends(get_db)):
+    """POST alias for history persistence — required by navigator.sendBeacon()
+    which only supports POST. Identical behavior to PUT."""
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+    pipeline.history_json = data.history_json
+    db.commit()
+
+
+@router.post("/{pipeline_id}/history/snapshots", status_code=204)
+def update_pipeline_history_snapshots_post(pipeline_id: str, data: HistorySnapshotPayload):
+    """POST alias for snapshot persistence — required by navigator.sendBeacon()."""
+    SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = SNAPSHOTS_DIR / f"{pipeline_id}_history.json"
+    path.write_text(data.history_snapshots)
+
+
+@router.put("/{pipeline_id}/history/snapshots", status_code=204)
+def update_pipeline_history_snapshots(pipeline_id: str, data: HistorySnapshotPayload):
+    """Persist full history snapshots to SNAPSHOTS_DIR (off the DB).
+
+    This keeps heavy node/edge data out of the SQLite database.
+    The file is capped at ~5 MB by the frontend serializer.
+    """
+    SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = SNAPSHOTS_DIR / f"{pipeline_id}_history.json"
+    path.write_text(data.history_snapshots)
+
+
+@router.get("/{pipeline_id}/history/snapshots")
+def get_pipeline_history_snapshots(pipeline_id: str):
+    """Retrieve full history snapshots from SNAPSHOTS_DIR."""
+    path = SNAPSHOTS_DIR / f"{pipeline_id}_history.json"
+    if not path.exists():
+        return {"exists": False, "history_snapshots": None}
+    try:
+        return {"exists": True, "history_snapshots": path.read_text()}
+    except OSError:
+        return {"exists": False, "history_snapshots": None}
+
+
+class AutosavePayload(BaseModel):
+    definition: dict[str, Any]
+    name: str = ""
+    session_id: str = ""
+
+
+import re
+
+_SAFE_ID_RE = re.compile(r"^[a-z0-9\-]{1,64}$")
+
+
+def _autosave_glob(pipeline_id: str) -> list[Path]:
+    """Find all autosave files for a pipeline across all sessions.
+
+    Pattern: {pipeline_id}_*_autosave.json
+    Falls back to legacy {pipeline_id}_autosave.json for backward compat.
+    """
+    results = list(SNAPSHOTS_DIR.glob(f"{pipeline_id}_*_autosave.json"))
+    legacy = SNAPSHOTS_DIR / f"{pipeline_id}_autosave.json"
+    if legacy.exists() and legacy not in results:
+        results.append(legacy)
+    return results
+
+
+@router.post("/{pipeline_id}/autosave", status_code=204)
+def create_autosave(pipeline_id: str, data: AutosavePayload):
+    """Write a session-scoped autosave snapshot to SNAPSHOTS_DIR.
+
+    Each browser tab sends a unique session_id so that concurrent
+    tabs editing the same pipeline don't overwrite each other.
+    """
+    SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Sanitize session_id to prevent path traversal
+    session_id = data.session_id if _SAFE_ID_RE.match(data.session_id) else "default"
+    path = SNAPSHOTS_DIR / f"{pipeline_id}_{session_id}_autosave.json"
+
+    payload = {
+        "pipeline_id": pipeline_id,
+        "session_id": session_id,
+        "name": data.name,
+        "definition": data.definition,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    path.write_text(json.dumps(payload))
+
+
+@router.get("/{pipeline_id}/autosave")
+def get_autosave(pipeline_id: str, db: Session = Depends(get_db)):
+    """Find the newest autosave across all sessions for a pipeline.
+
+    Scans all {pipeline_id}_*_autosave.json files, returns the one
+    with the most recent timestamp — but only if it's newer than
+    the last explicit save.
+    """
+    candidates = _autosave_glob(pipeline_id)
+    if not candidates:
+        return {"exists": False}
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        return {"exists": False}
+
+    last_save_dt = pipeline.updated_at
+    if last_save_dt.tzinfo is None:
+        last_save_dt = last_save_dt.replace(tzinfo=timezone.utc)
+
+    # Find the newest valid autosave
+    best = None
+    best_dt = None
+    stale_paths = []
+
+    for path in candidates:
+        try:
+            data = json.loads(path.read_text())
+            ts = data.get("timestamp", "")
+            dt = datetime.fromisoformat(ts)
+        except (json.JSONDecodeError, OSError, ValueError, TypeError):
+            stale_paths.append(path)
+            continue
+
+        if dt <= last_save_dt:
+            stale_paths.append(path)
+            continue
+
+        if best_dt is None or dt > best_dt:
+            # If we had a previous best, it's now stale relative to this one
+            if best is not None:
+                stale_paths.append(best["_path"])
+            best = {**data, "_path": path}
+            best_dt = dt
+
+    # Clean up stale autosaves
+    for p in stale_paths:
+        p.unlink(missing_ok=True)
+
+    if best is None:
+        return {"exists": False}
+
+    return {
+        "exists": True,
+        "timestamp": best.get("timestamp"),
+        "definition": best.get("definition"),
+        "name": best.get("name", ""),
+    }
+
+
+@router.delete("/{pipeline_id}/autosave", status_code=204)
+def delete_autosave(pipeline_id: str):
+    """Delete ALL autosave files for a pipeline (from any session)."""
+    for path in _autosave_glob(pipeline_id):
+        path.unlink(missing_ok=True)
 
 
 @router.post("/{pipeline_id}/duplicate", response_model=PipelineResponse)
@@ -95,6 +423,176 @@ def clone_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
     return clone
 
 
+@router.post("/{pipeline_id}/clone-variant")
+def clone_as_variant(pipeline_id: str, data: CloneAsVariantRequest, db: Session = Depends(get_db)):
+    """Clone a pipeline as an experiment variant with config diff tracking."""
+    original = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not original:
+        raise HTTPException(404, "Pipeline not found")
+
+    # Count existing variants to generate default name
+    variant_count = db.query(Pipeline).filter(
+        Pipeline.source_pipeline_id == pipeline_id
+    ).count()
+
+    new_name = data.name or f"{original.name} (variant {variant_count + 1})"
+    project_id = data.project_id or original.project_id
+
+    # Deep-copy definition
+    definition_copy = copy.deepcopy(original.definition or {})
+    source_def = original.definition or {}
+
+    # Compute initial config diff (identical at clone time → all inherited)
+    config_diff = _compute_config_diff(
+        source_definition=source_def,
+        variant_definition=definition_copy,
+        source_pipeline_id=pipeline_id,
+        source_pipeline_name=original.name,
+    )
+
+    clone = Pipeline(
+        id=str(uuid.uuid4()),
+        name=new_name,
+        project_id=project_id,
+        experiment_id=original.experiment_id,
+        description=original.description,
+        definition=definition_copy,
+        source_pipeline_id=pipeline_id,
+        variant_notes=data.variant_notes,
+        config_diff=config_diff,
+    )
+    db.add(clone)
+    db.commit()
+    db.refresh(clone)
+
+    return {
+        "pipeline": PipelineResponse.model_validate(clone).model_dump(),
+        "new_pipeline_id": clone.id,
+        "inherited_config_count": config_diff["inherited_count"],
+        "total_config_count": config_diff["total_count"],
+    }
+
+
+@router.post("/{pipeline_id}/update-config-diff")
+def update_config_diff(pipeline_id: str, db: Session = Depends(get_db)):
+    """Recompute config diff between a variant and its source pipeline."""
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+
+    if not pipeline.source_pipeline_id:
+        return {"changed_count": 0, "total_count": 0, "changes": {}}
+
+    source = db.query(Pipeline).filter(Pipeline.id == pipeline.source_pipeline_id).first()
+    if not source:
+        return {"changed_count": 0, "total_count": 0, "changes": {}}
+
+    config_diff = _compute_config_diff(
+        source_definition=source.definition or {},
+        variant_definition=pipeline.definition or {},
+        source_pipeline_id=pipeline.source_pipeline_id,
+        source_pipeline_name=source.name,
+    )
+
+    pipeline.config_diff = config_diff
+    db.commit()
+
+    return {
+        "changed_count": config_diff["changed_count"],
+        "inherited_count": config_diff["inherited_count"],
+        "total_count": config_diff["total_count"],
+        "changes": config_diff["changed_keys"],
+        "added_nodes": config_diff["added_nodes"],
+        "removed_nodes": config_diff["removed_nodes"],
+        "source_pipeline_name": source.name,
+    }
+
+
+@router.get("/{pipeline_id}/plan")
+def get_pipeline_plan(pipeline_id: str, db: Session = Depends(get_db)):
+    """Run the planner on the current pipeline and return a JSON-serialized plan summary.
+
+    Read-only — does not trigger execution. For each node returns:
+    resolved_config, config_sources, cache_fingerprint, cache_eligible, in_loop.
+
+    Config merge precedence: global workspace → project → pipeline definition.
+    """
+    from ..engine.planner import GraphPlanner
+    from ..engine.config_merge import merge_workspace_config
+    from ..services.registry import get_global_registry
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+
+    # Merge config from all scopes: global → project → definition
+    workspace_config = merge_workspace_config(
+        definition_config=definition.get("workspace_config") or None,
+        project_id=pipeline.project_id,
+        db=db,
+    )
+
+    if not nodes:
+        return {
+            "is_valid": True,
+            "errors": [],
+            "plan_hash": "empty",
+            "nodes": {},
+            "execution_order": [],
+            "warnings": [],
+        }
+
+    registry = get_global_registry()
+    if registry is None:
+        from ..services.registry import BlockRegistryService
+        registry = BlockRegistryService()
+
+    planner = GraphPlanner(registry)
+    result = planner.plan(nodes, edges, workspace_config=workspace_config or None)
+
+    if not result.is_valid or result.plan is None:
+        return {
+            "is_valid": False,
+            "errors": list(result.errors),
+            "plan_hash": None,
+            "nodes": {},
+            "execution_order": [],
+            "warnings": [],
+        }
+
+    plan = result.plan
+    node_map = {n["id"]: n for n in nodes}
+
+    nodes_summary = {}
+    for node_id, rn in plan.nodes.items():
+        node_label = node_map.get(node_id, {}).get("data", {}).get("label", node_id)
+        nodes_summary[node_id] = {
+            "node_id": rn.node_id,
+            "label": node_label,
+            "block_type": rn.block_type,
+            "block_version": rn.block_version,
+            "resolved_config": rn.resolved_config,
+            "config_sources": rn.config_sources,
+            "cache_fingerprint": rn.cache_fingerprint,
+            "cache_eligible": rn.cache_eligible,
+            "in_loop": rn.in_loop,
+            "loop_id": rn.loop_id,
+        }
+
+    return {
+        "is_valid": True,
+        "errors": [],
+        "plan_hash": plan.plan_hash,
+        "nodes": nodes_summary,
+        "execution_order": list(plan.execution_order),
+        "warnings": list(plan.warnings),
+    }
+
+
 @router.post("/{pipeline_id}/resolve-config")
 def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
     """Resolve config inheritance for preview in the UI (dry run)."""
@@ -105,6 +603,7 @@ def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
         CATEGORY_PROPAGATION_KEYS,
     )
     from ..engine.block_registry import BlockRegistryService
+    from ..engine.config_merge import merge_workspace_config
 
     pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
     if not pipeline:
@@ -113,7 +612,11 @@ def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
     definition = pipeline.definition or {}
     nodes = definition.get("nodes", [])
     edges = definition.get("edges", [])
-    workspace_config = definition.get("workspace_config") or None
+    workspace_config = merge_workspace_config(
+        definition_config=definition.get("workspace_config") or None,
+        project_id=pipeline.project_id,
+        db=db,
+    ) or None
 
     if not nodes:
         return {"resolved": {}, "propagation_keys": {}}
@@ -179,3 +682,220 @@ def compile_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
 
     script = compile_pipeline_to_python(pipeline.name, definition)
     return PlainTextResponse(content=script, media_type="text/x-python")
+
+
+@router.post("/{pipeline_id}/export")
+def export_pipeline(pipeline_id: str, body: ExportRequest, db: Session = Depends(get_db)):
+    """Export a pipeline as a standalone Python script or Jupyter notebook.
+
+    Uses the planner to produce an ExecutionPlan, then compiles from it so
+    the exported code uses identical execution order and resolved configs.
+
+    Body: { "format": "python" | "jupyter" }
+    """
+    from ..engine.compiler import compile_pipeline_from_plan
+    from ..engine.graph_utils import validate_exportable
+    from ..engine.planner import GraphPlanner
+    from ..services.registry import BlockRegistryService
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+
+    # Kill switch: block export for unsupported pipelines
+    export_errors = validate_exportable(nodes, edges)
+    if export_errors:
+        raise HTTPException(
+            400,
+            detail={
+                "error": "export_unsupported",
+                "reasons": export_errors,
+                "remediation": "Remove unsupported blocks or use the full executor instead.",
+            },
+        )
+
+    # Plan the pipeline to get resolved configs and execution order
+    registry = BlockRegistryService()
+    planner = GraphPlanner(registry)
+    workspace_config = definition.get("workspace_config") or None
+    result = planner.plan(nodes, edges, workspace_config=workspace_config)
+
+    if not result.is_valid or result.plan is None:
+        raise HTTPException(
+            400,
+            detail={
+                "error": "plan_failed",
+                "reasons": list(result.errors),
+            },
+        )
+
+    plan = result.plan
+
+    if body.format == "jupyter":
+        from ..engine.jupyter_export import compile_pipeline_to_jupyter, notebook_to_json
+
+        nb = compile_pipeline_to_jupyter(
+            pipeline_name=pipeline.name,
+            plan=plan,
+            edges=edges,
+            nodes=nodes,
+            description=pipeline.description or "",
+        )
+        content = notebook_to_json(nb)
+        ext = "ipynb"
+        media_type = "application/x-ipynb+json"
+    else:
+        content = compile_pipeline_from_plan(
+            pipeline_name=pipeline.name,
+            plan=plan,
+            edges=edges,
+            nodes=nodes,
+            description=pipeline.description or "",
+        )
+        ext = "py"
+        media_type = "text/x-python"
+
+    if body.bundle:
+        # Create a zip with the script + required block directories
+        import io
+        import zipfile
+        from ..engine.executor import _find_block_module
+        from ..engine.block_registry import get_block_yaml
+
+        buf = io.BytesIO()
+        base_name = f"pipeline_{pipeline_id[:8]}"
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            # Write the main script/notebook
+            zf.writestr(f"{base_name}/{base_name}.{ext}", content)
+
+            # Copy each block's directory into blocks/<category>/<type>/
+            bundled: set[str] = set()
+            for node_id in plan.execution_order:
+                resolved_node = plan.nodes.get(node_id)
+                if not resolved_node:
+                    continue
+                bt = resolved_node.block_type
+                if bt in bundled:
+                    continue
+                block_dir = _find_block_module(bt)
+                if not block_dir:
+                    continue
+                schema = get_block_yaml(bt)
+                category = (schema or {}).get("category", "unknown")
+                block_dir_path = Path(str(block_dir))
+                if not block_dir_path.is_dir():
+                    continue
+
+                bundled.add(bt)
+                rel_base = f"{base_name}/blocks/{category}/{bt}"
+                for file_path in block_dir_path.rglob("*"):
+                    if file_path.is_file():
+                        # Skip __pycache__ and .pyc files
+                        if "__pycache__" in str(file_path) or file_path.suffix == ".pyc":
+                            continue
+                        arc_name = f"{rel_base}/{file_path.relative_to(block_dir_path)}"
+                        zf.write(str(file_path), arc_name)
+
+            # Write a requirements.txt
+            from ..engine.export_dependencies import collect_pip_dependencies_for_plan
+            pip_deps = collect_pip_dependencies_for_plan(plan)
+            if pip_deps:
+                req_content = "# Generated by Blueprint — pip install -r requirements.txt\n"
+                req_content += "\n".join(pip_deps) + "\n"
+                zf.writestr(f"{base_name}/requirements.txt", req_content)
+
+        buf.seek(0)
+        filename = f"{base_name}.zip"
+        return Response(
+            content=buf.getvalue(),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
+
+    filename = f"pipeline_{pipeline_id[:8]}.{ext}"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+@router.get("/{pipeline_id}/export/preflight")
+def export_preflight(pipeline_id: str, db: Session = Depends(get_db)):
+    """Pre-flight check for export: returns supported features, warnings, and blockers.
+
+    The frontend uses this to show a pre-flight check panel before generating
+    the export, not after.
+    """
+    from ..engine.graph_utils import validate_exportable, contains_loop_or_cycle
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+
+    supported = [
+        {"label": "DAG execution", "status": "ok"},
+        {"label": "Config resolution", "status": "ok"},
+    ]
+
+    warnings = [
+        {"label": "No SSE progress events", "status": "warning"},
+        {"label": "No artifact storage integration", "status": "warning"},
+        {"label": "No partial rerun support", "status": "warning"},
+    ]
+
+    blockers = []
+
+    # Check loops
+    if contains_loop_or_cycle(nodes, edges):
+        blockers.append({
+            "label": "Loop graphs cannot be exported",
+            "status": "error",
+            "detail": "The compiler cannot faithfully reproduce loop semantics in a standalone script.",
+        })
+
+    # Check custom/non-exportable blocks
+    from ..engine.block_registry import get_block_yaml
+    _NON_EXPORTABLE_BLOCK_TYPES = {"python_runner"}
+    for node in nodes:
+        if node.get("type") in ("groupNode", "stickyNote"):
+            continue
+        data = node.get("data", {})
+        block_type = data.get("type", "")
+        label = data.get("label", block_type)
+
+        if block_type in _NON_EXPORTABLE_BLOCK_TYPES:
+            blockers.append({
+                "label": f"Custom code blocks cannot be exported",
+                "status": "error",
+                "detail": f"Block '{label}' is a {block_type} block.",
+            })
+
+        schema = get_block_yaml(block_type)
+        if schema and schema.get("exportable") is False:
+            blockers.append({
+                "label": f"Block '{label}' is not exportable",
+                "status": "error",
+                "detail": f"{block_type} is marked as non-exportable in its block.yaml.",
+            })
+
+    can_export = len(blockers) == 0
+
+    return {
+        "can_export": can_export,
+        "supported": supported,
+        "warnings": warnings,
+        "blockers": blockers,
+    }

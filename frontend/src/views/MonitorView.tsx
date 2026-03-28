@@ -12,7 +12,8 @@ import LogStream from '@/components/Monitor/LogStream'
 import ComparisonView from '@/components/Monitor/ComparisonView'
 import PluginPanelContainer from '@/components/Monitor/PluginPanelContainer'
 import { runMetricsToTable } from '@/services/metricsBridge'
-import { Activity, ExternalLink, Wifi, WifiOff, Radio, Archive, TableProperties, Loader2 } from 'lucide-react'
+import DecisionLog from '@/components/Monitor/DecisionLog'
+import { Activity, ExternalLink, Wifi, WifiOff, Radio, Archive, TableProperties, Loader2, GitBranch } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function MonitorView() {
@@ -124,6 +125,7 @@ function NoRunState() {
 function MonitorContent({ runId }: { runId: string }) {
   const { isConnected: _isConnected, overallProgress, eta, status } = useRunMonitor(runId)
   const [viewedBlockId, setViewedBlockId] = useState<string | null>(null)
+  const [rightTab, setRightTab] = useState<'logs' | 'decisions'>('logs')
   const run = useMetricsStore((s) => s.runs[runId])
   const pipelineName = run?.pipelineName || ''
   const isReplay = status === 'complete' || status === 'failed'
@@ -339,9 +341,39 @@ function MonitorContent({ runId }: { runId: string }) {
             <SystemPanel runId={runId} />
           </div>
 
-          {/* Log stream */}
+          {/* Logs / Decisions tabs */}
+          <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+            {([
+              { id: 'logs' as const, label: 'Logs' },
+              { id: 'decisions' as const, label: 'Decisions', icon: <GitBranch size={9} /> },
+            ]).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setRightTab(tab.id)}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 4,
+                  padding: '6px 8px',
+                  background: rightTab === tab.id ? `${T.cyan}08` : 'none',
+                  border: 'none',
+                  borderBottom: rightTab === tab.id ? `2px solid ${T.cyan}` : '2px solid transparent',
+                  color: rightTab === tab.id ? T.text : T.dim,
+                  fontFamily: F,
+                  fontSize: FS.xxs,
+                  fontWeight: rightTab === tab.id ? 600 : 400,
+                  cursor: 'pointer',
+                }}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
           <div style={{ flex: 1, overflow: 'hidden' }}>
-            <LogStream runId={runId} />
+            {rightTab === 'logs' ? <LogStream runId={runId} /> : <DecisionLog runId={runId} />}
           </div>
         </div>
       </div>

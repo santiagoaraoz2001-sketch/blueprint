@@ -56,7 +56,7 @@ export default function DataDashboard({ blockId }: Props) {
           <AutoLineChart
             metricName="rows_processed"
             blockId={blockId}
-            color="#00BFA5"
+            color={T.cyan}
             height={160}
             title="ROWS PROCESSED"
           />

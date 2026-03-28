@@ -214,7 +214,7 @@ def get_project_dashboard(project_id: str, db: Session = Depends(get_db)):
                 "duration_ms": duration_ms,
                 "metrics": run.metrics or {},
                 "config_summary": _flatten_dict(run.config_snapshot) if run.config_snapshot else {},
-                "starred": (getattr(run, 'starred', 'false') or 'false') == 'true',
+                "starred": bool(getattr(run, 'starred', False)),
                 "tags": [],
             })
 

@@ -3,7 +3,7 @@ import { T, F, FS } from '@/lib/design-tokens'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useRunStore } from '@/stores/runStore'
 import { useReactFlow } from '@xyflow/react'
-import { Settings, Copy, Maximize, Trash2, RotateCcw, Eye, GitCompare } from 'lucide-react'
+import { Settings, Copy, Maximize, Trash2, RotateCcw, Eye, GitCompare, FileText, Search } from 'lucide-react'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { containsLoopOrCycle } from '@/lib/graph-utils'
 
@@ -13,9 +13,11 @@ interface NodeContextMenuProps {
   y: number
   nodeId: string
   onClose: () => void
+  onShowDoc?: (blockType: string) => void
+  onInspectConfig?: (nodeId: string) => void
 }
 
-export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: NodeContextMenuProps) {
+export default function NodeContextMenu({ visible, x, y, nodeId, onClose, onShowDoc, onInspectConfig }: NodeContextMenuProps) {
   const { fitView } = useReactFlow()
   const runStatus = useRunStore((s) => s.status)
   const activeRunId = useRunStore((s) => s.activeRunId)
@@ -150,6 +152,15 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
         onClick={handleEditConfig}
       />
       <ContextMenuBtn
+        icon={<Search size={10} />}
+        label="Inspect Config"
+        shortcut=""
+        onClick={() => {
+          onInspectConfig?.(nodeId)
+          onClose()
+        }}
+      />
+      <ContextMenuBtn
         icon={<Copy size={10} />}
         label="Duplicate"
         shortcut="\u2318C \u2318V"
@@ -160,6 +171,16 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
         label="Focus"
         shortcut="F"
         onClick={handleFocus}
+      />
+      <ContextMenuBtn
+        icon={<FileText size={10} />}
+        label="Documentation"
+        shortcut="?"
+        onClick={() => {
+          const node = usePipelineStore.getState().nodes.find((n) => n.id === nodeId)
+          if (node && onShowDoc) onShowDoc(node.data.type)
+          onClose()
+        }}
       />
       <div style={{ height: 1, background: T.border, margin: '2px 0' }} />
       <ContextMenuBtn

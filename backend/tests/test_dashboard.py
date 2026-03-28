@@ -495,30 +495,28 @@ class TestSequenceCrashRecovery:
 
 class TestRunStarring:
     def test_starred_column_defaults_false(self, db_session, project_with_experiments):
-        """New runs should have starred='false' by default."""
+        """New runs should have starred=False by default."""
         project, pipelines = project_with_experiments
         run = db_session.query(Run).filter(Run.project_id == project.id).first()
         assert run is not None
-        # Default is 'false' (string)
-        starred = getattr(run, 'starred', 'false') or 'false'
-        assert starred == 'false'
+        assert run.starred is False or run.starred is None or run.starred == 0
 
     def test_star_toggle(self, db_session, project_with_experiments):
-        """Starring a run should toggle between 'true' and 'false'."""
+        """Starring a run should toggle between True and False."""
         project, pipelines = project_with_experiments
         run = db_session.query(Run).filter(Run.project_id == project.id).first()
 
         # Toggle on
-        run.starred = 'true'
+        run.starred = True
         db_session.commit()
         db_session.refresh(run)
-        assert run.starred == 'true'
+        assert bool(run.starred) is True
 
         # Toggle off
-        run.starred = 'false'
+        run.starred = False
         db_session.commit()
         db_session.refresh(run)
-        assert run.starred == 'false'
+        assert bool(run.starred) is False
 
     def test_starred_in_dashboard_response(self, db_session, project_with_experiments):
         """Dashboard response should reflect the starred status from DB."""
@@ -529,21 +527,17 @@ class TestRunStarring:
             Run.project_id == project.id,
             Run.status == "complete",
         ).first()
-        run.starred = 'true'
+        run.starred = True
         db_session.commit()
 
-        # Verify the conversion logic
-        assert (getattr(run, 'starred', 'false') or 'false') == 'true'
-        starred_bool = (getattr(run, 'starred', 'false') or 'false') == 'true'
-        assert starred_bool is True
+        assert bool(run.starred) is True
 
         # Unstarred run
         other_run = db_session.query(Run).filter(
             Run.project_id == project.id,
             Run.id != run.id,
         ).first()
-        other_starred = (getattr(other_run, 'starred', 'false') or 'false') == 'true'
-        assert other_starred is False
+        assert bool(getattr(other_run, 'starred', False)) is False
 
 
 # ---------------------------------------------------------------------------
