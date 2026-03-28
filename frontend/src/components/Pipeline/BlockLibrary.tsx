@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { T, F, FS, CONNECTOR_COLORS, CATEGORY_COLORS } from '@/lib/design-tokens'
 import { getBlocksByCategory, getPortColor, type BlockDefinition, getAllBlocks, isPortCompatible, getBlockDefinition } from '@/lib/block-registry'
 import { BLOCK_ALIASES, CATEGORY_ALIASES } from '@/lib/search-aliases'
-import BlockTooltip from './BlockTooltip'
 import BlockDetailPanel from './BlockDetailPanel'
 import CustomModuleEditor, { loadCustomBlocks, type CustomBlock } from './CustomModuleEditor'
 import BlockGeneratorModal from './BlockGeneratorModal'
@@ -144,22 +143,24 @@ export default function BlockLibrary() {
   const [detailBlock, setDetailBlock] = useState<string | null>(null)
   const [categoryPopup, setCategoryPopup] = useState<string | null>(null)
 
-  // Tooltip state
-  const [tooltipBlock, setTooltipBlock] = useState<string | null>(null)
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  // Block documentation hover — dispatches to BlockDoc popover via custom events
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleItemHover = useCallback((blockType: string, rect: DOMRect) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
     hoverTimerRef.current = setTimeout(() => {
-      setTooltipBlock(blockType)
-      setTooltipPos({ x: rect.right + 8, y: rect.top })
+      window.dispatchEvent(new CustomEvent('blueprint:show-block-doc', {
+        detail: {
+          blockType,
+          anchor: { x: rect.right, y: rect.top, width: 0, height: rect.height },
+        },
+      }))
     }, 300)
   }, [])
 
   const handleItemLeave = useCallback(() => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
-    setTooltipBlock(null)
+    window.dispatchEvent(new CustomEvent('blueprint:hide-block-doc'))
   }, [])
 
   const toggleCategory = (cat: string) => {
@@ -489,13 +490,6 @@ export default function BlockLibrary() {
           onClose={() => setCategoryPopup(null)}
           onBlockClick={(type) => { setCategoryPopup(null); setDetailBlock(type) }}
         />
-      )}
-
-      {/* Hover tooltip rendered as portal-like overlay */}
-      {tooltipBlock && (
-        <div style={{ position: 'fixed', left: tooltipPos.x, top: tooltipPos.y, zIndex: 9999, pointerEvents: 'none' }}>
-          <BlockTooltip blockType={tooltipBlock} visible position={{ x: 0, y: 0 }} />
-        </div>
       )}
 
       {/* Custom Module Editor */}

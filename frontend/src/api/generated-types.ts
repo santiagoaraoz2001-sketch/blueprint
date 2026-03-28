@@ -1,18 +1,19 @@
 /**
- * Generated API types stub.
+ * Hand-maintained type declarations mirroring backend Pydantic schemas.
  *
- * This file provides type declarations for the Blueprint API schemas.
- * In production it is generated from the OpenAPI spec via: npm run generate:api
+ * This file is the TypeScript source of truth for API response shapes.
+ * It replaces the missing OpenAPI-generated file that types.ts imports.
  *
- * If the backend API schema changes, regenerate this file.
- * Until then, this stub provides enough type safety for the frontend to compile.
+ * To regenerate from OpenAPI: npm run generate:api
+ * When the generator is unavailable, maintain this file manually.
+ * Each interface maps 1:1 to a Pydantic model in backend/schemas/.
  */
-
-/* eslint-disable @typescript-eslint/no-empty-object-type */
 
 export interface components {
   schemas: {
-    // ── Projects ──
+    // ═══════════════════════════════════════════════════
+    //  PROJECTS  (backend/schemas/project.py)
+    // ═══════════════════════════════════════════════════
     ProjectResponse: {
       id: string
       name: string
@@ -26,9 +27,9 @@ export interface components {
       priority: number
       github_repo: string | null
       notes: string
-      tags: string[]
       hypothesis: string | null
       key_result: string | null
+      tags: string[]
       total_experiments: number
       completed_experiments: number
       current_phase: string | null
@@ -38,138 +39,255 @@ export interface components {
       actual_compute_hours: number
       started_at: string | null
       completed_at: string | null
-      created_at: string | null
-      updated_at: string | null
+      created_at: string
+      updated_at: string
     }
     ProjectCreate: {
       name: string
-      description?: string
-      status?: string
       paper_number?: string | null
       paper_title?: string | null
+      paper_subtitle?: string | null
       target_venue?: string | null
+      description?: string
+      status?: string
+      blocked_by?: string | null
+      priority?: number
+      github_repo?: string | null
+      notes?: string
       hypothesis?: string | null
-      estimated_compute_hours?: number
+      key_result?: string | null
       tags?: string[]
+      total_experiments?: number
+      completed_experiments?: number
+      current_phase?: string | null
+      completion_criteria?: string | null
+      estimated_compute_hours?: number
+      estimated_cost_usd?: number
     }
-    ProjectUpdate: Partial<components['schemas']['ProjectCreate']>
+    ProjectUpdate: {
+      name?: string | null
+      paper_number?: string | null
+      paper_title?: string | null
+      paper_subtitle?: string | null
+      target_venue?: string | null
+      description?: string | null
+      status?: string | null
+      blocked_by?: string | null
+      priority?: number | null
+      github_repo?: string | null
+      notes?: string | null
+      hypothesis?: string | null
+      key_result?: string | null
+      tags?: string[] | null
+      total_experiments?: number | null
+      completed_experiments?: number | null
+      current_phase?: string | null
+      completion_criteria?: string | null
+      estimated_compute_hours?: number | null
+      estimated_cost_usd?: number | null
+      actual_compute_hours?: number | null
+      started_at?: string | null
+      completed_at?: string | null
+    }
 
-    // ── Experiment Phases ──
+    // ═══════════════════════════════════════════════════
+    //  EXPERIMENT PHASES  (backend/schemas/experiment_phase.py)
+    // ═══════════════════════════════════════════════════
     ExperimentPhaseResponse: {
       id: string
-      phase_id: string
       project_id: string
+      phase_id: string
       name: string
       description: string | null
-      research_question: string | null
       status: string
+      blocked_by_phase: string | null
       total_runs: number
       completed_runs: number
-      order: number
-      created_at: string | null
+      research_question: string | null
+      finding: string | null
+      sort_order: number
+      created_at: string
     }
     ExperimentPhaseCreate: {
       phase_id: string
       name: string
-      description?: string
-      research_question?: string
+      description?: string | null
+      status?: string
+      blocked_by_phase?: string | null
       total_runs?: number
+      research_question?: string | null
+      sort_order?: number
     }
-    ExperimentPhaseUpdate: Partial<components['schemas']['ExperimentPhaseCreate']>
+    ExperimentPhaseUpdate: {
+      phase_id?: string | null
+      name?: string | null
+      description?: string | null
+      status?: string | null
+      blocked_by_phase?: string | null
+      total_runs?: number | null
+      completed_runs?: number | null
+      research_question?: string | null
+      finding?: string | null
+      sort_order?: number | null
+    }
     QuickSetupPhase: {
       phase_id: string
       name: string
-      total_runs: number
-      description?: string
-      research_question?: string
+      total_runs?: number
+      description?: string | null
+      research_question?: string | null
     }
     QuickSetupRequest: {
       phases: components['schemas']['QuickSetupPhase'][]
     }
 
-    // ── Pipelines ──
+    // ═══════════════════════════════════════════════════
+    //  PIPELINES  (backend/schemas/pipeline.py)
+    // ═══════════════════════════════════════════════════
     PipelineResponse: {
       id: string
       name: string
-      description: string
       project_id: string | null
-      nodes: unknown[]
-      edges: unknown[]
-      definition: Record<string, unknown> | null
-      created_at: string | null
-      updated_at: string | null
+      experiment_id: string | null
+      experiment_phase_id: string | null
+      description: string
+      definition: Record<string, any>
+      history_json: string | null
+      created_at: string
+      updated_at: string
     }
     PipelineCreate: {
       name: string
-      description?: string
       project_id?: string | null
-      nodes?: unknown[]
-      edges?: unknown[]
+      experiment_id?: string | null
+      experiment_phase_id?: string | null
+      description?: string
+      definition?: Record<string, any>
     }
-    PipelineUpdate: Partial<components['schemas']['PipelineCreate']>
+    PipelineUpdate: {
+      name?: string | null
+      description?: string | null
+      experiment_phase_id?: string | null
+      definition?: Record<string, any> | null
+    }
 
-    // ── Runs ──
+    // ═══════════════════════════════════════════════════
+    //  RUNS  (backend/schemas/run.py)
+    // ═══════════════════════════════════════════════════
     RunResponse: {
       id: string
       pipeline_id: string
+      project_id: string | null
+      mlflow_run_id: string | null
       status: string
-      error_message: string | null
-      created_at: string | null
-      started_at: string | null
+      started_at: string
       finished_at: string | null
       duration_seconds: number | null
-      metrics: Record<string, number | string>
-      config_snapshot: Record<string, unknown> | null
-      experiment_phase_id: string | null
+      error_message: string | null
+      config_snapshot: Record<string, any>
+      metrics: Record<string, any>
+      outputs_snapshot: Record<string, any> | null
+      data_fingerprints: Record<string, any> | null
     }
 
-    // ── Execution ──
-    ExecuteResponse: { run_id: string; status: string }
-    PartialExecuteResponse: { run_id: string; status: string }
-    CancelResponse: { run_id: string; status: string }
-    RunOutputsResponse: { run_id: string; outputs: Record<string, unknown> }
+    // ═══════════════════════════════════════════════════
+    //  EXECUTION  (backend/schemas/execution.py)
+    // ═══════════════════════════════════════════════════
+    ExecuteResponse: {
+      status: string
+      pipeline_id: string
+      run_id: string
+    }
+    PartialExecuteResponse: {
+      status: string
+      pipeline_id: string
+      run_id: string
+      partial: boolean
+      source_run_id: string
+      start_node_id: string
+    }
+    CancelResponse: {
+      status: string
+      run_id: string | null
+    }
+    RunOutputsResponse: {
+      run_id: string
+      status: string
+      outputs: Record<string, any>
+    }
     PipelineValidationResponse: {
       valid: boolean
-      errors: { node_id: string; message: string; severity: string }[]
-      warnings: { node_id: string; message: string; severity: string }[]
+      errors: string[]
+      warnings: string[]
+      estimated_runtime_s: number
+      block_count: number
+      edge_count: number
     }
     BlockConfigValidationResponse: {
       valid: boolean
-      errors: string[]
+      errors: Record<string, any>[]
+      validated_config: Record<string, any>
     }
-    PipelineTestResponse: { success: boolean; message: string }
+    PipelineTestResponse: {
+      mode: string
+      validation: Record<string, any>
+      estimated_runtime_s: number
+      sample_size: number
+      block_count: number
+    }
 
-    // ── Datasets ──
+    // ═══════════════════════════════════════════════════
+    //  DATASETS  (backend/schemas/dataset.py)
+    // ═══════════════════════════════════════════════════
     DatasetResponse: {
       id: string
       name: string
+      source: string
+      source_path: string
       description: string
-      format: string
-      size_bytes: number
       row_count: number | null
-      created_at: string | null
+      size_bytes: number | null
+      column_count: number | null
+      columns: any[]
+      tags: string[]
+      created_at: string
+      version: number
     }
     DatasetCreate: {
       name: string
+      source?: string
+      source_path?: string
       description?: string
-      format?: string
+      tags?: string[]
     }
 
-    // ── Papers ──
+    // ═══════════════════════════════════════════════════
+    //  PAPERS  (backend/schemas/paper.py)
+    // ═══════════════════════════════════════════════════
     PaperResponse: {
       id: string
+      name: string
       project_id: string
-      title: string
-      content: string
-      status: string
-      created_at: string | null
-      updated_at: string | null
+      content: Record<string, any>
+      created_at: string
+      updated_at: string
     }
-    PaperCreate: { project_id: string; title: string; content?: string }
-    PaperUpdate: Partial<components['schemas']['PaperCreate']>
+    PaperCreate: {
+      name: string
+      project_id: string
+      content?: Record<string, any>
+    }
+    PaperUpdate: {
+      name?: string | null
+      content?: Record<string, any> | null
+    }
 
-    // ── System ──
-    FeatureFlagsResponse: { marketplace: boolean }
+    // ═══════════════════════════════════════════════════
+    //  SYSTEM  (backend/schemas/system.py)
+    // ═══════════════════════════════════════════════════
+    FeatureFlagsResponse: {
+      marketplace: boolean
+    }
     SystemMetricsResponse: {
       cpu_percent: number
       memory_percent: number
@@ -186,70 +304,128 @@ export interface components {
       can_fine_tune: boolean
       can_run_local_llm: boolean
       disk_ok: boolean
-      accelerators: Record<string, boolean>
+      accelerators: Record<string, any>
     }
-    BenchmarkRefreshResponse: { status: string }
-    ScheduleResponse: { status: string }
-    DependencyCheckResponse: { name: string; installed: boolean; version: string | null }
-    InstallResponse: { success: boolean; message: string }
-    DiagnosticsResponse: Record<string, unknown>
-
-    // ── Blocks ──
-    BlockSourceResponse: { block_yaml: string; run_py: string }
-
-    // ── Sweeps ──
-    CreateSweepRequest: {
-      pipeline_id: string
-      sweep_config: Record<string, unknown>
+    BenchmarkRefreshResponse: {
+      status: string
+      entries: number
+    }
+    ScheduleResponse: {
+      stages: Record<string, any>[]
+      total_stages: number
+      max_parallelism: number
+    }
+    DependencyCheckResponse: {
+      summary: {
+        total_blocks: number
+        ready_blocks: number
+        missing_packages: string[]
+        in_virtual_env: boolean
+      }
+      packages: Record<string, { package: string; installed: boolean; version: string | null }>
+      blocks: Record<string, { ready: boolean; total_deps: number; missing: string[]; install_command: string | null }>
+    }
+    InstallResponse: {
+      success: boolean
+      stdout: string
+      stderr: string
+      installed: string[]
+      error: string | null
+    }
+    DiagnosticsResponse: {
+      run_id: string
+      events: Record<string, any>[]
+      event_count: number
+      truncated: boolean
+      max_events: number | null
     }
 
-    // ── Registry ──
+    // ═══════════════════════════════════════════════════
+    //  BLOCKS  (backend/schemas/blocks.py)
+    // ═══════════════════════════════════════════════════
+    BlockSourceResponse: {
+      block: string
+      source: string
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  REGISTRY  (backend/routers/registry.py inline models)
+    // ═══════════════════════════════════════════════════
     PortSchema: {
       id: string
       label: string
       data_type: string
       required: boolean
+      default: any
+      aliases: string[]
+      description: string
+      position: string | null
     }
     ConfigFieldSchema: {
       name: string
       label: string
       type: string
-      default: unknown
-      options?: string[]
-      description?: string
+      default: any
+      min: number | null
+      max: number | null
+      options: string[] | null
+      description: string | null
+      depends_on: Record<string, any> | null
+      mandatory: boolean | null
     }
     BlockSchema: {
       type: string
       name: string
-      description: string
       category: string
-      version: string
+      description: string
       icon: string
       accent: string
-      maturity: string
+      version: string
       inputs: components['schemas']['PortSchema'][]
       outputs: components['schemas']['PortSchema'][]
-      config_fields: components['schemas']['ConfigFieldSchema'][]
+      config: components['schemas']['ConfigFieldSchema'][]
       tags: string[]
+      aliases: string[]
+      deprecated: boolean
+      maturity: string
+      exportable: boolean
     }
-    BlockDetailSchema: components['schemas']['BlockSchema'] & {
-      default_config: Record<string, unknown>
-      source_available: boolean
+    BlockDetailSchema: {
+      format: string | null
+      formatEditable: boolean | null
+      codePreview: string | null
+      tips: string[] | null
+      useCases: string[] | null
+      howItWorks: string | null
     }
     ValidateConnectionRequest: {
-      source_type: string
-      target_type: string
+      src_type: string
+      src_port: string
+      dst_type: string
+      dst_port: string
     }
     ValidateConnectionResponse: {
-      compatible: boolean
-      reason?: string
+      valid: boolean
+      error: string | null
     }
-    RegistryVersionResponse: { version: number; block_count: number }
+    RegistryVersionResponse: {
+      version: number
+    }
     RegistryHealthResponse: {
-      total: number
-      valid: number
-      broken: number
+      total_blocks: number
       categories: Record<string, number>
+      broken_blocks: string[]
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  SWEEPS  (backend/routers/sweeps.py inline model)
+    // ═══════════════════════════════════════════════════
+    CreateSweepRequest: {
+      pipeline_id: string
+      param_space: Record<string, any>
+      metric_key: string
+      strategy?: string
+      max_runs?: number
     }
   }
 }

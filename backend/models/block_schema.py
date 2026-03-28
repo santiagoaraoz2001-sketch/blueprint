@@ -59,6 +59,38 @@ class ConfigField(BaseModel):
     file_extensions: list[str] = Field(default_factory=list)
 
 
+# Valid operators for declarative cross-field validation rules
+VALID_RULE_OPERATORS = frozenset({
+    "lte", "gte", "lt", "gt", "eq", "neq",
+    "product_lte", "sum_lte", "required_if",
+})
+
+
+class ConfigValidationRule(BaseModel):
+    """A single declarative cross-field validation rule."""
+    fields: list[str]
+    op: str
+    value: float | int | None = None
+    condition_field: str | None = None
+    condition_value: Any = None
+    message: str = "Validation failed"
+    severity: str = "warning"
+
+    @field_validator("op")
+    @classmethod
+    def validate_op(cls, v: str) -> str:
+        if v not in VALID_RULE_OPERATORS:
+            raise ValueError(f"Invalid validation operator: {v!r}. Must be one of {sorted(VALID_RULE_OPERATORS)}")
+        return v
+
+    @field_validator("severity")
+    @classmethod
+    def validate_severity(cls, v: str) -> str:
+        if v not in ("warning", "error"):
+            raise ValueError(f"Invalid severity: {v!r}. Must be 'warning' or 'error'")
+        return v
+
+
 # Simple semver pattern: major.minor.patch with optional pre-release
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+].+)?$")
 
@@ -73,6 +105,7 @@ class BlockSchema(BaseModel):
     inputs: list[PortSchema] = Field(default_factory=list)
     outputs: list[PortSchema] = Field(default_factory=list)
     config: list[ConfigField] = Field(default_factory=list)
+    config_validation: list[ConfigValidationRule] = Field(default_factory=list)
     side_inputs: list[PortSchema] = Field(default_factory=list)
     source_type: str = "builtin"
     source_path: str = ""

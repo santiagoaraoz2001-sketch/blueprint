@@ -147,6 +147,27 @@ config:
     default: auto
     description: Force a specific training framework. 'auto' detects the best available.
     section: advanced
+config_validation:
+- fields: [batch_size, epochs]
+  op: product_lte
+  value: 384
+  message: "Large batch_size × epochs may cause very long training times"
+  severity: warning
+- fields: [r]
+  op: lte
+  value: 64
+  message: "LoRA rank > 64 is unusual and may negate parameter efficiency"
+  severity: warning
+- fields: [alpha]
+  op: gte
+  value: 1
+  message: "LoRA alpha must be at least 1"
+  severity: error
+- fields: [lr]
+  op: lte
+  value: 0.001
+  message: "Learning rate > 1e-3 often causes training instability with LoRA"
+  severity: warning
 side_inputs:
 - id: _loop
   label: Loop
