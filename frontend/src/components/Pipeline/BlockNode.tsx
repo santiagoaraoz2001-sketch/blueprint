@@ -58,6 +58,9 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
     nodeRunStatus?.status ?? (data.status as any) ?? 'idle'
   const effectiveProgress = nodeRunStatus?.progress ?? data.progress ?? 0
 
+  // Artifact type indicator — shown after run completes
+  const primaryOutputType = nodeRunStatus?.primaryOutputType
+
   // Re-run mode visual state
   const rerunNodeState: NodeExecutionState | null = usePipelineStore(
     (s) => s.rerunMode?.nodeStates[id] ?? null
@@ -368,6 +371,36 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
           zIndex: 2,
         }}
       />
+
+      {/* Artifact type indicator dot — shown after run completes */}
+      {effectiveStatus === 'complete' && primaryOutputType && (() => {
+        const typeColorMap: Record<string, string> = {
+          text: T.cyan,
+          dataset: T.purple,
+          data: T.purple,
+          model: T.orange,
+          metrics: T.green,
+          config: T.amber,
+          embedding: T.pink,
+        }
+        const dotColor = typeColorMap[primaryOutputType] || T.dim
+        return (
+          <div
+            title={`Output: ${primaryOutputType}`}
+            style={{
+              position: 'absolute',
+              top: 10,
+              right: 22,
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: dotColor,
+              boxShadow: `0 0 6px ${dotColor}80`,
+              zIndex: 2,
+            }}
+          />
+        )
+      })()}
 
       {/* Inheritance overlay badge */}
       {overlayRole && overlayRole !== 'dimmed' && (

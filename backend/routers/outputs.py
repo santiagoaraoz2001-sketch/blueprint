@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -269,6 +270,69 @@ def get_artifact(artifact_id: str, db: Session = Depends(get_db)):
     if not artifact:
         raise HTTPException(404, "Artifact not found")
     return artifact
+
+
+@router.get("/artifacts/{artifact_id}/download")
+def download_artifact(artifact_id: str, db: Session = Depends(get_db)):
+    """Stream the raw artifact file for download."""
+    import os
+
+    artifact = db.query(Artifact).filter(Artifact.id == artifact_id).first()
+    if not artifact:
+        raise HTTPException(404, "Artifact not found")
+    if not os.path.isfile(artifact.file_path):
+        raise HTTPException(404, "Artifact file no longer exists on disk")
+    return FileResponse(
+        path=artifact.file_path,
+        filename=artifact.name,
+        media_type="application/octet-stream",
+    )
+
+
+@router.get("/artifacts/{artifact_id}/preview")
+def preview_artifact(
+    artifact_id: str,
+    rows: int = Query(default=20, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """Return a structured preview of an artifact's content.
+
+    Supports CSV, JSONL, JSON, Parquet, SQLite, text, Excel, and YAML via
+    the shared dataset preview parsers.
+    """
+    import os
+    from pathlib import Path
+    from .datasets import _read_file_preview
+
+    artifact = db.query(Artifact).filter(Artifact.id == artifact_id).first()
+    if not artifact:
+        raise HTTPException(404, "Artifact not found")
+    if not os.path.isfile(artifact.file_path):
+        raise HTTPException(404, "Artifact file no longer exists on disk")
+
+    ext = Path(artifact.file_path).suffix.lower()
+    try:
+        preview_rows, columns, total_rows = _read_file_preview(
+            artifact.file_path, ext, rows, offset,
+        )
+    except Exception as e:
+        return {
+            "artifact_id": artifact_id,
+            "rows": [],
+            "columns": [],
+            "total_rows": 0,
+            "format": ext.lstrip("."),
+            "error": str(e),
+        }
+
+    return {
+        "artifact_id": artifact_id,
+        "rows": preview_rows,
+        "columns": columns,
+        "total_rows": total_rows,
+        "format": ext.lstrip("."),
+    }
 
 
 @router.get("/live", response_model=list[LiveRunItem])

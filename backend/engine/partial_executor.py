@@ -43,6 +43,8 @@ from .block_registry import resolve_output_handle
 from .composite import CompositeBlockContext
 from .schema_validator import load_block_schema
 from .graph_utils import is_cache_valid
+from .artifact_registry import register_block_artifacts, _sha256_file
+from ..models.artifact import Artifact
 
 
 def _get_downstream_nodes(start_id: str, nodes: list, edges: list) -> set[str]:
@@ -90,6 +92,59 @@ def _validate_upstream_definitions(
         if cur_data.get("type") != src_data.get("type"):
             mismatched.append(nid)
     return mismatched
+
+
+# Files larger than this skip hash verification (50 MB) — existence + size is
+# sufficient for large artifacts to keep partial-rerun startup fast.
+_VERIFY_HASH_MAX_SIZE = 50 * 1024 * 1024
+
+
+def _verify_node_artifacts(
+    source_run_id: str,
+    node_id: str,
+    db: Session,
+) -> tuple[bool, str]:
+    """Verify integrity of artifacts for a cached node.
+
+    Two-tier check:
+      1. Fast path (all files): existence + size match via os.stat (O(1) per file)
+      2. Slow path (files < 50 MB with a stored hash): SHA-256 verification
+
+    Returns (ok, reason). If no artifacts exist for the node, returns True
+    (some blocks produce in-memory outputs only).
+    """
+    artifacts = (
+        db.query(Artifact)
+        .filter(Artifact.run_id == source_run_id, Artifact.node_id == node_id)
+        .all()
+    )
+    if not artifacts:
+        return True, ""
+
+    import os
+    for art in artifacts:
+        # Fast path: existence check
+        try:
+            stat = os.stat(art.file_path)
+        except OSError:
+            return False, f"Artifact file missing: {art.name} ({art.file_path})"
+
+        # Fast path: size mismatch catches truncated or replaced files
+        if art.size_bytes and stat.st_size != art.size_bytes:
+            return False, (
+                f"Artifact size mismatch for {art.name}: "
+                f"expected {art.size_bytes} bytes, got {stat.st_size} bytes"
+            )
+
+        # Slow path: hash only for small files (< 50 MB) that have a stored hash
+        if art.hash and stat.st_size <= _VERIFY_HASH_MAX_SIZE:
+            current_hash = _sha256_file(art.file_path)
+            if current_hash and current_hash != art.hash:
+                return False, (
+                    f"Artifact hash mismatch for {art.name}: "
+                    f"expected {art.hash[:12]}…, got {current_hash[:12]}…"
+                )
+    return True, ""
 
 
 async def execute_partial_pipeline(
@@ -332,9 +387,8 @@ async def execute_partial_pipeline(
             if node_id not in downstream:
                 # Kill switch: validate cache before reuse
                 if not is_cache_valid(node_id, pipeline_id, config, db):
-                    # Determine reason for logging
                     import sys as _sys
-                    reason = "config_changed"  # default
+                    reason = "config_changed"
                     _last_run = db.query(Run).filter(
                         Run.pipeline_id == pipeline_id
                     ).order_by(Run.started_at.desc()).first()
@@ -351,46 +405,57 @@ async def execute_partial_pipeline(
                         })
                     except Exception:
                         pass
-                    # Force re-execution by adding to downstream
                     downstream.add(node_id)
-                    # Fall through to the EXECUTE NODE path below
-                    # (the continue below will be skipped because
-                    # node_id is now in downstream)
 
-            if node_id not in downstream:
-                outputs[node_id] = cached_outputs.get(node_id, {})
+                # Verify artifact integrity before reusing cached outputs
+                if node_id not in downstream:
+                    art_ok, art_reason = _verify_node_artifacts(
+                        source_run_id, node_id, db,
+                    )
+                    if not art_ok:
+                        import logging
+                        logging.getLogger("blueprint.partial_executor").warning(
+                            "Artifact verification failed for node %s: %s. "
+                            "Forcing re-execution from this node forward.",
+                            node_id, art_reason,
+                        )
+                        downstream.add(node_id)
+                        downstream |= _get_downstream_nodes(node_id, nodes, edges)
 
-                cache_event = {
-                    "node_id": node_id,
-                    "block_type": block_type,
-                    "category": category,
-                    "index": idx,
-                    "total": len(nodes),
-                    "source_run_id": source_run_id,
-                }
-                try:
-                    publish_event(run_id, "node_cached", cache_event)
-                except Exception:
-                    pass
-                metrics_log_buffer.append({
-                    "type": "node_cached", "timestamp": time.time(), **cache_event
-                })
-                metrics_file.write(
-                    json.dumps({
-                        "type": "node_cached",
-                        "timestamp": time.time(),
-                        **cache_event,
-                    }) + "\n"
-                )
-                metrics_file.flush()
+                if node_id not in downstream:
+                    outputs[node_id] = cached_outputs.get(node_id, {})
 
-                # Update live run progress
-                live.current_block = node_data.get("label", block_type)
-                live.current_block_index = idx
-                live.block_progress = 1.0
-                live.overall_progress = (idx + 1) / len(nodes)
-                db.commit()
-                continue
+                    cache_event = {
+                        "node_id": node_id,
+                        "block_type": block_type,
+                        "category": category,
+                        "index": idx,
+                        "total": len(nodes),
+                        "source_run_id": source_run_id,
+                    }
+                    try:
+                        publish_event(run_id, "node_cached", cache_event)
+                    except Exception:
+                        pass
+                    metrics_log_buffer.append({
+                        "type": "node_cached", "timestamp": time.time(), **cache_event
+                    })
+                    metrics_file.write(
+                        json.dumps({
+                            "type": "node_cached",
+                            "timestamp": time.time(),
+                            **cache_event,
+                        }) + "\n"
+                    )
+                    metrics_file.flush()
+
+                    # Update live run progress
+                    live.current_block = node_data.get("label", block_type)
+                    live.current_block_index = idx
+                    live.block_progress = 1.0
+                    live.overall_progress = (idx + 1) / len(nodes)
+                    db.commit()
+                    continue
 
             # ---- EXECUTE NODE: run normally ----
 
@@ -590,7 +655,29 @@ async def execute_partial_pipeline(
                 db.commit()
                 return
 
-            # Heartbeat + partial outputs
+            # Register artifacts produced by this block (best-effort)
+            artifact_ids: list[str] = []
+            try:
+                artifact_ids = register_block_artifacts(
+                    pipeline_id=pipeline_id,
+                    run_id=run_id,
+                    node_id=node_id,
+                    block_type=block_type,
+                    outputs=node_outputs,
+                    run_dir=run_dir,
+                )
+            except Exception:
+                pass
+
+            # Determine primary output data type for canvas indicators
+            primary_output_type = None
+            try:
+                if block_schema and block_schema.get("outputs"):
+                    primary_output_type = block_schema["outputs"][0].get("data_type")
+            except Exception:
+                pass
+
+            # Heartbeat + partial outputs (preview-only, not authoritative)
             run.last_heartbeat = datetime.now(timezone.utc)
             run.outputs_snapshot = _safe_outputs_snapshot(outputs)
             db.commit()
@@ -610,7 +697,12 @@ async def execute_partial_pipeline(
             except Exception:
                 pass
 
-            completed_event = {"node_id": node_id, "index": idx}
+            completed_event = {
+                "node_id": node_id,
+                "index": idx,
+                "primary_output_type": primary_output_type,
+                "artifact_count": len(artifact_ids),
+            }
             try:
                 publish_event(run_id, "node_completed", completed_event)
             except Exception:

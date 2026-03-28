@@ -142,18 +142,20 @@ export function useOutputRuns(opts: {
 export function useOutputArtifacts(opts: {
   projectId?: string | null
   pipelineId?: string | null
+  runId?: string | null
   artifactType?: string | null
   limit?: number
   enabled?: boolean
 } = {}) {
-  const { projectId, pipelineId, artifactType, limit = 100, enabled = true } = opts
+  const { projectId, pipelineId, runId, artifactType, limit = 100, enabled = true } = opts
 
   return useQuery({
-    queryKey: outputsKeys.artifacts({ projectId, pipelineId, artifactType }),
+    queryKey: outputsKeys.artifacts({ projectId, pipelineId, artifactType, ...(runId ? { runId } : {}) }),
     queryFn: async () => {
       const params = new URLSearchParams()
       if (projectId) params.set('project_id', projectId)
       if (pipelineId) params.set('pipeline_id', pipelineId)
+      if (runId) params.set('run_id', runId)
       if (artifactType) params.set('artifact_type', artifactType)
       if (limit) params.set('limit', String(limit))
       const qs = params.toString()
@@ -171,6 +173,31 @@ export function useArtifact(artifactId: string | null) {
   return useQuery({
     queryKey: outputsKeys.artifact(artifactId || ''),
     queryFn: () => api.get<ArtifactItem>(`/outputs/artifacts/${artifactId}`),
+    enabled: !!artifactId,
+    staleTime: 60_000,
+  })
+}
+
+/**
+ * Structured preview of an artifact's file content.
+ * Server-side parsing handles CSV, JSONL, Parquet, text, etc.
+ */
+export interface ArtifactPreviewData {
+  artifact_id: string
+  rows: Record<string, unknown>[]
+  columns: string[]
+  total_rows: number
+  format: string
+  error?: string
+}
+
+export function useArtifactPreview(artifactId: string | null, opts?: { rows?: number }) {
+  const rows = opts?.rows ?? 20
+  return useQuery({
+    queryKey: ['outputs', 'artifact-preview', artifactId, rows] as const,
+    queryFn: () => api.get<ArtifactPreviewData>(
+      `/outputs/artifacts/${artifactId}/preview?rows=${rows}`
+    ),
     enabled: !!artifactId,
     staleTime: 60_000,
   })
