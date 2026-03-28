@@ -179,6 +179,31 @@ export function useArtifact(artifactId: string | null) {
 }
 
 /**
+ * Structured preview of an artifact's file content.
+ * Server-side parsing handles CSV, JSONL, Parquet, text, etc.
+ */
+export interface ArtifactPreviewData {
+  artifact_id: string
+  rows: Record<string, unknown>[]
+  columns: string[]
+  total_rows: number
+  format: string
+  error?: string
+}
+
+export function useArtifactPreview(artifactId: string | null, opts?: { rows?: number }) {
+  const rows = opts?.rows ?? 20
+  return useQuery({
+    queryKey: ['outputs', 'artifact-preview', artifactId, rows] as const,
+    queryFn: () => api.get<ArtifactPreviewData>(
+      `/outputs/artifacts/${artifactId}/preview?rows=${rows}`
+    ),
+    enabled: !!artifactId,
+    staleTime: 60_000,
+  })
+}
+
+/**
  * Fetch currently running pipelines. Polls every 5s.
  */
 export function useLiveRuns(enabled = true) {

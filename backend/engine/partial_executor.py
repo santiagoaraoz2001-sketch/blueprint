@@ -94,6 +94,11 @@ def _validate_upstream_definitions(
     return mismatched
 
 
+# Files larger than this skip hash verification (50 MB) — existence + size is
+# sufficient for large artifacts to keep partial-rerun startup fast.
+_VERIFY_HASH_MAX_SIZE = 50 * 1024 * 1024
+
+
 def _verify_node_artifacts(
     source_run_id: str,
     node_id: str,
@@ -101,7 +106,10 @@ def _verify_node_artifacts(
 ) -> tuple[bool, str]:
     """Verify integrity of artifacts for a cached node.
 
-    Checks that all artifact files still exist and their hashes match.
+    Two-tier check:
+      1. Fast path (all files): existence + size match via os.stat (O(1) per file)
+      2. Slow path (files < 50 MB with a stored hash): SHA-256 verification
+
     Returns (ok, reason). If no artifacts exist for the node, returns True
     (some blocks produce in-memory outputs only).
     """
@@ -115,9 +123,21 @@ def _verify_node_artifacts(
 
     import os
     for art in artifacts:
-        if not os.path.isfile(art.file_path):
+        # Fast path: existence check
+        try:
+            stat = os.stat(art.file_path)
+        except OSError:
             return False, f"Artifact file missing: {art.name} ({art.file_path})"
-        if art.hash:
+
+        # Fast path: size mismatch catches truncated or replaced files
+        if art.size_bytes and stat.st_size != art.size_bytes:
+            return False, (
+                f"Artifact size mismatch for {art.name}: "
+                f"expected {art.size_bytes} bytes, got {stat.st_size} bytes"
+            )
+
+        # Slow path: hash only for small files (< 50 MB) that have a stored hash
+        if art.hash and stat.st_size <= _VERIFY_HASH_MAX_SIZE:
             current_hash = _sha256_file(art.file_path)
             if current_hash and current_hash != art.hash:
                 return False, (

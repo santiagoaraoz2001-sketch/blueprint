@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
 import { T, F, FCODE, FS } from '@/lib/design-tokens'
 import { Download, Loader2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import type { ArtifactItem } from '@/hooks/useOutputs'
+import { useArtifactPreview } from '@/hooks/useOutputs'
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -12,59 +12,15 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(i > 1 ? 1 : 0)} ${sizes[i]}`
 }
 
-// Preview content is fetched from the artifact metadata or via a lightweight preview endpoint.
-// For now, we render type-specific views based on what we know from the artifact record.
+type PreviewType = 'text' | 'dataset' | 'metrics' | 'model' | 'figure'
 
-interface PreviewData {
-  type: 'text' | 'dataset' | 'metrics' | 'model' | 'figure' | 'unknown'
-  content?: string
-  rows?: Record<string, unknown>[]
-  columns?: string[]
-  metrics?: Record<string, number>
-  modelInfo?: { path: string; size: string; format: string }
-}
-
-function parsePreviewFromMetadata(artifact: ArtifactItem): PreviewData {
-  const meta = artifact.metadata || {}
+function inferPreviewType(artifact: ArtifactItem): PreviewType {
   const aType = artifact.artifact_type
-
-  if (aType === 'metrics' || aType === 'checkpoint') {
-    if (meta && typeof meta === 'object') {
-      const numericEntries = Object.entries(meta).filter(
-        ([, v]) => typeof v === 'number'
-      )
-      if (numericEntries.length > 0) {
-        return {
-          type: 'metrics',
-          metrics: Object.fromEntries(numericEntries) as Record<string, number>,
-        }
-      }
-    }
-    return { type: 'metrics', metrics: {} }
-  }
-
-  if (aType === 'model' || aType === 'adapter') {
-    const ext = artifact.name.split('.').pop() || 'unknown'
-    return {
-      type: 'model',
-      modelInfo: {
-        path: artifact.file_path,
-        size: formatBytes(artifact.size_bytes),
-        format: ext.toUpperCase(),
-      },
-    }
-  }
-
-  if (aType === 'figure') {
-    return { type: 'figure' }
-  }
-
-  if (aType === 'dataset' || aType === 'data') {
-    return { type: 'dataset' }
-  }
-
-  // text, log, or unknown
-  return { type: 'text' }
+  if (aType === 'metrics' || aType === 'checkpoint') return 'metrics'
+  if (aType === 'model' || aType === 'adapter') return 'model'
+  if (aType === 'figure') return 'figure'
+  if (aType === 'dataset' || aType === 'data') return 'dataset'
+  return 'text'
 }
 
 const CHART_COLORS = [T.cyan, T.green, T.amber, T.blue, T.purple, T.pink, T.orange, T.teal]
@@ -130,8 +86,7 @@ function MetricsPreview({ metrics }: { metrics: Record<string, number> }) {
   )
 }
 
-function TextPreview({ content }: { content: string }) {
-  const lines = content.split('\n')
+function TextPreview({ rows }: { rows: Record<string, unknown>[] }) {
   return (
     <pre
       style={{
@@ -149,7 +104,7 @@ function TextPreview({ content }: { content: string }) {
         lineHeight: 1.6,
       }}
     >
-      {lines.map((line, i) => (
+      {rows.map((row, i) => (
         <div key={i} style={{ display: 'flex' }}>
           <span style={{
             color: T.muted,
@@ -159,9 +114,9 @@ function TextPreview({ content }: { content: string }) {
             userSelect: 'none',
             opacity: 0.6,
           }}>
-            {i + 1}
+            {String(row.line ?? i + 1)}
           </span>
-          <span>{line}</span>
+          <span>{String(row.text ?? '')}</span>
         </div>
       ))}
     </pre>
@@ -210,7 +165,7 @@ function DatasetPreview({ rows, columns }: { rows: Record<string, unknown>[]; co
           </tr>
         </thead>
         <tbody>
-          {rows.slice(0, 10).map((row, i) => (
+          {rows.map((row, i) => (
             <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : T.surface1 }}>
               {columns.map((col) => (
                 <td
@@ -236,7 +191,8 @@ function DatasetPreview({ rows, columns }: { rows: Record<string, unknown>[]; co
   )
 }
 
-function ModelInfoPreview({ info }: { info: { path: string; size: string; format: string } }) {
+function ModelInfoPreview({ artifact }: { artifact: ArtifactItem }) {
+  const ext = artifact.name.split('.').pop() || 'unknown'
   return (
     <div
       style={{
@@ -249,16 +205,16 @@ function ModelInfoPreview({ info }: { info: { path: string; size: string; format
       }}
     >
       {[
-        { label: 'Format', value: info.format },
-        { label: 'Size', value: info.size },
-        { label: 'Path', value: info.path },
-      ].map(({ label, value }) => (
+        { label: 'Format', value: ext.toUpperCase(), mono: false },
+        { label: 'Size', value: formatBytes(artifact.size_bytes), mono: false },
+        { label: 'Path', value: artifact.file_path, mono: true },
+      ].map(({ label, value, mono }) => (
         <div key={label} style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
           <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, minWidth: 50, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             {label}
           </span>
           <span style={{
-            fontFamily: label === 'Path' ? FCODE : F,
+            fontFamily: mono ? FCODE : F,
             fontSize: FS.xs,
             color: T.text,
             overflow: 'hidden',
@@ -273,53 +229,63 @@ function ModelInfoPreview({ info }: { info: { path: string; size: string; format
   )
 }
 
+/**
+ * Server-side content preview for text/dataset types.
+ * Uses the /api/outputs/artifacts/{id}/preview endpoint which handles
+ * CSV, JSONL, JSON, Parquet, SQLite, text, Excel, and YAML.
+ */
+function ServerPreview({ artifact, previewType }: { artifact: ArtifactItem; previewType: PreviewType }) {
+  const { data, isLoading, error } = useArtifactPreview(artifact.id, { rows: 20 })
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: T.dim, padding: 4 }}>
+        <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+        <span style={{ fontFamily: F, fontSize: FS.xxs }}>Loading preview...</span>
+      </div>
+    )
+  }
+
+  if (error || !data || data.error) {
+    return (
+      <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
+        {data?.error || 'Could not load preview.'}
+      </span>
+    )
+  }
+
+  if (!data.rows.length) {
+    return (
+      <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
+        Empty file.
+      </span>
+    )
+  }
+
+  // Text/log files come back with {line, text} rows
+  const isTextFormat = data.columns.length === 2
+    && data.columns.includes('line')
+    && data.columns.includes('text')
+
+  if (isTextFormat || previewType === 'text') {
+    return <TextPreview rows={data.rows} />
+  }
+
+  // Metrics files (JSON) — try to render as chart if data looks like key-value
+  if (previewType === 'metrics' && data.rows.length === 1) {
+    const row = data.rows[0]
+    const numericEntries = Object.entries(row).filter(([, v]) => typeof v === 'number')
+    if (numericEntries.length > 0) {
+      return <MetricsPreview metrics={Object.fromEntries(numericEntries) as Record<string, number>} />
+    }
+  }
+
+  // Dataset / structured data — render as table
+  return <DatasetPreview rows={data.rows} columns={data.columns} />
+}
+
 export default function ArtifactPreview({ artifact }: { artifact: ArtifactItem }) {
-  const [fileContent, setFileContent] = useState<string | null>(null)
-  const [datasetRows, setDatasetRows] = useState<Record<string, unknown>[] | null>(null)
-  const [datasetColumns, setDatasetColumns] = useState<string[]>([])
-  const [loading, setLoading] = useState(false)
-
-  const preview = parsePreviewFromMetadata(artifact)
-
-  // Load file content for text previews
-  useEffect(() => {
-    if (preview.type !== 'text' && preview.type !== 'dataset') return
-
-    let cancelled = false
-    setLoading(true)
-
-    // Fetch the file content via download endpoint (first 10KB only for preview)
-    fetch(`/api/outputs/artifacts/${artifact.id}/download`, {
-      headers: { Range: 'bytes=0-10240' },
-    })
-      .then((res) => res.text())
-      .then((text) => {
-        if (cancelled) return
-        if (preview.type === 'dataset') {
-          // Try to parse as JSONL or CSV
-          try {
-            const lines = text.trim().split('\n').filter(Boolean)
-            const parsed = lines.slice(0, 11).map((l) => JSON.parse(l))
-            if (parsed.length > 0) {
-              const cols = Object.keys(parsed[0])
-              setDatasetColumns(cols)
-              setDatasetRows(parsed.slice(0, 10))
-            }
-          } catch {
-            // Fall back to text display
-            setFileContent(text)
-          }
-        } else {
-          setFileContent(text)
-        }
-        setLoading(false)
-      })
-      .catch(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    return () => { cancelled = true }
-  }, [artifact.id, preview.type])
+  const previewType = inferPreviewType(artifact)
 
   const handleDownload = () => {
     window.open(`/api/outputs/artifacts/${artifact.id}/download`, '_blank')
@@ -327,38 +293,19 @@ export default function ArtifactPreview({ artifact }: { artifact: ArtifactItem }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {/* Preview content */}
-      {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: T.dim, padding: 4 }}>
-          <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
-          <span style={{ fontFamily: F, fontSize: FS.xxs }}>Loading preview...</span>
-        </div>
+      {/* Type-specific preview */}
+      {previewType === 'model' && (
+        <ModelInfoPreview artifact={artifact} />
       )}
 
-      {!loading && preview.type === 'text' && fileContent && (
-        <TextPreview content={fileContent} />
-      )}
-
-      {!loading && preview.type === 'dataset' && datasetRows && datasetColumns.length > 0 && (
-        <DatasetPreview rows={datasetRows} columns={datasetColumns} />
-      )}
-
-      {!loading && preview.type === 'dataset' && fileContent && !datasetRows && (
-        <TextPreview content={fileContent} />
-      )}
-
-      {preview.type === 'metrics' && preview.metrics && (
-        <MetricsPreview metrics={preview.metrics} />
-      )}
-
-      {preview.type === 'model' && preview.modelInfo && (
-        <ModelInfoPreview info={preview.modelInfo} />
-      )}
-
-      {preview.type === 'figure' && (
+      {previewType === 'figure' && (
         <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
           Figure preview — download to view.
         </div>
+      )}
+
+      {(previewType === 'text' || previewType === 'dataset' || previewType === 'metrics') && (
+        <ServerPreview artifact={artifact} previewType={previewType} />
       )}
 
       {/* Download button */}
