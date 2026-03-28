@@ -1,0 +1,379 @@
+# MODEL_CATALOG.yaml — Single source of truth for model intelligence.
+#
+# Used by the Copilot rule engine (OOM prediction, context window checks)
+# and the frontend client-side rule engine.
+#
+# Consumed by:
+#   - backend/services/model_catalog.py  → Python model lookup
+#   - scripts/generate_model_catalog.py  → frontend/src/lib/generated/model-catalog.generated.ts
+#
+# EDITING: update this file, then run `python scripts/generate_model_catalog.py`.
+# Do NOT edit model-catalog.generated.ts by hand.
+#
+# Structure:
+#   Each entry in `families` defines a model family with:
+#     - pattern: regex matched against lowercase, normalized model name
+#     - params_b: parameter count in billions
+#     - context: context window in tokens
+#     - aliases: list of common shortened names (for exact substring match)
+#
+# Normalization: before matching, model names are lowercased and all of
+# [ /, _, . ] are replaced with '-'. E.g.:
+#   "meta-llama/Llama-3.1-8B-Instruct" → "meta-llama-llama-3-1-8b-instruct"
+#   "Qwen/Qwen2.5-72B-Instruct"        → "qwen-qwen2-5-72b-instruct"
+#
+# Families are matched top-to-bottom; first match wins.
+# Put more specific patterns (e.g. "llama-3.1-405b") BEFORE generic ones.
+
+families:
+
+  # ── Meta Llama ───────────────────────────────────────────────────
+  - pattern: "llama[- ]?3[.-]?1[- ]?405b"
+    params_b: 405.0
+    context: 131072
+    aliases: ["llama-3.1-405b"]
+
+  - pattern: "llama[- ]?3[.-]?1[- ]?70b"
+    params_b: 70.0
+    context: 131072
+    aliases: ["llama-3.1-70b"]
+
+  - pattern: "llama[- ]?3[.-]?1[- ]?8b"
+    params_b: 8.0
+    context: 131072
+    aliases: ["llama-3.1-8b"]
+
+  - pattern: "llama[- ]?3[.-]?2[- ]?90b"
+    params_b: 90.0
+    context: 131072
+    aliases: ["llama-3.2-90b"]
+
+  - pattern: "llama[- ]?3[.-]?2[- ]?11b"
+    params_b: 11.0
+    context: 131072
+    aliases: ["llama-3.2-11b"]
+
+  - pattern: "llama[- ]?3[.-]?2[- ]?3b"
+    params_b: 3.0
+    context: 131072
+    aliases: ["llama-3.2-3b"]
+
+  - pattern: "llama[- ]?3[.-]?2[- ]?1b"
+    params_b: 1.0
+    context: 131072
+    aliases: ["llama-3.2-1b"]
+
+  - pattern: "llama[- ]?3[- ]?70b"
+    params_b: 70.0
+    context: 8192
+    aliases: ["llama-3-70b"]
+
+  - pattern: "llama[- ]?3[- ]?8b"
+    params_b: 8.0
+    context: 8192
+    aliases: ["llama-3-8b"]
+
+  - pattern: "llama[- ]?2[- ]?70b"
+    params_b: 70.0
+    context: 4096
+    aliases: ["llama-2-70b"]
+
+  - pattern: "llama[- ]?2[- ]?13b"
+    params_b: 13.0
+    context: 4096
+    aliases: ["llama-2-13b"]
+
+  - pattern: "llama[- ]?2[- ]?7b"
+    params_b: 7.0
+    context: 4096
+    aliases: ["llama-2-7b"]
+
+  - pattern: "llama[- ]?70b"
+    params_b: 70.0
+    context: 2048
+    aliases: ["llama-70b"]
+
+  - pattern: "llama[- ]?13b"
+    params_b: 13.0
+    context: 2048
+    aliases: ["llama-13b"]
+
+  - pattern: "llama[- ]?7b"
+    params_b: 7.0
+    context: 2048
+    aliases: ["llama-7b"]
+
+  # ── Mistral / Mixtral ────────────────────────────────────────────
+  - pattern: "mistral[- ]?large"
+    params_b: 123.0
+    context: 131072
+    aliases: ["mistral-large"]
+
+  - pattern: "mistral[- ]?nemo"
+    params_b: 12.0
+    context: 131072
+    aliases: ["mistral-nemo"]
+
+  - pattern: "mixtral[- ]?8x22b"
+    params_b: 141.0
+    context: 65536
+    aliases: ["mixtral-8x22b"]
+
+  - pattern: "mixtral[- ]?8x7b"
+    params_b: 46.7
+    context: 32768
+    aliases: ["mixtral-8x7b"]
+
+  - pattern: "mistral[- ]?7b"
+    params_b: 7.3
+    context: 8192
+    aliases: ["mistral-7b"]
+
+  # ── Microsoft Phi ────────────────────────────────────────────────
+  - pattern: "phi[- ]?4"
+    params_b: 14.0
+    context: 16384
+    aliases: ["phi-4"]
+
+  - pattern: "phi[- ]?3[- ]?medium"
+    params_b: 14.0
+    context: 131072
+    aliases: ["phi-3-medium"]
+
+  - pattern: "phi[- ]?3[- ]?small"
+    params_b: 7.0
+    context: 131072
+    aliases: ["phi-3-small"]
+
+  - pattern: "phi[- ]?3[- ]?mini"
+    params_b: 3.8
+    context: 128000
+    aliases: ["phi-3-mini"]
+
+  - pattern: "phi[- ]?2"
+    params_b: 2.7
+    context: 2048
+    aliases: ["phi-2"]
+
+  # ── Google Gemma ─────────────────────────────────────────────────
+  - pattern: "gemma[- ]?2[- ]?27b"
+    params_b: 27.0
+    context: 8192
+    aliases: ["gemma-2-27b"]
+
+  - pattern: "gemma[- ]?2[- ]?9b"
+    params_b: 9.0
+    context: 8192
+    aliases: ["gemma-2-9b"]
+
+  - pattern: "gemma[- ]?2[- ]?2b"
+    params_b: 2.0
+    context: 8192
+    aliases: ["gemma-2-2b"]
+
+  - pattern: "gemma[- ]?7b"
+    params_b: 7.0
+    context: 8192
+    aliases: ["gemma-7b"]
+
+  - pattern: "gemma[- ]?2b"
+    params_b: 2.0
+    context: 8192
+    aliases: ["gemma-2b"]
+
+  # ── Alibaba Qwen ─────────────────────────────────────────────────
+  - pattern: "qwen[- ]?2[.-]?5[- ]?72b"
+    params_b: 72.0
+    context: 131072
+    aliases: ["qwen-2.5-72b", "qwen2.5-72b"]
+
+  - pattern: "qwen[- ]?2[.-]?5[- ]?32b"
+    params_b: 32.0
+    context: 131072
+    aliases: ["qwen-2.5-32b", "qwen2.5-32b"]
+
+  - pattern: "qwen[- ]?2[.-]?5[- ]?14b"
+    params_b: 14.0
+    context: 131072
+    aliases: ["qwen-2.5-14b", "qwen2.5-14b"]
+
+  - pattern: "qwen[- ]?2[.-]?5[- ]?7b"
+    params_b: 7.0
+    context: 131072
+    aliases: ["qwen-2.5-7b", "qwen2.5-7b"]
+
+  - pattern: "qwen[- ]?2[.-]?5[- ]?3b"
+    params_b: 3.0
+    context: 131072
+    aliases: ["qwen-2.5-3b", "qwen2.5-3b"]
+
+  - pattern: "qwen[- ]?2[.-]?5[- ]?1[.-]?5b"
+    params_b: 1.5
+    context: 131072
+    aliases: ["qwen-2.5-1.5b", "qwen2.5-1.5b"]
+
+  - pattern: "qwen[- ]?2[.-]?5[- ]?0[.-]?5b"
+    params_b: 0.5
+    context: 131072
+    aliases: ["qwen-2.5-0.5b", "qwen2.5-0.5b"]
+
+  - pattern: "qwen[- ]?72b"
+    params_b: 72.0
+    context: 32768
+    aliases: ["qwen-72b"]
+
+  - pattern: "qwen[- ]?14b"
+    params_b: 14.0
+    context: 8192
+    aliases: ["qwen-14b"]
+
+  - pattern: "qwen[- ]?7b"
+    params_b: 7.0
+    context: 8192
+    aliases: ["qwen-7b"]
+
+  # ── Falcon ───────────────────────────────────────────────────────
+  - pattern: "falcon[- ]?180b"
+    params_b: 180.0
+    context: 2048
+    aliases: ["falcon-180b"]
+
+  - pattern: "falcon[- ]?40b"
+    params_b: 40.0
+    context: 2048
+    aliases: ["falcon-40b"]
+
+  - pattern: "falcon[- ]?7b"
+    params_b: 7.0
+    context: 2048
+    aliases: ["falcon-7b"]
+
+  # ── OpenAI GPT-2 ─────────────────────────────────────────────────
+  - pattern: "gpt2[- ]?xl"
+    params_b: 1.5
+    context: 1024
+    aliases: ["gpt2-xl"]
+
+  - pattern: "gpt2[- ]?large"
+    params_b: 0.774
+    context: 1024
+    aliases: ["gpt2-large"]
+
+  - pattern: "gpt2[- ]?medium"
+    params_b: 0.345
+    context: 1024
+    aliases: ["gpt2-medium"]
+
+  - pattern: "gpt2"
+    params_b: 0.117
+    context: 1024
+    aliases: ["gpt2"]
+
+  # ── Google T5 ────────────────────────────────────────────────────
+  - pattern: "t5[- ]?11b|t5[- ]?xxl"
+    params_b: 11.0
+    context: 512
+    aliases: ["t5-11b", "t5-xxl"]
+
+  - pattern: "t5[- ]?3b|t5[- ]?xl"
+    params_b: 3.0
+    context: 512
+    aliases: ["t5-3b", "t5-xl"]
+
+  - pattern: "t5[- ]?large"
+    params_b: 0.770
+    context: 512
+    aliases: ["t5-large"]
+
+  - pattern: "t5[- ]?base"
+    params_b: 0.220
+    context: 512
+    aliases: ["t5-base"]
+
+  - pattern: "t5[- ]?small"
+    params_b: 0.060
+    context: 512
+    aliases: ["t5-small"]
+
+  # ── BERT ─────────────────────────────────────────────────────────
+  - pattern: "bert[- ]?large"
+    params_b: 0.340
+    context: 512
+    aliases: ["bert-large"]
+
+  - pattern: "bert[- ]?base"
+    params_b: 0.110
+    context: 512
+    aliases: ["bert-base"]
+
+  # ── DeepSeek ─────────────────────────────────────────────────────
+  - pattern: "deepseek[- ]?v3"
+    params_b: 671.0
+    context: 131072
+    aliases: ["deepseek-v3"]
+
+  - pattern: "deepseek[- ]?v2[.-]?5"
+    params_b: 236.0
+    context: 131072
+    aliases: ["deepseek-v2.5"]
+
+  - pattern: "deepseek[- ]?coder[- ]?v2"
+    params_b: 236.0
+    context: 131072
+    aliases: ["deepseek-coder-v2"]
+
+  - pattern: "deepseek[- ]?67b"
+    params_b: 67.0
+    context: 4096
+    aliases: ["deepseek-67b"]
+
+  - pattern: "deepseek[- ]?7b"
+    params_b: 7.0
+    context: 4096
+    aliases: ["deepseek-7b"]
+
+  # ── Cohere Command ───────────────────────────────────────────────
+  - pattern: "command[- ]?r[- ]?plus"
+    params_b: 104.0
+    context: 131072
+    aliases: ["command-r-plus"]
+
+  - pattern: "command[- ]?r(?![- ]?plus)"
+    params_b: 35.0
+    context: 131072
+    aliases: ["command-r"]
+
+  # ── Yi ───────────────────────────────────────────────────────────
+  - pattern: "yi[- ]?34b"
+    params_b: 34.0
+    context: 4096
+    aliases: ["yi-34b"]
+
+  - pattern: "yi[- ]?6b"
+    params_b: 6.0
+    context: 4096
+    aliases: ["yi-6b"]
+
+  # ── Stable Diffusion / StableLM ──────────────────────────────────
+  - pattern: "stablelm[- ]?2[- ]?12b"
+    params_b: 12.0
+    context: 4096
+    aliases: ["stablelm-2-12b"]
+
+  - pattern: "stablelm[- ]?2[- ]?1[.-]?6b"
+    params_b: 1.6
+    context: 4096
+    aliases: ["stablelm-2-1.6b"]
+
+# ── Heuristic Extraction Patterns ─────────────────────────────────
+# When no family matches, the model catalog tries to extract parameter
+# counts from the model name itself using these regex patterns.
+# Matched against the normalized (lowercased, dashes-for-separators) name.
+# First capturing group must be the numeric part.
+heuristic_patterns:
+  # "70b", "7b", "1.5b", "0.5b" — billions
+  - pattern: "(\\d+(?:\\.\\d+)?)b(?:\\b|[-_])"
+    unit: "B"
+  # "350m", "125m" — millions → divide by 1000
+  - pattern: "(\\d+(?:\\.\\d+)?)m(?:\\b|[-_])"
+    unit: "M"

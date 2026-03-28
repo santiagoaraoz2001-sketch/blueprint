@@ -27,6 +27,7 @@ import EdgePreviewPanel from './EdgePreviewPanel'
 import InheritanceOverlay, { OVERLAY_COLORS } from './InheritanceOverlay'
 import NodeContextMenu from './NodeContextMenu'
 import RerunOverlay from './RerunOverlay'
+import CopilotPanel from '../Copilot/CopilotPanel'
 import DebugToolbar from '@/components/Debug/DebugToolbar'
 import DataInspector from '@/components/Debug/DataInspector'
 import BlockSearch from '@/components/Search/BlockSearch'
@@ -926,6 +927,8 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
           </div>
         )
       })()}
+
+      <CopilotPanel />
     </div>
   )
 }
