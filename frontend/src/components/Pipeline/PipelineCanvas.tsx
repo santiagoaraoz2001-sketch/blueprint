@@ -27,6 +27,7 @@ import EdgePreviewPanel from './EdgePreviewPanel'
 import InheritanceOverlay, { OVERLAY_COLORS } from './InheritanceOverlay'
 import NodeContextMenu from './NodeContextMenu'
 import RerunOverlay from './RerunOverlay'
+import ConfigInspector from '@/components/Config/ConfigInspector'
 
 const nodeTypes: NodeTypes = {
   blockNode: BlockNode as any,
@@ -80,6 +81,7 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
     y: number
     nodeId: string
   }>({ visible: false, x: 0, y: 0, nodeId: '' })
+  const [inspectNodeId, setInspectNodeId] = useState<string | null>(null)
 
   const [paletteParams, setPaletteParams] = useState<{
     visible: boolean
@@ -502,6 +504,7 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
 
   return (
     <div
+      data-testid="pipeline-canvas"
       ref={reactFlowRef}
       onDragLeave={onDragLeave}
       style={{
@@ -720,7 +723,16 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
         y={contextMenu.y}
         nodeId={contextMenu.nodeId}
         onClose={() => setContextMenu((p) => ({ ...p, visible: false }))}
+        onInspectConfig={(nid) => setInspectNodeId(nid)}
       />
+
+      {/* Config Inspector panel */}
+      {inspectNodeId && (
+        <ConfigInspector
+          nodeId={inspectNodeId}
+          onClose={() => setInspectNodeId(null)}
+        />
+      )}
 
       {/* Re-run mode overlay */}
       <RerunOverlay />

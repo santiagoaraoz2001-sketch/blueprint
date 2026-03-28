@@ -186,26 +186,32 @@ def _execute_sweep_run(
     if mgr:
         mgr.record_result(run_id, config, metric_value)
 
-    # Publish SSE event for live frontend updates
+    # Publish SSE event for live frontend updates (crash-safe)
     event_type = "sweep_run_failed" if error_msg else "sweep_run_completed"
-    publish_event(sweep_id, event_type, {
-        "sweep_id": sweep_id,
-        "run_id": run_id,
-        "config": config,
-        "config_index": config_index,
-        "metric": metric_value,
-        "completed": completed,
-        "total": total,
-        **({"error": error_msg} if error_msg else {}),
-    })
+    try:
+        publish_event(sweep_id, event_type, {
+            "sweep_id": sweep_id,
+            "run_id": run_id,
+            "config": config,
+            "config_index": config_index,
+            "metric": metric_value,
+            "completed": completed,
+            "total": total,
+            **({"error": error_msg} if error_msg else {}),
+        })
+    except Exception:
+        pass
 
     if new_status == "complete":
         # Clean up in-memory manager
         _active_sweeps.pop(sweep_id, None)
-        publish_event(sweep_id, "sweep_completed", {
-            "sweep_id": sweep_id,
-            "total": total,
-        })
+        try:
+            publish_event(sweep_id, "sweep_completed", {
+                "sweep_id": sweep_id,
+                "total": total,
+            })
+        except Exception:
+            pass
 
 
 # ── Endpoints ───────────────────────────────────────────────────────

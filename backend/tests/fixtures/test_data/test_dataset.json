@@ -1,0 +1,12 @@
+[
+  {"id": 1, "text": "First record for testing", "label": "positive", "score": 0.95},
+  {"id": 2, "text": "Second record with different content", "label": "negative", "score": 0.3},
+  {"id": 3, "text": "Third record about machine learning", "label": "positive", "score": 0.88},
+  {"id": 4, "text": "Fourth record with neutral sentiment", "label": "neutral", "score": 0.52},
+  {"id": 5, "text": "Fifth record for evaluation purposes", "label": "positive", "score": 0.91},
+  {"id": 6, "text": "Sixth record with some edge cases", "label": "negative", "score": 0.15},
+  {"id": 7, "text": "Seventh record testing boundary", "label": "neutral", "score": 0.50},
+  {"id": 8, "text": "Eighth record with longer text content for chunking tests", "label": "positive", "score": 0.79},
+  {"id": 9, "text": "Ninth record almost at the end", "label": "negative", "score": 0.22},
+  {"id": 10, "text": "Tenth and final record in the test dataset", "label": "positive", "score": 0.85}
+]

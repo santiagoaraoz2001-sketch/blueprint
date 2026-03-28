@@ -1,0 +1,143 @@
+{
+  "id": "dataset-prep",
+  "name": "Dataset Prep",
+  "description": "Load a HuggingFace dataset, build and transform it, split into train/val/test sets, and export the prepared data.",
+  "difficulty": "beginner",
+  "estimated_runtime": "10 min",
+  "required_services": [],
+  "required_capabilities": [],
+  "tags": [
+    "data",
+    "preprocessing",
+    "beginner"
+  ],
+  "nodes": [
+    {
+      "id": "dp_1",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 80
+      },
+      "data": {
+        "type": "huggingface_loader",
+        "label": "Load Dataset",
+        "category": "source",
+        "icon": "Download",
+        "accent": "#DE9A68",
+        "config": {
+          "dataset_name": "imdb",
+          "split": "train",
+          "max_samples": 10000
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "dp_2",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 260
+      },
+      "data": {
+        "type": "dataset_builder",
+        "label": "Build Dataset",
+        "category": "data",
+        "icon": "Database",
+        "accent": "#62B8D9",
+        "config": {},
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "dp_3",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 440
+      },
+      "data": {
+        "type": "train_val_test_split",
+        "label": "Split",
+        "category": "data",
+        "icon": "Split",
+        "accent": "#62B8D9",
+        "config": {
+          "train_ratio": 0.8,
+          "val_ratio": 0.1,
+          "test_ratio": 0.1,
+          "seed": 42,
+          "shuffle": true
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "dp_4",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 620
+      },
+      "data": {
+        "type": "data_export",
+        "label": "Export",
+        "category": "endpoints",
+        "icon": "Download",
+        "accent": "#56C4B0",
+        "config": {
+          "format": "jsonl",
+          "filename": "prepared_dataset"
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "dp_e1",
+      "source": "dp_1",
+      "target": "dp_2",
+      "sourceHandle": "dataset",
+      "targetHandle": "dataset",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#5FB8E8",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "dp_e2",
+      "source": "dp_2",
+      "target": "dp_3",
+      "sourceHandle": "dataset",
+      "targetHandle": "dataset",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#5FB8E8",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "dp_e3",
+      "source": "dp_3",
+      "target": "dp_4",
+      "sourceHandle": "train",
+      "targetHandle": "data",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#5FB8E8",
+        "strokeWidth": 1.5
+      }
+    }
+  ],
+  "default_config": {}
+}

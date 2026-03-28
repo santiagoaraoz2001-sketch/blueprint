@@ -446,3 +446,81 @@ def clone_pipeline_from_run(run_id: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_pipeline)
     return new_pipeline
+
+
+@router.get("/{run_id}/decisions")
+def get_execution_decisions(run_id: str, db: Session = Depends(get_db)):
+    """Return execution decisions for a run, ordered by timestamp."""
+    from ..models.execution_decision import ExecutionDecision
+
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    decisions = (
+        db.query(ExecutionDecision)
+        .filter(ExecutionDecision.run_id == run_id)
+        .order_by(ExecutionDecision.timestamp.asc())
+        .all()
+    )
+
+    # Build a node label lookup from the pipeline definition
+    node_labels: dict[str, str] = {}
+    if run.config_snapshot:
+        for n in run.config_snapshot.get("nodes", []):
+            node_labels[n["id"]] = n.get("data", {}).get("label", n["id"])
+
+    return [
+        {
+            "id": d.id,
+            "run_id": d.run_id,
+            "node_id": d.node_id,
+            "node_label": node_labels.get(d.node_id, d.node_id),
+            "decision": d.decision,
+            "reason": d.reason,
+            "cache_fingerprint": d.cache_fingerprint,
+            "plan_hash": d.plan_hash,
+            "timestamp": d.timestamp.isoformat() if d.timestamp else None,
+        }
+        for d in decisions
+    ]
+
+
+@router.delete("/{run_id}/decisions", status_code=200)
+def delete_run_decisions(run_id: str, db: Session = Depends(get_db)):
+    """Delete all execution decisions for a specific run.
+
+    Use for manual cleanup of decision logs for individual runs.
+    """
+    from ..models.execution_decision import ExecutionDecision
+
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    result = db.query(ExecutionDecision).filter(
+        ExecutionDecision.run_id == run_id,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": result, "run_id": run_id}
+
+
+@router.get("/decisions/stats")
+def get_decision_stats(db: Session = Depends(get_db)):
+    """Return statistics about the decision log.
+
+    Includes total records, distinct runs, date range, and retention settings.
+    """
+    from ..services.decision_cleanup import get_decision_stats as _get_stats
+    return _get_stats(db)
+
+
+@router.post("/decisions/cleanup")
+def trigger_decision_cleanup(db: Session = Depends(get_db)):
+    """Manually trigger decision log cleanup.
+
+    Deletes decisions for runs older than the retention threshold
+    (default: 30 days), while always retaining the most recent N runs.
+    """
+    from ..services.decision_cleanup import cleanup_old_decisions
+    return cleanup_old_decisions(db)
