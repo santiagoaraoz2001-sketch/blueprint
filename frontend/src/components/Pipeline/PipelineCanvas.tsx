@@ -27,6 +27,9 @@ import EdgePreviewPanel from './EdgePreviewPanel'
 import InheritanceOverlay, { OVERLAY_COLORS } from './InheritanceOverlay'
 import NodeContextMenu from './NodeContextMenu'
 import RerunOverlay from './RerunOverlay'
+import BlockSearch from '@/components/Search/BlockSearch'
+import BlockSuggestions from '@/components/Search/BlockSuggestions'
+import BlockDoc from '@/components/Blocks/BlockDoc'
 import ConfigInspector from '@/components/Config/ConfigInspector'
 
 const nodeTypes: NodeTypes = {
@@ -40,7 +43,7 @@ const edgeTypes: EdgeTypes = {
 }
 
 export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onShowTemplates?: () => void; onShowAgent?: () => void } = {}) {
-  const { fitView, flowToScreenPosition } = useReactFlow()
+  const { fitView, flowToScreenPosition, screenToFlowPosition } = useReactFlow()
   const {
     nodes,
     edges,
@@ -98,6 +101,36 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
     sourceNodeId: '',
     sourceHandleId: '',
   })
+
+  // Block documentation popover state
+  const [blockDocState, setBlockDocState] = useState<{
+    visible: boolean
+    blockType: string | null
+    anchor: { x: number; y: number; width?: number; height?: number } | null
+  }>({ visible: false, blockType: null, anchor: null })
+
+  const showBlockDoc = useCallback((blockType: string, anchor?: { x: number; y: number; width?: number; height?: number }) => {
+    setBlockDocState({ visible: true, blockType, anchor: anchor ?? null })
+  }, [])
+
+  const hideBlockDoc = useCallback(() => {
+    setBlockDocState({ visible: false, blockType: null, anchor: null })
+  }, [])
+
+  // Helper to get viewport center in flow coordinates.
+  // Uses ReactFlow's screenToFlowPosition for accurate conversion
+  // regardless of zoom level or pan offset.
+  const getViewportCenter = useCallback(() => {
+    const bounds = reactFlowRef.current?.getBoundingClientRect()
+    if (!bounds) return { x: 300, y: 300 }
+    // Screen-space center of the canvas container
+    const screenCenter = {
+      x: bounds.left + bounds.width / 2,
+      y: bounds.top + bounds.height / 2,
+    }
+    // Convert screen center → flow coordinates (accounts for zoom + pan)
+    return screenToFlowPosition(screenCenter)
+  }, [screenToFlowPosition])
 
   // Edge hover preview state
   const [hoveredEdgeParams, setHoveredEdgeParams] = useState<{
@@ -443,6 +476,21 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [fitView, selectNode])
 
+  // Listen for block doc custom events from BlockNode '?' button and palette hover
+  useEffect(() => {
+    const showHandler = (e: Event) => {
+      const { blockType, anchor } = (e as CustomEvent).detail
+      showBlockDoc(blockType, anchor)
+    }
+    const hideHandler = () => hideBlockDoc()
+    window.addEventListener('blueprint:show-block-doc', showHandler)
+    window.addEventListener('blueprint:hide-block-doc', hideHandler)
+    return () => {
+      window.removeEventListener('blueprint:show-block-doc', showHandler)
+      window.removeEventListener('blueprint:hide-block-doc', hideHandler)
+    }
+  }, [showBlockDoc, hideBlockDoc])
+
   // Close context menu on outside click
   useEffect(() => {
     if (!contextMenu.visible) return
@@ -723,6 +771,7 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
         y={contextMenu.y}
         nodeId={contextMenu.nodeId}
         onClose={() => setContextMenu((p) => ({ ...p, visible: false }))}
+        onShowDoc={(blockType) => showBlockDoc(blockType, { x: contextMenu.x, y: contextMenu.y })}
         onInspectConfig={(nid) => setInspectNodeId(nid)}
       />
 
@@ -736,6 +785,27 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
 
       {/* Re-run mode overlay */}
       <RerunOverlay />
+
+      {/* Block search modal (Cmd+K) */}
+      <BlockSearch
+        onAddBlock={addNode}
+        onShowBlockDoc={(blockType) => showBlockDoc(blockType)}
+        getViewportCenter={getViewportCenter}
+      />
+
+      {/* Contextual block suggestions when a node is selected */}
+      <BlockSuggestions
+        flowToScreenPosition={flowToScreenPosition}
+        containerRef={reactFlowRef}
+      />
+
+      {/* Block documentation popover */}
+      <BlockDoc
+        blockType={blockDocState.blockType}
+        anchor={blockDocState.anchor}
+        visible={blockDocState.visible}
+        onClose={hideBlockDoc}
+      />
 
       {/* Auto-wiring suggestions popup */}
       {connectionSuggestions.length > 0 && (() => {
