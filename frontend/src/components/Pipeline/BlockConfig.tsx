@@ -234,7 +234,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
   // Ollama status — only check when we have model fields and Ollama has models
   const ollamaFramework = frameworkData.find((d: any) => d.id === 'ollama')
   const ollamaHasModels = (ollamaFramework?.models?.length ?? 0) > 0
-  const ollamaAvailable = ollamaFramework?.available ?? false
+
   const [ollamaRunning, setOllamaRunning] = useState<boolean | null>(null)
   const [ollamaStarting, setOllamaStarting] = useState(false)
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
-import { CheckCircle2, AlertTriangle, XCircle, Loader2, X, FileCode, FileJson, Download, Package } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, XCircle, Loader2, X, FileCode, FileJson, Package } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface PreflightItem {

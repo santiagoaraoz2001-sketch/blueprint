@@ -14,6 +14,23 @@ export function useKeyboardShortcuts() {
       const meta = e.metaKey || e.ctrlKey
       const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement
 
+      // ? — Toggle help panel (not in inputs)
+      if (!meta && e.key === '?' && !isInput) {
+        e.preventDefault()
+        useUIStore.getState().toggleHelpPanel()
+        return
+      }
+
+      // Escape — Close help panel
+      if (e.key === 'Escape') {
+        const { helpPanelOpen } = useUIStore.getState()
+        if (helpPanelOpen) {
+          e.preventDefault()
+          useUIStore.getState().toggleHelpPanel()
+          return
+        }
+      }
+
       // G — Toggle guide (not in inputs)
       if (!meta && e.key === 'g' && !isInput) {
         e.preventDefault()

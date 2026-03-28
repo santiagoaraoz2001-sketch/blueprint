@@ -40,7 +40,7 @@ export default function WorkspaceConfig({ onClose }: Props) {
   const [newKey, setNewKey] = useState('')
   const [newValue, setNewValue] = useState('')
 
-  const pipelineId = usePipelineStore((s) => s.tabs[s.activeTabIndex]?.id)
+  const pipelineId = usePipelineStore((s) => s.tabs.find(t => t.id === s.activeTabId)?.id)
 
   // Try to detect the project_id from the active pipeline
   const [projectId, setProjectId] = useState<string | null>(null)

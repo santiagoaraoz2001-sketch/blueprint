@@ -48,7 +48,6 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
   // Backend validation errors for this node
   const backendNodeErrors: NodeValidationError[] = useValidationStore((s) => s.nodeErrors[id] || [])
   const hasBackendErrors = backendNodeErrors.some(e => e.severity === 'error')
-  const hasBackendWarnings = !hasBackendErrors && backendNodeErrors.length > 0
 
   // Inheritance overlay — derived selector returns primitive for O(1) lookup + minimal re-renders
   const overlayRole = usePipelineStore(

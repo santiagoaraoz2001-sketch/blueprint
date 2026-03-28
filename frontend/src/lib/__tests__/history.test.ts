@@ -6,7 +6,6 @@ import {
   deserializeHistory,
   deserializeHistoryMeta,
   type HistoryEntry,
-  type HistoryEntryMeta,
 } from '../history'
 
 // ── Helpers ──────────────────────────────────────────

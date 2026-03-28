@@ -11,7 +11,6 @@ import ToolbarDropdown from './ToolbarDropdown'
 import toast from 'react-hot-toast'
 import PipelineAnalysisPanel from './PipelineAnalysisPanel'
 import ExportPreflightPanel from './ExportPreflightPanel'
-import { getBlockDefinition } from '@/lib/block-registry'
 import { generateRequirements } from '@/lib/block-dependencies'
 import { isPipelineExportable, exportDisabledReason } from '@/lib/graph-utils'
 import Editor from '@monaco-editor/react'
@@ -27,8 +26,9 @@ export default function RunControls() {
   const [templateDesc, setTemplateDesc] = useState('')
   const [templateCat, setTemplateCat] = useState('inference')
 
+  // Code modal state — retained for JSX close handlers; export now handled by ExportPreflightPanel
   const [showCodeModal, setShowCodeModal] = useState(false)
-  const [generatedCode, setGeneratedCode] = useState('')
+  const [generatedCode, /* setGeneratedCode */] = useState('')
   const [codeCopied, setCodeCopied] = useState(false)
   const [showAnalysis, setShowAnalysis] = useState(false)
   const [showExportPreflight, setShowExportPreflight] = useState(false)
@@ -147,65 +147,6 @@ export default function RunControls() {
 
     // Open the pre-flight check panel — export happens from there
     setShowExportPreflight(true)
-  }
-
-  const handleLegacyEject = async () => {
-    if (!pipelineId) {
-      toast.error('Save pipeline first')
-      return
-    }
-
-    // Pre-eject validation
-    const warnings: string[] = []
-    const errors: string[] = []
-    const { edges } = usePipelineStore.getState()
-
-    for (const node of nodes) {
-      const def = getBlockDefinition(node.data.type)
-      if (!def) continue
-
-      // Check required inputs are connected
-      for (const input of def.inputs) {
-        if (input.required) {
-          const hasConnection = edges.some(
-            (e) => e.target === node.id && e.targetHandle === input.id,
-          )
-          if (!hasConnection) {
-            errors.push(`${node.data.label}: missing required input "${input.label}"`)
-          }
-        }
-      }
-
-      // Check empty config fields that have no default
-      for (const field of def.configFields) {
-        if (field.default === undefined || field.default === '') {
-          const val = node.data.config?.[field.name]
-          if (val === '' || val === undefined || val === null) {
-            warnings.push(`${node.data.label}: empty config "${field.label || field.name}"`)
-          }
-        }
-      }
-    }
-
-    if (errors.length > 0) {
-      errors.forEach((e) => toast.error(e, { duration: 5000 }))
-      return
-    }
-    if (warnings.length > 0) {
-      warnings.slice(0, 3).forEach((w) => toast(w, { icon: '⚠️', duration: 4000 }))
-    }
-
-    try {
-      const baseUrl = import.meta.env.VITE_API_URL || '/api'
-      const res = await fetch(`${baseUrl}/pipelines/${pipelineId}/compile`)
-      if (!res.ok) throw new Error('Failed to compile pipeline')
-      const code = await res.text()
-      setGeneratedCode(code)
-      setCodeCopied(false)
-      setShowCodeModal(true)
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to eject pipeline')
-    }
   }
 
   const handleDownloadRequirements = () => {
@@ -507,7 +448,7 @@ export default function RunControls() {
               {useMemo(() => (
                 <Editor
                   language="python"
-                  theme="vs-dark"
+                  theme={document.documentElement.dataset.theme === 'light' ? 'vs' : 'vs-dark'}
                   value={generatedCode}
                   options={{
                     readOnly: true,

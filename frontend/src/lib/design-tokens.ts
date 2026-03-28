@@ -1,5 +1,5 @@
 import { useSettingsStore, FONT_SIZE_SCALES } from '@/stores/settingsStore'
-import type { ThemeMode, AccentColor } from '@/stores/settingsStore'
+import type { ThemeMode, AccentColor, FontSizeScale } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import type { View } from '@/stores/uiStore'
 
@@ -46,7 +46,7 @@ const DARK: ThemeTokens = {
   borderHi: '#374659',
   text:     '#F2F4F8',
   sec:      '#C4CDDE',
-  dim:      '#7A8799',
+  dim:      '#90A0B5',
   muted:    '#1A1F2C',
   surface0: '#0B0D13',
   surface1: '#0F1319',
@@ -89,10 +89,10 @@ const LIGHT: ThemeTokens = {
   surface4: '#DAE3F2',
   surface5: '#CFDBEE',
   surface6: '#C4D2EA',
-  cyan:   '#0A8870',
-  green:  '#2B8A42',
-  amber:  '#A5681E',
-  yellow: '#9B7D14',
+  cyan:   '#087860',
+  green:  '#1F7235',
+  amber:  '#8B5518',
+  yellow: '#7A6210',
   orange: '#B0521E',
   red:    '#AA2F3E',
   blue:   '#2B52B4',
@@ -139,21 +139,6 @@ function hexToRgb(hex: string) {
   return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 }
 }
 
-function rgbToHex(r: number, g: number, b: number) {
-  const toHex = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
-}
-
-function blendHex(base: string, overlay: string, ratio = 0.5) {
-  const a = hexToRgb(base)
-  const b = hexToRgb(overlay)
-  return rgbToHex(
-    a.r * (1 - ratio) + b.r * ratio,
-    a.g * (1 - ratio) + b.g * ratio,
-    a.b * (1 - ratio) + b.b * ratio,
-  )
-}
-
 // Specific Labs brand teal — fixed, immutable, used ONLY for the logo dot.
 // Never change this to an adaptive or user-selectable value.
 export const BRAND_TEAL = '#2FFCC8'
@@ -166,8 +151,9 @@ function getUserAccent(theme: ThemeTokens, accentColor: AccentColor): string {
 function getActiveTheme() {
   const settings = typeof (useSettingsStore as any).getState === 'function'
     ? (useSettingsStore as any).getState()
-    : ({ theme: 'dark', accentColor: 'cyan' } as { theme: ThemeMode; accentColor: AccentColor })
-  const theme = settings.theme === 'light' ? LIGHT : DARK
+    : ({ theme: 'dark', accentColor: 'cyan', resolvedTheme: () => 'dark' as const } as { theme: ThemeMode; accentColor: AccentColor; resolvedTheme: () => 'dark' | 'light' })
+  const resolved = typeof settings.resolvedTheme === 'function' ? settings.resolvedTheme() : (settings.theme === 'light' ? 'light' : 'dark')
+  const theme = resolved === 'light' ? LIGHT : DARK
   const view = typeof (useUIStore as any).getState === 'function'
     ? ((useUIStore as any).getState().activeView as View)
     : 'research'
@@ -175,7 +161,10 @@ function getActiveTheme() {
   return { theme, accent, view }
 }
 
-export function getTheme(mode: ThemeMode): ThemeTokens {
+export function getTheme(mode: ThemeMode | 'dark' | 'light'): ThemeTokens {
+  if (mode === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? DARK : LIGHT
+  }
   return mode === 'light' ? LIGHT : DARK
 }
 
@@ -207,11 +196,11 @@ export type FontSizeTokens = typeof FS_BASE
 
 export const FS: FontSizeTokens = new Proxy(FS_BASE, {
   get(_target, prop: string) {
-    const fontSize = typeof (useSettingsStore as any).getState === 'function'
+    const fontSize: FontSizeScale = typeof (useSettingsStore as any).getState === 'function'
       ? (useSettingsStore as any).getState().fontSize
       : 'default'
     const scale = FONT_SIZE_SCALES[fontSize] ?? 1.0
-    const base = (FS_BASE as any)[prop]
+    const base = FS_BASE[prop as keyof typeof FS_BASE]
     return typeof base === 'number' ? Math.round(base * scale * 100) / 100 : base
   },
 })
@@ -298,8 +287,12 @@ export const STATUS_COLORS: Record<string, string> = {
   cancelled: '#DE7B4F',
 }
 
-export function injectThemeCSSVars(mode: ThemeMode, view?: View) {
-  const t = mode === 'light' ? LIGHT : DARK
+export function injectThemeCSSVars(mode: ThemeMode | 'dark' | 'light', view?: View) {
+  // Resolve 'system' to actual theme
+  const resolvedMode = mode === 'system'
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : mode
+  const t = resolvedMode === 'light' ? LIGHT : DARK
   const accentColor = (typeof (useSettingsStore as any).getState === 'function'
     ? (useSettingsStore as any).getState().accentColor
     : 'cyan') as AccentColor
@@ -334,10 +327,29 @@ export function injectThemeCSSVars(mode: ThemeMode, view?: View) {
   root.style.setProperty('--shadow',             t.shadow)
   root.style.setProperty('--shadow-heavy',       t.shadowHeavy)
   root.style.setProperty('--shadow-light',       t.shadowLight)
-  root.style.setProperty('--scrollbar-thumb',       mode === 'light' ? 'rgba(35,52,79,0.20)' : 'rgba(206,214,229,0.15)')
-  root.style.setProperty('--scrollbar-thumb-hover', mode === 'light' ? 'rgba(35,52,79,0.32)' : 'rgba(206,214,229,0.28)')
-  root.style.setProperty('--select-bg',    mode === 'light' ? '#FFFFFF' : t.surface3)
+  root.style.setProperty('--scrollbar-thumb',       resolvedMode === 'light' ? 'rgba(35,52,79,0.20)' : 'rgba(206,214,229,0.15)')
+  root.style.setProperty('--scrollbar-thumb-hover', resolvedMode === 'light' ? 'rgba(35,52,79,0.32)' : 'rgba(206,214,229,0.28)')
+  root.style.setProperty('--select-bg',    resolvedMode === 'light' ? '#FFFFFF' : t.surface3)
   root.style.setProperty('--select-color', t.text)
   // Brand teal — immutable, always injected regardless of user accent choice
   root.style.setProperty('--brand-teal', BRAND_TEAL)
+  // Expose resolved theme mode for CSS selectors and Monaco/Recharts
+  root.dataset.theme = resolvedMode
+  root.style.setProperty('--theme-mode', resolvedMode)
+}
+
+/** Resolve the current theme setting to 'dark' | 'light' */
+export function resolveThemeMode(): 'dark' | 'light' {
+  const settings = typeof (useSettingsStore as any).getState === 'function'
+    ? (useSettingsStore as any).getState()
+    : { theme: 'dark' }
+  if (settings.theme === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  }
+  return settings.theme === 'light' ? 'light' : 'dark'
+}
+
+/** Get the Monaco editor theme name for the current resolved theme */
+export function getMonacoTheme(): string {
+  return resolveThemeMode() === 'light' ? 'vs' : 'vs-dark'
 }

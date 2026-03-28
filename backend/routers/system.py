@@ -769,3 +769,33 @@ def get_run_diagnostics(run_id: str):
         result["truncated"] = True
         result["max_events"] = _MAX_DIAGNOSTICS_EVENTS
     return result
+
+
+# ---------------------------------------------------------------------------
+# Help Documentation
+# ---------------------------------------------------------------------------
+
+# Resolve docs/help/ relative to the project root (two levels up from this file).
+_HELP_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "help"
+
+# Allow only alphanumeric chars, hyphens, and underscores in topic names.
+_SAFE_TOPIC = re.compile(r'^[a-zA-Z0-9_\-]+$')
+
+
+@router.get("/help/{topic}")
+def get_help_topic(topic: str):
+    """Return the markdown content for a help documentation topic."""
+    if not _SAFE_TOPIC.match(topic):
+        raise HTTPException(400, "Invalid topic name")
+
+    help_file = (_HELP_DIR / f"{topic}.md").resolve()
+
+    # Prevent directory traversal: resolved path must be inside _HELP_DIR.
+    if not str(help_file).startswith(str(_HELP_DIR.resolve())):
+        raise HTTPException(400, "Invalid topic path")
+
+    if not help_file.is_file():
+        raise HTTPException(404, f"Help topic '{topic}' not found")
+
+    content = help_file.read_text(encoding="utf-8")
+    return {"topic": topic, "content": content}

@@ -37,6 +37,9 @@ export default function ConfirmDialog({
       onClick={onCancel}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         style={{
           width: 360,
           background: T.surface1,

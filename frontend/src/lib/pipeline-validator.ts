@@ -72,43 +72,7 @@ function getConnectedInputs(nodeId: string, edges: Edge[]): Set<string> {
 //   return outputs
 // }
 
-/** DFS cycle detection (kept for backward compat — detectLoops is preferred) */
-function hasCycle(nodes: Node[], edges: Edge[]): string[] | null {
-  const adj = new Map<string, string[]>()
-  for (const e of edges) {
-    if (!adj.has(e.source)) adj.set(e.source, [])
-    adj.get(e.source)!.push(e.target)
-  }
 
-  const visited = new Set<string>()
-  const stack = new Set<string>()
-  const path: string[] = []
-
-  function dfs(node: string): boolean {
-    visited.add(node)
-    stack.add(node)
-    path.push(node)
-
-    for (const neighbor of adj.get(node) || []) {
-      if (stack.has(neighbor)) {
-        path.push(neighbor)
-        return true
-      }
-      if (!visited.has(neighbor) && dfs(neighbor)) return true
-    }
-
-    stack.delete(node)
-    path.pop()
-    return false
-  }
-
-  for (const node of nodes) {
-    if (!visited.has(node.id)) {
-      if (dfs(node.id)) return path
-    }
-  }
-  return null
-}
 
 interface LoopInfo {
   controllerId: string

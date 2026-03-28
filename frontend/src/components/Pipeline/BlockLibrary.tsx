@@ -765,21 +765,6 @@ function BlockItem({
   )
 }
 
-/* ── Category descriptions for detail popup ── */
-const CATEGORY_DESCRIPTIONS: Record<string, { summary: string; connectorNote: string }> = {
-  external:      { summary: 'Source blocks that ingest data from the outside world — APIs, files, databases, HuggingFace Hub, and web scraping.',         connectorNote: 'Produces dataset, text, model, or config connectors depending on the source type.' },
-  data:          { summary: 'Transform blocks for data manipulation — filtering, splitting, chunking, augmenting, and previewing datasets.',             connectorNote: 'Primarily uses dataset and text connectors for structured and unstructured data.' },
-  model:         { summary: 'Model ops blocks — loading, selecting, merging (SLERP/DARE/TIES), quantizing, and packaging model weights.',                  connectorNote: 'Uses model connectors for weights and adapters, dataset for batch I/O.' },
-  inference:     { summary: 'Inference blocks — LLM prompting, chat, structured output, vision, translation, summarization, and content safety.',       connectorNote: 'Accepts optional model connector, produces text, dataset, or metrics connectors.' },
-  training:      { summary: 'Training blocks — fine-tuning (LoRA/QLoRA/Full), alignment (DPO/RLHF), distillation, and hyperparameter sweeps.',           connectorNote: 'Consumes dataset + model connectors, produces model + metrics connectors.' },
-  metrics:       { summary: 'Evaluation blocks — LM Eval Harness, MMLU, custom metrics, report generation, and experiment logging.',                     connectorNote: 'Uses metrics connectors for scores and artifact connectors for reports.' },
-  embedding:     { summary: 'Vector operation blocks — generating embeddings, building vector stores, similarity search, and clustering.',                connectorNote: 'Uses embedding connectors for vectors, dataset for metadata, config for indices.' },
-  utilities:     { summary: 'Flow control blocks — conditional branching, looping, parallel fan-out, aggregation, and artifact viewing.',                 connectorNote: 'Uses any connectors for type-agnostic pass-through routing.' },
-  agents:        { summary: 'Autonomous agent blocks — orchestrators, tool registries, chain-of-thought, multi-agent debate, and memory.',               connectorNote: 'Uses agent connectors for agent instances, plus model, dataset, and config.' },
-  interventions: { summary: 'Gate blocks — human-in-the-loop review, quality gates, A/B testing, notifications, and rollback points.',                   connectorNote: 'Uses any connectors for type-agnostic gating and pass-through.' },
-  endpoints:     { summary: 'Terminal blocks that persist or export pipeline results — save to files, push to APIs, databases, and HuggingFace Hub.',     connectorNote: 'Consumes dataset, text, model, config, or any connectors. No outputs (true sinks).' },
-}
-
 /* ── Connector type descriptions for legend popup ── */
 const CONNECTOR_DESCRIPTIONS: Record<string, { label: string; summary: string; examples: string }> = {
   dataset:   { label: 'Dataset',   summary: 'Structured tabular data — CSV rows, Parquet tables, HuggingFace datasets. The primary data format for training, evaluation, and transforms.', examples: 'CSV files, Parquet tables, JSONL, HuggingFace datasets' },

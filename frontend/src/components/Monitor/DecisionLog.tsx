@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { T, F, FS, FCODE } from '@/lib/design-tokens'
 import { api } from '@/api/client'
-import { CheckCircle, Play, XCircle, SkipForward, Filter } from 'lucide-react'
+import { CheckCircle, Play, XCircle, SkipForward } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Types

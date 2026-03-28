@@ -48,8 +48,8 @@ function segmentWithGaps(series: MetricSeries[]): { data: any[]; gapIndices: num
 }
 
 export default memo(function AutoLineChart({
-  metricName, blockId, color = '#00BFA5', height = 200,
-  title, showGaps = true, overlayMetric, overlayColor = '#F59E0B',
+  metricName, blockId, color = T.cyan, height = 200,
+  title, showGaps = true, overlayMetric, overlayColor = T.amber,
 }: AutoLineChartProps) {
   const blockMetrics = useMetricsStore((s) => s.metrics[blockId] ?? EMPTY_BLOCK_METRICS)
   const series = blockMetrics[metricName] || []
@@ -97,7 +97,7 @@ export default memo(function AutoLineChart({
       )}
       <ResponsiveContainer width="100%" height={title ? height - 20 : height}>
         <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1A2332" />
+          <CartesianGrid strokeDasharray="3 3" stroke={T.surface4} />
           <XAxis
             dataKey="step"
             stroke={T.dim}

@@ -193,6 +193,9 @@ export default function PipelineEditorView() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [undo, redo, handleSave])
 
+  // Hoist pipelineId — needed by autosave check and backend validation
+  const pipelineId = usePipelineStore((s) => s.id)
+
   // Check for autosave recovery when pipeline loads
   useEffect(() => {
     if (!pipelineId) return
@@ -265,13 +268,7 @@ export default function PipelineEditorView() {
   }, [])
 
   // ── Debounced backend validation on graph changes ──
-  const pipelineId = usePipelineStore((s) => s.id)
   const edges = usePipelineStore((s) => s.edges)
-  const backendValidation = useValidationStore((s) => s.result)
-  const isBackendValidating = useValidationStore((s) => s.isValidating)
-  const isBackendStale = useValidationStore((s) => s.isStale)
-  const backendNodeErrors = useValidationStore((s) => s.nodeErrors)
-  const backendPanelVisible = useValidationStore((s) => s.panelVisible)
   const validateBackend = useValidationStore((s) => s.validate)
   const markStale = useValidationStore((s) => s.markStale)
 
@@ -298,10 +295,6 @@ export default function PipelineEditorView() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipelineId, nodes.length, edges.length, validateBackend, markStale, configFingerprint])
-
-  // Count backend validation errors for the panel toggle badge
-  const backendErrorCount = backendValidation ? backendValidation.errors.length : 0
-  const backendWarningCount = backendValidation ? backendValidation.warnings.length : 0
 
   // Show TemplateLanding for first-launch (no pipelines exist)
   if (showFirstLaunch) {

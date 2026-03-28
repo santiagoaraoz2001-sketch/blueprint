@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { T, F, FS, FCODE, DEPTH, GLOW } from '@/lib/design-tokens'
+import { T, F, FS, FCODE, DEPTH } from '@/lib/design-tokens'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useRunStore } from '@/stores/runStore'
 import { api } from '@/api/client'
@@ -68,7 +68,7 @@ export default function ConfigInspector({ nodeId, onClose }: Props) {
   const [showEffective, setShowEffective] = useState(false)
   const [copiedFp, setCopiedFp] = useState(false)
 
-  const pipelineId = usePipelineStore((s) => s.tabs[s.activeTabIndex]?.id)
+  const pipelineId = usePipelineStore((s) => s.tabs.find(t => t.id === s.activeTabId)?.id)
   const nodes = usePipelineStore((s) => s.nodes)
   const edges = usePipelineStore((s) => s.edges)
   const activeRunId = useRunStore((s) => s.activeRunId)
