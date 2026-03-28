@@ -1763,13 +1763,23 @@ async def execute_pipeline(
                     return
                 except Exception as e:
                     tb = traceback.format_exc()
+                    # Classify the error for structured diagnostics
+                    from .error_classifier import classify_error
+                    classified = classify_error(e, block_type=block_type)
+                    classified_msg = f"[{classified.title}] {classified.message}"
+                    classified_action = classified.action
+
                     log_block_failed(run_id, node_id, block_type, str(e), tb)
                     try:
-                        publish_event(run_id, "node_failed", {"node_id": node_id, "error": str(e)})
+                        publish_event(run_id, "node_failed", {
+                            "node_id": node_id,
+                            "error": classified_msg,
+                            "classified": classified.to_dict(),
+                        })
                     except Exception:
                         pass
                     run.status = "failed"
-                    run.error_message = scrub_traceback(f"Block {block_type} failed: {str(e)}\n\n{tb}")
+                    run.error_message = scrub_traceback(f"{classified_msg}\nAction: {classified_action}\n\n{tb}")
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     run.data_fingerprints = all_fingerprints
                     live.status = "failed"

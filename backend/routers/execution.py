@@ -21,12 +21,14 @@ from ..block_sdk.config_validator import (
     _validate_select,
 )
 from ..block_sdk.exceptions import BlockConfigError
+from ..engine.error_classifier import classify_error
 from ..schemas.execution import (
     ExecuteResponse,
     PartialExecuteResponse,
     CancelResponse,
     RunOutputsResponse,
     PipelineValidationResponse,
+    GatewayValidationResponse,
     BlockConfigValidationResponse,
     PipelineTestResponse,
 )
@@ -86,7 +88,7 @@ def shutdown_executor():
         )
 
 
-@router.post("/pipelines/{pipeline_id}/execute", response_model=ExecuteResponse)
+@router.post("/pipelines/{pipeline_id}/execute")
 def start_pipeline_run(pipeline_id: str, db: Session = Depends(get_db)):
     pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
     if not pipeline:
@@ -95,6 +97,23 @@ def start_pipeline_run(pipeline_id: str, db: Session = Depends(get_db)):
     definition = pipeline.definition or {}
     if not definition.get("nodes"):
         raise HTTPException(400, "Pipeline has no blocks")
+
+    # ── Hard gate: backend validation must pass before execution ──
+    report = validate_pipeline(definition)
+    if not report.valid:
+        # Build remediation hints from error messages
+        remediation = _build_remediation(report.errors)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "validation_failed",
+                "errors": report.errors,
+                "error_count": len(report.errors),
+                "remediation": remediation,
+                "warnings": report.warnings,
+            },
+        )
 
     run_id = str(uuid.uuid4())
     project_id = pipeline.project_id  # May be None if pipeline has no project
@@ -341,3 +360,39 @@ def test_pipeline_endpoint(pipeline_id: str, db: Session = Depends(get_db)):
         "sample_size": 10,
         "block_count": report.block_count,
     }
+
+
+# ── Helper: build remediation hints from validation errors ──
+
+_REMEDIATION_PATTERNS: list[tuple[str, str]] = [
+    ("has no blocks", "Add at least one block to the pipeline canvas"),
+    ("cycle", "Remove circular connections to create a directed acyclic graph (DAG)"),
+    ("missing required input", "Connect the required input port or set a default value"),
+    ("Incompatible connection", "Remove the incompatible edge or change the block type"),
+    ("required but empty", "Open the block config panel and fill in the required field"),
+    ("unknown type", "Update or replace the block with a valid block type"),
+    ("Duplicate node ID", "Remove duplicate blocks — each node must have a unique ID"),
+    ("Self-loop", "Remove the self-referencing edge"),
+    ("unknown source", "Fix or remove edges that reference deleted blocks"),
+    ("unknown target", "Fix or remove edges that reference deleted blocks"),
+]
+
+
+def _build_remediation(errors: list[str]) -> list[str]:
+    """Generate remediation suggestions from error messages."""
+    remediation: list[str] = []
+    seen: set[str] = set()
+    for err in errors:
+        err_lower = err.lower()
+        for pattern, hint in _REMEDIATION_PATTERNS:
+            if pattern.lower() in err_lower and hint not in seen:
+                remediation.append(hint)
+                seen.add(hint)
+                break
+        else:
+            # Generic fallback
+            generic = "Review the pipeline for configuration issues"
+            if generic not in seen:
+                remediation.append(generic)
+                seen.add(generic)
+    return remediation

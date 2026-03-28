@@ -6,6 +6,7 @@ import { getIcon } from '@/lib/icon-utils'
 import ProgressBar from '@/components/shared/ProgressBar'
 import { usePipelineStore, type BlockNodeData, type NodeExecutionState } from '@/stores/pipelineStore'
 import { useRunStore } from '@/stores/runStore'
+import { useValidationStore, type NodeValidationError } from '@/stores/validationStore'
 import { OVERLAY_COLORS } from './InheritanceOverlay'
 import { AlertTriangle, Clock, Lock } from 'lucide-react'
 import { estimatePipeline, formatTimeShort } from '@/lib/pipeline-estimator'
@@ -13,6 +14,7 @@ import { estimatePipeline, formatTimeShort } from '@/lib/pipeline-estimator'
 function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; selected?: boolean }) {
   const [isHovered, setIsHovered] = useState(false)
   const [hoveredPort, setHoveredPort] = useState<string | null>(null)
+  const [showErrorTooltip, setShowErrorTooltip] = useState(false)
 
   // Count connections per handle — uses ReactFlow internal store with custom equality
   // so this node ONLY re-renders when its OWN connection counts change (not all edges).
@@ -36,6 +38,11 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
 
   const focusedErrorNodeId = usePipelineStore((s) => s.focusedErrorNodeId)
   const isErrorFocused = focusedErrorNodeId === id
+
+  // Backend validation errors for this node
+  const backendNodeErrors: NodeValidationError[] = useValidationStore((s) => s.nodeErrors[id] || [])
+  const hasBackendErrors = backendNodeErrors.some(e => e.severity === 'error')
+  const hasBackendWarnings = !hasBackendErrors && backendNodeErrors.length > 0
 
   // Inheritance overlay — derived selector returns primitive for O(1) lookup + minimal re-renders
   const overlayRole = usePipelineStore(
@@ -119,9 +126,10 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
         background: `linear-gradient(145deg, ${T.surface2} 0%, ${T.surface1} 100%)`,
         backdropFilter: 'blur(16px)',
         borderRadius: 8,
-        border: `1px solid ${
+        border: `${hasBackendErrors ? '2px' : '1px'} solid ${
           rerunBorderColor
             ? rerunBorderColor
+            : hasBackendErrors ? 'var(--color-error, #EF5350)'
             : isErrorFocused ? T.red : selected ? accent : isHovered ? T.borderHi : T.border
         }`,
         transition: 'border-color 0.2s, box-shadow 0.2s, opacity 0.3s',
@@ -129,13 +137,15 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
           ? `0 0 0 2px ${T.blue}, 0 8px 32px ${T.blue}30`
           : isWillRerunDownstream
             ? `0 0 0 1px ${T.blue}60, 0 4px 16px ${T.blue}15`
-            : isErrorFocused
-              ? `0 8px 32px ${T.red}60, 0 0 0 2px ${T.red}`
-              : selected
-                ? `0 0 0 1px ${accent}40, 0 8px 32px ${T.shadowHeavy}`
-                : isHovered
-                  ? `0 8px 24px ${T.shadow}, inset 0 1px 0 rgba(255,255,255,0.05)`
-                  : `0 4px 12px ${T.shadow}`,
+            : hasBackendErrors
+              ? `0 0 12px rgba(239, 83, 80, 0.4), 0 0 0 1px rgba(239, 83, 80, 0.5)`
+              : isErrorFocused
+                ? `0 8px 32px ${T.red}60, 0 0 0 2px ${T.red}`
+                : selected
+                  ? `0 0 0 1px ${accent}40, 0 8px 32px ${T.shadowHeavy}`
+                  : isHovered
+                    ? `0 8px 24px ${T.shadow}, inset 0 1px 0 rgba(255,255,255,0.05)`
+                    : `0 4px 12px ${T.shadow}`,
         position: 'relative',
         overflow: 'visible',
         zIndex: selected || isErrorFocused ? 10 : isHovered ? 5 : 1,
@@ -268,6 +278,79 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
         />
       )}
 
+      {/* Validation error icon — top-right (shown when backend reports errors) */}
+      {backendNodeErrors.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 6,
+            right: 6,
+            zIndex: 25,
+            cursor: 'pointer',
+          }}
+          onClick={(e) => { e.stopPropagation(); setShowErrorTooltip(!showErrorTooltip) }}
+          onMouseLeave={() => setShowErrorTooltip(false)}
+        >
+          <AlertTriangle
+            size={14}
+            color={hasBackendErrors ? 'var(--color-error, #EF5350)' : T.amber}
+            fill={hasBackendErrors ? 'rgba(239, 83, 80, 0.15)' : 'rgba(255, 190, 69, 0.15)'}
+          />
+          {/* Error tooltip popup */}
+          {showErrorTooltip && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: 4,
+                width: 260,
+                padding: '8px 10px',
+                background: T.surface2,
+                border: `1px solid ${hasBackendErrors ? 'var(--color-error, #EF5350)' : T.amber}40`,
+                borderRadius: 6,
+                boxShadow: `0 8px 24px ${T.shadowHeavy}`,
+                zIndex: 100,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {backendNodeErrors.map((err, i) => (
+                <div key={i} style={{ marginBottom: i < backendNodeErrors.length - 1 ? 6 : 0 }}>
+                  <div style={{
+                    fontFamily: F,
+                    fontSize: FS.xxs,
+                    fontWeight: 700,
+                    color: err.severity === 'error' ? 'var(--color-error, #EF5350)' : T.amber,
+                    marginBottom: 2,
+                  }}>
+                    {err.severity === 'error' ? 'ERROR' : 'WARNING'}
+                  </div>
+                  <div style={{
+                    fontFamily: F,
+                    fontSize: FS.xxs,
+                    color: T.sec,
+                    lineHeight: 1.4,
+                  }}>
+                    {err.message}
+                  </div>
+                  {err.action && (
+                    <div style={{
+                      fontFamily: F,
+                      fontSize: FS.xxs,
+                      color: T.cyan,
+                      marginTop: 2,
+                      lineHeight: 1.4,
+                    }}>
+                      {err.action}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Status dot */}
       <div
         role="status"
@@ -275,7 +358,7 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
         style={{
           position: 'absolute',
           top: 10,
-          right: 12,
+          right: backendNodeErrors.length > 0 ? 24 : 12,
           width: 6,
           height: 6,
           borderRadius: '50%',

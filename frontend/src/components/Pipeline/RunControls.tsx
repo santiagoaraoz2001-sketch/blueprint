@@ -4,8 +4,9 @@ import { useRunStore } from '@/stores/runStore'
 import { useOutputStore } from '@/stores/outputStore'
 import { useUIStore } from '@/stores/uiStore'
 import { usePipelineStore } from '@/stores/pipelineStore'
+import { useValidationStore } from '@/stores/validationStore'
 import { validatePipelineClient } from '@/lib/pipeline-validator'
-import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Check, AlertTriangle, Gauge, FileDown, MoreVertical } from 'lucide-react'
+import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Check, AlertTriangle, Gauge, FileDown, MoreVertical, ShieldAlert } from 'lucide-react'
 import ToolbarDropdown from './ToolbarDropdown'
 import toast from 'react-hot-toast'
 import PipelineAnalysisPanel from './PipelineAnalysisPanel'
@@ -32,7 +33,14 @@ export default function RunControls() {
 
   const isRunning = status === 'running'
   const isStarting = useRunStore((s) => s.isStarting)
-  const isRunDisabled = isRunning || isStarting || nodes.length === 0
+  const backendValidation = useValidationStore((s) => s.result)
+  const isBackendValidating = useValidationStore((s) => s.isValidating)
+  const isBackendStale = useValidationStore((s) => s.isStale)
+  const backendErrorCount = backendValidation ? backendValidation.errors.length : 0
+  const hasBackendErrors = backendValidation !== null && !backendValidation.valid && !isBackendStale
+  // Treat stale results as "still validating" — don't allow runs based on outdated state
+  const isPendingValidation = isBackendValidating || isBackendStale
+  const isRunDisabled = isRunning || isStarting || nodes.length === 0 || hasBackendErrors || isPendingValidation
 
   // Kill switch: check if pipeline is exportable (loops, cycles, custom code)
   const edges = usePipelineStore((s) => s.edges)
@@ -308,30 +316,45 @@ export default function RunControls() {
           <button
             onClick={isRunDisabled ? undefined : handleRun}
             data-tour="btn-run-pipeline"
-            title={nodes.length === 0 ? 'Add blocks to run' : isStarting ? 'Starting...' : 'Run Pipeline (Cmd/Ctrl + Enter)'}
+            title={
+              nodes.length === 0 ? 'Add blocks to run'
+              : isPendingValidation ? 'Validating...'
+              : hasBackendErrors ? `${backendErrorCount} validation error${backendErrorCount !== 1 ? 's' : ''} — fix to enable`
+              : isStarting ? 'Starting...'
+              : 'Run Pipeline (Cmd/Ctrl + Enter)'
+            }
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 6,
               padding: '5px 16px',
-              background: `${T.green}22`,
-              border: `1px solid ${T.green}50`,
+              background: hasBackendErrors ? `${T.red}14` : isPendingValidation ? `${T.amber}14` : `${T.green}22`,
+              border: `1px solid ${hasBackendErrors ? `${T.red}50` : isPendingValidation ? `${T.amber}40` : `${T.green}50`}`,
               borderRadius: 4,
-              color: T.green,
+              color: hasBackendErrors ? T.red : isPendingValidation ? T.amber : T.green,
               fontFamily: F,
               fontSize: FS.xs,
               fontWeight: 800,
               letterSpacing: '0.08em',
               cursor: isRunDisabled ? 'not-allowed' : 'pointer',
               transition: 'all 0.15s',
-              opacity: isRunDisabled ? 0.35 : 1,
+              opacity: isRunDisabled ? 0.5 : 1,
               pointerEvents: isRunDisabled ? 'none' as const : 'auto' as const,
+              position: 'relative' as const,
             }}
             onMouseEnter={(e) => { if (!isRunDisabled) { e.currentTarget.style.background = `${T.green}30`; e.currentTarget.style.borderColor = `${T.green}70` } }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = `${T.green}22`; e.currentTarget.style.borderColor = `${T.green}50` }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = hasBackendErrors ? `${T.red}14` : `${T.green}22`; e.currentTarget.style.borderColor = hasBackendErrors ? `${T.red}50` : `${T.green}50` }}
           >
-            {isStarting ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={12} />}
-            {isStarting ? 'STARTING...' : status === 'complete' || status === 'failed' ? 'RE-RUN' : 'RUN'}
+            {isPendingValidation ? (
+              <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : hasBackendErrors ? (
+              <ShieldAlert size={12} />
+            ) : isStarting ? (
+              <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <Play size={12} />
+            )}
+            {isPendingValidation ? 'VALIDATING...' : isStarting ? 'STARTING...' : hasBackendErrors ? `${backendErrorCount} ERROR${backendErrorCount !== 1 ? 'S' : ''}` : status === 'complete' || status === 'failed' ? 'RE-RUN' : 'RUN'}
           </button>
           <ToolbarDropdown
             label=""

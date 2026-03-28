@@ -68,6 +68,7 @@ export interface BlockDefinition {
   name: string
   description: string
   category: string
+  version: string
   tags: string[]
   aliases: string[]
   icon: string

@@ -41,6 +41,14 @@ class ValidationError(BaseModel):
     recoverable: bool = False
 
 
+class ValidationErrorDetail(BaseModel):
+    """A structured validation error with remediation guidance."""
+    message: str
+    node_id: str | None = None
+    severity: str = "error"  # 'error' | 'warning'
+    action: str | None = None  # suggested remediation
+
+
 class PipelineValidationResponse(BaseModel):
     """Returned from the pipeline validation endpoint."""
     valid: bool
@@ -49,6 +57,15 @@ class PipelineValidationResponse(BaseModel):
     estimated_runtime_s: float
     block_count: int
     edge_count: int
+
+
+class GatewayValidationResponse(BaseModel):
+    """Returned from the execution gateway when validation fails (HTTP 400)."""
+    error: str = "validation_failed"
+    errors: list[str]
+    error_count: int
+    remediation: list[str]
+    warnings: list[str] = []
 
 
 class BlockConfigValidationResponse(BaseModel):
