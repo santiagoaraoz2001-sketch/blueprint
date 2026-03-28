@@ -38,6 +38,8 @@ export interface BlockNodeData {
   config: Record<string, unknown>
   inputs?: PortDefinition[]
   outputs?: PortDefinition[]
+  /** Block version at the time this node was created — used for stale handle detection */
+  block_version?: string
   status: 'idle' | 'running' | 'complete' | 'failed'
   progress: number
   [key: string]: unknown
@@ -494,6 +496,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
         config: { ...def.defaultConfig },
         inputs: def.inputs,
         outputs: def.outputs,
+        block_version: def.version,
         status: 'idle',
         progress: 0,
       },
@@ -537,6 +540,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
         config: { ...def.defaultConfig },
         inputs: def.inputs,
         outputs: def.outputs,
+        block_version: def.version,
         status: 'idle',
         progress: 0,
       },

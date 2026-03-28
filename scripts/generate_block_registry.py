@@ -311,6 +311,7 @@ def _format_block(block: dict) -> str:
     lines.append(f"    name: {_ts_value(block['name'])},")
     lines.append(f"    description: {_ts_value(block['description'])},")
     lines.append(f"    category: '{_esc(block['category'])}',")
+    lines.append(f"    version: '{_esc(block.get('version', '1.0.0'))}',")
     # tags
     if block["tags"]:
         tags = ", ".join(f"'{_esc(t)}'" for t in block["tags"])

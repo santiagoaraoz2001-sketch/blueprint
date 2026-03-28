@@ -6,6 +6,7 @@ import {
   MiniMap,
   useReactFlow,
   type NodeTypes,
+  type EdgeTypes,
   type Connection,
   BackgroundVariant,
 } from '@xyflow/react'
@@ -13,12 +14,14 @@ import '@xyflow/react/dist/style.css'
 import { T, F, FD, FS } from '@/lib/design-tokens'
 import { LayoutTemplate, Sparkles as SparklesIcon, Search as SearchIcon } from 'lucide-react'
 import { usePipelineStore } from '@/stores/pipelineStore'
+import { useValidationStore } from '@/stores/validationStore'
 import { useShallow } from 'zustand/react/shallow'
 import { getBlockDefinition, getPortColor, isPortCompatible, resolvePort, findBestInputPort, type PortDefinition } from '@/lib/block-registry'
 import { computeBlockWidth } from '@/lib/block-registry-types'
 import BlockNode from './BlockNode'
 import StickyNote from './StickyNote'
 import GroupNode from './GroupNode'
+import ValidationEdge from './ValidationEdge'
 import QuickPalette from './QuickPalette'
 import EdgePreviewPanel from './EdgePreviewPanel'
 import InheritanceOverlay, { OVERLAY_COLORS } from './InheritanceOverlay'
@@ -29,6 +32,10 @@ const nodeTypes: NodeTypes = {
   blockNode: BlockNode as any,
   stickyNote: StickyNote as any,
   groupNode: GroupNode as any,
+}
+
+const edgeTypes: EdgeTypes = {
+  validationEdge: ValidationEdge as any,
 }
 
 export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onShowTemplates?: () => void; onShowAgent?: () => void } = {}) {
@@ -443,7 +450,8 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
   }, [contextMenu.visible])
 
   // Recompute edge colors for loaded pipelines (onConnect already sets them for new edges).
-  // Also applies inheritance overlay styling when active.
+  // Also applies inheritance overlay styling when active, and validation error styling.
+  const edgeErrors = useValidationStore((s) => s.edgeErrors)
   const coloredEdges = useMemo(() => {
     const currentNodes = usePipelineStore.getState().nodes
     // Pre-build a Set for O(1) participating-edge lookup
@@ -461,7 +469,7 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
         baseStroke = port ? getPortColor(port.dataType) : T.borderHi
       }
 
-      // Inheritance overlay styling
+      // Inheritance overlay styling (takes precedence)
       if (participatingSet) {
         const isParticipating = participatingSet.has(edge.id)
         return {
@@ -477,9 +485,20 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
         }
       }
 
+      // Validation error edges get custom edge type for red dashed rendering
+      const hasEdgeError = !!edgeErrors[edge.id]
+      if (hasEdgeError) {
+        return {
+          ...edge,
+          type: 'validationEdge',
+          style: { ...edge.style, stroke: baseStroke, strokeWidth: 1.5 },
+          animated: false,
+        }
+      }
+
       return { ...edge, style: { ...edge.style, stroke: baseStroke, strokeWidth: 1.5 } }
     })
-  }, [edges, inheritanceOverlay])
+  }, [edges, inheritanceOverlay, edgeErrors])
 
   return (
     <div
@@ -654,6 +673,7 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
         onPaneClick={onPaneClick}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         snapToGrid
         snapGrid={[16, 16]}

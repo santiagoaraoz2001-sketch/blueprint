@@ -10,6 +10,7 @@ import BlockConfig from '@/components/Pipeline/BlockConfig'
 import RunControls from '@/components/Pipeline/RunControls'
 import AgentWorkflowGenerator from '@/components/Pipeline/AgentWorkflowGenerator'
 import ValidationPanel from '@/components/Pipeline/ValidationPanel'
+import BackendValidationPanel from '@/components/Validation/ValidationPanel'
 import PipelineTabBar from '@/components/Pipeline/PipelineTabBar'
 import { validatePipelineClient, type DiagnosticReport } from '@/lib/pipeline-validator'
 import PipelineMonitor, { type MonitorBlock } from '@/components/Pipeline/PipelineMonitor'
@@ -18,6 +19,7 @@ import TemplateGallery from '@/components/Pipeline/TemplateGallery'
 import ToolbarDropdown from '@/components/Pipeline/ToolbarDropdown'
 import MissionController from '@/components/Mission/MissionController'
 import { useRunStore } from '@/stores/runStore'
+import { useValidationStore } from '@/stores/validationStore'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import toast from 'react-hot-toast'
 
@@ -204,7 +206,44 @@ export default function PipelineEditorView() {
     }
   }, [])
 
+  // ── Debounced backend validation on graph changes ──
+  const pipelineId = usePipelineStore((s) => s.id)
+  const edges = usePipelineStore((s) => s.edges)
+  const backendValidation = useValidationStore((s) => s.result)
+  const isBackendValidating = useValidationStore((s) => s.isValidating)
+  const isBackendStale = useValidationStore((s) => s.isStale)
+  const backendNodeErrors = useValidationStore((s) => s.nodeErrors)
+  const backendPanelVisible = useValidationStore((s) => s.panelVisible)
+  const validateBackend = useValidationStore((s) => s.validate)
+  const markStale = useValidationStore((s) => s.markStale)
 
+  // Stringify configs once per render for dependency tracking
+  const configFingerprint = JSON.stringify(nodes.map(n => n.data.config))
+
+  // Debounce backend validation by 500ms on node/edge/config changes.
+  // markStale() fires immediately so the UI shows "VALIDATING..." without
+  // waiting for the debounce to expire, preventing stale result display.
+  const validationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!pipelineId || nodes.length === 0) return
+
+    // Immediately mark current results stale — this causes the Run button
+    // to show "VALIDATING..." and prevents acting on outdated validation
+    markStale()
+
+    if (validationTimerRef.current) clearTimeout(validationTimerRef.current)
+    validationTimerRef.current = setTimeout(() => {
+      validateBackend(pipelineId)
+    }, 500)
+    return () => {
+      if (validationTimerRef.current) clearTimeout(validationTimerRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipelineId, nodes.length, edges.length, validateBackend, markStale, configFingerprint])
+
+  // Count backend validation errors for the panel toggle badge
+  const backendErrorCount = backendValidation ? backendValidation.errors.length : 0
+  const backendWarningCount = backendValidation ? backendValidation.warnings.length : 0
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -563,6 +602,9 @@ export default function PipelineEditorView() {
             report={validationReport}
             onClose={() => setShowValidation(false)}
           />
+
+          {/* Backend validation panel — collapsible from bottom */}
+          <BackendValidationPanel />
         </ReactFlowProvider>
 
         {/* Agent workflow generator panel */}

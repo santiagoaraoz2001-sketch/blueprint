@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from .block_registry import is_known_block, get_block_types, get_block_config_schema
+from .block_registry import is_known_block, get_block_types, get_block_config_schema, get_block_yaml
 from ..block_sdk.config_validator import (
     validate_and_apply_defaults,
     _validate_type,
@@ -316,7 +316,50 @@ def validate_pipeline(definition: dict) -> ValidationReport:
                 except BlockConfigError as exc:
                     report.warnings.append(f"Block '{node_label}': {exc}")
 
-    # ── 5b. Check port existence on edges ──
+    # ── 5b. Stale handle detection — compare saved ports with registry ──
+    for node in nodes:
+        if node.get("type") in ("groupNode", "stickyNote"):
+            continue
+        block_type = node.get("data", {}).get("type", node.get("data", {}).get("blockType", ""))
+        if not block_type:
+            continue
+
+        block_yaml = get_block_yaml(block_type) if is_known_block(block_type) else None
+        if not block_yaml:
+            continue
+
+        node_label = node.get("data", {}).get("label", node.get("id", "?"))
+        saved_version = node.get("data", {}).get("block_version")
+        registry_version = block_yaml.get("version")
+
+        # If both versions exist and differ, check for breaking changes
+        if saved_version and registry_version and str(saved_version) != str(registry_version):
+            # Check for removed input ports (breaking change)
+            saved_inputs = {p.get("id") for p in node.get("data", {}).get("inputs", []) if p.get("id")}
+            registry_inputs = {p.get("id") for p in block_yaml.get("inputs", []) if p.get("id")}
+            removed_inputs = saved_inputs - registry_inputs
+
+            # Check for removed output ports (breaking change)
+            saved_outputs = {p.get("id") for p in node.get("data", {}).get("outputs", []) if p.get("id")}
+            registry_outputs = {p.get("id") for p in block_yaml.get("outputs", []) if p.get("id")}
+            removed_outputs = saved_outputs - registry_outputs
+
+            if removed_inputs or removed_outputs:
+                removed = sorted(removed_inputs | removed_outputs)
+                report.errors.append(
+                    f"Block '{node_label}' has outdated ports ({', '.join(removed)}) "
+                    f"— version changed from {saved_version} to {registry_version}. "
+                    f"Remove stale connections and reconfigure the block."
+                )
+                report.valid = False
+            else:
+                # Non-breaking: new ports were added (with defaults) — auto-migrate silently
+                report.warnings.append(
+                    f"Block '{node_label}' was saved with version {saved_version}, "
+                    f"current is {registry_version} (compatible — new ports added)"
+                )
+
+    # ── 5c. Check port existence on edges ──
     for edge in edges:
         src = edge.get("source", "")
         tgt = edge.get("target", "")
