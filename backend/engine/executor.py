@@ -1902,6 +1902,13 @@ async def execute_pipeline(
         except Exception:
             pass
 
+        # Auto-journal: generate experiment journal entry (never crashes execution)
+        try:
+            from ..services.experiment_journal import on_run_journal
+            on_run_journal(run_id, db)
+        except Exception:
+            pass
+
         try:
             publish_event(run_id, "run_completed", {
                 "run_id": run_id,
@@ -1929,6 +1936,13 @@ async def execute_pipeline(
         try:
             from ..services.project_lifecycle import on_run_failed
             on_run_failed(run_id, db)
+        except Exception:
+            pass
+
+        # Auto-journal: generate experiment journal entry for failed runs too
+        try:
+            from ..services.experiment_journal import on_run_journal
+            on_run_journal(run_id, db)
         except Exception:
             pass
 

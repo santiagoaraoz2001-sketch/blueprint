@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime, Float, Integer, JSON, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, Float, Integer, JSON, ForeignKey, Boolean
 from ..database import Base
 
 
@@ -22,6 +22,7 @@ class Run(Base):
     metrics_log = Column(JSON, nullable=True)
     data_fingerprints = Column(JSON, nullable=True)  # {node_id: {input_name: fingerprint}}
     config_fingerprints = Column(JSON, nullable=True)  # {node_id: sha256_hex} — Merkle-chain config hashes
+    best_in_project = Column(Boolean, default=False, nullable=False, server_default="0")
 
 
 class LiveRun(Base):

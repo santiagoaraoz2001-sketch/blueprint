@@ -90,6 +90,31 @@ def compare_runs(
         flat_config = _flatten_dict(config)
         metrics = run.metrics if isinstance(run.metrics, dict) else {}
 
+        # Build metric_sources: {metric_key: node_id} from metrics_log
+        # The metrics_log contains typed events with node_id for each metric.
+        # We take the *last* node_id that emitted each metric key (matching
+        # how all_metrics stores `block_type.metric_name` as the key, with
+        # the last-written value winning).
+        metric_sources: dict[str, str] = {}
+        metrics_log = run.metrics_log if isinstance(run.metrics_log, list) else []
+        for event in metrics_log:
+            if not isinstance(event, dict):
+                continue
+            if event.get("type") != "metric":
+                continue
+            ename = event.get("name", "")
+            enode = event.get("node_id", "")
+            if not ename or not enode:
+                continue
+            # Reconstruct the key format used in all_metrics: block_type.name
+            # The category is present in the event but not the block_type; however
+            # we also need to try raw metric name matching since the compare
+            # columns use the keys from run.metrics which are block_type.name.
+            # Match both: the raw metric name and all possible prefixed forms.
+            for mk in sorted_metrics:
+                if mk == ename or mk.endswith(f".{ename}"):
+                    metric_sources[mk] = enode
+
         rows.append({
             'id': run.id,
             'status': run.status,
@@ -97,8 +122,10 @@ def compare_runs(
             'finished_at': run.finished_at.isoformat() if run.finished_at else None,
             'duration_seconds': run.duration_seconds,
             'error_message': run.error_message,
+            'best_in_project': bool(run.best_in_project),
             'config': {k: flat_config.get(k) for k in sorted_config},
             'metrics': {k: metrics.get(k) for k in sorted_metrics},
+            'metric_sources': metric_sources,
         })
 
     return {
