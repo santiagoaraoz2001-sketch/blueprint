@@ -87,7 +87,9 @@ from ..utils.structured_logger import (
     log_run_start, log_run_complete, log_run_failed,
     log_block_start, log_block_complete, log_block_failed,
 )
-from .config_resolver import resolve_configs
+from .config_resolver import resolve_configs, inject_workspace_file_paths
+from .fingerprint import compute_fingerprints
+from .block_registry import BlockRegistryService
 from .metrics_schema import create_metric
 from .artifact_registry import register_block_artifacts
 
@@ -1115,6 +1117,7 @@ async def execute_pipeline(
     """Execute a full pipeline. Called in a background thread."""
     nodes = definition.get("nodes", [])
     edges = definition.get("edges", [])
+    workspace_config = definition.get("workspace_config") or None
 
     if not nodes:
         # Create a completed Run record so clients don't get a 404
@@ -1222,10 +1225,25 @@ async def execute_pipeline(
             loop_by_controller[loop_def.controller_id] = loop_def
 
         # Resolve config inheritance across the DAG
-        resolved_configs = resolve_configs(
+        _registry = BlockRegistryService()
+        _resolved_tuples = resolve_configs(
             nodes, edges, order,
-            find_block_dir_fn=_find_block_module,
+            workspace_config=workspace_config,
+            registry=_registry,
         )
+        # Post-resolution: auto-fill file_path fields from workspace settings
+        inject_workspace_file_paths(_resolved_tuples, nodes, _registry)
+
+        # Compute deterministic Merkle-chain config fingerprints
+        config_fps = compute_fingerprints(
+            _resolved_tuples, order, edges, _registry, nodes,
+        )
+        run.config_fingerprints = config_fps
+
+        # Extract just the config dicts for backward-compat with downstream code
+        resolved_configs = {
+            nid: cfg for nid, (cfg, _src) in _resolved_tuples.items()
+        }
 
         for idx, node_id in enumerate(order):
             node = node_map.get(node_id)

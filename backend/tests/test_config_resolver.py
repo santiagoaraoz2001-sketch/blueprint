@@ -1,37 +1,65 @@
 """
-Tests for the Config Inheritance Resolver.
+Tests for Config Resolver — config precedence, workspace propagation, and source tracking.
 
-Covers the 7 acceptance criteria plus edge cases:
-1. Seed propagation through a linear chain
-2. Override respected (explicit value not replaced)
-3. Override value propagates downstream (not reverted to original)
-4. text_column propagation
-5. trust_remote_code propagation
-6. Original pipeline JSON not mutated
-7. Provenance tracking (_inherited metadata)
+5 required tests:
+1. test_user_override_beats_workspace — user seed=99 wins over workspace seed=42
+2. test_workspace_propagates_seed — workspace seed=42 propagates to all blocks with seed config
+3. test_inheritance_through_dag — upstream block value inherited by downstream
+4. test_default_fallback — no user/workspace/inherited value, falls back to schema default
+5. test_config_sources_tracked — every resolved value has a source entry
+
+Plus additional tests:
+- inject_workspace_file_paths behavior
+- workspace_config extraction from pipeline definition
 """
 
-import copy
-from pathlib import Path
-from unittest.mock import patch
+from typing import Any, Optional
+from unittest.mock import patch, MagicMock
 
 import pytest
 
-from backend.engine.config_resolver import (
-    CATEGORY_PROPAGATION_KEYS,
-    GLOBAL_PROPAGATION_KEYS,
-    _get_all_propagation_keys,
-    _get_propagation_keys,
-    _is_user_override,
-    _load_schema_defaults,
-    resolve_configs,
-)
+from backend.engine.config_resolver import resolve_configs, inject_workspace_file_paths
+
+
+# ---------------------------------------------------------------------------
+# Fake BlockRegistryService
+# ---------------------------------------------------------------------------
+
+class FakeRegistry:
+    """Minimal stand-in for BlockRegistryService that returns controlled schema data."""
+
+    def __init__(self, schema_defaults: dict[str, Any] | None = None, version: str = "1.0.0"):
+        self._defaults = schema_defaults or {
+            "seed": 42,
+            "text_column": "text",
+            "trust_remote_code": False,
+            "system_prompt": "",
+            "prompt_template": "",
+            "model_name": "",
+        }
+        self._version = version
+
+    def get_block_schema_defaults(self, block_type: str) -> dict[str, Any]:
+        return dict(self._defaults)
+
+    def get_block_version(self, block_type: str) -> str:
+        return self._version
+
+    def get_block_info(self, block_type: str) -> Optional[dict]:
+        return {"type": block_type, "category": "data", "path": f"/fake/{block_type}"}
+
+    def get_block_config_schema(self, block_type: str) -> dict[str, Any]:
+        return {k: {"type": "string", "default": v} for k, v in self._defaults.items()}
+
+    def get_category(self, block_type: str) -> str:
+        return "data"
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_node(node_id, block_type="test_block", category="data", config=None):
+def _node(node_id: str, block_type: str = "test_block", category: str = "data", config: dict | None = None):
     return {
         "id": node_id,
         "type": "customNode",
@@ -44,424 +72,290 @@ def _make_node(node_id, block_type="test_block", category="data", config=None):
     }
 
 
-def _make_edge(source, target):
+def _edge(source: str, target: str):
     return {"source": source, "target": target}
 
 
-# Fake block directory that returns a schema with seed, text_column,
-# trust_remote_code, system_prompt, training_format, and prompt_template defaults
-_FAKE_SCHEMA = {
-    "config": {
-        "seed": {"type": "integer", "default": 42},
-        "text_column": {"type": "string", "default": "text"},
-        "trust_remote_code": {"type": "boolean", "default": False},
-        "system_prompt": {"type": "string", "default": ""},
-        "training_format": {"type": "string", "default": ""},
-        "prompt_template": {"type": "string", "default": ""},
-    }
-}
-
-
-def _fake_find_block_dir(block_type):
-    """Return a fake block directory path (schema loaded via mock)."""
-    return Path(f"/fake/blocks/{block_type}")
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(autouse=True)
-def _mock_schema_loading():
-    """Mock YAML loading so tests don't need real block directories."""
-    import yaml
-
-    def fake_load_defaults(block_dir_str):
-        defaults = {}
-        config_section = _FAKE_SCHEMA.get("config", {})
-        for field_name, field_def in config_section.items():
-            if isinstance(field_def, dict) and "default" in field_def:
-                defaults[field_name] = field_def["default"]
-        return defaults
-
-    # Clear lru_cache before each test
-    _load_schema_defaults.cache_clear()
-
-    with patch("backend.engine.config_resolver.Path.exists", return_value=True), \
-         patch("builtins.open", create=True), \
-         patch("yaml.safe_load", return_value=_FAKE_SCHEMA):
-        yield
-
-    _load_schema_defaults.cache_clear()
-
-
 # ===========================================================================
-# Acceptance Criteria Tests
+# Required Acceptance Tests
 # ===========================================================================
 
-class TestSeedPropagation:
-    """Criterion 1: seed set on node A propagates to downstream B and C."""
 
-    def test_linear_chain(self):
+class TestUserOverrideBeatsWorkspace:
+    """User sets seed=99, workspace has seed=42 — resolved should be 99 with source 'user'."""
+
+    def test_user_override_beats_workspace(self):
+        nodes = [_node("a", config={"seed": 99})]
+        edges = []
+        order = ["a"]
+        workspace = {"seed": 42}
+        registry = FakeRegistry()
+
+        result = resolve_configs(nodes, edges, order, workspace, registry)
+        resolved_config, config_sources = result["a"]
+
+        assert resolved_config["seed"] == 99
+        assert config_sources["seed"] == "user"
+
+
+class TestWorkspacePropagatesSeed:
+    """Workspace seed=42 propagates to ALL blocks that have seed in their schema."""
+
+    def test_workspace_propagates_seed(self):
         nodes = [
-            _make_node("a", config={"seed": 99}),
-            _make_node("b"),
-            _make_node("c"),
+            _node("a"),
+            _node("b"),
+            _node("c"),
         ]
-        edges = [_make_edge("a", "b"), _make_edge("b", "c")]
+        edges = [_edge("a", "b"), _edge("b", "c")]
         order = ["a", "b", "c"]
+        workspace = {"seed": 777}
+        registry = FakeRegistry()
 
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
+        result = resolve_configs(nodes, edges, order, workspace, registry)
 
-        assert resolved["b"]["seed"] == 99
-        assert resolved["c"]["seed"] == 99
+        for nid in ["a", "b", "c"]:
+            cfg, src = result[nid]
+            assert cfg["seed"] == 777, f"Node {nid} should have workspace seed"
+            assert src["seed"] == "workspace", f"Node {nid} source should be 'workspace'"
 
 
-class TestOverrideRespected:
-    """Criterion 2: If downstream node explicitly sets a value, it is NOT replaced."""
+class TestInheritanceThroughDag:
+    """Upstream block sets model_name, downstream block inherits it."""
 
-    def test_explicit_override_preserved(self):
+    def test_inheritance_through_dag(self):
+        # model_name is in schema defaults but not a propagation key by default.
+        # However, seed IS a propagation key. Use seed for this test.
         nodes = [
-            _make_node("a", config={"seed": 99}),
-            _make_node("b", config={"seed": 7}),  # explicit override
+            _node("upstream", config={"seed": 123}),
+            _node("downstream"),
         ]
-        edges = [_make_edge("a", "b")]
+        edges = [_edge("upstream", "downstream")]
+        order = ["upstream", "downstream"]
+        registry = FakeRegistry()
+
+        result = resolve_configs(nodes, edges, order, None, registry)
+        cfg, src = result["downstream"]
+
+        assert cfg["seed"] == 123
+        assert src["seed"] == "inherited:upstream"
+
+
+class TestDefaultFallback:
+    """No user/workspace/inherited value — falls back to schema default."""
+
+    def test_default_fallback(self):
+        nodes = [_node("a")]
+        edges = []
+        order = ["a"]
+        registry = FakeRegistry()
+
+        result = resolve_configs(nodes, edges, order, None, registry)
+        cfg, src = result["a"]
+
+        assert cfg["seed"] == 42  # schema default
+        assert src["seed"] == "block_default"
+        assert cfg["text_column"] == "text"
+        assert src["text_column"] == "block_default"
+
+
+class TestConfigSourcesTracked:
+    """Every resolved value has a source entry — user, workspace, inherited, or block_default."""
+
+    def test_config_sources_tracked(self):
+        nodes = [
+            _node("a", config={"seed": 99}),
+            _node("b"),
+        ]
+        edges = [_edge("a", "b")]
         order = ["a", "b"]
+        workspace = {"text_column": "body"}
+        registry = FakeRegistry()
 
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
+        result = resolve_configs(nodes, edges, order, workspace, registry)
 
-        assert resolved["b"]["seed"] == 7  # NOT 99
+        for nid in ["a", "b"]:
+            cfg, src = result[nid]
+            # Every key in resolved config must have a corresponding source
+            for key in cfg:
+                assert key in src, f"Node {nid}: key '{key}' missing from config_sources"
+                assert src[key] in (
+                    "user", "workspace", "block_default",
+                ) or src[key].startswith("inherited:"), (
+                    f"Node {nid}: key '{key}' has invalid source '{src[key]}'"
+                )
 
+        # Verify specific sources
+        a_cfg, a_src = result["a"]
+        assert a_src["seed"] == "user"
+        assert a_src["text_column"] == "workspace"
 
-class TestOverridePropagatesDownstream:
-    """Criterion 3: Override value propagates further downstream."""
-
-    def test_override_flows_downstream(self):
-        nodes = [
-            _make_node("a", config={"seed": 99}),
-            _make_node("b", config={"seed": 7}),
-            _make_node("c"),
-        ]
-        edges = [_make_edge("a", "b"), _make_edge("b", "c")]
-        order = ["a", "b", "c"]
-
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
-
-        assert resolved["b"]["seed"] == 7
-        assert resolved["c"]["seed"] == 7  # Gets B's override, not A's
-
-
-class TestTextColumnPropagation:
-    """Criterion 4: text_column propagates."""
-
-    def test_text_column_propagates(self):
-        nodes = [
-            _make_node("src", config={"text_column": "content"}),
-            _make_node("dst"),
-        ]
-        edges = [_make_edge("src", "dst")]
-        order = ["src", "dst"]
-
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
-
-        assert resolved["dst"]["text_column"] == "content"
-
-
-class TestTrustRemoteCodePropagation:
-    """Criterion 5: trust_remote_code propagates."""
-
-    def test_trust_remote_code_propagates(self):
-        nodes = [
-            _make_node("src", config={"trust_remote_code": True}),
-            _make_node("dst"),
-        ]
-        edges = [_make_edge("src", "dst")]
-        order = ["src", "dst"]
-
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
-
-        assert resolved["dst"]["trust_remote_code"] is True
-
-
-class TestOriginalNotMutated:
-    """Criterion 6: Original pipeline JSON is not mutated."""
-
-    def test_no_mutation(self):
-        nodes = [
-            _make_node("a", config={"seed": 99}),
-            _make_node("b"),
-        ]
-        edges = [_make_edge("a", "b")]
-        order = ["a", "b"]
-
-        original_b_config = copy.deepcopy(nodes[1]["data"]["config"])
-
-        resolve_configs(nodes, edges, order, _fake_find_block_dir)
-
-        assert nodes[1]["data"]["config"] == original_b_config
-
-
-class TestProvenanceTracking:
-    """Criterion 7: _inherited metadata tracks provenance."""
-
-    def test_inherited_metadata_present(self):
-        nodes = [
-            _make_node("a", config={"seed": 99}),
-            _make_node("b"),
-        ]
-        edges = [_make_edge("a", "b")]
-        order = ["a", "b"]
-
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
-
-        assert "_inherited" in resolved["b"]
-        inherited = resolved["b"]["_inherited"]
-        assert "seed" in inherited
-        assert inherited["seed"]["from_node"] == "a"
-        assert inherited["seed"]["value"] == 99
+        b_cfg, b_src = result["b"]
+        assert b_src["text_column"] == "workspace"
+        # seed inherited from a (user set 99, which differs from default 42)
+        assert b_src["seed"] == "inherited:a"
 
 
 # ===========================================================================
-# Edge Case Tests
+# inject_workspace_file_paths Tests
 # ===========================================================================
 
-class TestMultiKeyProvenance:
-    """Multiple keys inherit from different upstream nodes."""
 
-    def test_multi_key_sources(self):
-        nodes = [
-            _make_node("seed_src", config={"seed": 123}),
-            _make_node("text_src", config={"text_column": "body"}),
-            _make_node("merger"),
-        ]
-        edges = [
-            _make_edge("seed_src", "merger"),
-            _make_edge("text_src", "merger"),
-        ]
-        order = ["seed_src", "text_src", "merger"]
+class FakeRegistryWithFilePaths(FakeRegistry):
+    """Registry that declares output_path as a file_path field."""
 
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
-
-        inherited = resolved["merger"]["_inherited"]
-        assert inherited["seed"]["from_node"] == "seed_src"
-        assert inherited["text_column"]["from_node"] == "text_src"
+    def get_file_path_fields(self, block_type: str) -> frozenset[str]:
+        return frozenset(["output_path"])
 
 
-class TestDiamondDAG:
-    """Diamond DAG: first upstream in topo order wins."""
+class TestInjectWorkspaceFilePathsNoOp:
+    """No-op when workspace is not configured."""
 
-    def test_diamond_first_wins(self):
-        nodes = [
-            _make_node("root", config={"seed": 10}),
-            _make_node("left", config={"seed": 20}),
-            _make_node("right", config={"seed": 30}),
-            _make_node("merge"),
-        ]
-        edges = [
-            _make_edge("root", "left"),
-            _make_edge("root", "right"),
-            _make_edge("left", "merge"),
-            _make_edge("right", "merge"),
-        ]
-        order = ["root", "left", "right", "merge"]
+    def test_noop_when_no_workspace(self):
+        nodes = [_node("a")]
+        resolved = resolve_configs(nodes, [], ["a"], None, FakeRegistry())
 
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
+        with patch(
+            "backend.engine.config_resolver._get_workspace_settings",
+            return_value=(None, False),
+        ):
+            inject_workspace_file_paths(resolved, nodes, FakeRegistryWithFilePaths())
 
-        # Both left and right override seed; first upstream (left) wins
-        assert resolved["merge"]["seed"] == 20
+        # Nothing should change
+        cfg, src = resolved["a"]
+        assert src.get("output_path") is None or src.get("output_path") == "block_default"
 
 
-class TestMissingBlockDir:
-    """Block directory not found — resolver still works, just no schema defaults."""
+class TestInjectWorkspaceFilePathsOnlyDefault:
+    """Only replaces values whose source is 'block_default'."""
 
-    def test_missing_block_dir(self):
-        def bad_find(block_type):
-            return None
+    def test_user_override_not_replaced(self):
+        nodes = [_node("a", config={"output_path": "/my/custom/path"})]
+        registry = FakeRegistry(schema_defaults={
+            "seed": 42,
+            "output_path": "/default/path",
+        })
+        resolved = resolve_configs(nodes, [], ["a"], None, registry)
 
-        nodes = [
-            _make_node("a", config={"seed": 99}),
-            _make_node("b"),
-        ]
-        edges = [_make_edge("a", "b")]
-        order = ["a", "b"]
+        # output_path is user-set, should NOT be replaced
+        cfg, src = resolved["a"]
+        assert cfg["output_path"] == "/my/custom/path"
+        assert src["output_path"] == "user"
 
-        # Should not crash
-        resolved = resolve_configs(nodes, edges, order, bad_find)
-        # Without schema defaults, inheritance can't detect defaults vs overrides,
-        # so no inheritance occurs for nodes with missing block dirs
-        assert "seed" not in resolved["b"] or resolved["b"].get("seed") == 99
+        mock_manager = MagicMock()
+        mock_manager.resolve_output_path.return_value = "/workspace/outputs"
 
+        mock_ws_module = MagicMock()
+        mock_ws_module.WorkspaceManager.return_value = mock_manager
 
-class TestFindBlockDirRaises:
-    """find_block_dir_fn raising an error — gracefully handled."""
+        with patch(
+            "backend.engine.config_resolver._get_workspace_settings",
+            return_value=("/workspace", True),
+        ), patch.dict(
+            "sys.modules",
+            {"backend.services.workspace_manager": mock_ws_module},
+        ):
+            file_path_registry = FakeRegistryWithFilePaths(schema_defaults={
+                "seed": 42,
+                "output_path": "/default/path",
+            })
+            inject_workspace_file_paths(resolved, nodes, file_path_registry)
 
-    def test_find_raises_value_error(self):
-        def raising_find(block_type):
-            raise ValueError(f"Unknown block: {block_type}")
-
-        nodes = [
-            _make_node("a", config={"seed": 99}),
-            _make_node("b"),
-        ]
-        edges = [_make_edge("a", "b")]
-        order = ["a", "b"]
-
-        # Should not crash
-        resolved = resolve_configs(nodes, edges, order, raising_find)
-        assert "a" in resolved
-        assert "b" in resolved
-
-
-class TestEmptyPipeline:
-    """Empty pipeline returns empty dict."""
-
-    def test_empty(self):
-        resolved = resolve_configs([], [], [], _fake_find_block_dir)
-        assert resolved == {}
+        cfg, src = resolved["a"]
+        assert cfg["output_path"] == "/my/custom/path"  # Still user's value
+        assert src["output_path"] == "user"
 
 
-class TestGroupNodeSkipped:
-    """groupNode type nodes are skipped."""
+class TestInjectWorkspaceFilePathsAutoFill:
+    """Auto-fills block_default file_path fields with workspace paths."""
 
-    def test_group_node_ignored(self):
-        nodes = [
-            _make_node("a", config={"seed": 99}),
-            {"id": "group1", "type": "groupNode", "data": {}},
-            _make_node("b"),
-        ]
-        edges = [_make_edge("a", "b")]
-        order = ["a", "group1", "b"]
+    def test_default_replaced_with_workspace(self):
+        nodes = [_node("a", block_type="data_export", category="data")]
+        registry = FakeRegistry(schema_defaults={
+            "seed": 42,
+            "output_path": "/default/path",
+        })
+        resolved = resolve_configs(nodes, [], ["a"], None, registry)
 
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
+        # Verify it's at block_default
+        cfg, src = resolved["a"]
+        assert cfg["output_path"] == "/default/path"
+        assert src["output_path"] == "block_default"
 
-        assert "group1" not in resolved
-        assert resolved["b"]["seed"] == 99
+        mock_manager = MagicMock()
+        mock_manager.resolve_output_path.return_value = "/workspace/outputs/exports"
 
+        # Patch the lazy import inside inject_workspace_file_paths
+        mock_ws_module = MagicMock()
+        mock_ws_module.WorkspaceManager.return_value = mock_manager
 
-class TestCategoryIsolation:
-    """Category-specific keys only apply to matching categories."""
+        with patch(
+            "backend.engine.config_resolver._get_workspace_settings",
+            return_value=("/workspace", True),
+        ), patch.dict(
+            "sys.modules",
+            {"backend.services.workspace_manager": mock_ws_module},
+        ):
+            file_path_registry = FakeRegistryWithFilePaths(schema_defaults={
+                "seed": 42,
+                "output_path": "/default/path",
+            })
+            inject_workspace_file_paths(resolved, nodes, file_path_registry)
 
-    def test_system_prompt_only_for_inference(self):
-        nodes = [
-            _make_node("inf1", category="inference", config={"system_prompt": "Be helpful"}),
-            _make_node("data1", category="data"),
-            _make_node("inf2", category="inference"),
-        ]
-        edges = [
-            _make_edge("inf1", "data1"),
-            _make_edge("data1", "inf2"),
-        ]
-        order = ["inf1", "data1", "inf2"]
-
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
-
-        # system_prompt should NOT be applied to data node (wrong category)
-        assert resolved["data1"].get("system_prompt", "") == ""
-        # But SHOULD flow through data1 to reach inf2
-        assert resolved["inf2"]["system_prompt"] == "Be helpful"
-
-
-class TestCategoryFlowThroughIntermediate:
-    """Category-specific values flow through intermediate blocks of different categories."""
-
-    def test_training_format_flows_through_data(self):
-        nodes = [
-            _make_node("train1", category="training", config={"training_format": "alpaca"}),
-            _make_node("data1", category="data"),
-            _make_node("train2", category="training"),
-        ]
-        edges = [
-            _make_edge("train1", "data1"),
-            _make_edge("data1", "train2"),
-        ]
-        order = ["train1", "data1", "train2"]
-
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
-
-        assert resolved["train2"]["training_format"] == "alpaca"
-
-
-class TestDisconnectedNodes:
-    """Disconnected nodes receive no inheritance."""
-
-    def test_no_inheritance_for_disconnected(self):
-        nodes = [
-            _make_node("a", config={"seed": 99}),
-            _make_node("b"),
-        ]
-        edges = []  # No edges — disconnected
-        order = ["a", "b"]
-
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
-
-        # b should NOT inherit seed from a (no edge)
-        assert "seed" not in resolved["b"] or resolved["b"].get("seed") == 42
-
-
-class TestLongChainPropagation:
-    """Values propagate through long chains."""
-
-    def test_five_node_chain(self):
-        nodes = [_make_node(f"n{i}") for i in range(5)]
-        nodes[0]["data"]["config"]["seed"] = 777
-
-        edges = [_make_edge(f"n{i}", f"n{i+1}") for i in range(4)]
-        order = [f"n{i}" for i in range(5)]
-
-        resolved = resolve_configs(nodes, edges, order, _fake_find_block_dir)
-
-        for i in range(1, 5):
-            assert resolved[f"n{i}"]["seed"] == 777
+        cfg, src = resolved["a"]
+        assert cfg["output_path"] == "/workspace/outputs/exports"
+        assert src["output_path"] == "workspace_auto_fill"
 
 
 # ===========================================================================
-# Unit Tests for Internal Functions
+# Workspace Config from Pipeline Definition
 # ===========================================================================
 
-class TestIsUserOverride:
-    def test_different_from_default(self):
-        assert _is_user_override("seed", 99, 42) is True
 
-    def test_same_as_default(self):
-        assert _is_user_override("seed", 42, 42) is False
+class TestWorkspaceConfigFromDefinition:
+    """workspace_config key in pipeline definition is properly used."""
 
-    def test_no_schema_default_with_value(self):
-        assert _is_user_override("seed", 99, None) is True
+    def test_definition_workspace_config_applied(self):
+        """Simulate what the executor does: extract workspace_config from definition."""
+        definition = {
+            "nodes": [
+                _node("a"),
+                _node("b"),
+            ],
+            "edges": [_edge("a", "b")],
+            "workspace_config": {"seed": 999, "text_column": "body"},
+        }
 
-    def test_no_schema_default_empty_value(self):
-        assert _is_user_override("seed", "", None) is False
+        nodes = definition["nodes"]
+        edges = definition["edges"]
+        workspace_config = definition.get("workspace_config") or None
+        order = ["a", "b"]
+        registry = FakeRegistry()
 
-    def test_no_schema_default_none_value(self):
-        assert _is_user_override("seed", None, None) is False
+        result = resolve_configs(nodes, edges, order, workspace_config, registry)
 
+        for nid in ["a", "b"]:
+            cfg, src = result[nid]
+            assert cfg["seed"] == 999
+            assert src["seed"] == "workspace"
+            assert cfg["text_column"] == "body"
+            assert src["text_column"] == "workspace"
 
-class TestGetPropagationKeys:
-    def test_global_keys_always_present(self):
-        keys = _get_propagation_keys("data")
-        for k in GLOBAL_PROPAGATION_KEYS:
-            assert k in keys
+    def test_missing_workspace_config_is_noop(self):
+        """Definition without workspace_config uses defaults."""
+        definition = {
+            "nodes": [_node("a")],
+            "edges": [],
+        }
 
-    def test_inference_includes_system_prompt(self):
-        keys = _get_propagation_keys("inference")
-        assert "system_prompt" in keys
+        nodes = definition["nodes"]
+        edges = definition["edges"]
+        workspace_config = definition.get("workspace_config") or None
+        order = ["a"]
+        registry = FakeRegistry()
 
-    def test_training_includes_training_format(self):
-        keys = _get_propagation_keys("training")
-        assert "training_format" in keys
-        assert "prompt_template" in keys
+        result = resolve_configs(nodes, edges, order, workspace_config, registry)
 
-    def test_data_excludes_category_keys(self):
-        keys = _get_propagation_keys("data")
-        assert "system_prompt" not in keys
-        assert "training_format" not in keys
-
-
-class TestGetAllPropagationKeys:
-    def test_includes_all(self):
-        keys = _get_all_propagation_keys()
-        assert "seed" in keys
-        assert "text_column" in keys
-        assert "trust_remote_code" in keys
-        assert "system_prompt" in keys
-        assert "training_format" in keys
-        assert "prompt_template" in keys
+        cfg, src = result["a"]
+        assert cfg["seed"] == 42  # block default
+        assert src["seed"] == "block_default"

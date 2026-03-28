@@ -3,159 +3,40 @@ Config Resolver — propagates inheritable config keys through the pipeline DAG.
 
 Called by the executor AFTER topological sort, BEFORE block execution.
 
+Precedence (highest to lowest):
+1. User-set values on the specific node
+2. Workspace config (matching key names in the block's schema)
+3. Inherited values from upstream nodes connected via edges
+4. Block schema defaults from the registry
+
 Inheritance rules:
-1. Keys marked as "propagate" in block.yaml flow downstream along edges.
-2. Downstream blocks inherit the FIRST upstream value they encounter (topo order).
-3. If a downstream block has explicitly set a value (not equal to its schema default),
-   that value is treated as an override and NOT replaced.
-4. The resolver returns a dict of {node_id: resolved_config}.
+- Keys marked as global propagation keys always flow downstream along edges.
+- Category-specific keys only apply to blocks matching the category, but the
+  value still flows through intermediate blocks of any category.
+- Downstream blocks inherit the FIRST upstream value they encounter (topo order).
+- If a downstream block has a user-set value, that takes precedence over all.
+
+The resolver returns a dict of {node_id: (resolved_config, config_sources)}.
+config_sources maps each key to its origin:
+  'block_default' | 'workspace' | 'inherited:{upstream_node_id}' | 'user'
 """
 
-import logging
-from functools import lru_cache
-from pathlib import Path
-from typing import Any
+from __future__ import annotations
 
-import yaml
+import logging
+from typing import Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .block_registry import BlockRegistryService
 
 logger = logging.getLogger(__name__)
 
 
-# Keys that are ALWAYS propagated regardless of block.yaml declarations.
-# These are the 5 resolved conflicts from the config audit.
-GLOBAL_PROPAGATION_KEYS = {
-    "text_column",
-    "seed",
-    "trust_remote_code",
-}
+def _get_workspace_settings() -> tuple[Optional[str], bool]:
+    """Load workspace settings from DB.
 
-# Keys that propagate WITHIN specific categories only.
-# The key is only *applied* to blocks matching the category, but the value
-# still flows through intermediate blocks of any category so that
-# inference→data→inference chains work correctly.
-CATEGORY_PROPAGATION_KEYS = {
-    "inference": {"system_prompt", "temperature", "max_tokens", "top_p"},
-    "agents": {"system_prompt", "temperature", "max_tokens", "top_p"},
-    "evaluation": {"decimal_precision", "max_samples"},
-    "training": {"training_format", "prompt_template", "max_seq_length"},
-}
-
-# Union of all category-specific keys — used when building the propagation pool
-# so values can flow through intermediate blocks of different categories.
-_ALL_CATEGORY_KEYS: set[str] = set()
-for _keys in CATEGORY_PROPAGATION_KEYS.values():
-    _ALL_CATEGORY_KEYS.update(_keys)
-
-
-@lru_cache(maxsize=256)
-def _load_block_propagation_keys(block_dir: str) -> frozenset[str]:
-    """Load config keys marked with ``propagate: true`` in block.yaml.
-
-    Cached by block_dir so the file is only parsed once per process lifetime.
+    Returns (root_path, auto_fill_paths) or (None, False).
     """
-    schema_path = Path(block_dir) / "block.yaml"
-    if not schema_path.exists():
-        return frozenset()
-    try:
-        with open(schema_path) as f:
-            schema = yaml.safe_load(f) or {}
-    except (yaml.YAMLError, OSError):
-        return frozenset()
-
-    config_section = schema.get("config")
-    if not isinstance(config_section, dict):
-        return frozenset()
-
-    return frozenset(
-        field_name
-        for field_name, field_def in config_section.items()
-        if isinstance(field_def, dict) and field_def.get("propagate")
-    )
-
-
-@lru_cache(maxsize=256)
-def _load_schema_defaults(block_dir: str) -> dict[str, Any]:
-    """Load default config values from block.yaml.
-
-    Cached by block_dir path string so the same block.yaml is only parsed once
-    per process lifetime, even across multiple pipeline runs.
-    """
-    schema_path = Path(block_dir) / "block.yaml"
-    if not schema_path.exists():
-        return {}
-    try:
-        with open(schema_path) as f:
-            schema = yaml.safe_load(f) or {}
-    except (yaml.YAMLError, OSError) as exc:
-        logger.warning("Failed to parse %s: %s", schema_path, exc)
-        return {}
-
-    defaults = {}
-    config_section = schema.get("config")
-    if not isinstance(config_section, dict):
-        return {}
-    for field_name, field_def in config_section.items():
-        if isinstance(field_def, dict) and "default" in field_def:
-            defaults[field_name] = field_def["default"]
-    return defaults
-
-
-def _is_user_override(key: str, value: Any, schema_default: Any) -> bool:
-    """
-    Determine if a config value was explicitly set by the user
-    (vs being the schema default).
-
-    A value is considered a user override if:
-    - It differs from the schema default
-    - The schema has no default and the value is non-empty
-    """
-    if schema_default is None:
-        # No default in schema — any non-empty value is a user choice
-        return value is not None and value != ""
-    return value != schema_default
-
-
-def _get_propagation_keys(category: str) -> set[str]:
-    """Get the set of keys that should propagate for a given block category."""
-    keys = set(GLOBAL_PROPAGATION_KEYS)
-    keys.update(CATEGORY_PROPAGATION_KEYS.get(category, set()))
-    return keys
-
-
-def _get_all_propagation_keys() -> set[str]:
-    """Get the full set of keys that may propagate (global + all categories).
-
-    Used when building propagation pools so values can flow through
-    intermediate blocks regardless of category.
-    """
-    keys = set(GLOBAL_PROPAGATION_KEYS)
-    keys.update(_ALL_CATEGORY_KEYS)
-    return keys
-
-
-@lru_cache(maxsize=256)
-def _load_file_path_fields(block_dir: str) -> frozenset[str]:
-    """Load config field names that have type ``file_path`` from block.yaml."""
-    schema_path = Path(block_dir) / "block.yaml"
-    if not schema_path.exists():
-        return frozenset()
-    try:
-        with open(schema_path) as f:
-            schema = yaml.safe_load(f) or {}
-        config_section = schema.get("config", {})
-        if not isinstance(config_section, dict):
-            return frozenset()
-        file_path_fields = set()
-        for field_name, field_def in config_section.items():
-            if isinstance(field_def, dict) and field_def.get("type") == "file_path":
-                file_path_fields.add(field_name)
-        return frozenset(file_path_fields)
-    except Exception:
-        return frozenset()
-
-
-def _get_workspace_settings():
-    """Load workspace settings from DB. Returns (root_path, auto_fill_paths) or (None, False)."""
     try:
         from ..database import SessionLocal
         from ..models.workspace import WorkspaceSettings
@@ -171,92 +52,85 @@ def _get_workspace_settings():
         return None, False
 
 
-def _inject_workspace_defaults(
-    topo_order: list[str],
-    node_map: dict[str, dict],
-    schema_defaults: dict[str, dict],
-    categories: dict[str, str],
-    find_block_dir_fn,
-) -> None:
-    """Replace schema-default file_path values with workspace absolute paths.
+# Keys that are ALWAYS propagated regardless of block.yaml declarations.
+# These are the 5 known conflict keys from the config audit.
+GLOBAL_PROPAGATION_KEYS = {
+    "text_column",
+    "seed",
+    "trust_remote_code",
+    "system_prompt",
+    "prompt_template",
+}
 
-    Only replaces values that match the schema default (i.e., not user-overridden).
-    This runs BEFORE propagation so workspace paths can flow downstream too.
+# Keys that propagate WITHIN specific categories only.
+CATEGORY_PROPAGATION_KEYS: dict[str, set[str]] = {
+    "inference": {"system_prompt", "temperature", "max_tokens", "top_p"},
+    "agents": {"system_prompt", "temperature", "max_tokens", "top_p"},
+    "evaluation": {"decimal_precision", "max_samples"},
+    "training": {"training_format", "prompt_template", "max_seq_length"},
+}
+
+# Union of all category-specific keys — used when building propagation pools.
+_ALL_CATEGORY_KEYS: set[str] = set()
+for _keys in CATEGORY_PROPAGATION_KEYS.values():
+    _ALL_CATEGORY_KEYS.update(_keys)
+
+
+def _get_propagation_keys(category: str) -> set[str]:
+    """Get the set of keys that should propagate for a given block category."""
+    keys = set(GLOBAL_PROPAGATION_KEYS)
+    keys.update(CATEGORY_PROPAGATION_KEYS.get(category, set()))
+    return keys
+
+
+def _get_all_propagation_keys() -> set[str]:
+    """Get the full set of keys that may propagate (global + all categories)."""
+    keys = set(GLOBAL_PROPAGATION_KEYS)
+    keys.update(_ALL_CATEGORY_KEYS)
+    return keys
+
+
+def _is_user_override(key: str, value: Any, schema_default: Any) -> bool:
+    """Determine if a config value was explicitly set by the user.
+
+    A value is considered a user override if:
+    - It differs from the schema default
+    - The schema has no default and the value is non-empty
     """
-    root_path, auto_fill = _get_workspace_settings()
-    if not root_path or not auto_fill:
-        return
-
-    from ..services.workspace_manager import WorkspaceManager
-    manager = WorkspaceManager(root_path)
-
-    for node_id in topo_order:
-        node = node_map.get(node_id)
-        if not node or node.get("type") == "groupNode":
-            continue
-
-        node_data = node.get("data", {})
-        block_type = node_data.get("type", "")
-        category = categories.get(node_id, "")
-        node_config = node_data.get("config", {})
-        defaults = schema_defaults.get(node_id, {})
-
-        # Find file_path fields for this block
-        block_dir = None
-        try:
-            block_dir = find_block_dir_fn(block_type)
-        except (ValueError, OSError):
-            pass
-
-        if not block_dir:
-            continue
-
-        file_path_fields = _load_file_path_fields(str(block_dir))
-        if not file_path_fields:
-            continue
-
-        for field_name in file_path_fields:
-            current_value = node_config.get(field_name, defaults.get(field_name))
-            schema_default = defaults.get(field_name)
-
-            # Only replace if value matches schema default (not user-overridden)
-            if _is_user_override(field_name, current_value, schema_default):
-                continue
-
-            workspace_path = manager.resolve_output_path(block_type, field_name, category)
-            if workspace_path:
-                node_config[field_name] = workspace_path
-                logger.debug(
-                    "Workspace auto-fill: %s.%s → %s",
-                    block_type, field_name, workspace_path,
-                )
+    if schema_default is None:
+        return value is not None and value != ""
+    return value != schema_default
 
 
 def resolve_configs(
     nodes: list[dict],
     edges: list[dict],
-    topo_order: list[str],
-    find_block_dir_fn,  # callable(block_type) -> Path | None
-) -> dict[str, dict]:
-    """
-    Resolve config inheritance for all nodes in the pipeline.
+    exec_order: list[str],
+    workspace_config: dict | None,
+    registry: BlockRegistryService,
+) -> dict[str, tuple[dict, dict]]:
+    """Resolve config inheritance for all nodes in the pipeline.
 
     Args:
-        nodes: Pipeline node definitions (from pipeline JSON)
-        edges: Pipeline edge definitions
-        topo_order: Topologically sorted node IDs
-        find_block_dir_fn: Function to find block directory from block type
+        nodes: Pipeline node definitions (from pipeline JSON).
+        edges: Pipeline edge definitions.
+        exec_order: Topologically sorted node IDs.
+        workspace_config: Workspace-level config dict (key->value). When a key
+            matches a block's schema field, it is applied to EVERY matching
+            block (not just the first consumer). ``None`` means no workspace config.
+        registry: Block registry service for loading schema defaults and versions.
 
     Returns:
-        Dict of {node_id: resolved_config} with inherited values applied.
-        Each config may contain an ``_inherited`` key with provenance metadata
-        mapping inherited key names to ``{"from_node": ..., "value": ...}``.
-        The executor strips ``_inherited`` before passing config to blocks.
+        Dict of {node_id: (resolved_config, config_sources)}.
+        resolved_config is the final config dict for the block.
+        config_sources maps each resolved key to its origin string:
+          'block_default' | 'workspace' | 'inherited:<upstream_node_id>' | 'user'
     """
+    workspace_config = workspace_config or {}
     node_map = {n["id"]: n for n in nodes}
 
     # Build adjacency: for each node, which nodes feed INTO it?
-    incoming: dict[str, list[str]] = {nid: [] for nid in topo_order}
+    incoming: dict[str, list[str]] = {nid: [] for nid in exec_order}
     for edge in edges:
         src = edge.get("source", "")
         tgt = edge.get("target", "")
@@ -265,70 +139,57 @@ def resolve_configs(
 
     all_prop_keys = _get_all_propagation_keys()
 
-    # Phase 1: Load schema defaults and block-declared propagation keys
-    schema_defaults: dict[str, dict] = {}
+    # Phase 1: Load schema defaults and determine categories
+    schema_defaults: dict[str, dict[str, Any]] = {}
     categories: dict[str, str] = {}
-    block_prop_keys: dict[str, frozenset[str]] = {}  # per-node propagation keys from block.yaml
+    block_types: dict[str, str] = {}
 
-    for node_id in topo_order:
+    for node_id in exec_order:
         node = node_map.get(node_id)
         if not node:
             continue
-
-        # Skip visual grouping nodes — they carry no config
         if node.get("type") == "groupNode":
             continue
 
         node_data = node.get("data", {})
         block_type = node_data.get("type", "")
         category = node_data.get("category", "")
+        block_types[node_id] = block_type
         categories[node_id] = category
 
-        block_dir = None
         if block_type:
             try:
-                block_dir = find_block_dir_fn(block_type)
-            except (ValueError, OSError) as exc:
+                schema_defaults[node_id] = dict(
+                    registry.get_block_schema_defaults(block_type)
+                )
+            except Exception as exc:
                 logger.warning(
-                    "Could not locate block dir for %r (node %s): %s",
+                    "Could not load schema defaults for %r (node %s): %s",
                     block_type, node_id, exc,
                 )
-
-        if block_dir:
-            dir_str = str(block_dir)
-            schema_defaults[node_id] = dict(_load_schema_defaults(dir_str))
-            block_prop_keys[node_id] = _load_block_propagation_keys(dir_str)
+                schema_defaults[node_id] = {}
         else:
             schema_defaults[node_id] = {}
-            block_prop_keys[node_id] = frozenset()
 
-    # Phase 1.5: Inject workspace defaults for file_path fields
-    _inject_workspace_defaults(topo_order, node_map, schema_defaults, categories, find_block_dir_fn)
-
-    # Phase 2: Walk DAG in topo order, propagating values
-    resolved: dict[str, dict] = {}
-    # Track which values are available for propagation at each node
+    # Phase 2: Walk DAG in topo order, resolving configs with full precedence
+    resolved: dict[str, tuple[dict, dict]] = {}
     propagation_pool: dict[str, dict[str, Any]] = {}
 
-    for node_id in topo_order:
+    for node_id in exec_order:
         node = node_map.get(node_id)
         if not node:
             continue
-
-        # Skip visual grouping nodes
         if node.get("type") == "groupNode":
             continue
 
         node_data = node.get("data", {})
-        node_config = dict(node_data.get("config", {}))
+        user_config = dict(node_data.get("config", {}))
         category = categories.get(node_id, "")
         defaults = schema_defaults.get(node_id, {})
-        # Merge hardcoded propagation keys with block.yaml-declared keys
-        prop_keys = _get_propagation_keys(category) | block_prop_keys.get(node_id, frozenset())
+        prop_keys = _get_propagation_keys(category)
 
         # Collect propagated values from all upstream nodes
         upstream_values: dict[str, Any] = {}
-        # Track which parent provided each key (for provenance)
         upstream_sources: dict[str, str] = {}
         for parent_id in incoming.get(node_id, []):
             parent_pool = propagation_pool.get(parent_id, {})
@@ -337,35 +198,129 @@ def resolve_configs(
                     upstream_values[key] = value
                     upstream_sources[key] = parent_id
 
-        # Apply inheritance: only for keys this node accepts AND hasn't overridden
-        for key in prop_keys:
-            if key in upstream_values and key in defaults:
-                # This block has this config key in its schema
-                current_value = node_config.get(key, defaults.get(key))
-                if not _is_user_override(key, current_value, defaults.get(key)):
-                    # Not overridden by user → inherit upstream value
-                    node_config[key] = upstream_values[key]
+        # Build resolved config and sources with precedence:
+        # user > workspace > inherited > block_default
+        resolved_config: dict[str, Any] = {}
+        config_sources: dict[str, str] = {}
 
-                    # Provenance tracking
-                    if "_inherited" not in node_config:
-                        node_config["_inherited"] = {}
-                    node_config["_inherited"][key] = {
-                        "from_node": upstream_sources[key],
-                        "value": upstream_values[key],
-                    }
+        # Start with all keys from schema defaults
+        all_keys = set(defaults.keys())
+        all_keys.update(user_config.keys())
+        all_keys.update(
+            k for k in workspace_config if k in defaults
+        )
+        all_keys.update(
+            k for k in upstream_values if k in defaults and k in prop_keys
+        )
 
-        resolved[node_id] = node_config
+        for key in all_keys:
+            has_user_value = key in user_config
+            user_value = user_config.get(key)
+            has_default = key in defaults
+            default_value = defaults.get(key)
 
-        # Build propagation pool for this node's downstream.
+            # Check if user explicitly set this value (differs from default)
+            if has_user_value and (
+                not has_default or _is_user_override(key, user_value, default_value)
+            ):
+                resolved_config[key] = user_value
+                config_sources[key] = "user"
+            elif key in workspace_config and has_default:
+                # Workspace config applies to every block that has this key in schema
+                resolved_config[key] = workspace_config[key]
+                config_sources[key] = "workspace"
+            elif key in upstream_values and has_default and key in prop_keys:
+                # Inherited from upstream
+                resolved_config[key] = upstream_values[key]
+                config_sources[key] = f"inherited:{upstream_sources[key]}"
+            elif has_default:
+                resolved_config[key] = default_value
+                config_sources[key] = "block_default"
+            elif has_user_value:
+                # User set a key not in schema — pass through
+                resolved_config[key] = user_value
+                config_sources[key] = "user"
+
+        resolved[node_id] = (resolved_config, config_sources)
+
+        # Build propagation pool for downstream nodes.
         # Pool starts from upstream values (so values flow through any category),
         # then merges in this node's own propagatable values.
-        # We use all_prop_keys + block-declared keys so that e.g. system_prompt
-        # flows through a data block to reach a downstream inference block.
         pool = dict(upstream_values)
-        pool_keys = all_prop_keys | block_prop_keys.get(node_id, frozenset())
+        pool_keys = all_prop_keys
         for key in pool_keys:
-            if key in node_config and node_config[key] is not None and node_config[key] != "":
-                pool[key] = node_config[key]
+            val = resolved_config.get(key)
+            if val is not None and val != "":
+                pool[key] = val
         propagation_pool[node_id] = pool
 
     return resolved
+
+
+def inject_workspace_file_paths(
+    resolved: dict[str, tuple[dict, dict]],
+    nodes: list[dict],
+    registry: BlockRegistryService,
+) -> None:
+    """Replace schema-default file_path values with workspace absolute paths.
+
+    This is a **post-resolution** phase that runs AFTER ``resolve_configs``.
+    It only touches values whose source is ``'block_default'`` — user overrides,
+    workspace config, and inherited values are never replaced.
+
+    Mutates ``resolved`` in place. If the workspace is not configured or
+    auto_fill_paths is disabled, this is a no-op.
+
+    Args:
+        resolved: Output of ``resolve_configs`` — mutated in place.
+        nodes: Pipeline node definitions (for extracting block types/categories).
+        registry: Block registry service for looking up file_path fields.
+    """
+    root_path, auto_fill = _get_workspace_settings()
+    if not root_path or not auto_fill:
+        return
+
+    try:
+        from ..services.workspace_manager import WorkspaceManager
+    except ImportError:
+        logger.warning("WorkspaceManager not available; skipping file_path auto-fill")
+        return
+
+    manager = WorkspaceManager(root_path)
+    node_map = {n["id"]: n for n in nodes}
+
+    for node_id, (resolved_config, config_sources) in resolved.items():
+        node = node_map.get(node_id)
+        if not node:
+            continue
+
+        node_data = node.get("data", {})
+        block_type = node_data.get("type", "")
+        category = node_data.get("category", "")
+
+        if not block_type:
+            continue
+
+        try:
+            file_path_fields = registry.get_file_path_fields(block_type)
+        except Exception:
+            continue
+
+        if not file_path_fields:
+            continue
+
+        for field_name in file_path_fields:
+            # Only auto-fill if the current value came from schema defaults
+            if config_sources.get(field_name) != "block_default":
+                continue
+
+            workspace_path = manager.resolve_output_path(
+                block_type, field_name, category,
+            )
+            if workspace_path:
+                resolved_config[field_name] = workspace_path
+                config_sources[field_name] = "workspace_auto_fill"
+                logger.debug(
+                    "Workspace auto-fill: %s.%s → %s",
+                    block_type, field_name, workspace_path,
+                )
