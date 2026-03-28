@@ -14,10 +14,11 @@ import BackendValidationPanel from '@/components/Validation/ValidationPanel'
 import PipelineTabBar from '@/components/Pipeline/PipelineTabBar'
 import { validatePipelineClient, type DiagnosticReport } from '@/lib/pipeline-validator'
 import PipelineMonitor, { type MonitorBlock } from '@/components/Pipeline/PipelineMonitor'
-import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp, AlertCircle, WifiOff } from 'lucide-react'
+import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp, AlertCircle, WifiOff, History } from 'lucide-react'
 import TemplateGallery from '@/components/Pipeline/TemplateGallery'
 import ToolbarDropdown from '@/components/Pipeline/ToolbarDropdown'
 import MissionController from '@/components/Mission/MissionController'
+import VersionHistory from '@/components/Versions/VersionHistory'
 import { useRunStore } from '@/stores/runStore'
 import { useValidationStore } from '@/stores/validationStore'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -85,6 +86,7 @@ export default function PipelineEditorView() {
   const [validationReport, setValidationReport] = useState<DiagnosticReport | null>(null)
   const [validating, setValidating] = useState(false)
   const [showMonitor, setShowMonitor] = useState(false)
+  const [showVersions, setShowVersions] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Run monitor state from store — SSE is handled exclusively by RunControls
@@ -418,7 +420,7 @@ export default function PipelineEditorView() {
               separator: true,
             },
             {
-              label: 'Export JSON',
+              label: 'Export .blueprint',
               icon: <FileDown size={12} />,
               onClick: exportPipeline,
             },
@@ -501,6 +503,21 @@ export default function PipelineEditorView() {
           style={{ display: 'none' }}
           onChange={handleFileChange}
         />
+
+        {/* Versions */}
+        <button
+          onClick={() => setShowVersions(!showVersions)}
+          style={{
+            ...btnStyle,
+            color: showVersions ? T.cyan : T.dim,
+            border: showVersions ? `1px solid ${T.cyan}50` : `1px solid ${T.border}`,
+            background: showVersions ? `${T.cyan}10` : 'transparent',
+          }}
+          title="Version History"
+        >
+          <History size={10} />
+          VERSIONS
+        </button>
 
         {/* Save */}
         <button
@@ -620,6 +637,23 @@ export default function PipelineEditorView() {
           logs={runLogs}
           onClose={() => setShowMonitor(false)}
         />
+
+        {/* Version history side panel */}
+        {showVersions && (
+          <div style={{
+            width: 320,
+            minWidth: 320,
+            borderLeft: `1px solid ${T.border}`,
+            background: T.bgAlt,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            <ReactFlowProvider>
+              <VersionHistory />
+            </ReactFlowProvider>
+          </div>
+        )}
       </div>
 
       {/* Template selector: show on button click */}

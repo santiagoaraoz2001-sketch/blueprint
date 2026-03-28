@@ -21,6 +21,7 @@ import {
   PanelLeftOpen,
   Home,
   Activity,
+  Package,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -41,6 +42,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'marketplace',   label: 'Blocks',    icon: Blocks,          group: 'build'   },
   { id: 'monitor',       label: 'Mission',   icon: Activity,        group: 'run'     },
   { id: 'output',        label: 'Outputs',   icon: Terminal,        group: 'run'     },
+  { id: 'models',        label: 'Models',    icon: Package,         group: 'run'     },
   { id: 'results',       label: 'Results',   icon: BarChart3,       group: 'analyze' },
   { id: 'data',          label: 'Data Grid', icon: Table2,          group: 'analyze' },
   { id: 'visualization', label: 'Charts',    icon: LineChart,       group: 'analyze' },

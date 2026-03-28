@@ -26,6 +26,7 @@ const viewLabels: Record<string, string> = {
   data:          'DATA GRID',
   visualization: 'CHARTS',
   workshop:      'WORKSHOP',
+  models:        'MODEL REGISTRY',
 }
 
 export default function TopBar() {

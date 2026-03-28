@@ -1045,7 +1045,25 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
   },
 
   exportPipeline: () => {
-    const { name, nodes, edges } = get()
+    const { id, name, nodes, edges } = get()
+    // Use deterministic .blueprint.json export if pipeline is saved
+    if (id) {
+      api.get<Record<string, unknown>>(`/pipelines/${id}/export-blueprint`)
+        .then((blueprint) => {
+          const data = JSON.stringify(blueprint, null, 2)
+          const blob = new Blob([data], { type: 'application/json' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `${name.replace(/\s+/g, '_').toLowerCase()}.blueprint.json`
+          a.click()
+          URL.revokeObjectURL(url)
+          toast.success('Pipeline exported as .blueprint.json')
+        })
+        .catch(() => toast.error('Export failed'))
+      return
+    }
+    // Fallback for unsaved pipelines
     const data = JSON.stringify({ name, nodes, edges }, null, 2)
     const blob = new Blob([data], { type: 'application/json' })
     const url = URL.createObjectURL(blob)

@@ -1,3 +1,4 @@
+import json
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -6,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.pipeline import Pipeline
 from ..schemas.pipeline import PipelineCreate, PipelineUpdate, PipelineResponse
+from .pipeline_versions import create_version_for_pipeline
 
 router = APIRouter(prefix="/api/pipelines", tags=["pipelines"])
 
@@ -42,6 +44,11 @@ def update_pipeline(pipeline_id: str, data: PipelineUpdate, db: Session = Depend
         raise HTTPException(404, "Pipeline not found")
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(pipeline, key, value)
+
+    # Auto-save a version snapshot on every explicit Save
+    definition = pipeline.definition or {}
+    create_version_for_pipeline(db, pipeline_id, definition, message="Auto-save")
+
     db.commit()
     db.refresh(pipeline)
     return pipeline

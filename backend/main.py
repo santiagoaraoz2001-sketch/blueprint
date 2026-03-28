@@ -22,9 +22,9 @@ from .services.registry import BlockRegistryService, set_global_registry
 from .models.run import LiveRun, Run
 from .routers import (
     artifacts, block_generator, blocks, connectors, control_tower, custom_blocks,
-    datasets, events, execution, inference, marketplace, models, outputs,
-    papers, pipelines, plugins, projects, registry, runs, secrets, sweeps,
-    system, workspace,
+    datasets, events, execution, inference, marketplace, models, model_registry,
+    outputs, papers, pipelines, pipeline_versions, plugins, projects, registry,
+    runs, secrets, sweeps, system, workspace,
 )
 from .utils.structured_logger import init_structured_logging, log_event, log_recovery
 
@@ -272,6 +272,8 @@ app.include_router(outputs.router)
 app.include_router(workspace.router)
 app.include_router(artifacts.router)
 app.include_router(registry.router)
+app.include_router(pipeline_versions.router)
+app.include_router(model_registry.router)
 if ENABLE_MARKETPLACE:
     app.include_router(marketplace.router)
 

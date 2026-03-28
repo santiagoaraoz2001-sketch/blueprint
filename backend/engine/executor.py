@@ -1902,6 +1902,13 @@ async def execute_pipeline(
         except Exception:
             pass
 
+        # Auto-register models produced by training/merge blocks (never crashes execution)
+        try:
+            from ..services.model_auto_register import auto_register_models
+            auto_register_models(run_id, nodes, outputs, all_metrics, db)
+        except Exception:
+            pass
+
         try:
             publish_event(run_id, "run_completed", {
                 "run_id": run_id,

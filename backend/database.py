@@ -77,7 +77,7 @@ def init_db():
       which could silently create an inconsistent schema.
     """
     # Import all models so they register with Base.metadata
-    from .models import project, experiment, experiment_phase, pipeline, run, dataset, artifact, paper, sweep, workspace  # noqa: F401
+    from .models import project, experiment, experiment_phase, pipeline, pipeline_version, run, dataset, artifact, paper, sweep, workspace, model_record  # noqa: F401
 
     has_tables = _db_has_tables()
 
