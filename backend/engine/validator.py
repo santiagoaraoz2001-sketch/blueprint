@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .block_registry import is_known_block, get_block_types, get_block_config_schema
+from .executor import _detect_loops
 from ..block_sdk.config_validator import (
     validate_and_apply_defaults,
     _validate_type,
@@ -38,24 +39,26 @@ CATEGORY_RUNTIME = {
     "endpoints": 3,
 }
 
-# Port type compatibility matrix (mirrors frontend isPortCompatible in block-registry-types.ts)
-# SOURCE → CAN CONNECT TO
-# Must be kept in sync with the frontend COMPAT map.
-COMPAT = {
-    # Identity
-    ("dataset", "dataset"), ("text", "text"), ("model", "model"),
-    ("config", "config"), ("metrics", "metrics"), ("embedding", "embedding"),
-    ("artifact", "artifact"), ("agent", "agent"), ("any", "any"),
-    # Cross-type coercions (from frontend COMPAT map)
-    ("dataset", "text"),
-    ("text", "dataset"), ("text", "config"),
-    ("config", "text"),
-    ("metrics", "dataset"), ("metrics", "text"),
-    ("embedding", "dataset"),
-    ("artifact", "text"),
+# Port type compatibility matrix.
+# AUTHORITATIVE SOURCE: frontend/src/lib/block-registry-types.ts COMPAT (line 123).
+# This dict MUST be kept in exact sync with the frontend.
+# SOURCE → set of CAN-CONNECT-TO types.
+COMPAT: dict[str, set[str]] = {
+    "dataset":   {"dataset", "text", "any"},
+    "text":      {"text", "dataset", "any"},
+    "model":     {"model", "llm", "any"},
+    "config":    {"config", "text", "llm", "any"},
+    "metrics":   {"metrics", "dataset", "text", "any"},
+    "embedding": {"embedding", "dataset", "any"},
+    "artifact":  {"artifact", "text", "any"},
+    "agent":     {"agent", "any"},
+    "llm":       {"llm", "model", "config", "any"},
+    "any":       {"any", "dataset", "text", "model", "config", "metrics",
+                  "embedding", "artifact", "agent", "llm"},
 }
 
-# Backward-compat aliases for legacy port type names
+# Backward-compat aliases for legacy port type names.
+# AUTHORITATIVE SOURCE: frontend/src/lib/block-registry-types.ts PORT_TYPE_ALIASES.
 _PORT_TYPE_ALIASES: dict[str, str] = {
     "data": "dataset",
     "external": "dataset",
@@ -67,6 +70,7 @@ _PORT_TYPE_ALIASES: dict[str, str] = {
     "api": "dataset",
     "file": "dataset",
     "cloud": "config",
+    "llm_config": "llm",
 }
 
 
@@ -76,11 +80,10 @@ def _resolve_port_type(port_type: str) -> str:
 
 
 def _port_compatible(src_type: str, tgt_type: str) -> bool:
+    """Check if source port type can connect to target port type."""
     src = _resolve_port_type(src_type)
     tgt = _resolve_port_type(tgt_type)
-    if src == "any" or tgt == "any":
-        return True
-    return (src, tgt) in COMPAT
+    return tgt in COMPAT.get(src, set())
 
 # Critical config fields that must be set for specific block types
 CRITICAL_CONFIG_FIELDS = {
@@ -135,47 +138,36 @@ def validate_pipeline(definition: dict) -> ValidationReport:
             node_label = node.get("data", {}).get("label", node.get("id", "?"))
             report.warnings.append(f"Block '{node_label}' uses unknown type '{block_type}' — it may not have a run.py implementation")
 
-    # ── 2. Check for cycles (DFS) ──
-    # Build adjacency only for executable nodes (skip groupNode, stickyNote)
+    # ── 2. Check for cycles / legal loops ──
+    # Use _detect_loops() which distinguishes legal single-controller loops
+    # from illegal cycles. Legal loops are reported as warnings, not errors.
     visual_types = {"groupNode", "stickyNote"}
-    exec_node_ids = {nid for nid, n in node_map.items() if n.get("type") not in visual_types}
+    exec_nodes = [n for n in nodes if n.get("type") not in visual_types]
+    exec_node_ids = {n.get("id") for n in exec_nodes}
+    exec_edges = [
+        e for e in edges
+        if e.get("source") in exec_node_ids and e.get("target") in exec_node_ids
+    ]
 
-    adjacency: dict[str, list[str]] = {nid: [] for nid in exec_node_ids}
-    for edge in edges:
-        src = edge.get("source", "")
-        tgt = edge.get("target", "")
-        if src in adjacency and tgt in exec_node_ids:
-            adjacency[src].append(tgt)
-
-    # DFS cycle detection (iterative to avoid stack overflow on large pipelines)
-    WHITE, GRAY, BLACK = 0, 1, 2
-    color = {nid: WHITE for nid in exec_node_ids}
-    has_cycle = False
-
-    for start in exec_node_ids:
-        if color[start] != WHITE:
-            continue
-        stack = [(start, iter(adjacency.get(start, [])))]
-        color[start] = GRAY
-
-        while stack:
-            node_id, children = stack[-1]
-            try:
-                child = next(children)
-                if color.get(child) == GRAY:
-                    has_cycle = True
-                    break
-                if color.get(child) == WHITE:
-                    color[child] = GRAY
-                    stack.append((child, iter(adjacency.get(child, []))))
-            except StopIteration:
-                color[node_id] = BLACK
-                stack.pop()
-
-        if has_cycle:
-            report.errors.append("Pipeline contains a cycle — blocks cannot have circular dependencies")
-            report.valid = False
-            break
+    try:
+        detected_loops = _detect_loops(exec_nodes, exec_edges)
+        if detected_loops:
+            loop_parts = []
+            for lp in detected_loops:
+                ctrl_label = node_map.get(lp.controller_id, {}).get(
+                    "data", {}
+                ).get("label", lp.controller_id)
+                loop_parts.append(
+                    f"'{ctrl_label}' ({len(lp.body_node_ids)} body block"
+                    f"{'s' if len(lp.body_node_ids) != 1 else ''})"
+                )
+            report.warnings.append(
+                f"Pipeline contains {len(detected_loops)} loop(s): "
+                + ", ".join(loop_parts)
+            )
+    except ValueError as exc:
+        report.errors.append(str(exc))
+        report.valid = False
 
     # ── 3. Check disconnected nodes & required ports ──
     connected_target_handles = set()

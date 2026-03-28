@@ -1,0 +1,67 @@
+{
+  "name": "illegal_cycle",
+  "description": "A→B→C→A cycle with no loop controller. Must be rejected.",
+  "nodes": [
+    {
+      "id": "node_a",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Node A",
+        "category": "data",
+        "config": {"text": "hello"},
+        "inputs": [{"id": "text", "dataType": "text", "required": false}],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "node_b",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "Node B",
+        "category": "inference",
+        "config": {"model_name": "test-model"},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "response", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "node_c",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "Node C",
+        "category": "inference",
+        "config": {"model_name": "test-model"},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "response", "dataType": "text"}]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "node_a", "target": "node_b", "sourceHandle": "text", "targetHandle": "text"},
+    {"id": "e2", "source": "node_b", "target": "node_c", "sourceHandle": "response", "targetHandle": "text"},
+    {"id": "e3", "source": "node_c", "target": "node_a", "sourceHandle": "response", "targetHandle": "text"}
+  ],
+  "expected": {
+    "validation": {
+      "valid": false,
+      "has_cycle": true,
+      "error_code": "E_UNCONTROLLED_CYCLE"
+    },
+    "topological_order": "incomplete — cycle nodes are dropped by Kahn's algorithm",
+    "loop_detection": {
+      "should_raise": true,
+      "error": "ValueError: cycle without loop_controller"
+    },
+    "compiler": {
+      "should_generate": false,
+      "note": "Compiler uses _topological_sort which silently drops cyclic nodes — generates incomplete code"
+    },
+    "partial_rerun": {
+      "safe": false,
+      "note": "Partial executor uses _topological_sort — would silently drop cyclic nodes"
+    }
+  }
+}

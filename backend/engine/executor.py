@@ -81,6 +81,7 @@ from ..block_sdk.exceptions import BlockError, BlockInputError, BlockConfigError
 from .composite import CompositeBlockContext, execute_sub_pipeline
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
+from ..utils.redact import scrub_traceback
 from .block_registry import resolve_output_handle
 from .schema_validator import load_block_schema, validate_inputs, validate_config
 from ..utils.structured_logger import (
@@ -239,6 +240,22 @@ def _detect_loops(
                     stack_b.append(nb)
         sccs.append(component)
 
+    # ── Step 2b: Filter stuck-downstream nodes ──
+    # Kahn's residual includes nodes whose in-degree never reached 0 because
+    # a cyclic predecessor was never processed — but they may NOT be in any
+    # actual cycle. Kosaraju correctly places them in single-node SCCs.
+    # A single-node SCC with no self-loop edge is NOT a real cycle — discard it.
+    def _has_self_loop(nid: str) -> bool:
+        return any(
+            e.get("source") == nid and e.get("target") == nid
+            for e in edges
+        )
+
+    sccs = [scc for scc in sccs if len(scc) > 1 or _has_self_loop(scc[0])]
+
+    if not sccs:
+        return []
+
     # ── Step 3: Validate each SCC and build LoopDefinitions ──
     def _is_loop_controller(nid: str) -> bool:
         n = node_map.get(nid, {})
@@ -248,10 +265,16 @@ def _detect_loops(
     for scc in sccs:
         controllers = [n for n in scc if _is_loop_controller(n)]
         if len(controllers) != 1:
-            raise ValueError(
-                "Pipeline contains a cycle that doesn't pass through "
-                "a Loop Controller block."
-            )
+            if len(controllers) == 0:
+                raise ValueError(
+                    "Pipeline contains a cycle that doesn't pass through "
+                    "a Loop Controller block."
+                )
+            else:
+                raise ValueError(
+                    f"Pipeline cycle contains {len(controllers)} Loop Controller "
+                    f"blocks; exactly 1 is required per cycle."
+                )
 
         controller_id = controllers[0]
         body_nodes_set = set(scc) - {controller_id}
@@ -793,6 +816,10 @@ async def _execute_loop(
         block_schema = load_block_schema(block_dir)
         timeout_seconds = block_schema.get("timeout") if block_schema else None
         is_composite = block_schema.get("composite", False) if block_schema else False
+
+        # Embed block version into config_snapshot for cache validation
+        if block_schema and block_schema.get("version"):
+            body_data["block_version"] = block_schema["version"]
 
         # Validate config once (static across iterations)
         if block_schema:
@@ -1395,7 +1422,7 @@ async def execute_pipeline(
                     except Exception:
                         pass
                     run.status = "failed"
-                    run.error_message = f"Loop {block_type} failed: {str(e)}\n\n{tb}"
+                    run.error_message = scrub_traceback(f"Loop {block_type} failed: {str(e)}\n\n{tb}")
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     run.data_fingerprints = all_fingerprints
                     live.status = "failed"
@@ -1531,6 +1558,10 @@ async def execute_pipeline(
                 max_retries = block_schema.get("max_retries", 0) if block_schema else 0
                 is_composite = block_schema.get("composite", False) if block_schema else False
 
+                # --- Embed block version into config_snapshot for cache validation ---
+                if block_schema and block_schema.get("version"):
+                    node_data["block_version"] = block_schema["version"]
+
                 # --- Pre-execution validation ---
                 if block_schema:
                     validate_inputs(block_schema, node_inputs)
@@ -1616,7 +1647,7 @@ async def execute_pipeline(
                     except Exception:
                         pass
                     run.status = "failed"
-                    run.error_message = f"Block {block_type} failed: {str(e)}\n\n{tb}"
+                    run.error_message = scrub_traceback(f"Block {block_type} failed: {str(e)}\n\n{tb}")
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     run.data_fingerprints = all_fingerprints
                     live.status = "failed"
@@ -1734,7 +1765,7 @@ async def execute_pipeline(
     except Exception as e:
         tb = traceback.format_exc()
         run.status = "failed"
-        run.error_message = f"{str(e)}\n\n{tb}"
+        run.error_message = scrub_traceback(f"{str(e)}\n\n{tb}")
         run.finished_at = datetime.now(timezone.utc)
         run.duration_seconds = time.time() - start_time
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
@@ -1791,6 +1822,6 @@ def _write_error_log(run_id: str, tb: str):
     try:
         error_dir = ARTIFACTS_DIR / run_id
         error_dir.mkdir(parents=True, exist_ok=True)
-        (error_dir / "error.log").write_text(tb)
+        (error_dir / "error.log").write_text(scrub_traceback(tb))
     except Exception:
         pass

@@ -1,0 +1,26 @@
+{
+  "fixture_name": "illegal_cycle",
+  "loop_detection": {
+    "legal_loops": [],
+    "illegal_cycle": true
+  },
+  "edge_compatibility": {
+    "e1": {
+      "source": "text",
+      "target": "text",
+      "compatible": true
+    },
+    "e2": {
+      "source": "text",
+      "target": "text",
+      "compatible": true
+    },
+    "e3": {
+      "source": "text",
+      "target": "text",
+      "compatible": true
+    }
+  },
+  "node_count": 3,
+  "edge_count": 3
+}

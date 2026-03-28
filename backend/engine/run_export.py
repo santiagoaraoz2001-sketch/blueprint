@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import ARTIFACTS_DIR
+from ..utils.redact import redact_config
 
 EXPORT_SCHEMA_VERSION = "1.0.0"
 
@@ -111,7 +112,7 @@ def generate_run_export(run, artifacts_dir: Path | None = None) -> dict:
             "duration_seconds": run.duration_seconds,
         },
         "pipeline": _extract_pipeline_metadata(run.config_snapshot),
-        "config": run.config_snapshot or {},
+        "config": redact_config(run.config_snapshot or {}),
         "metrics": {
             "summary": run.metrics or {},
             "timeseries": run.metrics_log or [],
