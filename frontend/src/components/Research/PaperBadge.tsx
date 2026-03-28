@@ -1,13 +1,13 @@
-import { F, FS } from '@/lib/design-tokens'
+import { T, F, FS } from '@/lib/design-tokens'
 
 const PAPER_STATUS_COLORS: Record<string, string> = {
-  planned: '#64748B',
-  queued: '#8B5CF6',
-  active: '#00BFA5',
-  blocked: '#F59E0B',
-  analyzing: '#3B82F6',
-  writing: '#6366F1',
-  complete: '#10B981',
+  planned: T.dim,
+  queued: T.purple,
+  active: T.cyan,
+  blocked: T.amber,
+  analyzing: T.blue,
+  writing: T.purple,
+  complete: T.green,
 }
 
 interface PaperBadgeProps {

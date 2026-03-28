@@ -11,7 +11,7 @@ from ..database import get_db
 from ..models.run import Run
 from ..models.pipeline import Pipeline
 from ..models.experiment_phase import ExperimentPhase
-from ..schemas.run import RunResponse
+from ..schemas.run import RunResponse, RunMetadataUpdate
 from ..schemas.pipeline import PipelineResponse
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
@@ -38,6 +38,8 @@ def list_runs(
     pipeline_id: str | None = None,
     project_id: str | None = None,
     status: str | None = None,
+    tag: str | None = None,
+    starred: bool | None = None,
     limit: int = 50,
     db: Session = Depends(get_db),
 ):
@@ -48,6 +50,10 @@ def list_runs(
         q = q.filter(Run.project_id == project_id)
     if status:
         q = q.filter(Run.status == status)
+    if tag:
+        q = q.filter(Run.tags.contains(tag))
+    if starred is not None:
+        q = q.filter(Run.starred == starred)
     return q.order_by(Run.started_at.desc()).limit(limit).all()
 
 
@@ -185,6 +191,19 @@ def get_run(run_id: str, db: Session = Depends(get_db)):
     run = db.query(Run).filter(Run.id == run_id).first()
     if not run:
         raise HTTPException(404, "Run not found")
+    return run
+
+
+@router.put("/{run_id}/metadata", response_model=RunResponse)
+def update_run_metadata(run_id: str, data: RunMetadataUpdate, db: Session = Depends(get_db)):
+    """Update run notes, tags, and/or starred status."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(run, key, value)
+    db.commit()
+    db.refresh(run)
     return run
 
 
@@ -427,3 +446,81 @@ def clone_pipeline_from_run(run_id: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_pipeline)
     return new_pipeline
+
+
+@router.get("/{run_id}/decisions")
+def get_execution_decisions(run_id: str, db: Session = Depends(get_db)):
+    """Return execution decisions for a run, ordered by timestamp."""
+    from ..models.execution_decision import ExecutionDecision
+
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    decisions = (
+        db.query(ExecutionDecision)
+        .filter(ExecutionDecision.run_id == run_id)
+        .order_by(ExecutionDecision.timestamp.asc())
+        .all()
+    )
+
+    # Build a node label lookup from the pipeline definition
+    node_labels: dict[str, str] = {}
+    if run.config_snapshot:
+        for n in run.config_snapshot.get("nodes", []):
+            node_labels[n["id"]] = n.get("data", {}).get("label", n["id"])
+
+    return [
+        {
+            "id": d.id,
+            "run_id": d.run_id,
+            "node_id": d.node_id,
+            "node_label": node_labels.get(d.node_id, d.node_id),
+            "decision": d.decision,
+            "reason": d.reason,
+            "cache_fingerprint": d.cache_fingerprint,
+            "plan_hash": d.plan_hash,
+            "timestamp": d.timestamp.isoformat() if d.timestamp else None,
+        }
+        for d in decisions
+    ]
+
+
+@router.delete("/{run_id}/decisions", status_code=200)
+def delete_run_decisions(run_id: str, db: Session = Depends(get_db)):
+    """Delete all execution decisions for a specific run.
+
+    Use for manual cleanup of decision logs for individual runs.
+    """
+    from ..models.execution_decision import ExecutionDecision
+
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+
+    result = db.query(ExecutionDecision).filter(
+        ExecutionDecision.run_id == run_id,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": result, "run_id": run_id}
+
+
+@router.get("/decisions/stats")
+def get_decision_stats(db: Session = Depends(get_db)):
+    """Return statistics about the decision log.
+
+    Includes total records, distinct runs, date range, and retention settings.
+    """
+    from ..services.decision_cleanup import get_decision_stats as _get_stats
+    return _get_stats(db)
+
+
+@router.post("/decisions/cleanup")
+def trigger_decision_cleanup(db: Session = Depends(get_db)):
+    """Manually trigger decision log cleanup.
+
+    Deletes decisions for runs older than the retention threshold
+    (default: 30 days), while always retaining the most recent N runs.
+    """
+    from ..services.decision_cleanup import cleanup_old_decisions
+    return cleanup_old_decisions(db)

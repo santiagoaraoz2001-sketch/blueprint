@@ -50,6 +50,8 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div
+          role="alert"
+          aria-live="assertive"
           style={{
             height: '100%',
             display: 'flex',
@@ -136,6 +138,8 @@ export default class ErrorBoundary extends Component<Props, State> {
             <>
               <button
                 onClick={this.toggleDetails}
+                aria-expanded={this.state.showDetails}
+                aria-label="Toggle error details"
                 style={{
                   display: 'flex',
                   alignItems: 'center',

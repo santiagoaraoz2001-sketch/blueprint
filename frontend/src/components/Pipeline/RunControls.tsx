@@ -11,7 +11,7 @@ import ToolbarDropdown from './ToolbarDropdown'
 import toast from 'react-hot-toast'
 import PipelineAnalysisPanel from './PipelineAnalysisPanel'
 import DryRunModal from './DryRunModal'
-import { getBlockDefinition } from '@/lib/block-registry'
+import ExportPreflightPanel from './ExportPreflightPanel'
 import { generateRequirements } from '@/lib/block-dependencies'
 import { isPipelineExportable, exportDisabledReason } from '@/lib/graph-utils'
 import Editor from '@monaco-editor/react'
@@ -27,12 +27,13 @@ export default function RunControls() {
   const [templateDesc, setTemplateDesc] = useState('')
   const [templateCat, setTemplateCat] = useState('inference')
 
+  // Code modal state — retained for JSX close handlers; export now handled by ExportPreflightPanel
   const [showCodeModal, setShowCodeModal] = useState(false)
-  const [generatedCode, setGeneratedCode] = useState('')
+  const [generatedCode, /* setGeneratedCode */] = useState('')
   const [codeCopied, setCodeCopied] = useState(false)
   const [showAnalysis, setShowAnalysis] = useState(false)
   const [showDryRun, setShowDryRun] = useState(false)
-  const [dryRunCacheKey, setDryRunCacheKey] = useState('')
+  const [showExportPreflight, setShowExportPreflight] = useState(false)
 
   const isRunning = status === 'running'
   const isStarting = useRunStore((s) => s.isStarting)
@@ -68,19 +69,11 @@ export default function RunControls() {
     return labels
   }, [nodes])
 
-  // Invalidate dry-run cache when pipeline changes
-  useEffect(() => {
-    setDryRunCacheKey('')
-  }, [nodes, edges])
-
   const handleDryRun = async () => {
     if (!pipelineId) {
       toast.error('Save pipeline first')
       return
     }
-    // Bust cache if pipeline changed
-    const key = `${pipelineId}-${nodes.length}-${edges.length}`
-    setDryRunCacheKey(key)
     setShowDryRun(true)
   }
 
@@ -174,57 +167,8 @@ export default function RunControls() {
       return
     }
 
-    // Pre-eject validation
-    const warnings: string[] = []
-    const errors: string[] = []
-    const { edges } = usePipelineStore.getState()
-
-    for (const node of nodes) {
-      const def = getBlockDefinition(node.data.type)
-      if (!def) continue
-
-      // Check required inputs are connected
-      for (const input of def.inputs) {
-        if (input.required) {
-          const hasConnection = edges.some(
-            (e) => e.target === node.id && e.targetHandle === input.id,
-          )
-          if (!hasConnection) {
-            errors.push(`${node.data.label}: missing required input "${input.label}"`)
-          }
-        }
-      }
-
-      // Check empty config fields that have no default
-      for (const field of def.configFields) {
-        if (field.default === undefined || field.default === '') {
-          const val = node.data.config?.[field.name]
-          if (val === '' || val === undefined || val === null) {
-            warnings.push(`${node.data.label}: empty config "${field.label || field.name}"`)
-          }
-        }
-      }
-    }
-
-    if (errors.length > 0) {
-      errors.forEach((e) => toast.error(e, { duration: 5000 }))
-      return
-    }
-    if (warnings.length > 0) {
-      warnings.slice(0, 3).forEach((w) => toast(w, { icon: '⚠️', duration: 4000 }))
-    }
-
-    try {
-      const baseUrl = import.meta.env.VITE_API_URL || '/api'
-      const res = await fetch(`${baseUrl}/pipelines/${pipelineId}/compile`)
-      if (!res.ok) throw new Error('Failed to compile pipeline')
-      const code = await res.text()
-      setGeneratedCode(code)
-      setCodeCopied(false)
-      setShowCodeModal(true)
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to eject pipeline')
-    }
+    // Open the pre-flight check panel — export happens from there
+    setShowExportPreflight(true)
   }
 
   const handleDownloadRequirements = () => {
@@ -283,7 +227,7 @@ export default function RunControls() {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div data-testid="run-controls" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       {isRunning && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 4 }}>
           {/* Progress bar */}
@@ -374,6 +318,7 @@ export default function RunControls() {
           </button>
           <button
             onClick={isRunDisabled ? undefined : handleRun}
+            data-testid="btn-run"
             data-tour="btn-run-pipeline"
             title={
               nodes.length === 0 ? 'Add blocks to run'
@@ -421,7 +366,7 @@ export default function RunControls() {
             items={[
               { label: 'Save as Template', icon: <LayoutTemplate size={12} color={T.blue} />, onClick: handleSaveTemplate, color: T.blue },
               { label: 'Analyze Pipeline', icon: <Gauge size={12} color={T.amber} />, onClick: () => setShowAnalysis(true), color: T.amber },
-              { label: 'Eject to Python', icon: <FileCode size={12} color={isExportDisabled ? T.dim : T.purple} />, onClick: handleEject, color: T.purple, separator: true, disabled: isExportDisabled, tooltip: exportDisabledTooltip },
+              { label: 'Export Pipeline', icon: <FileCode size={12} color={isExportDisabled ? T.dim : T.purple} />, onClick: handleEject, color: T.purple, separator: true, disabled: isExportDisabled, tooltip: exportDisabledTooltip },
             ]}
           />
         </>
@@ -553,7 +498,7 @@ export default function RunControls() {
               {useMemo(() => (
                 <Editor
                   language="python"
-                  theme="vs-dark"
+                  theme={document.documentElement.dataset.theme === 'light' ? 'vs' : 'vs-dark'}
                   value={generatedCode}
                   options={{
                     readOnly: true,
@@ -662,6 +607,15 @@ export default function RunControls() {
 
       {/* Pipeline Analysis Panel */}
       <PipelineAnalysisPanel open={showAnalysis} onClose={() => setShowAnalysis(false)} />
+
+      {/* Export Pre-flight Panel */}
+      {pipelineId && (
+        <ExportPreflightPanel
+          open={showExportPreflight}
+          onClose={() => setShowExportPreflight(false)}
+          pipelineId={pipelineId}
+        />
+      )}
 
       {/* Traceback expansion (GAP 13) */}
       {showTraceback && status === 'failed' && useRunStore.getState().error && (

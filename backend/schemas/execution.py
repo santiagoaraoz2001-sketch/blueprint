@@ -110,3 +110,36 @@ class DryRunResponse(BaseModel):
     warnings: list[str]
     per_node_estimates: dict[str, NodeEstimateResponse]
     total_estimate: TotalEstimateResponse
+
+
+# ---------------------------------------------------------------------------
+# Autofix
+# ---------------------------------------------------------------------------
+
+class AutofixPatchResponse(BaseModel):
+    """A single proposed autofix patch."""
+    patch_id: str
+    node_id: str
+    field: str
+    action: str
+    old_value: Any = None
+    new_value: Any = None
+    reason: str
+    confidence: str
+    edge_id: str | None = None
+    source_id: str | None = None
+    target_id: str | None = None
+
+
+class AutofixRequest(BaseModel):
+    """Request body for the autofix endpoint."""
+    action: str  # 'propose' | 'apply'
+    patch_ids: list[str] | None = None
+
+
+class AutofixResponse(BaseModel):
+    """Response from the autofix endpoint."""
+    patches: list[AutofixPatchResponse]
+    applied: list[str] = []
+    skipped: list[dict[str, str]] = []
+    definition: dict[str, Any] | None = None
