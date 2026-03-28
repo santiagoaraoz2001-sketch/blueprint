@@ -1,3 +1,6 @@
+> **Historical Snapshot:** This is a historical audit snapshot from March 2026.
+> For current repo facts, see [`docs/REPO_FACTS.json`](../REPO_FACTS.json).
+
 # Blueprint Session 8 — Final Validation Report
 
 **Date:** 2026-03-13

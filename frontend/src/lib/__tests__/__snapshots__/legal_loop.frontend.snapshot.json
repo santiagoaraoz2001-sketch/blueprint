@@ -1,0 +1,38 @@
+{
+  "fixture_name": "legal_loop",
+  "loop_detection": {
+    "legal_loops": [
+      {
+        "controllerId": "loop_ctrl",
+        "bodyIds": [
+          "loop_body"
+        ]
+      }
+    ],
+    "illegal_cycle": false
+  },
+  "edge_compatibility": {
+    "e1": {
+      "source": "text",
+      "target": "any",
+      "compatible": true
+    },
+    "e2": {
+      "source": "any",
+      "target": "text",
+      "compatible": true
+    },
+    "e3": {
+      "source": "text",
+      "target": "any",
+      "compatible": true
+    },
+    "e4": {
+      "source": "dataset",
+      "target": "dataset",
+      "compatible": true
+    }
+  },
+  "node_count": 4,
+  "edge_count": 4
+}

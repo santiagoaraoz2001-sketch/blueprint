@@ -1,0 +1,16 @@
+{
+  "fixture_name": "input_satisfies_config",
+  "loop_detection": {
+    "legal_loops": [],
+    "illegal_cycle": false
+  },
+  "edge_compatibility": {
+    "e1": {
+      "source": "model",
+      "target": "model",
+      "compatible": true
+    }
+  },
+  "node_count": 2,
+  "edge_count": 1
+}

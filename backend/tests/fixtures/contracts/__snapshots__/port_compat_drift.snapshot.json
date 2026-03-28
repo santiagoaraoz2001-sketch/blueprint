@@ -1,0 +1,57 @@
+{
+  "compiler": {
+    "code_length": 9293,
+    "generated": true,
+    "has_blocks": true
+  },
+  "fixture_name": "port_compat_drift",
+  "loop_aware_sort": {
+    "note": "no loops \u2014 same as simple sort",
+    "order": [
+      "text_source",
+      "model_source",
+      "config_consumer",
+      "llm_consumer"
+    ]
+  },
+  "loop_detection": {
+    "loop_count": 0,
+    "loops": []
+  },
+  "partial_rerun_safety": {
+    "has_loop_controller": false,
+    "safe_per_contract": false
+  },
+  "port_compat": {
+    "config_to_llm": true,
+    "config_to_text": true,
+    "dataset_to_text": true,
+    "llm_to_config": true,
+    "llm_to_model": true,
+    "model_to_llm": true,
+    "text_to_config": false,
+    "text_to_dataset": true
+  },
+  "topological_sort": {
+    "all_nodes_included": true,
+    "node_count": 4,
+    "order": [
+      "text_source",
+      "model_source",
+      "config_consumer",
+      "llm_consumer"
+    ]
+  },
+  "validation": {
+    "block_count": 4,
+    "edge_count": 2,
+    "error_count": 1,
+    "errors": [
+      "Incompatible connection: Cannot connect TEXT (Text Source) to CONFIG (Config Consumer)"
+    ],
+    "estimated_runtime_s": 30,
+    "valid": false,
+    "warning_count": 0,
+    "warnings": []
+  }
+}

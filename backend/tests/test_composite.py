@@ -581,105 +581,92 @@ class TestExecuteSubPipeline:
 
 
 # ---------------------------------------------------------------------------
-# debate_composite reference block — smoke test
+# multi_agent_debate reference block — smoke test
 # ---------------------------------------------------------------------------
 
-class TestDebateCompositeBlock:
-    """Test the reference debate_composite block's run() function."""
+class TestMultiAgentDebateBlock:
+    """Test the multi_agent_debate block's run() function (demo mode)."""
 
-    def test_debate_defines_sub_pipeline(self):
-        """run() should define sub-blocks and edges for each round."""
-        ctx = CompositeBlockContext(
-            run_dir="/tmp/test",
-            block_dir="/tmp/blocks/debate_composite",
-            config={"model_name": "gpt-4", "rounds": 2},
-            inputs={"input": "Should AI be regulated?"},
-        )
+    @staticmethod
+    def _load_debate_module():
         import importlib.util
         import os
 
-        block_path = os.path.join(
+        block_path = os.path.normpath(os.path.join(
             os.path.dirname(__file__), "..", "..",
-            "blocks", "agents", "debate_composite", "run.py",
-        )
-        block_path = os.path.normpath(block_path)
-
+            "blocks", "agents", "multi_agent_debate", "run.py",
+        ))
         spec = importlib.util.spec_from_file_location("debate_run", block_path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
+        return mod
 
-        mod.run(ctx)
-
-        assert ctx.has_sub_pipeline()
-        # 2 rounds × 3 blocks = 6 sub-blocks
-        assert ctx.sub_block_count == 6
-
-        pipeline = ctx.get_sub_pipeline()
-        node_ids = {n["id"] for n in pipeline["nodes"]}
-        assert "pessimist_r0" in node_ids
-        assert "optimist_r0" in node_ids
-        assert "judge_r0" in node_ids
-        assert "pessimist_r1" in node_ids
-        assert "optimist_r1" in node_ids
-        assert "judge_r1" in node_ids
-
-        # Verify edges: pessimist + optimist → judge per round
-        edge_pairs = {(e["source"], e["target"]) for e in pipeline["edges"]}
-        assert ("pessimist_r0", "judge_r0") in edge_pairs
-        assert ("optimist_r0", "judge_r0") in edge_pairs
-        assert ("pessimist_r1", "judge_r1") in edge_pairs
-        assert ("optimist_r1", "judge_r1") in edge_pairs
-        # Cross-round: judge_r0 → pessimist_r1 and optimist_r1
-        assert ("judge_r0", "pessimist_r1") in edge_pairs
-        assert ("judge_r0", "optimist_r1") in edge_pairs
-
-    def test_debate_no_topic_raises(self):
-        ctx = CompositeBlockContext(
-            run_dir="/tmp/test",
-            block_dir="/tmp/blocks/debate_composite",
-            config={"model_name": "gpt-4", "rounds": 1},
+    def test_debate_runs_demo_mode(self, tmp_path):
+        """run() should complete in demo mode and produce expected outputs."""
+        ctx = BlockContext(
+            run_dir=str(tmp_path / "run"),
+            block_dir=str(tmp_path / "block"),
+            config={"num_agents": 3, "num_rounds": 2, "seed": 42},
             inputs={},
         )
-        import importlib.util
-        import os
-        from backend.block_sdk.exceptions import BlockInputError
+        # Write a topic file so load_input("input") can find it
+        input_dir = tmp_path / "run" / "inputs"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        topic_file = input_dir / "input"
+        topic_file.write_text("Should AI be regulated?")
+        ctx._inputs["input"] = str(topic_file)
 
-        block_path = os.path.normpath(os.path.join(
-            os.path.dirname(__file__), "..", "..",
-            "blocks", "agents", "debate_composite", "run.py",
-        ))
-        spec = importlib.util.spec_from_file_location("debate_run", block_path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-
-        with pytest.raises(BlockInputError, match="No debate topic"):
-            mod.run(ctx)
-
-    def test_debate_single_round(self):
-        ctx = CompositeBlockContext(
-            run_dir="/tmp/test",
-            block_dir="/tmp/blocks/debate_composite",
-            config={"model_name": "", "rounds": 1},
-            inputs={"input": "Test topic"},
-        )
-        import importlib.util
-        import os
-
-        block_path = os.path.normpath(os.path.join(
-            os.path.dirname(__file__), "..", "..",
-            "blocks", "agents", "debate_composite", "run.py",
-        ))
-        spec = importlib.util.spec_from_file_location("debate_run", block_path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-
+        mod = self._load_debate_module()
         mod.run(ctx)
 
-        # 1 round × 3 blocks = 3 sub-blocks
-        assert ctx.sub_block_count == 3
-        pipeline = ctx.get_sub_pipeline()
-        # No cross-round edges with 1 round
-        edge_pairs = {(e["source"], e["target"]) for e in pipeline["edges"]}
-        assert ("pessimist_r0", "judge_r0") in edge_pairs
-        assert ("optimist_r0", "judge_r0") in edge_pairs
-        assert len(edge_pairs) == 2
+        assert "response" in ctx._outputs
+        assert "dataset" in ctx._outputs
+        assert "metrics" in ctx._outputs
+
+        metrics = ctx._outputs["metrics"]
+        assert metrics["num_agents"] == 3
+        assert metrics["num_rounds"] == 2
+        assert metrics["total_arguments"] == 6  # 3 agents × 2 rounds
+        assert metrics["demo_mode"] is True
+        assert 0 <= metrics["consensus_score"] <= 1
+
+    def test_debate_single_round(self, tmp_path):
+        """Single round should produce num_agents arguments."""
+        ctx = BlockContext(
+            run_dir=str(tmp_path / "run"),
+            block_dir=str(tmp_path / "block"),
+            config={"num_agents": 2, "num_rounds": 1, "seed": 42},
+            inputs={},
+        )
+        input_dir = tmp_path / "run" / "inputs"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        topic_file = input_dir / "input"
+        topic_file.write_text("Test topic")
+        ctx._inputs["input"] = str(topic_file)
+
+        mod = self._load_debate_module()
+        mod.run(ctx)
+
+        metrics = ctx._outputs["metrics"]
+        assert metrics["num_agents"] == 2
+        assert metrics["num_rounds"] == 1
+        assert metrics["total_arguments"] == 2  # 2 agents × 1 round
+
+    def test_debate_uses_config_topic_as_fallback(self, tmp_path):
+        """When no input is connected, falls back to config topic."""
+        ctx = BlockContext(
+            run_dir=str(tmp_path / "run"),
+            block_dir=str(tmp_path / "block"),
+            config={
+                "num_agents": 2,
+                "num_rounds": 1,
+                "seed": 42,
+                "topic": "Custom topic from config",
+            },
+            inputs={},
+        )
+        mod = self._load_debate_module()
+        mod.run(ctx)
+
+        assert "response" in ctx._outputs
+        assert "metrics" in ctx._outputs
