@@ -1,0 +1,66 @@
+{
+  "name": "simple_dag",
+  "description": "A→B→C linear DAG. Simplest valid pipeline.",
+  "nodes": [
+    {
+      "id": "node_a",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Text Input",
+        "category": "data",
+        "config": {"text": "hello world"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "node_b",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "LLM Inference",
+        "category": "inference",
+        "config": {"model_name": "test-model", "temperature": 0.7},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "response", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "node_c",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Data Export",
+        "category": "output",
+        "config": {"format": "json"},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "dataset", "dataType": "dataset"}]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "node_a", "target": "node_b", "sourceHandle": "text", "targetHandle": "text"},
+    {"id": "e2", "source": "node_b", "target": "node_c", "sourceHandle": "response", "targetHandle": "text"}
+  ],
+  "expected": {
+    "validation": {
+      "valid": true,
+      "error_count": 0,
+      "has_cycle": false
+    },
+    "topological_order": ["node_a", "node_b", "node_c"],
+    "loop_detection": {
+      "loop_count": 0,
+      "loops": []
+    },
+    "compiler": {
+      "should_generate": true,
+      "refusal_reason": null
+    },
+    "partial_rerun": {
+      "safe_from_node_b": true,
+      "safe_from_node_c": true
+    }
+  }
+}

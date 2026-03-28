@@ -1,0 +1,68 @@
+{
+  "name": "partial_rerun_safe",
+  "description": "A→B→C DAG where partial rerun from B is safe. Source run is complete with valid outputs.",
+  "nodes": [
+    {
+      "id": "upstream",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Upstream",
+        "category": "data",
+        "config": {"text": "cached data"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "rerun_start",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "Rerun Start",
+        "category": "inference",
+        "config": {"model_name": "test-model", "temperature": 0.5},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "response", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "downstream",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Downstream",
+        "category": "output",
+        "config": {"format": "json"},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "dataset", "dataType": "dataset"}]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "upstream", "target": "rerun_start", "sourceHandle": "text", "targetHandle": "text"},
+    {"id": "e2", "source": "rerun_start", "target": "downstream", "sourceHandle": "response", "targetHandle": "text"}
+  ],
+  "source_run": {
+    "status": "complete",
+    "outputs_snapshot": {
+      "upstream": {"text": "cached data"},
+      "rerun_start": {"response": "old response"},
+      "downstream": {"dataset": {"rows": []}}
+    }
+  },
+  "expected": {
+    "partial_rerun": {
+      "start_node_id": "rerun_start",
+      "safe": true,
+      "upstream_nodes": ["upstream"],
+      "downstream_nodes": ["rerun_start", "downstream"],
+      "cached_nodes": ["upstream"],
+      "reexecuted_nodes": ["rerun_start", "downstream"]
+    },
+    "validation": {
+      "valid": true,
+      "has_cycle": false
+    }
+  }
+}

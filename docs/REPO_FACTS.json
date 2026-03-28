@@ -1,20 +1,7 @@
 {
-  "_generated": "2026-03-27T23:28:07Z",
-  "_generator": "scripts/generate_repo_facts.py",
   "blocks": {
     "total": 119,
-    "categories": [
-      "agents",
-      "data",
-      "endpoints",
-      "evaluation",
-      "flow",
-      "inference",
-      "merge",
-      "output",
-      "training"
-    ],
-    "by_category": {
+    "categories": {
       "agents": 9,
       "data": 27,
       "endpoints": 8,
@@ -24,16 +11,216 @@
       "merge": 5,
       "output": 5,
       "training": 12
+    },
+    "blocks_without_yaml": []
+  },
+  "readme_claimed_blocks": 119,
+  "readme_claimed_categories": 9,
+  "compatibility_maps": {
+    "frontend": {
+      "dataset": [
+        "any",
+        "dataset",
+        "text"
+      ],
+      "text": [
+        "any",
+        "dataset",
+        "text"
+      ],
+      "model": [
+        "any",
+        "llm",
+        "model"
+      ],
+      "config": [
+        "any",
+        "config",
+        "llm",
+        "text"
+      ],
+      "metrics": [
+        "any",
+        "dataset",
+        "metrics",
+        "text"
+      ],
+      "embedding": [
+        "any",
+        "dataset",
+        "embedding"
+      ],
+      "artifact": [
+        "any",
+        "artifact",
+        "text"
+      ],
+      "agent": [
+        "agent",
+        "any"
+      ],
+      "llm": [
+        "any",
+        "config",
+        "llm",
+        "model"
+      ],
+      "any": [
+        "agent",
+        "any",
+        "artifact",
+        "config",
+        "dataset",
+        "embedding",
+        "llm",
+        "metrics",
+        "model",
+        "text"
+      ]
+    },
+    "backend": {
+      "agent": [
+        "agent",
+        "any"
+      ],
+      "any": [
+        "agent",
+        "any",
+        "artifact",
+        "config",
+        "dataset",
+        "embedding",
+        "llm",
+        "metrics",
+        "model",
+        "text"
+      ],
+      "artifact": [
+        "any",
+        "artifact",
+        "text"
+      ],
+      "config": [
+        "any",
+        "config",
+        "llm",
+        "text"
+      ],
+      "dataset": [
+        "any",
+        "dataset",
+        "text"
+      ],
+      "embedding": [
+        "any",
+        "dataset",
+        "embedding"
+      ],
+      "llm": [
+        "any",
+        "config",
+        "llm",
+        "model"
+      ],
+      "metrics": [
+        "any",
+        "dataset",
+        "metrics",
+        "text"
+      ],
+      "model": [
+        "any",
+        "llm",
+        "model"
+      ],
+      "text": [
+        "any",
+        "dataset",
+        "text"
+      ]
+    },
+    "drift": [],
+    "frontend_aliases": {
+      "data": "dataset",
+      "external": "dataset",
+      "training": "model",
+      "intervention": "any",
+      "checkpoint": "model",
+      "optimizer": "config",
+      "schedule": "config",
+      "api": "dataset",
+      "file": "dataset",
+      "cloud": "config",
+      "llm_config": "llm"
+    },
+    "backend_aliases": {
+      "data": "dataset",
+      "external": "dataset",
+      "training": "model",
+      "intervention": "any",
+      "checkpoint": "model",
+      "optimizer": "config",
+      "schedule": "config",
+      "api": "dataset",
+      "file": "dataset",
+      "cloud": "config",
+      "llm_config": "llm"
     }
   },
-  "backend": {
-    "router_count": 21,
-    "model_count": 10
-  },
-  "test_file_count": 15,
-  "supported_platforms": [
-    "Linux",
-    "Windows",
-    "macOS"
-  ]
+  "routers": [
+    "block_generator",
+    "blocks",
+    "connectors",
+    "control_tower",
+    "custom_blocks",
+    "datasets",
+    "events",
+    "execution",
+    "inference",
+    "marketplace",
+    "models",
+    "outputs",
+    "papers",
+    "pipelines",
+    "plugins",
+    "projects",
+    "runs",
+    "secrets",
+    "sweeps",
+    "system",
+    "workspace"
+  ],
+  "router_count": 21,
+  "models": [
+    "artifact",
+    "dataset",
+    "experiment",
+    "experiment_phase",
+    "paper",
+    "pipeline",
+    "project",
+    "run",
+    "sweep",
+    "workspace"
+  ],
+  "model_count": 10,
+  "scripts": [
+    "audit_drift.py",
+    "audit_port_types.py",
+    "blueprint_plugin.py",
+    "check_repo_facts.py",
+    "diff_frontend_backend_contracts.py",
+    "generate_api_types.py",
+    "generate_block_registry.py",
+    "generate_repo_facts.py",
+    "guard_heavy_imports.py",
+    "print_contract_matrix.py",
+    "run_integration_tests.sh",
+    "scaffold_block.py",
+    "scaffold_blocks.py",
+    "watch_block_registry.py"
+  ],
+  "script_count": 14,
+  "drift_found": false,
+  "drift_details": []
 }

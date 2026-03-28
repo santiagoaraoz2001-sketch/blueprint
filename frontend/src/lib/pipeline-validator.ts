@@ -72,7 +72,7 @@ function getConnectedInputs(nodeId: string, edges: Edge[]): Set<string> {
 //   return outputs
 // }
 
-/** DFS cycle detection */
+/** DFS cycle detection (kept for backward compat — detectLoops is preferred) */
 function hasCycle(nodes: Node[], edges: Edge[]): string[] | null {
   const adj = new Map<string, string[]>()
   for (const e of edges) {
@@ -108,6 +108,127 @@ function hasCycle(nodes: Node[], edges: Edge[]): string[] | null {
     }
   }
   return null
+}
+
+interface LoopInfo {
+  controllerId: string
+  bodyIds: string[]
+}
+
+interface LoopDetectionResult {
+  legalLoops: LoopInfo[]
+  illegalCycle: boolean
+}
+
+/**
+ * Loop-aware cycle detection using Kahn's + Kosaraju's algorithm.
+ *
+ * Distinguishes legal single-controller loops from illegal cycles.
+ * Mirrors the backend _detect_loops() in executor.py.
+ */
+function detectLoops(nodes: Node<BlockNodeData>[], edges: Edge[]): LoopDetectionResult {
+  // Step 1: Kahn's algorithm to find cyclic nodes
+  const inDegree = new Map<string, number>()
+  const adj = new Map<string, string[]>()
+  const revAdj = new Map<string, string[]>()
+
+  for (const n of nodes) {
+    inDegree.set(n.id, 0)
+    adj.set(n.id, [])
+    revAdj.set(n.id, [])
+  }
+  for (const e of edges) {
+    if (adj.has(e.source) && adj.has(e.target)) {
+      adj.get(e.source)!.push(e.target)
+      revAdj.get(e.target)!.push(e.source)
+      inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1)
+    }
+  }
+
+  const queue: string[] = []
+  for (const [id, deg] of inDegree) {
+    if (deg === 0) queue.push(id)
+  }
+  const acyclic = new Set<string>()
+  while (queue.length > 0) {
+    const n = queue.shift()!
+    acyclic.add(n)
+    for (const nb of adj.get(n) ?? []) {
+      const newDeg = (inDegree.get(nb) ?? 1) - 1
+      inDegree.set(nb, newDeg)
+      if (newDeg === 0) queue.push(nb)
+    }
+  }
+
+  const cyclicNodes = new Set<string>()
+  for (const n of nodes) {
+    if (!acyclic.has(n.id)) cyclicNodes.add(n.id)
+  }
+
+  if (cyclicNodes.size === 0) return { legalLoops: [], illegalCycle: false }
+
+  // Step 2: Kosaraju's SCC (iterative)
+  // Phase A: Forward DFS → finish order
+  const visited = new Set<string>()
+  const finishOrder: string[] = []
+  for (const start of cyclicNodes) {
+    if (visited.has(start)) continue
+    const stack: [string, boolean][] = [[start, false]]
+    while (stack.length > 0) {
+      const [node, processed] = stack.pop()!
+      if (processed) { finishOrder.push(node); continue }
+      if (visited.has(node)) continue
+      visited.add(node)
+      stack.push([node, true])
+      for (const nb of adj.get(node) ?? []) {
+        if (cyclicNodes.has(nb) && !visited.has(nb)) stack.push([nb, false])
+      }
+    }
+  }
+
+  // Phase B: Reverse DFS in reverse finish order → SCCs
+  visited.clear()
+  const sccs: string[][] = []
+  for (let i = finishOrder.length - 1; i >= 0; i--) {
+    const start = finishOrder[i]
+    if (visited.has(start)) continue
+    const component: string[] = []
+    const stack = [start]
+    while (stack.length > 0) {
+      const n = stack.pop()!
+      if (visited.has(n)) continue
+      visited.add(n)
+      component.push(n)
+      for (const nb of revAdj.get(n) ?? []) {
+        if (cyclicNodes.has(nb) && !visited.has(nb)) stack.push(nb)
+      }
+    }
+    sccs.push(component)
+  }
+
+  // Step 3: Filter stuck-downstream single-node SCCs (no self-loop)
+  const hasSelfLoop = (nid: string) => edges.some(e => e.source === nid && e.target === nid)
+  const realSccs = sccs.filter(scc => scc.length > 1 || hasSelfLoop(scc[0]))
+
+  if (realSccs.length === 0) return { legalLoops: [], illegalCycle: false }
+
+  // Step 4: Validate each SCC has exactly 1 loop_controller
+  const legalLoops: LoopInfo[] = []
+  for (const scc of realSccs) {
+    const controllers = scc.filter(nid => {
+      const node = nodes.find(n => n.id === nid)
+      return node?.data?.type === 'loop_controller'
+    })
+    if (controllers.length !== 1) {
+      return { legalLoops: [], illegalCycle: true }
+    }
+    legalLoops.push({
+      controllerId: controllers[0],
+      bodyIds: scc.filter(id => id !== controllers[0]),
+    })
+  }
+
+  return { legalLoops, illegalCycle: false }
 }
 
 // Critical config fields that must be non-empty for specific block types
@@ -229,15 +350,25 @@ export function validatePipelineClient(
     idSet.add(n.id)
   }
 
-  // 3. Cycle detection
+  // 3. Cycle / loop detection
   if (blockNodes.length > 0) {
-    const cycle = hasCycle(blockNodes, edges)
-    if (cycle) {
+    const { legalLoops, illegalCycle } = detectLoops(blockNodes, edges)
+    if (illegalCycle) {
       errors.push({
-        message: 'Pipeline contains a cycle — blocks form a loop',
+        message: 'Pipeline contains an illegal cycle — no Loop Controller found',
         severity: 'error',
         category: 'structure',
-        suggestion: 'Remove one of the edges creating the cycle',
+        suggestion: 'Add a Loop Controller block to manage the cycle, or remove one of the edges creating it',
+      })
+    } else if (legalLoops.length > 0) {
+      const loopNames = legalLoops.map(l => {
+        const ctrl = nodeMap.get(l.controllerId)
+        return ctrl?.data?.label ?? l.controllerId
+      })
+      info.push({
+        message: `Pipeline contains ${legalLoops.length} loop(s): ${loopNames.join(', ')}`,
+        severity: 'info',
+        category: 'structure',
       })
     }
   }

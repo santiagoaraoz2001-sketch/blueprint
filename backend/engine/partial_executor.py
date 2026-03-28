@@ -20,6 +20,7 @@ from ..models.run import Run, LiveRun
 from ..routers.events import publish_event
 from .executor import (
     _topological_sort,
+    _detect_loops,
     _find_block_module,
     _load_and_run_block,
     _resolve_secrets,
@@ -32,9 +33,11 @@ from .executor import (
     _cancel_events,
     _cancel_lock,
     BLOCK_ALIASES,
+    CONFIG_MIGRATIONS,
     SAFE_BLOCK_TYPE,
     MEMORY_PRESSURE_THRESHOLD,
 )
+from .config_resolver import resolve_configs
 from .block_registry import resolve_output_handle
 from .composite import CompositeBlockContext
 from .schema_validator import load_block_schema
@@ -210,6 +213,22 @@ async def execute_partial_pipeline(
         # --- Topological sort ---
         order = _topological_sort(nodes, edges)
 
+        # --- Refuse partial re-run for pipelines with loops ---
+        try:
+            loops = _detect_loops(nodes, edges)
+        except ValueError:
+            loops = []  # Illegal cycle — will surface via other validation
+        if loops:
+            raise ValueError(
+                "Partial re-run is not supported for pipelines containing "
+                "loop controllers. Please use full execution instead."
+            )
+
+        # --- Resolve config inheritance across the DAG ---
+        resolved_configs = resolve_configs(
+            nodes, edges, order, find_block_dir_fn=_find_block_module,
+        )
+
         # --- Find downstream nodes (inclusive of start) ---
         downstream = _get_downstream_nodes(start_node_id, nodes, edges)
         upstream_ids = set(order) - downstream
@@ -295,8 +314,17 @@ async def execute_partial_pipeline(
 
             node_data = node.get("data", {})
             block_type = node_data.get("type", "")
-            config = dict(node_data.get("config", {}))
+            # Use resolved config (with inheritance) instead of raw node config
+            config = dict(resolved_configs.get(node_id, node_data.get("config", {})))
+            # Strip provenance metadata
+            config.pop("_inherited", None)
             category = node_data.get("category", "flow")
+
+            # Apply CONFIG_MIGRATIONS for aliased block types
+            original_type = block_type
+            if original_type in CONFIG_MIGRATIONS:
+                for mig_key, mig_val in CONFIG_MIGRATIONS[original_type].items():
+                    config.setdefault(mig_key, mig_val)
 
             # ---- CACHED NODE: use outputs from source run ----
             if node_id not in downstream:

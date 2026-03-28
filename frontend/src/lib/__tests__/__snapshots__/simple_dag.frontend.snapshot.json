@@ -1,0 +1,21 @@
+{
+  "fixture_name": "simple_dag",
+  "loop_detection": {
+    "legal_loops": [],
+    "illegal_cycle": false
+  },
+  "edge_compatibility": {
+    "e1": {
+      "source": "text",
+      "target": "text",
+      "compatible": true
+    },
+    "e2": {
+      "source": "text",
+      "target": "text",
+      "compatible": true
+    }
+  },
+  "node_count": 3,
+  "edge_count": 2
+}
