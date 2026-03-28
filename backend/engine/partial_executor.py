@@ -42,6 +42,7 @@ from .config_resolver import resolve_configs
 from .block_registry import resolve_output_handle
 from .composite import CompositeBlockContext
 from .schema_validator import load_block_schema
+from .graph_utils import is_cache_valid
 
 
 def _get_downstream_nodes(start_id: str, nodes: list, edges: list) -> set[str]:
@@ -329,6 +330,34 @@ async def execute_partial_pipeline(
 
             # ---- CACHED NODE: use outputs from source run ----
             if node_id not in downstream:
+                # Kill switch: validate cache before reuse
+                if not is_cache_valid(node_id, pipeline_id, config, db):
+                    # Determine reason for logging
+                    import sys as _sys
+                    reason = "config_changed"  # default
+                    _last_run = db.query(Run).filter(
+                        Run.pipeline_id == pipeline_id
+                    ).order_by(Run.started_at.desc()).first()
+                    if _last_run and _last_run.status != "complete":
+                        reason = "run_incomplete"
+                    print(
+                        f"[kill-switch] Cache invalidated for node {node_id}: {reason}",
+                        file=_sys.stderr,
+                    )
+                    try:
+                        publish_event(run_id, "cache_invalidated", {
+                            "node_id": node_id,
+                            "reason": reason,
+                        })
+                    except Exception:
+                        pass
+                    # Force re-execution by adding to downstream
+                    downstream.add(node_id)
+                    # Fall through to the EXECUTE NODE path below
+                    # (the continue below will be skipped because
+                    # node_id is now in downstream)
+
+            if node_id not in downstream:
                 outputs[node_id] = cached_outputs.get(node_id, {})
 
                 cache_event = {
@@ -496,16 +525,15 @@ async def execute_partial_pipeline(
                     metrics_file.flush()
                     metrics_log_buffer.append(metric_event)
 
-                # Detect composite blocks
+                # Detect composite blocks + read timeout from schema
                 block_schema = load_block_schema(block_dir)
                 is_composite = block_schema.get("composite", False) if block_schema else False
                 context_cls = CompositeBlockContext if is_composite else None
-
-                # Read timeout/retry from schema — parity with main executor
-                block_schema = load_block_schema(block_dir)
                 timeout_seconds = block_schema.get("timeout") if block_schema else None
-                is_composite = block_schema.get("composite", False) if block_schema else False
-                context_cls = CompositeBlockContext if is_composite else context_cls
+
+                # Embed block version into config_snapshot for cache validation
+                if block_schema and block_schema.get("version"):
+                    node_data["block_version"] = block_schema["version"]
 
                 try:
                     node_outputs, data_fingerprints = _load_and_run_block(
