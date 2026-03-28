@@ -1,0 +1,98 @@
+{
+  "name": "valid_loop",
+  "description": "Valid single-controller loop: text_input → loop_controller → llm_inference(body) → feedback → result export.",
+  "nodes": [
+    {
+      "id": "seed",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Seed Data",
+        "category": "data",
+        "config": {"text": "Initial seed for loop"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "loop_ctrl",
+      "type": "blockNode",
+      "data": {
+        "type": "loop_controller",
+        "label": "Loop Controller",
+        "category": "flow",
+        "config": {
+          "iterations": 3,
+          "stop_metric": "",
+          "context_management": "retain",
+          "seed_mode": "fixed",
+          "base_seed": 42,
+          "accumulate_results": true
+        },
+        "inputs": [
+          {"id": "input", "dataType": "any", "required": false},
+          {"id": "feedback", "dataType": "any", "required": false}
+        ],
+        "outputs": [
+          {"id": "body", "dataType": "any"},
+          {"id": "result", "dataType": "dataset"},
+          {"id": "metrics", "dataType": "metrics"}
+        ]
+      }
+    },
+    {
+      "id": "loop_body",
+      "type": "blockNode",
+      "data": {
+        "type": "text_concatenator",
+        "label": "Loop Body",
+        "category": "data",
+        "config": {
+          "separator": " ",
+          "template": "Iteration output: {text_a}",
+          "trim_whitespace": true,
+          "skip_empty": true
+        },
+        "inputs": [
+          {"id": "text_a", "dataType": "text", "required": true},
+          {"id": "text_b", "dataType": "text", "required": true}
+        ],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "after_loop",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "After Loop Export",
+        "category": "endpoints",
+        "config": {"format": "json"},
+        "inputs": [
+          {"id": "data", "dataType": "any", "required": true}
+        ],
+        "outputs": [
+          {"id": "file_path", "dataType": "artifact"},
+          {"id": "status", "dataType": "metrics"},
+          {"id": "summary", "dataType": "metrics"}
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "seed", "target": "loop_ctrl", "sourceHandle": "text", "targetHandle": "input"},
+    {"id": "e2", "source": "loop_ctrl", "target": "loop_body", "sourceHandle": "body", "targetHandle": "text_a"},
+    {"id": "e2b", "source": "loop_ctrl", "target": "loop_body", "sourceHandle": "body", "targetHandle": "text_b"},
+    {"id": "e3", "source": "loop_body", "target": "loop_ctrl", "sourceHandle": "text", "targetHandle": "feedback"},
+    {"id": "e4", "source": "loop_ctrl", "target": "after_loop", "sourceHandle": "result", "targetHandle": "data"}
+  ],
+  "expected": {
+    "validation": "pass",
+    "execution_order": ["seed", "loop_ctrl", "after_loop", "loop_body"],
+    "final_status": "completed",
+    "expected_errors": [],
+    "partial_rerun_allowed": false,
+    "export_allowed": false,
+    "notes": "Loop pipelines cannot be partially rerun or exported per contract V1"
+  }
+}

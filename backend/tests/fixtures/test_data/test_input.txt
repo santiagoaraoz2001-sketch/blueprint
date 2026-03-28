@@ -1,0 +1,5 @@
+Line one of test data for contract tests.
+Line two contains some sample text.
+Line three has numbers: 42, 3.14, 100.
+Line four is about machine learning pipelines.
+Line five is the final line of the test file.
