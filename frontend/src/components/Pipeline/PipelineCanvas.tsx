@@ -464,11 +464,21 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
           e.preventDefault()
           usePipelineStore.getState().removeSelectedNodes()
         }
+      } else if (meta && e.key === 'd') {
+        // Cmd/Ctrl+D — duplicate selected nodes
+        e.preventDefault()
+        if (selectedIds.length > 0) {
+          usePipelineStore.getState().duplicateNodes(selectedIds)
+        }
       } else if (meta && e.key === 'Enter') {
         // Cmd/Ctrl+Enter to run pipeline
         e.preventDefault()
         const runBtn = document.querySelector('[data-tour="btn-run-pipeline"]') as HTMLButtonElement
         if (runBtn) runBtn.click()
+      } else if (e.shiftKey && e.key === '?') {
+        // Shift+? — open keyboard cheatsheet
+        e.preventDefault()
+        window.dispatchEvent(new CustomEvent('blueprint:toggle-cheatsheet'))
       }
     }
 

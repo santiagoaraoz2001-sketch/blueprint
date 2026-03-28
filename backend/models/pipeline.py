@@ -13,5 +13,6 @@ class Pipeline(Base):
     name = Column(String, nullable=False)
     description = Column(Text, default="")
     definition = Column(JSON, default=dict)  # Full DAG: nodes, edges, block configs
+    history_json = Column(Text, nullable=True)  # Serialized undo/redo history (last 50 entries)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

@@ -19,6 +19,10 @@ class PipelineUpdate(BaseModel):
     definition: dict[str, Any] | None = None
 
 
+class PipelineHistoryUpdate(BaseModel):
+    history_json: str  # JSON-encoded undo/redo history
+
+
 class PipelineResponse(BaseModel):
     id: str
     name: str
@@ -27,6 +31,7 @@ class PipelineResponse(BaseModel):
     experiment_phase_id: str | None
     description: str
     definition: dict[str, Any]
+    history_json: str | None = None
     created_at: datetime
     updated_at: datetime
 
