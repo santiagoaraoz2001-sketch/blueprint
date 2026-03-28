@@ -71,6 +71,7 @@ class BlockSchema(BaseModel):
     icon: str = ""
     accent: str = ""
     deprecated: bool = False
+    requires: list[str] = Field(default_factory=list)
 
     @field_validator("version")
     @classmethod

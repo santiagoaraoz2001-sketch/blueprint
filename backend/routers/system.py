@@ -15,7 +15,7 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
-from ..config import BASE_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR
+from ..config import BASE_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR, ARTIFACTS_DIR
 
 SAFE_MODEL_ID = re.compile(r'^[a-zA-Z0-9_\-./]+$')
 
@@ -207,6 +207,92 @@ def capabilities():
         disk_ok=disk_free >= 10,
         accelerators=accel,
     )
+
+
+@router.get("/capabilities/detailed")
+def detailed_capabilities():
+    """Return detailed capability detection including per-library availability.
+
+    Uses the CapabilityDetector singleton for comprehensive checks including
+    torch, transformers, peft, ollama, GPU, and installed profile detection.
+    """
+    from ..services.capability_detector import get_capability_detector
+    detector = get_capability_detector()
+    return detector.detect()
+
+
+@router.post("/capabilities/refresh")
+def refresh_capabilities():
+    """Force re-detection of all capabilities (e.g. after pip install)."""
+    from ..services.capability_detector import get_capability_detector
+    detector = get_capability_detector()
+    return detector.refresh()
+
+
+# ---------------------------------------------------------------------------
+# One-click recovery: start services
+# ---------------------------------------------------------------------------
+
+_SERVICE_COMMANDS: dict[str, list[str]] = {
+    "ollama": ["ollama", "serve"],
+}
+
+
+@router.post("/start-service/{name}")
+def start_service(name: str):
+    """Start a known service by name (e.g. 'ollama').
+
+    Launches the service as a tracked background subprocess that will be
+    cleaned up during server shutdown.  Returns immediately — the service
+    may still be booting.
+    """
+    if name not in _SERVICE_COMMANDS:
+        raise HTTPException(404, f"Unknown service: {name}. Available: {list(_SERVICE_COMMANDS.keys())}")
+
+    cmd = _SERVICE_COMMANDS[name]
+    try:
+        # Check if already running externally (not spawned by us)
+        if name == "ollama":
+            from ..services.capability_detector import _check_ollama
+            if _check_ollama():
+                return {"status": "already_running", "service": name}
+
+        from ..services.process_manager import get_process_manager
+        mgr = get_process_manager()
+
+        # ProcessManager handles dedup (returns existing if alive)
+        tracked = mgr.start(name, cmd)
+        return {
+            "status": "started",
+            "service": name,
+            "pid": tracked.pid,
+            "command": " ".join(cmd),
+        }
+    except FileNotFoundError:
+        raise HTTPException(
+            422,
+            f"Service binary not found: {cmd[0]}. Install {name} first.",
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Failed to start {name}: {e}")
+
+
+@router.post("/stop-service/{name}")
+def stop_service(name: str):
+    """Stop a previously started service by name."""
+    from ..services.process_manager import get_process_manager
+    mgr = get_process_manager()
+    if mgr.stop(name):
+        return {"status": "stopped", "service": name}
+    raise HTTPException(404, f"No tracked process named '{name}'")
+
+
+@router.get("/services")
+def list_services():
+    """Return status of all tracked background services."""
+    from ..services.process_manager import get_process_manager
+    mgr = get_process_manager()
+    return {"services": [tp.to_dict() for tp in mgr.list_all()]}
 
 
 # ---------------------------------------------------------------------------

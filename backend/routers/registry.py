@@ -7,6 +7,7 @@ hand-maintained frontend block-registry.ts.
 
 from __future__ import annotations
 
+import ast
 import logging
 import threading
 import time
@@ -147,6 +148,7 @@ class BlockSchema(BaseModel):
     deprecatedMessage: str | None = None
     recommended: bool | None = None
     side_inputs: list[PortSchema] | None = None
+    requires: list[str] = []
 
 
 class ValidateConnectionRequest(BaseModel):
@@ -269,6 +271,7 @@ def _load_block(yaml_path: Path, category: str) -> BlockSchema | None:
         icon=schema.get("icon", CATEGORY_ICONS.get(category, "Box")),
         accent=schema.get("accent", CATEGORY_ACCENTS.get(category, "#6b7280")),
         maturity=schema.get("maturity", "stable" if has_run else "experimental"),
+        requires=schema.get("requires", []),
         inputs=[_convert_port(p) for p in schema.get("inputs", [])],
         outputs=[_convert_port(p) for p in schema.get("outputs", [])],
         defaultConfig=_extract_defaults(schema.get("config", {})),
@@ -289,7 +292,63 @@ def _load_block(yaml_path: Path, category: str) -> BlockSchema | None:
     if schema.get("recommended"):
         block.recommended = True
 
+    # Auto-infer requires from run.py if not explicitly set in YAML
+    if not block.requires and has_run:
+        block.requires = _infer_requires_from_run_py(block_dir)
+
     return block
+
+
+# Import name → capability name mapping (mirrors BlockRegistryService._IMPORT_TO_CAPABILITY)
+_IMPORT_TO_CAPABILITY: dict[str, str] = {
+    "torch": "torch",
+    "torchvision": "torch",
+    "torchaudio": "torch",
+    "transformers": "transformers",
+    "sentence_transformers": "transformers",
+    "peft": "peft",
+    "bitsandbytes": "bitsandbytes",
+    "datasets": "datasets",
+    "accelerate": "accelerate",
+    "sklearn": "scikit_learn",
+    "pandas": "pandas",
+    "numpy": "numpy",
+    "scipy": "scipy",
+    "mlx": "mlx",
+    "mlx_lm": "mlx",
+    "sentencepiece": "sentencepiece",
+    "tokenizers": "tokenizers",
+    "safetensors": "safetensors",
+    "trl": "trl",
+    "PIL": "pillow",
+    "cv2": "opencv",
+    "matplotlib": "matplotlib",
+    "seaborn": "seaborn",
+}
+
+
+def _infer_requires_from_run_py(block_dir: Path) -> list[str]:
+    """Parse run.py AST and map imports to capability names."""
+    run_py = block_dir / "run.py"
+    if not run_py.exists():
+        return []
+    try:
+        tree = ast.parse(run_py.read_text())
+    except Exception:
+        return []
+    raw_modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                raw_modules.add(alias.name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            raw_modules.add(node.module.split(".")[0])
+    caps: set[str] = set()
+    for mod in raw_modules:
+        cap = _IMPORT_TO_CAPABILITY.get(mod)
+        if cap:
+            caps.add(cap)
+    return sorted(caps)
 
 
 def discover_all() -> tuple[dict[str, BlockSchema], list[str]]:
@@ -354,18 +413,43 @@ def get_health() -> RegistryHealthResponse:
 
 # ─── API endpoints ───────────────────────────────────────────────────
 
-@router.get("/blocks", response_model=list[BlockSchema])
+@router.get("/blocks")
 def list_registry_blocks(
     category: Optional[str] = Query(None, description="Filter by category"),
     source: Optional[str] = Query(None, description="Filter by source"),
     include_broken: bool = Query(False, description="Include broken blocks"),
+    include_availability: bool = Query(False, description="Include per-block availability info"),
 ):
-    """List all block schemas (frontend-ready BlockDefinition shape)."""
+    """List all block schemas (frontend-ready BlockDefinition shape).
+
+    When ``include_availability=true``, each block dict gains an ``availability``
+    key: ``{"available": bool, "missing": ["torch", ...]}``.
+    """
     _ensure_loaded()
     result = list(_blocks.values())
     if category:
         result = [b for b in result if b.category == category]
-    return result
+
+    if not include_availability:
+        return result
+
+    # Merge availability info from the capability detector
+    from ..services.capability_detector import get_capability_detector
+    from ..services.registry import get_global_registry
+
+    detector = get_capability_detector()
+    cap_report = detector.detect()
+    caps = cap_report.get("capabilities", {})
+
+    registry = get_global_registry()
+    availability = registry.get_block_availability(caps)
+
+    enriched = []
+    for block in result:
+        block_dict = block.model_dump()
+        block_dict["availability"] = availability.get(block.type, {"available": True, "missing": []})
+        enriched.append(block_dict)
+    return enriched
 
 
 @router.get("/blocks/{block_type}", response_model=BlockSchema)

@@ -7,10 +7,11 @@ import BlockDetailPanel from './BlockDetailPanel'
 import CustomModuleEditor, { loadCustomBlocks, type CustomBlock } from './CustomModuleEditor'
 import BlockGeneratorModal from './BlockGeneratorModal'
 import { usePipelineStore } from '@/stores/pipelineStore'
+import { useErrorStore, type BlockAvailability } from '@/stores/errorStore'
 import { useIsSimpleMode } from '@/hooks/useIsSimpleMode'
 import * as Icons from 'lucide-react'
 
-const { Search, ChevronRight, ChevronDown, Plus, Sparkles, Zap } = Icons
+const { Search, ChevronRight, ChevronDown, Plus, Sparkles, Zap, Lock } = Icons
 
 const CATEGORY_ORDER = ['external', 'data', 'model', 'inference', 'training', 'metrics', 'embedding', 'utilities', 'agents', 'interventions', 'endpoints']
 
@@ -59,6 +60,13 @@ export default function BlockLibrary() {
   const blocksByCategory = getBlocksByCategory()
   const isSimple = useIsSimpleMode()
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const blockAvailability = useErrorStore((s) => s.blockAvailability)
+
+  // Fetch capabilities and block availability on mount
+  useEffect(() => {
+    useErrorStore.getState().fetchCapabilities()
+    useErrorStore.getState().fetchBlockAvailability()
+  }, [])
 
   // "/" keyboard shortcut to focus search
   useEffect(() => {
@@ -77,6 +85,9 @@ export default function BlockLibrary() {
 
   // Smart add: find best open port and auto-wire
   const handleSmartAdd = useCallback((blockType: string) => {
+    // Block adding unavailable blocks
+    const avail = useErrorStore.getState().blockAvailability[blockType]
+    if (avail && !avail.available) return
     const state = usePipelineStore.getState()
     const { nodes, edges } = state
     const def = getBlockDefinition(blockType)
@@ -156,6 +167,12 @@ export default function BlockLibrary() {
   }
 
   const onDragStart = (e: React.DragEvent, blockType: string) => {
+    // Prevent dragging unavailable blocks
+    const avail = blockAvailability[blockType]
+    if (avail && !avail.available) {
+      e.preventDefault()
+      return
+    }
     e.dataTransfer.setData('application/blueprint-block', blockType)
     e.dataTransfer.effectAllowed = 'move'
 
@@ -451,6 +468,7 @@ export default function BlockLibrary() {
                       onMouseLeave={handleItemLeave}
                       onSmartAdd={handleSmartAdd}
                       onClick={(type) => setDetailBlock(type)}
+                      availability={blockAvailability[b.type]}
                     />
                   ))}
                 </div>
@@ -515,6 +533,7 @@ function BlockItem({
   onDuplicate,
   onClick,
   onSmartAdd,
+  availability,
 }: {
   block: BlockDefinition
   tourId?: string
@@ -524,18 +543,29 @@ function BlockItem({
   onDuplicate?: (blockType: string) => void
   onClick?: (blockType: string) => void
   onSmartAdd?: (blockType: string) => void
+  availability?: BlockAvailability
 }) {
   const [hovered, setHovered] = useState(false)
   const IconComponent = (Icons as any)[block.icon] || Icons.Box
   const itemRef = useRef<HTMLDivElement>(null)
+  const isUnavailable = availability && !availability.available
+  const missingDeps = availability?.missing ?? []
+
+  const unavailableTooltip = isUnavailable
+    ? `Requires ${missingDeps.join(', ')}. Install with: pip install ${missingDeps.join(' ')}`
+    : undefined
 
   return (
     <div
       ref={itemRef}
-      draggable
+      draggable={!isUnavailable}
       data-tour={tourId}
+      title={unavailableTooltip}
       onClick={() => onClick?.(block.type)}
-      onDragStart={(e) => onDragStart(e, block.type)}
+      onDragStart={(e) => {
+        if (isUnavailable) { e.preventDefault(); return }
+        onDragStart(e, block.type)
+      }}
       onMouseEnter={(e) => {
         setHovered(true)
         if (onMouseEnter) onMouseEnter(e)
@@ -550,17 +580,42 @@ function BlockItem({
         gap: 12,
         margin: '0 8px',
         padding: '8px 12px',
-        cursor: 'grab',
-        background: hovered ? `${T.surface3}90` : 'transparent',
+        cursor: isUnavailable ? 'not-allowed' : 'grab',
+        background: hovered && !isUnavailable ? `${T.surface3}90` : 'transparent',
         borderRadius: 6,
-        border: `1px solid ${hovered ? T.borderHi : 'transparent'}`,
-        boxShadow: hovered ? `0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05)` : 'none',
-        transform: hovered ? 'translateY(-1px)' : 'none',
+        border: `1px solid ${hovered && !isUnavailable ? T.borderHi : 'transparent'}`,
+        boxShadow: hovered && !isUnavailable ? `0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05)` : 'none',
+        transform: hovered && !isUnavailable ? 'translateY(-1px)' : 'none',
         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         position: 'relative',
         overflow: 'hidden',
+        opacity: isUnavailable ? 0.4 : 1,
       }}
     >
+      {/* Lock overlay for unavailable blocks */}
+      {isUnavailable && (
+        <div style={{
+          position: 'absolute',
+          top: 4,
+          right: 4,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 3,
+          background: `${T.surface4}dd`,
+          border: `1px solid ${T.border}`,
+          borderRadius: 4,
+          padding: '1px 5px',
+          zIndex: 5,
+        }}>
+          <Lock size={8} color={T.dim} />
+          <span style={{
+            fontFamily: F, fontSize: 6, color: T.dim,
+            fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+          }}>
+            {missingDeps.length === 1 ? missingDeps[0] : `${missingDeps.length} deps`}
+          </span>
+        </div>
+      )}
       {/* Accent glow line inside */}
       <div
         style={{

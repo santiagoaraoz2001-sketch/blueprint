@@ -86,6 +86,7 @@ side_inputs:
   required: false
 maturity: stable
 exportable: true
-requires: []
+requires:
+  - transformers
 execution:
   isolation: inprocess
