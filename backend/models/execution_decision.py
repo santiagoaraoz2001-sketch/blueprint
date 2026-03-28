@@ -1,8 +1,7 @@
-"""ExecutionDecision — per-node execution decision records for replay inspection.
+"""ExecutionDecision — records why each node was executed, cached, or skipped during a run.
 
-Tracks what decision was made for each node during a run (execute, cache_hit,
-skipped) along with the reason and timing information.  Populated by the
-executor and partial executor during pipeline execution.
+Tracks per-node decisions with timing, resolved config, errors, and loop info.
+Populated by the executor, partial executor, and planner during pipeline execution.
 """
 
 from datetime import datetime, timezone
@@ -12,17 +11,18 @@ from ..database import Base
 
 class ExecutionDecision(Base):
     """Per-node execution decision recorded during a run."""
-    __tablename__ = "blueprint_execution_decisions"
+    __tablename__ = "execution_decisions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     run_id = Column(String, ForeignKey("blueprint_runs.id"), nullable=False, index=True)
     node_id = Column(String, nullable=False)
-    block_type = Column(String, nullable=False)
-    execution_order = Column(Integer, nullable=False)
+    block_type = Column(String, nullable=False, default="")
+    execution_order = Column(Integer, nullable=False, default=0)
 
-    # 'execute' | 'cache_hit' | 'skipped'
+    # 'execute' | 'cache_hit' | 'cache_invalidated' | 'skipped'
     decision = Column(String, nullable=False)
     decision_reason = Column(Text, nullable=True)
+    reason = Column(Text, nullable=True)  # Alias kept for backward compat with main
 
     # 'completed' | 'failed' | 'skipped' | 'cached' | 'not_executed'
     status = Column(String, nullable=False, default="pending")
@@ -38,12 +38,18 @@ class ExecutionDecision(Base):
     # Error info (populated on failure)
     error_json = Column(JSON, nullable=True)  # {title, message, action, severity, original_type}
 
+    # Cache/plan fingerprints (from planner)
+    cache_fingerprint = Column(String, nullable=True)
+    plan_hash = Column(String, nullable=True)
+
     # Loop info
     iteration = Column(Integer, nullable=True)  # null for non-loop nodes
     loop_id = Column(String, nullable=True)
 
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
-        Index("ix_exec_decision_run_node", "run_id", "node_id"),
+        Index("ix_execution_decisions_run_node", "run_id", "node_id"),
+        Index("ix_execution_decisions_timestamp", "timestamp"),
     )

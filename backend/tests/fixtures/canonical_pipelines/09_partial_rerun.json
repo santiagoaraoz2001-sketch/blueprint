@@ -1,0 +1,91 @@
+{
+  "name": "partial_rerun",
+  "description": "4-block DAG where partial rerun from middle node is valid. Upstream outputs can be cached.",
+  "nodes": [
+    {
+      "id": "data_load",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Data Loader",
+        "category": "data",
+        "config": {"text": "cached upstream data"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "preprocess",
+      "type": "blockNode",
+      "data": {
+        "type": "text_concatenator",
+        "label": "Preprocessor",
+        "category": "data",
+        "config": {"separator": "\n", "template": "Preprocessed: {text_a}", "trim_whitespace": true, "skip_empty": true},
+        "inputs": [
+          {"id": "text_a", "dataType": "text", "required": true},
+          {"id": "text_b", "dataType": "text", "required": true}
+        ],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "analyze",
+      "type": "blockNode",
+      "data": {
+        "type": "text_concatenator",
+        "label": "Analyzer",
+        "category": "data",
+        "config": {"separator": "\n", "template": "Analysis: {text_a}", "trim_whitespace": true, "skip_empty": true},
+        "inputs": [
+          {"id": "text_a", "dataType": "text", "required": true},
+          {"id": "text_b", "dataType": "text", "required": true}
+        ],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "report",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Report Generator",
+        "category": "endpoints",
+        "config": {"format": "json"},
+        "inputs": [{"id": "data", "dataType": "any", "required": true}],
+        "outputs": [
+          {"id": "file_path", "dataType": "artifact"},
+          {"id": "status", "dataType": "metrics"},
+          {"id": "summary", "dataType": "metrics"}
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "data_load", "target": "preprocess", "sourceHandle": "text", "targetHandle": "text_a"},
+    {"id": "e1b", "source": "data_load", "target": "preprocess", "sourceHandle": "text", "targetHandle": "text_b"},
+    {"id": "e2", "source": "preprocess", "target": "analyze", "sourceHandle": "text", "targetHandle": "text_a"},
+    {"id": "e2b", "source": "preprocess", "target": "analyze", "sourceHandle": "text", "targetHandle": "text_b"},
+    {"id": "e3", "source": "analyze", "target": "report", "sourceHandle": "text", "targetHandle": "data"}
+  ],
+  "source_run": {
+    "status": "complete",
+    "outputs_snapshot": {
+      "data_load": {"text": "cached upstream data"},
+      "preprocess": {"text": "Preprocessed: cached upstream data"},
+      "analyze": {"text": "Analysis: Preprocessed: cached upstream data"},
+      "report": {"dataset": {"rows": []}}
+    }
+  },
+  "expected": {
+    "validation": "pass",
+    "execution_order": ["data_load", "preprocess", "analyze", "report"],
+    "final_status": "completed",
+    "expected_errors": [],
+    "partial_rerun_allowed": true,
+    "export_allowed": true,
+    "partial_rerun_from": "analyze",
+    "cached_nodes": ["data_load", "preprocess"],
+    "reexecuted_nodes": ["analyze", "report"]
+  }
+}

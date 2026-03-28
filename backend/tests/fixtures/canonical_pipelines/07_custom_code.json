@@ -1,0 +1,69 @@
+{
+  "name": "custom_code",
+  "description": "Pipeline with python_runner block executing user code.",
+  "nodes": [
+    {
+      "id": "input_data",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Input Data",
+        "category": "data",
+        "config": {"text": "Hello from custom code test"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "custom",
+      "type": "blockNode",
+      "data": {
+        "type": "python_runner",
+        "label": "Custom Code",
+        "category": "flow",
+        "config": {
+          "script": "data = ctx.load_input('input_data')\nresult = {'processed': True, 'original': str(data), 'length': len(str(data))}\nctx.save_output('output_data', result)\nctx.log_message('Custom code executed successfully')",
+          "timeout_seconds": 30,
+          "trust_level": "sandboxed"
+        },
+        "inputs": [
+          {"id": "input_data", "dataType": "any", "required": false}
+        ],
+        "outputs": [
+          {"id": "output_data", "dataType": "any"}
+        ]
+      }
+    },
+    {
+      "id": "export",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Export",
+        "category": "endpoints",
+        "config": {"format": "json"},
+        "inputs": [
+          {"id": "data", "dataType": "any", "required": true}
+        ],
+        "outputs": [
+          {"id": "file_path", "dataType": "artifact"},
+          {"id": "status", "dataType": "metrics"},
+          {"id": "summary", "dataType": "metrics"}
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "input_data", "target": "custom", "sourceHandle": "text", "targetHandle": "input_data"},
+    {"id": "e2", "source": "custom", "target": "export", "sourceHandle": "output_data", "targetHandle": "data"}
+  ],
+  "expected": {
+    "validation": "pass",
+    "execution_order": ["input_data", "custom", "export"],
+    "final_status": "completed",
+    "expected_errors": [],
+    "partial_rerun_allowed": true,
+    "export_allowed": false,
+    "notes": "python_runner blocks are not exportable per contract V1"
+  }
+}

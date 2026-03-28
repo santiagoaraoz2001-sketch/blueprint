@@ -148,6 +148,11 @@ export default function AppShell({ children }: AppShellProps) {
     >
       {!prefersReducedMotion && <AmbientField />}
 
+      {/* Skip-to-content link for keyboard navigation */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
       <div
         style={{
           position: 'relative',
@@ -162,11 +167,16 @@ export default function AppShell({ children }: AppShellProps) {
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           <Sidebar />
           <main
+            id="main-content"
+            role="main"
+            aria-label="Main content area"
+            tabIndex={-1}
             style={{
               flex: 1,
               overflow: 'auto',
               background: 'transparent',
               position: 'relative',
+              outline: 'none',
             }}
           >
             {children}
