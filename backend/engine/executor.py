@@ -22,58 +22,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# Path safety: block types must be simple identifiers
-SAFE_BLOCK_TYPE = re.compile(r'^[a-zA-Z0-9_]+$')
-
-# Backward-compat aliases for renamed blocks
-BLOCK_ALIASES = {
-    "model_prompt": "llm_inference",
-    "huggingface_dataset_loader": "huggingface_loader",
-    "huggingface_model": "huggingface_model_loader",
-    "model_loader": "model_selector",
-    "data_exporter": "data_export",
-    "results_exporter": "data_export",
-    # Block consolidation aliases
-    "debate_composite": "multi_agent_debate",
-    "checkpoint_gate": "quality_gate",
-    "notification_sender": "notification_hub",
-    "manual_review": "human_review_gate",
-    "save_csv": "data_export",
-    "save_json": "data_export",
-    "save_parquet": "data_export",
-    "save_txt": "data_export",
-    "save_yaml": "data_export",
-    "save_local": "data_export",
-    # Deprecated inference blocks → llm_inference
-    "batch_inference": "llm_inference",
-    "few_shot_prompting": "llm_inference",
-    "text_translator": "llm_inference",
-    "text_classifier": "llm_inference",
-    "streaming_server": "llm_inference",
-    "text_summarizer": "llm_inference",
-    "structured_output": "llm_inference",
-    "function_calling": "llm_inference",
-    "chat_completion": "llm_inference",
-    # Deprecated model blocks → model_selector
-    "gguf_model": "model_selector",
-    "mlx_model": "model_selector",
-    "ollama_model": "model_selector",
-}
-
-# Config defaults injected when an aliased block resolves to its new type.
-# This ensures saved workflows that used the old block type still work correctly.
-CONFIG_MIGRATIONS: dict[str, dict[str, object]] = {
-    "save_csv": {"format": "csv"},
-    "save_json": {"format": "json"},
-    "save_parquet": {"format": "parquet"},
-    "save_txt": {"format": "txt"},
-    "save_yaml": {"format": "yaml"},
-    "save_local": {"format": "auto"},
-}
+# Single source of truth for block aliases — shared with subprocess worker
+from .block_aliases import SAFE_BLOCK_TYPE, BLOCK_ALIASES, CONFIG_MIGRATIONS
 
 from sqlalchemy.orm import Session
 
-from ..config import ARTIFACTS_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR
+from ..config import ARTIFACTS_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR, MAX_PARALLEL_BLOCKS
 from ..database import SessionLocal
 from ..models.run import Run, LiveRun
 from ..block_sdk.context import BlockContext
@@ -95,6 +49,8 @@ from .metrics_schema import create_metric
 from .artifact_registry import register_block_artifacts
 from .artifacts import ArtifactStore
 from ..models.artifact import ArtifactRecord
+from .subprocess_runner import SubprocessBlockRunner
+from .worker_tracker import track_worker, untrack_worker
 
 # Ensure the repo root is on sys.path so blocks can do cross-block imports
 # like `from blocks.inference._inference_utils import ...`.
@@ -533,6 +489,52 @@ def _load_and_run_block_with_timeout(
         raise error[0]
 
     return result[0]
+
+
+# Module-level subprocess runner (reused across all runs)
+_subprocess_runner = SubprocessBlockRunner()
+
+
+def _run_block_subprocess(
+    block_type: str,
+    config: dict,
+    inputs: dict[str, Any],
+    run_id: str,
+    node_id: str,
+    timeout_seconds: int | None = None,
+    progress_cb=None,
+    message_cb=None,
+) -> tuple[dict[str, Any], dict[str, dict]]:
+    """Execute a block in an isolated subprocess.
+
+    Returns (outputs, data_fingerprints). The subprocess writes fingerprints
+    to a JSON file which the runner reads back after completion.
+    """
+    def _progress_forwarder(percent: float, message: str):
+        if progress_cb and percent >= 0:
+            total = 100
+            current = int(percent * total)
+            try:
+                progress_cb(current, total)
+            except Exception:
+                pass
+        if message_cb and message and not message.startswith("Progress:"):
+            try:
+                message_cb(message)
+            except Exception:
+                pass
+
+    outputs, fingerprints = _subprocess_runner.run_block(
+        block_type=block_type,
+        config=config,
+        inputs=inputs,
+        timeout_seconds=timeout_seconds or 3600,
+        progress_callback=_progress_forwarder,
+        run_id=run_id,
+        node_id=node_id,
+    )
+
+    return outputs, fingerprints
 
 
 def _resolve_secrets(config: dict) -> dict:
@@ -1332,8 +1334,11 @@ async def execute_pipeline(
                 pass
             # Layer 2: buffer
             metrics_log_buffer.append(event_data)
-            # SSE
-            publish_event(run_id, "system_metric", event_data)
+            # SSE (crash-safe — must never kill the metrics loop)
+            try:
+                publish_event(run_id, "system_metric", event_data)
+            except Exception:
+                pass
 
     system_thread = threading.Thread(target=_system_metrics_loop, daemon=True)
     system_thread.start()
@@ -1692,16 +1697,47 @@ async def execute_pipeline(
                 # Choose context class: composite blocks get CompositeBlockContext
                 context_cls = CompositeBlockContext if is_composite else None
 
+                # Check isolation mode from block schema
+                isolation_mode = "inprocess"  # default
+                if block_schema:
+                    execution_cfg = block_schema.get("execution", {})
+                    if isinstance(execution_cfg, dict):
+                        isolation_mode = execution_cfg.get("isolation", "inprocess")
+
+                # Guard: composite blocks cannot run in subprocess isolation.
+                # Sub-pipeline execution requires in-process access to the
+                # executor internals (_load_and_run_block, CompositeBlockContext).
+                # Fall back gracefully with a warning instead of crashing.
+                if isolation_mode == "subprocess" and is_composite:
+                    import logging as _lg
+                    _lg.getLogger("blueprint.executor").warning(
+                        "Block '%s' (type=%s) declares execution.isolation=subprocess "
+                        "but is also a composite block. Composite blocks require "
+                        "in-process execution for sub-pipeline support. "
+                        "Falling back to inprocess isolation.",
+                        node_id, block_type,
+                    )
+                    isolation_mode = "inprocess"
+
                 # --- Execute with retry + timeout ---
                 try:
                     for attempt in range(max_retries + 1):
                         try:
-                            node_outputs, data_fingerprints = _load_and_run_block_with_timeout(
-                                block_dir, config, node_inputs, run_dir,
-                                run_id, node_id, progress_cb, message_cb, metric_cb,
-                                timeout_seconds=timeout_seconds,
-                                context_cls=context_cls,
-                            )
+                            if isolation_mode == "subprocess":
+                                node_outputs, data_fingerprints = _run_block_subprocess(
+                                    block_type, config, node_inputs,
+                                    run_id, node_id,
+                                    timeout_seconds=timeout_seconds,
+                                    progress_cb=progress_cb,
+                                    message_cb=message_cb,
+                                )
+                            else:
+                                node_outputs, data_fingerprints = _load_and_run_block_with_timeout(
+                                    block_dir, config, node_inputs, run_dir,
+                                    run_id, node_id, progress_cb, message_cb, metric_cb,
+                                    timeout_seconds=timeout_seconds,
+                                    context_cls=context_cls,
+                                )
                             outputs[node_id] = node_outputs
                             if data_fingerprints:
                                 all_fingerprints[node_id] = data_fingerprints

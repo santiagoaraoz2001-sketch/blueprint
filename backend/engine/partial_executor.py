@@ -233,7 +233,11 @@ async def execute_partial_pipeline(
             except Exception:
                 pass
             metrics_log_buffer.append(event_data)
-            publish_event(run_id, "system_metric", event_data)
+            # SSE (crash-safe — must never kill the metrics loop)
+            try:
+                publish_event(run_id, "system_metric", event_data)
+            except Exception:
+                pass
 
     system_thread = threading.Thread(target=_system_metrics_loop, daemon=True)
     system_thread.start()
