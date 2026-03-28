@@ -232,6 +232,9 @@ interface PipelineState {
   saveSnapshot: () => void
   restoreVersion: (id: string) => void
 
+  // Apply a known-good definition directly (no backend round-trip)
+  applyDefinition: (definition: { nodes: any[]; edges: any[] }) => void
+
   // Agentic workflow
   applyGeneratedWorkflow: (nodes: Node<BlockNodeData>[], edges: Edge[]) => void
 
@@ -1038,6 +1041,25 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
       get().resolveConfigs(id)
     } catch {
       toast.error('Failed to load pipeline')
+    }
+  },
+
+  applyDefinition: (definition: { nodes: any[]; edges: any[] }) => {
+    const hydratedNodes = _hydrateNodePorts((definition.nodes || []) as any[])
+    const migratedEdges = _migrateEdgeHandles((definition.edges || []) as any[], hydratedNodes)
+    set({
+      nodes: hydratedNodes,
+      edges: migratedEdges,
+      isDirty: false,
+      selectedNodeId: null,
+      inheritanceOverlay: null,
+      resolvedConfigs: {},
+      propagationKeys: null,
+    })
+    // Re-resolve config inheritance if we have a pipeline ID
+    const pipelineId = get().id
+    if (pipelineId) {
+      get().resolveConfigs(pipelineId)
     }
   },
 

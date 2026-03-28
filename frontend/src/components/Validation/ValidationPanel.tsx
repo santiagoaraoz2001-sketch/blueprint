@@ -7,11 +7,13 @@
  * - Error count badge on the toggle button
  */
 
-import { useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useValidationStore } from '@/stores/validationStore'
 import { usePipelineStore } from '@/stores/pipelineStore'
+import { api } from '@/api/client'
+import AutofixPreview, { type AutofixPatch } from './AutofixPreview'
 import {
   AlertTriangle,
   XCircle,
@@ -21,6 +23,7 @@ import {
   X,
   Loader2,
   CheckCircle2,
+  Wrench,
 } from 'lucide-react'
 
 export default function BackendValidationPanel() {
@@ -30,11 +33,20 @@ export default function BackendValidationPanel() {
   const panelVisible = useValidationStore((s) => s.panelVisible)
   const togglePanel = useValidationStore((s) => s.togglePanel)
   const setPanelVisible = useValidationStore((s) => s.setPanelVisible)
+  const validate = useValidationStore((s) => s.validate)
   const isPending = isValidating || isStale
 
   const nodes = usePipelineStore((s) => s.nodes)
+  const pipelineId = usePipelineStore((s) => s.id)
   const focusErrorNode = usePipelineStore((s) => s.focusErrorNode)
+  const pushHistory = usePipelineStore((s) => s.pushHistory)
   const { fitView } = useReactFlow()
+
+  // Autofix state
+  const [autofixPatches, setAutofixPatches] = useState<AutofixPatch[]>([])
+  const [showAutofixModal, setShowAutofixModal] = useState(false)
+  const [isProposing, setIsProposing] = useState(false)
+  const [isApplying, setIsApplying] = useState(false)
 
   const errorCount = result ? result.errors.length : 0
   const warningCount = result ? result.warnings.length : 0
@@ -47,6 +59,61 @@ export default function BackendValidationPanel() {
     },
     [focusErrorNode, fitView],
   )
+
+  // ── Autofix handlers ──
+
+  const handleProposeAutofix = useCallback(async () => {
+    if (!pipelineId) return
+    setIsProposing(true)
+    try {
+      const resp = await api.post<{
+        patches: AutofixPatch[]
+        applied: string[]
+        skipped: Array<{ patch_id: string; reason: string }>
+      }>(`/pipelines/${pipelineId}/autofix`, { action: 'propose' })
+      if (resp && resp.patches.length > 0) {
+        setAutofixPatches(resp.patches)
+        setShowAutofixModal(true)
+      }
+    } catch {
+      // Silently fail — autofix is best-effort
+    } finally {
+      setIsProposing(false)
+    }
+  }, [pipelineId])
+
+  const handleApplyAutofix = useCallback(async (patchIds: string[]) => {
+    if (!pipelineId || patchIds.length === 0) return
+    setIsApplying(true)
+    try {
+      const resp = await api.post<{
+        patches: AutofixPatch[]
+        applied: string[]
+        skipped: Array<{ patch_id: string; reason: string }>
+        definition: { nodes: any[]; edges: any[] } | null
+      }>(`/pipelines/${pipelineId}/autofix`, { action: 'apply', patch_ids: patchIds })
+
+      if (resp && resp.applied.length > 0 && resp.definition) {
+        // Push current state to undo history before applying changes.
+        // This makes the entire autofix a single undo entry.
+        pushHistory()
+
+        // Apply the definition returned by the autofix endpoint directly
+        // to local state — no redundant GET, no race condition.
+        const { applyDefinition } = usePipelineStore.getState()
+        applyDefinition(resp.definition)
+
+        // Close modal and re-validate
+        setShowAutofixModal(false)
+        setAutofixPatches([])
+        await validate(pipelineId)
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setIsApplying(false)
+    }
+  }, [pipelineId, pushHistory, validate])
 
   // Build a flat item list from errors + warnings with node attribution
   const items = (() => {
@@ -230,6 +297,36 @@ export default function BackendValidationPanel() {
                 {warningCount} warning{warningCount !== 1 ? 's' : ''}
               </span>
             )}
+            {/* Fix N Issues button */}
+            {totalCount > 0 && (
+              <button
+                onClick={handleProposeAutofix}
+                disabled={isProposing || isPending}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: T.cyan,
+                  fontFamily: F,
+                  fontSize: FS.xxs,
+                  fontWeight: 700,
+                  color: '#000',
+                  cursor: isProposing || isPending ? 'not-allowed' : 'pointer',
+                  opacity: isProposing || isPending ? 0.5 : 1,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {isProposing ? (
+                  <Loader2 size={9} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <Wrench size={9} />
+                )}
+                {isProposing ? 'Scanning...' : `Fix ${totalCount} Issue${totalCount !== 1 ? 's' : ''}`}
+              </button>
+            )}
             <button
               onClick={() => setPanelVisible(false)}
               style={{
@@ -315,6 +412,16 @@ export default function BackendValidationPanel() {
             })}
           </div>
         </div>
+      )}
+
+      {/* Autofix preview modal */}
+      {showAutofixModal && autofixPatches.length > 0 && (
+        <AutofixPreview
+          patches={autofixPatches}
+          onApply={handleApplyAutofix}
+          onClose={() => setShowAutofixModal(false)}
+          isApplying={isApplying}
+        />
       )}
     </>
   )
