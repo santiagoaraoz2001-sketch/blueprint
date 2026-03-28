@@ -6,10 +6,11 @@ import { useUIStore } from '@/stores/uiStore'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useValidationStore } from '@/stores/validationStore'
 import { validatePipelineClient } from '@/lib/pipeline-validator'
-import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Check, AlertTriangle, Gauge, FileDown, MoreVertical, ShieldAlert } from 'lucide-react'
+import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Check, AlertTriangle, Gauge, FileDown, MoreVertical, ShieldAlert, Zap } from 'lucide-react'
 import ToolbarDropdown from './ToolbarDropdown'
 import toast from 'react-hot-toast'
 import PipelineAnalysisPanel from './PipelineAnalysisPanel'
+import DryRunModal from './DryRunModal'
 import { getBlockDefinition } from '@/lib/block-registry'
 import { generateRequirements } from '@/lib/block-dependencies'
 import { isPipelineExportable, exportDisabledReason } from '@/lib/graph-utils'
@@ -30,6 +31,8 @@ export default function RunControls() {
   const [generatedCode, setGeneratedCode] = useState('')
   const [codeCopied, setCodeCopied] = useState(false)
   const [showAnalysis, setShowAnalysis] = useState(false)
+  const [showDryRun, setShowDryRun] = useState(false)
+  const [dryRunCacheKey, setDryRunCacheKey] = useState('')
 
   const isRunning = status === 'running'
   const isStarting = useRunStore((s) => s.isStarting)
@@ -52,6 +55,34 @@ export default function RunControls() {
     () => exportDisabledReason(nodes, edges),
     [nodes, edges],
   )
+
+  // Dry run: same enable condition as Run button
+  const isDryRunDisabled = isRunning || isStarting || nodes.length === 0 || hasBackendErrors || isPendingValidation || !pipelineId
+
+  // Build node label lookup for the dry-run modal
+  const nodeLabels = useMemo(() => {
+    const labels: Record<string, string> = {}
+    for (const n of nodes) {
+      labels[n.id] = n.data?.label || n.id
+    }
+    return labels
+  }, [nodes])
+
+  // Invalidate dry-run cache when pipeline changes
+  useEffect(() => {
+    setDryRunCacheKey('')
+  }, [nodes, edges])
+
+  const handleDryRun = async () => {
+    if (!pipelineId) {
+      toast.error('Save pipeline first')
+      return
+    }
+    // Bust cache if pipeline changed
+    const key = `${pipelineId}-${nodes.length}-${edges.length}`
+    setDryRunCacheKey(key)
+    setShowDryRun(true)
+  }
 
   // SSE subscription via centralized manager
   useEffect(() => {
@@ -313,6 +344,34 @@ export default function RunControls() {
 
       {!isRunning ? (
         <>
+          {/* Dry Run — outline button, lighter styling */}
+          <button
+            onClick={isDryRunDisabled ? undefined : handleDryRun}
+            title={!pipelineId ? 'Save pipeline first' : isPendingValidation ? 'Validating...' : hasBackendErrors ? 'Fix errors first' : 'Simulate execution without running'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '5px 12px',
+              background: 'transparent',
+              border: `1px solid ${isDryRunDisabled ? T.border : T.cyan + '50'}`,
+              borderRadius: 4,
+              color: isDryRunDisabled ? T.dim : T.cyan,
+              fontFamily: F,
+              fontSize: FS.xs,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              cursor: isDryRunDisabled ? 'not-allowed' : 'pointer',
+              transition: 'all 0.15s',
+              opacity: isDryRunDisabled ? 0.4 : 1,
+              pointerEvents: isDryRunDisabled ? 'none' as const : 'auto' as const,
+            }}
+            onMouseEnter={(e) => { if (!isDryRunDisabled) { e.currentTarget.style.background = `${T.cyan}12`; e.currentTarget.style.borderColor = `${T.cyan}70` } }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = isDryRunDisabled ? T.border : `${T.cyan}50` }}
+          >
+            <Zap size={11} />
+            DRY RUN
+          </button>
           <button
             onClick={isRunDisabled ? undefined : handleRun}
             data-tour="btn-run-pipeline"
@@ -589,6 +648,16 @@ export default function RunControls() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Dry Run Modal */}
+      {pipelineId && (
+        <DryRunModal
+          open={showDryRun}
+          onClose={() => setShowDryRun(false)}
+          pipelineId={pipelineId}
+          nodeLabels={nodeLabels}
+        />
       )}
 
       {/* Pipeline Analysis Panel */}

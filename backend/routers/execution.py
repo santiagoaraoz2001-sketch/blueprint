@@ -31,6 +31,7 @@ from ..schemas.execution import (
     GatewayValidationResponse,
     BlockConfigValidationResponse,
     PipelineTestResponse,
+    DryRunResponse,
 )
 
 router = APIRouter(prefix="/api", tags=["execution"])
@@ -277,6 +278,77 @@ def validate_pipeline_endpoint(pipeline_id: str, db: Session = Depends(get_db)):
         "estimated_runtime_s": report.estimated_runtime_s,
         "block_count": report.block_count,
         "edge_count": report.edge_count,
+    }
+
+
+@router.post("/pipelines/{pipeline_id}/dry-run", response_model=DryRunResponse)
+def dry_run_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
+    """Simulate pipeline execution and estimate resource requirements.
+
+    Runs the planner and dry-run simulator without triggering actual execution.
+    Returns viability assessment, blockers, warnings, and per-node estimates.
+    """
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    if not nodes:
+        raise HTTPException(400, "Pipeline has no blocks")
+
+    # Plan the pipeline
+    from ..engine.planner import GraphPlanner
+    registry = get_global_registry()
+    planner = GraphPlanner(registry)
+    plan_result = planner.plan(nodes, definition.get("edges", []))
+
+    if not plan_result.is_valid or plan_result.plan is None:
+        # Return as non-viable with planner errors as blockers
+        from ..schemas.execution import TotalEstimateResponse
+        return {
+            "viable": False,
+            "blockers": list(plan_result.errors),
+            "warnings": [],
+            "per_node_estimates": {},
+            "total_estimate": TotalEstimateResponse(
+                peak_memory_mb=0,
+                total_artifact_volume_mb=0,
+                runtime_class="seconds",
+                confidence="low",
+            ).model_dump(),
+        }
+
+    # Detect system capabilities (cached for session lifetime)
+    from ..services.capability_detector import detect_capabilities
+    capabilities = detect_capabilities()
+
+    # Gather historical run data (per-node timing from metrics_log)
+    from ..services.run_history import gather_run_history
+    run_history = gather_run_history(db, plan_result.plan, pipeline_id=pipeline_id)
+
+    # Simulate
+    from ..engine.dry_run import simulate
+    result = simulate(plan_result.plan, capabilities, run_history, registry)
+
+    return {
+        "viable": result.viable,
+        "blockers": result.blockers,
+        "warnings": result.warnings,
+        "per_node_estimates": {
+            nid: {
+                "estimated_memory_mb": est.estimated_memory_mb,
+                "estimated_duration_class": est.estimated_duration_class,
+                "confidence": est.confidence,
+            }
+            for nid, est in result.per_node_estimates.items()
+        },
+        "total_estimate": {
+            "peak_memory_mb": result.total_estimate.peak_memory_mb,
+            "total_artifact_volume_mb": result.total_estimate.total_artifact_volume_mb,
+            "runtime_class": result.total_estimate.runtime_class,
+            "confidence": result.total_estimate.confidence,
+        },
     }
 
 
