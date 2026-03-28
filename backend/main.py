@@ -136,6 +136,16 @@ def _full_shutdown():
     log_event("server_stop", message="Blueprint server shutting down")
     _recovery_stop.set()
 
+    # 0. Terminate all tracked worker subprocesses
+    try:
+        from .engine.worker_tracker import terminate_all_workers, write_pid_manifest
+        from .config import BASE_DIR
+        terminated = terminate_all_workers()
+        if terminated:
+            _shutdown_logger.info("Terminated %d worker subprocess(es)", terminated)
+    except Exception:
+        pass
+
     # 1. Pipeline executor (bounded timeout)
     try:
         from .routers.execution import shutdown_executor
@@ -200,8 +210,25 @@ async def lifespan(app: FastAPI):
         health["total"], health["valid"], health["broken"],
     )
 
-    # Recover stale runs from previous crash
+    # Recover stale runs from previous crash (heartbeat-based, existing mechanism)
     _recover_stale_runs()
+
+    # Recover runs stuck in running/pending from hard crashes (subprocess-aware)
+    try:
+        from .engine.worker_tracker import recover_stale_runs_on_startup, write_pid_manifest
+        from .config import BASE_DIR
+        crashed_ids = recover_stale_runs_on_startup(SessionLocal)
+        if crashed_ids:
+            logging.getLogger("blueprint.recovery").info(
+                "Recovered %d crashed run(s) on startup: %s",
+                len(crashed_ids), crashed_ids,
+            )
+        # Write initial PID manifest for orphan detection
+        write_pid_manifest(BASE_DIR)
+    except Exception as exc:
+        logging.getLogger("blueprint.recovery").warning(
+            "Worker recovery on startup failed: %s", exc
+        )
 
     # Clean up old execution decisions on startup
     try:
