@@ -304,3 +304,205 @@ def set_capability_detector(detector: CapabilityDetector) -> None:
     """Install the app-level singleton.  Called once by ``main.py`` at startup."""
     global _instance
     _instance = detector
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Dry-Run Hardware Estimation — detect_capabilities()
+#
+# Provides resource-level detail (memory sizes, GPU backends, unified memory)
+# for the dry-run simulator.  Separate from the CapabilityDetector class
+# which focuses on library/profile availability for block gating.
+# ═══════════════════════════════════════════════════════════════════════════
+
+import functools
+
+
+@functools.lru_cache(maxsize=1)
+def detect_capabilities() -> dict[str, Any]:
+    """Detect system hardware capabilities for dry-run resource estimation.
+
+    Returns a dict with keys:
+        torch: bool              — PyTorch is importable
+        mlx: bool                — MLX is importable
+        gpu_backend: str         — 'cuda' | 'rocm' | 'metal' | 'mps' | 'none'
+        gpu_name: str            — GPU model name
+        gpu_memory_mb: int       — Dedicated or unified GPU memory in MB
+        system_memory_mb: int    — Total system RAM in MB
+        unified_memory: bool     — True on Apple Silicon
+        accelerators: dict       — {mlx, cuda, mps, rocm} availability
+        metal_active_mb: int     — MLX Metal active memory (0 if unavailable)
+        disk_free_gb: float      — Free disk space in GB
+    """
+    caps: dict[str, Any] = {
+        "torch": False,
+        "mlx": False,
+        "gpu_backend": "none",
+        "gpu_name": "none",
+        "gpu_memory_mb": 0,
+        "system_memory_mb": _detect_system_memory_mb(),
+        "unified_memory": False,
+        "accelerators": {},
+        "metal_active_mb": 0,
+        "disk_free_gb": 0.0,
+    }
+
+    _detect_apple_silicon(caps)
+    _detect_torch_hardware(caps)
+    _detect_mlx_hardware(caps)
+    _detect_disk(caps)
+
+    caps["accelerators"] = {
+        "cuda": caps["gpu_backend"] == "cuda",
+        "rocm": caps["gpu_backend"] == "rocm",
+        "metal": caps["gpu_backend"] in ("metal", "mps"),
+        "mlx": caps["mlx"],
+        "mps": _check_mps(),
+    }
+
+    if caps["gpu_memory_mb"] == 0:
+        _fallback_hardware_profile(caps)
+
+    return caps
+
+
+def invalidate_cache() -> None:
+    """Clear the cached capabilities (useful for testing)."""
+    detect_capabilities.cache_clear()
+
+
+def _detect_system_memory_mb() -> int:
+    try:
+        import psutil
+        return int(psutil.virtual_memory().total / (1024 * 1024))
+    except ImportError:
+        pass
+    if platform.system() == "Darwin":
+        try:
+            import subprocess
+            raw = subprocess.check_output(
+                ["sysctl", "-n", "hw.memsize"], timeout=5, stderr=subprocess.DEVNULL,
+            ).decode().strip()
+            return int(int(raw) / (1024 * 1024))
+        except Exception:
+            pass
+    elif platform.system() == "Linux":
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemTotal"):
+                        return int(int(line.split()[1]) / 1024)
+        except Exception:
+            pass
+    try:
+        import os
+        return int((os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")) / (1024 * 1024))
+    except (ValueError, OSError, AttributeError):
+        pass
+    return 16384
+
+
+def _detect_apple_silicon(caps: dict[str, Any]) -> None:
+    if platform.system() != "Darwin" or platform.machine().lower() not in ("arm64", "aarch64"):
+        return
+    caps["unified_memory"] = True
+    caps["gpu_memory_mb"] = caps["system_memory_mb"]
+    caps["gpu_backend"] = "metal"
+    try:
+        import subprocess, json as _json
+        raw = subprocess.check_output(
+            ["system_profiler", "SPDisplaysDataType", "-json"], timeout=10, stderr=subprocess.DEVNULL,
+        ).decode()
+        for gpu in _json.loads(raw).get("SPDisplaysDataType", []):
+            name = gpu.get("sppci_model", "")
+            if name:
+                caps["gpu_name"] = name
+                break
+    except Exception:
+        caps["gpu_name"] = f"Apple Silicon ({platform.machine()})"
+
+
+def _detect_torch_hardware(caps: dict[str, Any]) -> None:
+    try:
+        import torch
+        caps["torch"] = True
+    except ImportError:
+        return
+    if torch.cuda.is_available():
+        try:
+            props = torch.cuda.get_device_properties(0)
+            is_rocm = hasattr(torch.version, "hip") and torch.version.hip is not None
+            caps["gpu_backend"] = "rocm" if is_rocm else "cuda"
+            caps["gpu_name"] = props.name
+            caps["gpu_memory_mb"] = int(props.total_mem / (1024 * 1024))
+        except Exception:
+            caps["gpu_backend"] = "cuda"
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        if caps["gpu_backend"] == "none":
+            caps["gpu_backend"] = "mps"
+    elif hasattr(torch, "xpu") and torch.xpu.is_available():
+        try:
+            props = torch.xpu.get_device_properties(0)
+            caps["gpu_backend"] = "xpu"
+            caps["gpu_name"] = props.name
+            caps["gpu_memory_mb"] = int(getattr(props, "total_memory", 0) / (1024 * 1024))
+        except Exception:
+            caps["gpu_backend"] = "xpu"
+
+
+def _detect_mlx_hardware(caps: dict[str, Any]) -> None:
+    try:
+        import mlx.core  # noqa: F401
+        caps["mlx"] = True
+    except ImportError:
+        return
+    try:
+        import mlx.core.metal as metal
+        caps["metal_active_mb"] = int(metal.get_active_memory() / (1024 * 1024))
+        caps["metal_peak_mb"] = int(metal.get_peak_memory() / (1024 * 1024))
+        caps["metal_cache_mb"] = int(metal.get_cache_memory() / (1024 * 1024))
+        if hasattr(metal, "device_info"):
+            info = metal.device_info()
+            if isinstance(info, dict):
+                mem = info.get("memory_size", 0)
+                if mem > 0:
+                    caps["gpu_memory_mb"] = int(mem / (1024 * 1024))
+    except Exception:
+        pass
+
+
+def _check_mps() -> bool:
+    try:
+        import torch
+        return hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+    except ImportError:
+        return False
+
+
+def _fallback_hardware_profile(caps: dict[str, Any]) -> None:
+    try:
+        from ..utils.hardware import get_hardware_profile
+        profile = get_hardware_profile()
+        for gpu in profile.get("gpu", []):
+            if gpu.get("type") in ("metal", "cuda", "rocm") and gpu.get("vram_gb", 0) > 0:
+                vram_mb = int(gpu["vram_gb"] * 1024)
+                if vram_mb > caps["gpu_memory_mb"]:
+                    caps["gpu_memory_mb"] = vram_mb
+                    caps["gpu_backend"] = gpu["type"]
+                    caps["gpu_name"] = gpu.get("name", caps["gpu_name"])
+                break
+        ram_gb = profile.get("ram", {}).get("total_gb", 0)
+        if ram_gb > 0 and caps["system_memory_mb"] < int(ram_gb * 1024):
+            caps["system_memory_mb"] = int(ram_gb * 1024)
+        caps["disk_free_gb"] = profile.get("disk", {}).get("free_gb", caps["disk_free_gb"])
+    except Exception:
+        pass
+
+
+def _detect_disk(caps: dict[str, Any]) -> None:
+    try:
+        import shutil
+        from pathlib import Path
+        usage = shutil.disk_usage(str(Path.home()))
+        caps["disk_free_gb"] = round(usage.free / (1024 ** 3), 1)
+    except Exception:
+        pass
