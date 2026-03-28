@@ -111,6 +111,9 @@ side_inputs:
   required: false
 maturity: stable
 exportable: true
-requires: []
+requires:
+  - torch
+  - transformers
+  - datasets
 execution:
   isolation: inprocess

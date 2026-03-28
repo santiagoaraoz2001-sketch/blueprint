@@ -8,7 +8,7 @@ import { usePipelineStore, type BlockNodeData, type NodeExecutionState } from '@
 import { useRunStore } from '@/stores/runStore'
 import { useValidationStore, type NodeValidationError } from '@/stores/validationStore'
 import { OVERLAY_COLORS } from './InheritanceOverlay'
-import { AlertTriangle, Clock, Lock, StickyNote } from 'lucide-react'
+import { AlertTriangle, Clock, Lock, StickyNote, HelpCircle } from 'lucide-react'
 import { estimatePipeline, formatTimeShort } from '@/lib/pipeline-estimator'
 
 function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; selected?: boolean }) {
@@ -472,6 +472,37 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
             {data.label}
           </div>
         </div>
+        {/* Doc button — visible on hover */}
+        {isHovered && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              const rect = e.currentTarget.getBoundingClientRect()
+              window.dispatchEvent(new CustomEvent('blueprint:show-block-doc', {
+                detail: { blockType: data.type, anchor: { x: rect.right + 8, y: rect.top } },
+              }))
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 18,
+              height: 18,
+              borderRadius: 4,
+              background: `${T.surface4}`,
+              border: `1px solid ${T.border}`,
+              cursor: 'pointer',
+              padding: 0,
+              flexShrink: 0,
+              transition: 'background 0.1s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}20` }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = T.surface4 }}
+            title="Documentation"
+          >
+            <HelpCircle size={10} color={T.dim} />
+          </button>
+        )}
       </div>
 
       {/* Description — always visible */}
