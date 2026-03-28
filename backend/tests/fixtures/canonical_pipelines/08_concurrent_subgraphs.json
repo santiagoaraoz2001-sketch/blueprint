@@ -1,0 +1,92 @@
+{
+  "name": "concurrent_subgraphs",
+  "description": "Two completely independent subgraphs that can execute concurrently.",
+  "nodes": [
+    {
+      "id": "sg1_input",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Subgraph 1 Input",
+        "category": "data",
+        "config": {"text": "Subgraph 1 data"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "sg1_process",
+      "type": "blockNode",
+      "data": {
+        "type": "text_concatenator",
+        "label": "Subgraph 1 Process",
+        "category": "data",
+        "config": {"separator": " ", "template": "SG1: {text_a}", "trim_whitespace": true, "skip_empty": true},
+        "inputs": [
+          {"id": "text_a", "dataType": "text", "required": true},
+          {"id": "text_b", "dataType": "text", "required": true}
+        ],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "sg1_export",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Subgraph 1 Export",
+        "category": "endpoints",
+        "config": {"format": "json"},
+        "inputs": [{"id": "data", "dataType": "any", "required": true}],
+        "outputs": [
+          {"id": "file_path", "dataType": "artifact"},
+          {"id": "status", "dataType": "metrics"},
+          {"id": "summary", "dataType": "metrics"}
+        ]
+      }
+    },
+    {
+      "id": "sg2_input",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Subgraph 2 Input",
+        "category": "data",
+        "config": {"text": "Subgraph 2 data"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "sg2_export",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Subgraph 2 Export",
+        "category": "endpoints",
+        "config": {"format": "json"},
+        "inputs": [{"id": "data", "dataType": "any", "required": true}],
+        "outputs": [
+          {"id": "file_path", "dataType": "artifact"},
+          {"id": "status", "dataType": "metrics"},
+          {"id": "summary", "dataType": "metrics"}
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "sg1_input", "target": "sg1_process", "sourceHandle": "text", "targetHandle": "text_a"},
+    {"id": "e1b", "source": "sg1_input", "target": "sg1_process", "sourceHandle": "text", "targetHandle": "text_b"},
+    {"id": "e2", "source": "sg1_process", "target": "sg1_export", "sourceHandle": "text", "targetHandle": "data"},
+    {"id": "e3", "source": "sg2_input", "target": "sg2_export", "sourceHandle": "text", "targetHandle": "data"}
+  ],
+  "expected": {
+    "validation": "pass",
+    "execution_order": ["sg1_input", "sg2_input", "sg1_process", "sg2_export", "sg1_export"],
+    "final_status": "completed",
+    "expected_errors": [],
+    "partial_rerun_allowed": true,
+    "export_allowed": true,
+    "independent_subgraph_count": 2
+  }
+}
