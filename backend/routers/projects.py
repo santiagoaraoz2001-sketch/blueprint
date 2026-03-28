@@ -307,3 +307,45 @@ def _require_project(project_id: str, db: Session) -> Project:
     if not project:
         raise HTTPException(404, "Project not found")
     return project
+
+
+# ---------------------------------------------------------------------------
+# Project-scoped pipeline config overrides
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{project_id}/config")
+def get_project_config(project_id: str, db: Session = Depends(get_db)):
+    """Return project-level pipeline config overrides.
+
+    These sit between global workspace config and per-pipeline definition config
+    in the merge precedence chain: global → project → definition.
+    """
+    project = _require_project(project_id, db)
+    config = project.pipeline_config or {}
+
+    # Also return the effective merged config for context
+    from ..engine.config_merge import merge_workspace_config
+    effective = merge_workspace_config(project_id=project_id, db=db)
+
+    return {
+        "project_config": config,
+        "effective_config": effective,
+    }
+
+
+@router.put("/{project_id}/config")
+def update_project_config(project_id: str, body: dict, db: Session = Depends(get_db)):
+    """Update project-level pipeline config overrides.
+
+    Body: { "config": { key: value, ... } }
+    Replaces the entire project config dict.
+    """
+    project = _require_project(project_id, db)
+    new_config = body.get("config", {})
+    if not isinstance(new_config, dict):
+        raise HTTPException(400, "config must be a dict")
+    project.pipeline_config = new_config
+    db.commit()
+    db.refresh(project)
+    return {"ok": True, "config": project.pipeline_config}

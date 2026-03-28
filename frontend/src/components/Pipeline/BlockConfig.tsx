@@ -403,6 +403,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
 
   return (
     <motion.div
+      data-testid="block-config"
       data-tour="config-panel"
       initial={{ opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}

@@ -1,0 +1,140 @@
+{
+  "id": "simple-chat",
+  "name": "Simple Chat",
+  "description": "Select a model, send a prompt through chat completion, and export the response. The fastest way to test any LLM.",
+  "difficulty": "beginner",
+  "estimated_runtime": "5 min",
+  "required_services": [
+    "ollama"
+  ],
+  "required_capabilities": [],
+  "tags": [
+    "chat",
+    "inference",
+    "beginner"
+  ],
+  "nodes": [
+    {
+      "id": "sc_1",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 80
+      },
+      "data": {
+        "type": "model_selector",
+        "label": "Model Selector",
+        "category": "data",
+        "icon": "Box",
+        "accent": "#62B8D9",
+        "config": {},
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "sc_2",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 260
+      },
+      "data": {
+        "type": "text_input",
+        "label": "Prompt",
+        "category": "source",
+        "icon": "Type",
+        "accent": "#DE9A68",
+        "config": {
+          "text": "Explain machine learning in three sentences."
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "sc_3",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 440
+      },
+      "data": {
+        "type": "chat_completion",
+        "label": "Chat Completion",
+        "category": "inference",
+        "icon": "MessageSquare",
+        "accent": "#8FD07A",
+        "config": {
+          "temperature": 0.7,
+          "max_tokens": 512
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "sc_4",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 620
+      },
+      "data": {
+        "type": "data_export",
+        "label": "Save Response",
+        "category": "endpoints",
+        "icon": "Download",
+        "accent": "#56C4B0",
+        "config": {
+          "format": "txt",
+          "filename": "chat_response"
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "sc_e1",
+      "source": "sc_1",
+      "target": "sc_3",
+      "sourceHandle": "model",
+      "targetHandle": "model",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#A78BFA",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "sc_e2",
+      "source": "sc_2",
+      "target": "sc_3",
+      "sourceHandle": "text",
+      "targetHandle": "prompt",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#7B9BE3",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "sc_e3",
+      "source": "sc_3",
+      "target": "sc_4",
+      "sourceHandle": "response",
+      "targetHandle": "data",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#7B9BE3",
+        "strokeWidth": 1.5
+      }
+    }
+  ],
+  "default_config": {}
+}

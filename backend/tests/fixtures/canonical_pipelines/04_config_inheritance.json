@@ -1,0 +1,70 @@
+{
+  "name": "config_inheritance",
+  "description": "Workspace seed=42 propagates through DAG via config inheritance.",
+  "workspace_config": {
+    "seed": 42,
+    "temperature": 0.7
+  },
+  "nodes": [
+    {
+      "id": "input_node",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Input",
+        "category": "data",
+        "config": {"text": "Seed propagation test"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "llm_node",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "LLM with Inherited Config",
+        "category": "inference",
+        "config": {"model_name": "test-model"},
+        "inputs": [
+          {"id": "prompt", "dataType": "text", "required": true}
+        ],
+        "outputs": [
+          {"id": "response", "dataType": "text"},
+          {"id": "metadata", "dataType": "metrics"}
+        ]
+      }
+    },
+    {
+      "id": "export_node",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Export",
+        "category": "endpoints",
+        "config": {"format": "json"},
+        "inputs": [
+          {"id": "data", "dataType": "any", "required": true}
+        ],
+        "outputs": [
+          {"id": "file_path", "dataType": "artifact"},
+          {"id": "status", "dataType": "metrics"},
+          {"id": "summary", "dataType": "metrics"}
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "input_node", "target": "llm_node", "sourceHandle": "text", "targetHandle": "prompt"},
+    {"id": "e2", "source": "llm_node", "target": "export_node", "sourceHandle": "response", "targetHandle": "data"}
+  ],
+  "expected": {
+    "validation": "pass",
+    "execution_order": ["input_node", "llm_node", "export_node"],
+    "final_status": "completed",
+    "expected_errors": [],
+    "partial_rerun_allowed": true,
+    "export_allowed": true,
+    "notes": "workspace seed=42 should propagate to llm_node via config resolution"
+  }
+}

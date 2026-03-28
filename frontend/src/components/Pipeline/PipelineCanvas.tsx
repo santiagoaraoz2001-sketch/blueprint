@@ -30,6 +30,7 @@ import RerunOverlay from './RerunOverlay'
 import BlockSearch from '@/components/Search/BlockSearch'
 import BlockSuggestions from '@/components/Search/BlockSuggestions'
 import BlockDoc from '@/components/Blocks/BlockDoc'
+import ConfigInspector from '@/components/Config/ConfigInspector'
 
 const nodeTypes: NodeTypes = {
   blockNode: BlockNode as any,
@@ -83,6 +84,7 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
     y: number
     nodeId: string
   }>({ visible: false, x: 0, y: 0, nodeId: '' })
+  const [inspectNodeId, setInspectNodeId] = useState<string | null>(null)
 
   const [paletteParams, setPaletteParams] = useState<{
     visible: boolean
@@ -550,6 +552,7 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
 
   return (
     <div
+      data-testid="pipeline-canvas"
       ref={reactFlowRef}
       onDragLeave={onDragLeave}
       style={{
@@ -769,7 +772,16 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
         nodeId={contextMenu.nodeId}
         onClose={() => setContextMenu((p) => ({ ...p, visible: false }))}
         onShowDoc={(blockType) => showBlockDoc(blockType, { x: contextMenu.x, y: contextMenu.y })}
+        onInspectConfig={(nid) => setInspectNodeId(nid)}
       />
+
+      {/* Config Inspector panel */}
+      {inspectNodeId && (
+        <ConfigInspector
+          nodeId={inspectNodeId}
+          onClose={() => setInspectNodeId(null)}
+        />
+      )}
 
       {/* Re-run mode overlay */}
       <RerunOverlay />
