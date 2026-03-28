@@ -31,6 +31,10 @@ class CloneAsVariantRequest(BaseModel):
     variant_notes: str | None = None
 
 
+class PipelineHistoryUpdate(BaseModel):
+    history_json: str  # JSON-encoded undo/redo history
+
+
 class PipelineResponse(BaseModel):
     id: str
     name: str
@@ -43,6 +47,7 @@ class PipelineResponse(BaseModel):
     source_pipeline_id: str | None = None
     variant_notes: str | None = None
     config_diff: dict[str, Any] | None = None
+    history_json: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -20,6 +20,7 @@ import { useSettingsStore } from './settingsStore'
 import { DEMO_PIPELINE, DEMO_PIPELINES_LIST } from '@/lib/demo-data'
 import toast from 'react-hot-toast'
 import { useUIStore } from './uiStore'
+import { type HistoryEntry, inferOperationType, serializeHistory, serializeHistoryMeta, deserializeHistory } from '@/lib/history'
 
 /** Shape of the pipeline definition JSON blob stored in the database */
 export interface PipelineDefinition {
@@ -62,8 +63,8 @@ export interface PipelineTab {
   pipelineId: string | null  // backend pipeline ID
   isDirty: boolean
   runStatus: 'idle' | 'running' | 'complete' | 'failed' | 'cancelled'
-  past: { nodes: Node<BlockNodeData>[]; edges: Edge[] }[]
-  future: { nodes: Node<BlockNodeData>[]; edges: Edge[] }[]
+  past: HistoryEntry[]
+  future: HistoryEntry[]
 }
 
 export interface PipelineSnapshot {
@@ -176,12 +177,14 @@ interface PipelineState {
   tabs: PipelineTab[]
   activeTabId: string
 
-  // Undo/Redo history
-  past: { nodes: Node<BlockNodeData>[]; edges: Edge[] }[]
-  future: { nodes: Node<BlockNodeData>[]; edges: Edge[] }[]
+  // Undo/Redo history (with metadata for timeline display)
+  past: HistoryEntry[]
+  future: HistoryEntry[]
   pushHistory: () => void
   undo: () => void
   redo: () => void
+  /** Persist current undo/redo history to backend */
+  persistHistory: () => void
 
   // Version history
   versions: PipelineSnapshot[]
@@ -347,11 +350,72 @@ function _migrateEdgeHandles(edges: Edge[], nodes: Node<BlockNodeData>[]): Edge[
 /**
  * Helper: pushes a history snapshot onto the undo stack inside an Immer draft.
  * Uses current() from immer to get plain copies of the draft nodes/edges.
+ * Includes metadata (description, type, timestamp) for HistoryTimeline display.
  */
-function _pushHistory(state: { nodes: Node<BlockNodeData>[]; edges: Edge[]; past: { nodes: Node<BlockNodeData>[]; edges: Edge[] }[]; future: { nodes: Node<BlockNodeData>[]; edges: Edge[] }[] }) {
-  state.past.push({ nodes: current(state.nodes), edges: current(state.edges) })
+function _pushHistory(state: { nodes: Node<BlockNodeData>[]; edges: Edge[]; past: HistoryEntry[]; future: HistoryEntry[] }) {
+  const currNodes = current(state.nodes)
+  const currEdges = current(state.edges)
+
+  // Infer what changed from the previous snapshot
+  const prev = state.past.length > 0
+    ? state.past[state.past.length - 1]
+    : { nodes: [] as Node<BlockNodeData>[], edges: [] as Edge[] }
+  const { type, description } = inferOperationType(prev.nodes, prev.edges, currNodes, currEdges)
+
+  state.past.push({
+    nodes: currNodes,
+    edges: currEdges,
+    description,
+    type,
+    timestamp: new Date().toISOString(),
+  })
   if (state.past.length > 50) state.past.splice(0, state.past.length - 50)
   state.future = []
+}
+
+/** Debounce timer for history persistence */
+let _historyPersistTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Tracks whether a debounced persist is pending (for beforeunload flush). */
+let _historyPersistPending = false
+
+/**
+ * Flush pending history persistence synchronously via navigator.sendBeacon().
+ * Called on beforeunload to ensure no history is lost when the tab closes.
+ * sendBeacon is fire-and-forget, non-blocking, and survives page unload.
+ */
+function _flushHistoryBeacon() {
+  if (!_historyPersistPending) return
+  _historyPersistPending = false
+  if (_historyPersistTimer) {
+    clearTimeout(_historyPersistTimer)
+    _historyPersistTimer = null
+  }
+
+  const state = usePipelineStore.getState()
+  if (!state.id) return
+
+  const BASE_URL = import.meta.env.VITE_API_URL || '/api'
+
+  // Tier 1: lightweight metadata → DB (via POST for sendBeacon compat)
+  const metaBlob = new Blob(
+    [JSON.stringify({ history_json: serializeHistoryMeta(state.past, state.future) })],
+    { type: 'application/json' },
+  )
+  navigator.sendBeacon(`${BASE_URL}/pipelines/${state.id}/history`, metaBlob)
+
+  // Tier 2: full snapshots → SNAPSHOTS_DIR file
+  const { json } = serializeHistory(state.past, state.future)
+  const snapshotBlob = new Blob(
+    [JSON.stringify({ history_snapshots: json })],
+    { type: 'application/json' },
+  )
+  navigator.sendBeacon(`${BASE_URL}/pipelines/${state.id}/history/snapshots`, snapshotBlob)
+}
+
+// Register beforeunload handler once at module load time
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', _flushHistoryBeacon)
 }
 
 export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
@@ -376,15 +440,19 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
   inheritanceOverlay: null,
 
   pushHistory: () => set((state) => {
-    state.past.push({ nodes: current(state.nodes), edges: current(state.edges) })
-    if (state.past.length > 50) state.past.splice(0, state.past.length - 50)
-    state.future = []
+    _pushHistory(state)
   }),
 
   undo: () => set((state) => {
     if (state.past.length === 0) return
     const previous = state.past.pop()!
-    state.future.unshift({ nodes: current(state.nodes), edges: current(state.edges) })
+    state.future.unshift({
+      nodes: current(state.nodes),
+      edges: current(state.edges),
+      description: 'Current state',
+      type: 'unknown',
+      timestamp: new Date().toISOString(),
+    })
     state.nodes = previous.nodes
     state.edges = previous.edges
     state.isDirty = true
@@ -394,12 +462,41 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
   redo: () => set((state) => {
     if (state.future.length === 0) return
     const next = state.future.shift()!
-    state.past.push({ nodes: current(state.nodes), edges: current(state.edges) })
+    state.past.push({
+      nodes: current(state.nodes),
+      edges: current(state.edges),
+      description: 'Before redo',
+      type: 'unknown',
+      timestamp: new Date().toISOString(),
+    })
     state.nodes = next.nodes
     state.edges = next.edges
     state.isDirty = true
     state.selectedNodeId = null
   }),
+
+  persistHistory: () => {
+    const { id, past, future } = get()
+    if (!id) return
+    // Mark pending so beforeunload can flush if the tab closes
+    _historyPersistPending = true
+    // Debounce: only persist after 2 seconds of inactivity
+    if (_historyPersistTimer) clearTimeout(_historyPersistTimer)
+    _historyPersistTimer = setTimeout(() => {
+      _historyPersistPending = false
+
+      // Tier 1: lightweight metadata → DB column (tiny, fast)
+      api.put(`/pipelines/${id}/history`, {
+        history_json: serializeHistoryMeta(past, future),
+      }).catch(() => {})
+
+      // Tier 2: full snapshots → SNAPSHOTS_DIR file (size-gated)
+      const { json } = serializeHistory(past, future)
+      api.put(`/pipelines/${id}/history/snapshots`, {
+        history_snapshots: json,
+      }).catch(() => {})
+    }, 2000)
+  },
 
   onNodesChange: (changes) => {
     // Determine if we should save undo history for this change batch.
@@ -908,6 +1005,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
       const pipeline = await api.get<PipelineResponse>(`/pipelines/${id}`)
       const def = (pipeline.definition || {}) as PipelineDefinition
       const hydratedNodes = _hydrateNodePorts((def.nodes || []) as any[])
+
       set({
         id: pipeline.id,
         name: pipeline.name,
@@ -920,7 +1018,22 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
         propagationKeys: null,
         configDiff: (pipeline as any).config_diff || null,
         pipelineNotes: (pipeline as any).notes || '',
+        past: [],
+        future: [],
       })
+
+      // Restore full undo/redo history from SNAPSHOTS_DIR file (async, non-blocking)
+      api.get<{ exists: boolean; history_snapshots: string | null }>(
+        `/pipelines/${id}/history/snapshots`
+      ).then((res) => {
+        if (res.exists && res.history_snapshots) {
+          const restored = deserializeHistory(res.history_snapshots)
+          set({ past: restored.past, future: restored.future })
+        }
+      }).catch(() => {
+        // Fall back to DB metadata (no full snapshots, but timeline still works)
+      })
+
       // Resolve config inheritance after loading pipeline
       get().resolveConfigs(id)
     } catch {
@@ -966,10 +1079,13 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
       set({ id: created.id })
     }
     set({ isDirty: false })
-    // Re-resolve config inheritance with persisted data
+    // Persist history alongside save
     const pipelineId = get().id
     if (pipelineId) {
+      // Re-resolve config inheritance with persisted data
       get().resolveConfigs(pipelineId)
+      // Persist undo/redo history
+      get().persistHistory()
     }
   },
 

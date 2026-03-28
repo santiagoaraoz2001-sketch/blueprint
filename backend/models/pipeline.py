@@ -17,5 +17,6 @@ class Pipeline(Base):
     source_pipeline_id = Column(String, ForeignKey("blueprint_pipelines.id"), nullable=True)
     variant_notes = Column(Text, nullable=True)  # Why this variant exists
     config_diff = Column(JSON, nullable=True)  # Config keys that differ from source
+    history_json = Column(Text, nullable=True)  # Serialized undo/redo history (last 50 entries)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

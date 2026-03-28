@@ -14,7 +14,7 @@ import BackendValidationPanel from '@/components/Validation/ValidationPanel'
 import PipelineTabBar from '@/components/Pipeline/PipelineTabBar'
 import { validatePipelineClient, type DiagnosticReport } from '@/lib/pipeline-validator'
 import PipelineMonitor, { type MonitorBlock } from '@/components/Pipeline/PipelineMonitor'
-import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp, AlertCircle, WifiOff } from 'lucide-react'
+import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp, AlertCircle, WifiOff, History } from 'lucide-react'
 import TemplateGallery from '@/components/Pipeline/TemplateGallery'
 import TemplateLanding from '@/components/Templates/TemplateLanding'
 import ToolbarDropdown from '@/components/Pipeline/ToolbarDropdown'
@@ -22,6 +22,10 @@ import MissionController from '@/components/Mission/MissionController'
 import { useRunStore } from '@/stores/runStore'
 import { useValidationStore } from '@/stores/validationStore'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import KeyboardCheatsheet from '@/components/Pipeline/KeyboardCheatsheet'
+import HistoryTimeline from '@/components/History/HistoryTimeline'
+import AutosaveRecoveryDialog from '@/components/Pipeline/AutosaveRecoveryDialog'
+import { checkAutosave, discardAutosave } from '@/hooks/useAutoSave'
 import toast from 'react-hot-toast'
 
 const btnStyle: React.CSSProperties = {
@@ -111,6 +115,13 @@ export default function PipelineEditorView() {
   const [validating, setValidating] = useState(false)
   const [showMonitor, setShowMonitor] = useState(false)
   const [showPipelineNotes, setShowPipelineNotes] = useState(false)
+  const [showCheatsheet, setShowCheatsheet] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [recoveryData, setRecoveryData] = useState<{
+    pipelineId: string
+    timestamp: string
+    definition: any
+  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Run monitor state from store — SSE is handled exclusively by RunControls
@@ -181,6 +192,27 @@ export default function PipelineEditorView() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [undo, redo, handleSave])
+
+  // Check for autosave recovery when pipeline loads
+  useEffect(() => {
+    if (!pipelineId) return
+    checkAutosave(pipelineId).then((result) => {
+      if (result?.exists && result.timestamp && result.definition) {
+        setRecoveryData({
+          pipelineId,
+          timestamp: result.timestamp,
+          definition: result.definition,
+        })
+      }
+    })
+  }, [pipelineId])
+
+  // Listen for cheatsheet toggle from canvas shortcuts
+  useEffect(() => {
+    const handler = () => setShowCheatsheet((v) => !v)
+    window.addEventListener('blueprint:toggle-cheatsheet', handler)
+    return () => window.removeEventListener('blueprint:toggle-cheatsheet', handler)
+  }, [])
 
   // Warn before closing tab with unsaved changes
   useEffect(() => {
@@ -481,6 +513,19 @@ export default function PipelineEditorView() {
           >
             <Redo2 size={12} />
           </button>
+
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            style={{
+              ...btnStyle,
+              color: showHistory ? T.cyan : T.dim,
+              border: showHistory ? `1px solid ${T.cyan}50` : `1px solid ${T.border}`,
+              background: showHistory ? `${T.cyan}10` : 'transparent',
+            }}
+            title="History Timeline"
+          >
+            <History size={12} />
+          </button>
         </div>
 
         <div style={{ width: 1, height: 14, background: T.border }} />
@@ -769,6 +814,12 @@ export default function PipelineEditorView() {
           logs={runLogs}
           onClose={() => setShowMonitor(false)}
         />
+
+        {/* History timeline panel */}
+        <HistoryTimeline
+          visible={showHistory}
+          onClose={() => setShowHistory(false)}
+        />
       </div>
 
       {/* Template selector: show on button click */}
@@ -799,6 +850,42 @@ export default function PipelineEditorView() {
         confirmColor={T.amber}
         onConfirm={() => { newPipeline(); setShowNewConfirm(false) }}
         onCancel={() => setShowNewConfirm(false)}
+      />
+
+      {/* Keyboard shortcuts cheatsheet */}
+      <KeyboardCheatsheet
+        visible={showCheatsheet}
+        onClose={() => setShowCheatsheet(false)}
+      />
+
+      {/* Autosave recovery dialog */}
+      <AutosaveRecoveryDialog
+        open={!!recoveryData}
+        timestamp={recoveryData?.timestamp || ''}
+        onRestore={() => {
+          if (recoveryData) {
+            const def = recoveryData.definition
+            if (def && Array.isArray(def.nodes)) {
+              // Restore autosaved state into the current pipeline (preserving ID)
+              const store = usePipelineStore.getState()
+              store.pushHistory() // save current state so user can undo the restore
+              usePipelineStore.setState({
+                nodes: def.nodes,
+                edges: def.edges || [],
+                isDirty: true,
+              })
+              toast.success('Unsaved changes restored')
+            }
+            discardAutosave(recoveryData.pipelineId)
+          }
+          setRecoveryData(null)
+        }}
+        onDiscard={() => {
+          if (recoveryData) {
+            discardAutosave(recoveryData.pipelineId)
+          }
+          setRecoveryData(null)
+        }}
       />
     </div>
   )

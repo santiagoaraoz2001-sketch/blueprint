@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useUIStore } from '@/stores/uiStore'
 import { useProjectStore } from '@/stores/projectStore'
@@ -6,21 +6,38 @@ import { usePipelineStore } from '@/stores/pipelineStore'
 import { useGuideStore } from '@/stores/guideStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { DEMO_RUNS } from '@/lib/demo-data'
+import { getAllBlocks } from '@/lib/block-registry'
 import {
   FileText, GitBranch, Play, LayoutDashboard, BarChart3,
   Database, Blocks, BookOpen, PanelLeftClose, Activity,
-  Settings, Wrench, MessageSquare, LineChart,
+  Settings, Wrench, MessageSquare, LineChart, Save,
+  ShieldCheck, FileDown, Keyboard, HelpCircle, Plus,
+  CornerDownLeft,
 } from 'lucide-react'
+
+const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0
+const mod = isMac ? '\u2318' : 'Ctrl'
+const shift = isMac ? '\u21E7' : 'Shift'
+
+type PaletteCategory = 'Recent' | 'Action' | 'Navigation' | 'Block' | 'Help' | 'Project' | 'Pipeline' | 'Run'
 
 interface PaletteItem {
   id: string
   label: string
   subtitle?: string
-  category: 'Project' | 'Pipeline' | 'Run' | 'Navigation' | 'Action'
+  category: PaletteCategory
   icon: React.ReactNode
   action: () => void
-  /** Searchable text beyond label */
   searchText: string
+  shortcut?: string
+}
+
+// Persist recent actions across palette opens (session-scoped)
+let _recentActionIds: string[] = []
+const MAX_RECENT = 5
+
+function trackRecent(id: string) {
+  _recentActionIds = [id, ..._recentActionIds.filter((r) => r !== id)].slice(0, MAX_RECENT)
 }
 
 export default function CommandPalette() {
@@ -42,11 +59,58 @@ export default function CommandPalette() {
   const demoMode = useSettingsStore((s) => s.demoMode)
   const features = useSettingsStore((s) => s.features)
 
-  // Build items list
   const items = useMemo(() => {
     const result: PaletteItem[] = []
 
-    // Navigation commands
+    // ── Actions ──
+    result.push({
+      id: 'action-run', label: 'Run Pipeline', category: 'Action',
+      icon: <Play size={14} />, shortcut: `${mod}+\u23CE`,
+      action: () => {
+        setView('editor')
+        setTimeout(() => {
+          const btn = document.querySelector('[data-tour="btn-run-pipeline"]') as HTMLButtonElement
+          if (btn) btn.click()
+        }, 100)
+      },
+      searchText: 'run execute pipeline start',
+    })
+    result.push({
+      id: 'action-save', label: 'Save Pipeline', category: 'Action',
+      icon: <Save size={14} />, shortcut: `${mod}+S`,
+      action: () => usePipelineStore.getState().savePipeline(),
+      searchText: 'save pipeline persist',
+    })
+    result.push({
+      id: 'action-export', label: 'Export Pipeline JSON', category: 'Action',
+      icon: <FileDown size={14} />,
+      action: () => usePipelineStore.getState().exportPipeline(),
+      searchText: 'export download json pipeline',
+    })
+    result.push({
+      id: 'action-validate', label: 'Validate Pipeline', category: 'Action',
+      icon: <ShieldCheck size={14} />,
+      action: () => {
+        setView('editor')
+        // Trigger validation via custom event
+        window.dispatchEvent(new CustomEvent('blueprint:validate-pipeline'))
+      },
+      searchText: 'validate check pipeline errors',
+    })
+    result.push({
+      id: 'action-guide', label: 'Toggle Guide', category: 'Action',
+      icon: <BookOpen size={14} />,
+      action: toggleGuide,
+      searchText: 'toggle guide help tutorial',
+    })
+    result.push({
+      id: 'action-sidebar', label: 'Toggle Sidebar', category: 'Action',
+      icon: <PanelLeftClose size={14} />,
+      action: toggleSidebar,
+      searchText: 'toggle sidebar collapse panel',
+    })
+
+    // ── Navigation ──
     const navItems: { id: string; label: string; view: Parameters<typeof setView>[0]; icon: React.ReactNode }[] = [
       { id: 'nav-dashboard', label: 'Go to Dashboard', view: 'dashboard', icon: <LayoutDashboard size={14} /> },
       { id: 'nav-editor', label: 'Go to Pipeline Editor', view: 'editor', icon: <GitBranch size={14} /> },
@@ -66,26 +130,46 @@ export default function CommandPalette() {
         result.push({
           id, label, category: 'Navigation', icon,
           action: () => setView(view),
-          searchText: label,
+          searchText: label.toLowerCase(),
         })
       })
 
-    // Actions
+    // ── Help ──
     result.push({
-      id: 'action-guide', label: 'Toggle Guide', category: 'Action',
-      icon: <BookOpen size={14} />, action: toggleGuide, searchText: 'toggle guide help',
+      id: 'help-shortcuts', label: 'Keyboard Shortcuts', category: 'Help',
+      icon: <Keyboard size={14} />, shortcut: `${shift}+?`,
+      action: () => window.dispatchEvent(new CustomEvent('blueprint:toggle-cheatsheet')),
+      searchText: 'keyboard shortcuts hotkeys keybindings',
     })
     result.push({
-      id: 'action-sidebar', label: 'Toggle Sidebar', category: 'Action',
-      icon: <PanelLeftClose size={14} />, action: toggleSidebar, searchText: 'toggle sidebar collapse',
+      id: 'help-docs', label: 'Open Documentation', category: 'Help',
+      icon: <HelpCircle size={14} />,
+      action: () => window.open('https://github.com/specificlabs/blueprint', '_blank'),
+      searchText: 'documentation docs readme help',
     })
 
-    // Projects
+    // ── Blocks ──
+    getAllBlocks().forEach((block) => {
+      result.push({
+        id: `block-${block.type}`,
+        label: `Add ${block.name}`,
+        subtitle: block.category,
+        category: 'Block',
+        icon: <Plus size={14} />,
+        action: () => {
+          setView('editor')
+          setTimeout(() => usePipelineStore.getState().addNode(block.type, { x: 400, y: 300 }), 100)
+        },
+        searchText: `${block.name} ${block.category} ${block.type} block add`.toLowerCase(),
+      })
+    })
+
+    // ── Projects ──
     projects.forEach((p) => {
       result.push({
         id: `project-${p.id}`,
         label: p.name,
-        subtitle: [p.paper_number, p.status].filter(Boolean).join(' · '),
+        subtitle: [p.paper_number, p.status].filter(Boolean).join(' \u00B7 '),
         category: 'Project',
         icon: <FileText size={14} />,
         action: () => navigateToPaperDetail(p.id),
@@ -93,7 +177,7 @@ export default function CommandPalette() {
       })
     })
 
-    // Pipelines
+    // ── Pipelines ──
     pipelines.forEach((p) => {
       result.push({
         id: `pipeline-${p.id}`,
@@ -101,21 +185,18 @@ export default function CommandPalette() {
         subtitle: `${p.block_count} blocks`,
         category: 'Pipeline',
         icon: <GitBranch size={14} />,
-        action: () => {
-          loadPipeline(p.id)
-          setView('editor')
-        },
+        action: () => { loadPipeline(p.id); setView('editor') },
         searchText: `${p.name} pipeline`.toLowerCase(),
       })
     })
 
-    // Recent runs
+    // ── Recent runs ──
     if (demoMode) {
       DEMO_RUNS.forEach((r) => {
         result.push({
           id: `run-${r.id}`,
           label: `Run ${r.id}`,
-          subtitle: `${r.status} · ${new Date(r.started_at).toLocaleDateString()}`,
+          subtitle: `${r.status} \u00B7 ${new Date(r.started_at).toLocaleDateString()}`,
           category: 'Run',
           icon: <Play size={14} />,
           action: () => navigateToMonitor(r.id),
@@ -127,9 +208,19 @@ export default function CommandPalette() {
     return result
   }, [projects, pipelines, demoMode, features, setView, navigateToMonitor, navigateToPaperDetail, loadPipeline, toggleGuide, toggleSidebar])
 
-  // Filter
+  // Build filtered + recent results
   const filtered = useMemo(() => {
-    if (!search) return items.slice(0, 8)
+    if (!search) {
+      // Show recent actions first, then default items
+      const recentItems = _recentActionIds
+        .map((id) => items.find((it) => it.id === id))
+        .filter(Boolean) as PaletteItem[]
+      const recentIds = new Set(_recentActionIds)
+      const defaultItems = items
+        .filter((it) => !recentIds.has(it.id))
+        .slice(0, 10 - recentItems.length)
+      return [...recentItems, ...defaultItems]
+    }
     const q = search.toLowerCase()
     return items
       .filter((item) =>
@@ -137,7 +228,7 @@ export default function CommandPalette() {
         (item.subtitle?.toLowerCase().includes(q)) ||
         item.searchText.includes(q)
       )
-      .slice(0, 8)
+      .slice(0, 12)
   }, [items, search])
 
   // Keyboard: Cmd+K to open, Escape to close
@@ -158,17 +249,12 @@ export default function CommandPalette() {
     return () => window.removeEventListener('keydown', handler)
   }, [open])
 
-  // Focus input when opened
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 50)
   }, [open])
 
-  // Reset selection on search change
-  useEffect(() => {
-    setSelectedIndex(0)
-  }, [search])
+  useEffect(() => { setSelectedIndex(0) }, [search])
 
-  // Scroll selected item into view
   useEffect(() => {
     if (listRef.current) {
       const el = listRef.current.children[selectedIndex] as HTMLElement
@@ -176,10 +262,11 @@ export default function CommandPalette() {
     }
   }, [selectedIndex])
 
-  const execute = (item: PaletteItem) => {
+  const execute = useCallback((item: PaletteItem) => {
+    trackRecent(item.id)
     item.action()
     setOpen(false)
-  }
+  }, [])
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
@@ -196,6 +283,10 @@ export default function CommandPalette() {
 
   if (!open) return null
 
+  // Group items by category for display when no search
+  const showRecent = !search && _recentActionIds.length > 0
+  const recentCount = showRecent ? Math.min(_recentActionIds.length, MAX_RECENT) : 0
+
   return (
     <div
       style={{
@@ -208,7 +299,7 @@ export default function CommandPalette() {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 600, maxHeight: 400,
+          width: 600, maxHeight: 460,
           background: T.surface2, border: `1px solid ${T.borderHi}`,
           boxShadow: `0 16px 48px ${T.shadowHeavy}`,
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -221,7 +312,7 @@ export default function CommandPalette() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search projects, pipelines, runs, or type a command..."
+            placeholder="Type a command or search..."
             style={{
               width: '100%', background: 'none', border: 'none', outline: 'none',
               color: T.text, fontFamily: F, fontSize: FS.lg, letterSpacing: '0.02em',
@@ -231,53 +322,98 @@ export default function CommandPalette() {
 
         {/* Results */}
         <div ref={listRef} style={{ flex: 1, overflow: 'auto', padding: '4px 0' }}>
-          {filtered.map((item, i) => (
-            <div
-              key={item.id}
-              onClick={() => execute(item)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '8px 16px',
-                background: i === selectedIndex ? `${T.cyan}12` : 'transparent',
-                borderLeft: i === selectedIndex ? `2px solid ${T.cyan}` : '2px solid transparent',
-                cursor: 'pointer', transition: 'background 0.1s',
-              }}
-              onMouseEnter={() => setSelectedIndex(i)}
-            >
-              {/* Icon */}
-              <span style={{ color: i === selectedIndex ? T.cyan : T.dim, flexShrink: 0 }}>
-                {item.icon}
-              </span>
+          {/* Recent section header */}
+          {showRecent && (
+            <div style={{
+              padding: '6px 16px 2px',
+              fontFamily: F, fontSize: FS.xxs, fontWeight: 700,
+              color: T.dim, letterSpacing: '0.1em', textTransform: 'uppercase',
+            }}>
+              RECENT
+            </div>
+          )}
 
-              {/* Title + Subtitle */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontFamily: F, fontSize: FS.sm,
-                  color: i === selectedIndex ? T.text : T.sec,
-                  fontWeight: i === selectedIndex ? 700 : 400,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {item.label}
-                </div>
-                {item.subtitle && (
+          {filtered.map((item, i) => {
+            // Insert category header between recent and other items
+            const showCategoryBreak = showRecent && i === recentCount
+            return (
+              <div key={item.id}>
+                {showCategoryBreak && (
                   <div style={{
-                    fontFamily: F, fontSize: FS.xxs, color: T.dim, marginTop: 1,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    padding: '8px 16px 2px',
+                    fontFamily: F, fontSize: FS.xxs, fontWeight: 700,
+                    color: T.dim, letterSpacing: '0.1em', textTransform: 'uppercase',
+                    borderTop: `1px solid ${T.border}`, marginTop: 2,
                   }}>
-                    {item.subtitle}
+                    COMMANDS
                   </div>
                 )}
-              </div>
+                <div
+                  onClick={() => execute(item)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 16px',
+                    background: i === selectedIndex ? `${T.cyan}12` : 'transparent',
+                    borderLeft: i === selectedIndex ? `2px solid ${T.cyan}` : '2px solid transparent',
+                    cursor: 'pointer', transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={() => setSelectedIndex(i)}
+                >
+                  <span style={{ color: i === selectedIndex ? T.cyan : T.dim, flexShrink: 0 }}>
+                    {item.icon}
+                  </span>
 
-              {/* Category badge */}
-              <span style={{
-                fontFamily: F, fontSize: FS.xxs, color: T.dim,
-                letterSpacing: '0.08em', flexShrink: 0,
-              }}>
-                {item.category}
-              </span>
-            </div>
-          ))}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontFamily: F, fontSize: FS.sm,
+                      color: i === selectedIndex ? T.text : T.sec,
+                      fontWeight: i === selectedIndex ? 700 : 400,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {item.label}
+                    </div>
+                    {item.subtitle && (
+                      <div style={{
+                        fontFamily: F, fontSize: FS.xxs, color: T.dim, marginTop: 1,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {item.subtitle}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Shortcut hint (right-aligned, gray) */}
+                  {item.shortcut && (
+                    <kbd style={{
+                      fontFamily: "'JetBrains Mono','SF Mono','Fira Code',monospace",
+                      fontSize: FS.xxs,
+                      color: T.dim,
+                      background: T.surface4,
+                      border: `1px solid ${T.border}`,
+                      padding: '1px 6px',
+                      letterSpacing: '0.04em',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                    }}>
+                      {item.shortcut}
+                    </kbd>
+                  )}
+
+                  {/* Category badge */}
+                  <span style={{
+                    fontFamily: F, fontSize: FS.xxs, color: T.dim,
+                    letterSpacing: '0.08em', flexShrink: 0,
+                  }}>
+                    {item.category}
+                  </span>
+
+                  {i === selectedIndex && (
+                    <CornerDownLeft size={10} color={T.dim} style={{ flexShrink: 0, marginLeft: 2 }} />
+                  )}
+                </div>
+              </div>
+            )
+          })}
           {filtered.length === 0 && (
             <div style={{ padding: '20px 16px', textAlign: 'center' }}>
               <span style={{ fontFamily: F, fontSize: FS.sm, color: T.dim }}>No results found</span>
