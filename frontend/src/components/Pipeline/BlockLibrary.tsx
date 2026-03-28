@@ -240,6 +240,7 @@ export default function BlockLibrary() {
 
   return (
     <div
+      data-testid="block-library"
       style={{
         width: 300,
         minWidth: 300,

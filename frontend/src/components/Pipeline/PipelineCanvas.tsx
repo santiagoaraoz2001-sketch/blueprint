@@ -502,6 +502,7 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
 
   return (
     <div
+      data-testid="pipeline-canvas"
       ref={reactFlowRef}
       onDragLeave={onDragLeave}
       style={{

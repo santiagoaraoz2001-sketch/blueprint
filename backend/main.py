@@ -24,7 +24,7 @@ from .routers import (
     artifacts, block_generator, blocks, connectors, control_tower, custom_blocks,
     datasets, events, execution, inference, marketplace, models, outputs,
     papers, pipelines, plugins, projects, registry, runs, secrets, sweeps,
-    system, workspace,
+    system, templates, workspace,
 )
 from .utils.structured_logger import init_structured_logging, log_event, log_recovery
 
@@ -171,6 +171,12 @@ async def lifespan(app: FastAPI):
     registry.discover_all([BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR])
     app.state.registry = registry
     set_global_registry(registry)
+
+    # Initialize template service with registry for block validation
+    from .services.templates import TemplateService, set_template_service
+    tpl_svc = TemplateService(registry=registry)
+    set_template_service(tpl_svc)
+
     health = registry.get_health()
     logging.getLogger("blueprint.registry").info(
         "Block registry ready: %d total, %d valid, %d broken",
@@ -272,6 +278,7 @@ app.include_router(outputs.router)
 app.include_router(workspace.router)
 app.include_router(artifacts.router)
 app.include_router(registry.router)
+app.include_router(templates.router)
 if ENABLE_MARKETPLACE:
     app.include_router(marketplace.router)
 
