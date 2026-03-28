@@ -10,8 +10,10 @@ import yaml
 
 from backend.models.block_schema import (
     VALID_DATA_TYPES,
+    VALID_RULE_OPERATORS,
     BlockSchema,
     ConfigField,
+    ConfigValidationRule,
     PortSchema,
 )
 
@@ -126,6 +128,20 @@ class BlockRegistryService:
         side_inputs = [_parse_port(p) for p in raw.get("side_inputs", [])]
         config = _parse_config(raw.get("config", {}))
 
+        # Parse declarative cross-field validation rules
+        config_validation: list[ConfigValidationRule] = []
+        for rule_raw in raw.get("config_validation", []):
+            if not isinstance(rule_raw, dict):
+                continue
+            op = rule_raw.get("op", "")
+            if op not in VALID_RULE_OPERATORS:
+                logger.warning("Block %s: skipping rule with unknown op %r", yaml_path, op)
+                continue
+            try:
+                config_validation.append(ConfigValidationRule(**rule_raw))
+            except Exception as exc:
+                logger.warning("Block %s: invalid validation rule: %s", yaml_path, exc)
+
         version_str = str(raw.get("version", "0.1.0"))
         maturity = raw.get("maturity", "stable")
 
@@ -138,6 +154,7 @@ class BlockRegistryService:
             inputs=inputs,
             outputs=outputs,
             config=config,
+            config_validation=config_validation,
             side_inputs=side_inputs,
             source_type=source_type,
             source_path=str(yaml_path.parent),

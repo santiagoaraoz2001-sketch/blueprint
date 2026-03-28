@@ -54,6 +54,11 @@ CATEGORY_ACCENTS: dict[str, str] = {
     "interventions": "#FBBF24",
 }
 
+VALID_RULE_OPS = frozenset({
+    "lte", "gte", "lt", "gt", "eq", "neq",
+    "product_lte", "sum_lte", "required_if",
+})
+
 YAML_TYPE_MAP: dict[str, str] = {
     "string": "string",
     "integer": "integer",
@@ -128,6 +133,16 @@ class BlockDetailSchema(BaseModel):
     howItWorks: str | None = None
 
 
+class ConfigValidationRuleSchema(BaseModel):
+    fields: list[str]
+    op: str
+    value: float | int | None = None
+    condition_field: str | None = None
+    condition_value: Any = None
+    message: str = "Validation failed"
+    severity: str = "warning"
+
+
 class BlockSchema(BaseModel):
     type: str
     name: str
@@ -142,6 +157,7 @@ class BlockSchema(BaseModel):
     outputs: list[PortSchema] = []
     defaultConfig: dict[str, Any] = {}
     configFields: list[ConfigFieldSchema] = []
+    configValidation: list[ConfigValidationRuleSchema] = []
     detail: BlockDetailSchema | None = None
     deprecated: bool | None = None
     deprecatedMessage: str | None = None
@@ -273,6 +289,11 @@ def _load_block(yaml_path: Path, category: str) -> BlockSchema | None:
         outputs=[_convert_port(p) for p in schema.get("outputs", [])],
         defaultConfig=_extract_defaults(schema.get("config", {})),
         configFields=_convert_config_fields(schema.get("config", {})),
+        configValidation=[
+            ConfigValidationRuleSchema(**r)
+            for r in schema.get("config_validation", [])
+            if isinstance(r, dict) and r.get("op") in VALID_RULE_OPS
+        ],
     )
 
     # Side inputs
@@ -408,3 +429,36 @@ def refresh_registry():
         _version += 1
         logger.info("Registry refreshed: v%d, %d blocks, %d broken", _version, len(_blocks), len(_broken))
     return RegistryVersionResponse(version=_version)
+
+
+class ValidateConfigRequest(BaseModel):
+    block_type: str
+    config: dict[str, Any]
+
+
+class ConfigValidationResult(BaseModel):
+    fields: list[str]
+    message: str
+    severity: str
+    passed: bool
+
+
+@router.post("/validate-config", response_model=list[ConfigValidationResult])
+def validate_config(req: ValidateConfigRequest):
+    """Evaluate cross-field validation rules for a block config.
+
+    Returns only the FAILED rules as validation results.
+    """
+    from ..engine.config_rules import evaluate_rules
+
+    _ensure_loaded()
+    block = _blocks.get(req.block_type)
+    if not block:
+        raise HTTPException(404, f"Block type '{req.block_type}' not found")
+
+    rules = [r.model_dump() for r in block.configValidation]
+    if not rules:
+        return []
+
+    results = evaluate_rules(rules, req.config)
+    return [ConfigValidationResult(**r.to_dict()) for r in results]

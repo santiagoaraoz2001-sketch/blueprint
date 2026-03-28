@@ -52,6 +52,17 @@ export interface ConfigField {
   section?: string
 }
 
+/** Declarative cross-field validation rule from block.yaml config_validation section */
+export interface ConfigValidationRule {
+  fields: string[]
+  op: 'lte' | 'gte' | 'lt' | 'gt' | 'eq' | 'neq' | 'product_lte' | 'sum_lte' | 'required_if'
+  value?: number
+  condition_field?: string
+  condition_value?: any
+  message: string
+  severity: 'warning' | 'error'
+}
+
 export type BlockMaturity = 'stable' | 'beta' | 'experimental'
 
 export interface BlockDetail {
@@ -78,6 +89,7 @@ export interface BlockDefinition {
   outputs: PortDefinition[]
   defaultConfig: Record<string, any>
   configFields: ConfigField[]
+  configValidation?: ConfigValidationRule[]
   detail?: BlockDetail
   deprecated?: boolean
   deprecatedMessage?: string
