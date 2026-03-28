@@ -1,7 +1,8 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { T, F, FCODE, FS } from '@/lib/design-tokens'
 import { usePipelineStore, type BlockNodeData, INHERITABLE_KEYS, CONFIG_PROPAGATION_HANDLES, INHERITANCE_DENY_LIST } from '@/stores/pipelineStore'
 import { getBlockDefinition, getFileFormatWarning, type ConfigField, type ConnectorType } from '@/lib/block-registry'
 import { usePresetStore } from '@/stores/presetStore'
+import { evaluateConfigRules, getFieldValidationFailures, type ValidationFailure } from '@/lib/config-validation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getIcon } from '@/lib/icon-utils'
 import { Trash2, X, Save, ChevronDown, ChevronRight, AlertTriangle, GitBranch, FolderOpen, Search, Copy, ClipboardPaste, RotateCcw, Info, Zap, ArrowRight, Plus, Play, Loader2 } from 'lucide-react'
@@ -337,6 +338,11 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
     })
     return { total: mandatory.length, filled: filled.length }
   }, [displayFields, node.data.config, inheritedConfig])
+
+  // Cross-field validation
+  const crossFieldFailures = useMemo(() => {
+    return evaluateConfigRules(def?.configValidation, node.data.config)
+  }, [def?.configValidation, node.data.config])
 
   // Group fields by section
   const groupedFields = useMemo(() => {
@@ -825,6 +831,7 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
                       fieldInfo={fieldInfo}
                       inherited={inherited}
                       hideInheritance={isSimple}
+                      crossFieldFailures={getFieldValidationFailures(field.name, crossFieldFailures)}
                       onShowInheritance={isPropagatable ? () => {
                         const originId = inherited ? inherited.sourceId : node.id
                         activateInheritanceOverlay(field.name, originId)
@@ -1009,6 +1016,7 @@ function ConfigFieldInput({
   fieldInfo: rawFieldInfo,
   inherited: rawInherited,
   hideInheritance,
+  crossFieldFailures,
   onShowInheritance,
 }: {
   field: ConfigField
@@ -1021,6 +1029,7 @@ function ConfigFieldInput({
   fieldInfo: FieldInfo
   inherited?: { value: any; sourceName: string; sourceId: string }
   hideInheritance?: boolean
+  crossFieldFailures?: ValidationFailure[]
   onShowInheritance?: () => void
 }) {
   const [hovered, setHovered] = useState(false)
@@ -1051,18 +1060,32 @@ function ConfigFieldInput({
   // Mandatory empty field highlight
   const isMandatoryEmpty = field.mandatory && !isInherited && (value === '' || value === undefined || value === null)
 
-  // Left border accent: red for error, amber for mandatory empty, blue for inherited, orange for overridden inherited
-  const leftBorderColor = hasError ? T.red : isMandatoryEmpty ? T.amber : isInherited ? T.blue : isOverriddenInherited ? T.orange : 'transparent'
+  // Use monospace font for technical values
+  const TECHNICAL_FIELD_NAMES = new Set(['model_id', 'model_name', 'model_a', 'model_b', 'base_model', 'target_modules'])
+  const isTechnical = field.type === 'file_path' || TECHNICAL_FIELD_NAMES.has(field.name)
+
+  // Cross-field validation state
+  const hasCrossFieldError = (crossFieldFailures?.length ?? 0) > 0
+  const crossFieldSeverity = crossFieldFailures?.some(f => f.severity === 'error') ? 'error' : 'warning'
+
+  // Left border accent: red for error, amber for mandatory empty/cross-field warning, blue for inherited, orange for overridden inherited
+  const leftBorderColor = hasError ? T.red
+    : hasCrossFieldError && crossFieldSeverity === 'error' ? T.red
+    : isMandatoryEmpty ? T.amber
+    : hasCrossFieldError ? T.amber
+    : isInherited ? T.blue
+    : isOverriddenInherited ? T.orange
+    : 'transparent'
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '8px 12px',
     background: T.surface3,
-    border: `1px solid ${hasError ? `${T.red}60` : isInherited ? `${T.blue}40` : isOverriddenInherited ? `${T.orange}40` : T.borderHi}`,
+    border: `1px solid ${hasError || (hasCrossFieldError && crossFieldSeverity === 'error') ? `${T.red}60` : isInherited ? `${T.blue}40` : isOverriddenInherited ? `${T.orange}40` : T.borderHi}`,
     borderRadius: 6,
     color: isInherited ? T.dim : fieldInfo.state === 'default' ? T.dim : T.text,
-    fontFamily: F,
-    fontSize: FS.sm,
+    fontFamily: isTechnical ? FCODE : F,
+    fontSize: isTechnical ? FS.xxs : FS.sm,
     fontStyle: isInherited ? 'italic' : 'normal',
     outline: 'none',
     boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)',
@@ -1273,11 +1296,17 @@ function ConfigFieldInput({
         <textarea
           value={isInherited ? '' : String(value)}
           placeholder={inheritedPlaceholder}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            onChange(e.target.value)
+            // Auto-resize
+            e.target.style.height = 'auto'
+            e.target.style.height = `${e.target.scrollHeight}px`
+          }}
           style={{
             ...inputStyle,
             minHeight: 50,
             resize: 'vertical',
+            overflow: 'hidden',
           }}
         />
       ) : field.type === 'integer' ? (
@@ -1356,6 +1385,38 @@ function ConfigFieldInput({
           {validationError}
         </div>
       )}
+
+      {/* Character count for string/textarea fields */}
+      {(field.type === 'string' || field.type === 'text_area') && !isInherited && typeof value === 'string' && value.length > 0 && (
+        <div style={{
+          fontFamily: FCODE,
+          fontSize: '8px',
+          color: T.dim,
+          textAlign: 'right',
+          opacity: 0.6,
+        }}>
+          {value.length} char{value.length !== 1 ? 's' : ''}
+        </div>
+      )}
+
+      {/* Cross-field validation warnings/errors */}
+      {crossFieldFailures && crossFieldFailures.map((failure, i) => (
+        <div key={i} style={{
+          fontFamily: F,
+          fontSize: FS.xxs,
+          color: failure.severity === 'error' ? T.red : T.amber,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 4,
+          padding: '4px 6px',
+          background: failure.severity === 'error' ? `${T.red}0c` : `${T.amber}0c`,
+          border: `1px solid ${failure.severity === 'error' ? `${T.red}25` : `${T.amber}25`}`,
+          borderRadius: 4,
+        }}>
+          <AlertTriangle size={9} style={{ marginTop: 1, flexShrink: 0 }} />
+          <span style={{ lineHeight: 1.4 }}>{failure.message}</span>
+        </div>
+      ))}
 
       {/* File format compatibility warning */}
       {field.type === 'file_path' && expectedOutputType && typeof value === 'string' && value.length > 2 && (() => {
@@ -1546,10 +1607,19 @@ function FilePathInput({
 /* ── Preset Selector ── */
 function PresetSelector({ blockType, nodeId, currentConfig }: { blockType: string; nodeId: string; currentConfig: Record<string, any> }) {
   const allPresets = usePresetStore((s) => s.presets)
+  const fetchPresets = usePresetStore((s) => s.fetchPresets)
+  const loaded = usePresetStore((s) => s.loaded)
   const presets = useMemo(() => allPresets.filter((p) => p.blockType === blockType), [allPresets, blockType])
   const savePreset = usePresetStore((s) => s.savePreset)
   const deletePreset = usePresetStore((s) => s.deletePreset)
   const updateNodeConfig = usePipelineStore((s) => s.updateNodeConfig)
+
+  // Fetch presets from backend on first render
+  useEffect(() => {
+    if (!loaded) {
+      fetchPresets(blockType)
+    }
+  }, [loaded, blockType, fetchPresets])
   const [showSaveForm, setShowSaveForm] = useState(false)
   const [presetName, setPresetName] = useState('')
   const [presetDesc, setPresetDesc] = useState('')
@@ -1641,15 +1711,28 @@ function PresetSelector({ blockType, nodeId, currentConfig }: { blockType: strin
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                 >
                   <div onClick={() => handleLoadPreset(p)} style={{ flex: 1 }}>
-                    <div style={{ fontFamily: F, fontSize: FS.xs, color: T.text, fontWeight: 600 }}>{p.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontFamily: F, fontSize: FS.xs, color: T.text, fontWeight: 600 }}>{p.name}</span>
+                      {p.builtin && (
+                        <span style={{
+                          fontFamily: F, fontSize: '7px', color: T.cyan, fontWeight: 700,
+                          padding: '1px 4px', background: `${T.cyan}12`, border: `1px solid ${T.cyan}25`,
+                          borderRadius: 3, letterSpacing: '0.06em',
+                        }}>
+                          BUILT-IN
+                        </span>
+                      )}
+                    </div>
                     {p.description && <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>{p.description}</div>}
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deletePreset(p.id); toast.success('Deleted') }}
-                    style={{ background: 'none', border: 'none', color: T.dim, cursor: 'pointer', padding: 2 }}
-                  >
-                    <Trash2 size={10} />
-                  </button>
+                  {!p.builtin && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deletePreset(p.id); toast.success('Deleted') }}
+                      style={{ background: 'none', border: 'none', color: T.dim, cursor: 'pointer', padding: 2 }}
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
