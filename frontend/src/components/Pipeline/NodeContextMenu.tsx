@@ -3,7 +3,7 @@ import { T, F, FS } from '@/lib/design-tokens'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useRunStore } from '@/stores/runStore'
 import { useReactFlow } from '@xyflow/react'
-import { Settings, Copy, Maximize, Trash2, RotateCcw, Eye, GitCompare } from 'lucide-react'
+import { Settings, Copy, Maximize, Trash2, RotateCcw, Eye, GitCompare, FileText } from 'lucide-react'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { containsLoopOrCycle } from '@/lib/graph-utils'
 
@@ -13,9 +13,10 @@ interface NodeContextMenuProps {
   y: number
   nodeId: string
   onClose: () => void
+  onShowDoc?: (blockType: string) => void
 }
 
-export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: NodeContextMenuProps) {
+export default function NodeContextMenu({ visible, x, y, nodeId, onClose, onShowDoc }: NodeContextMenuProps) {
   const { fitView } = useReactFlow()
   const runStatus = useRunStore((s) => s.status)
   const activeRunId = useRunStore((s) => s.activeRunId)
@@ -160,6 +161,16 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
         label="Focus"
         shortcut="F"
         onClick={handleFocus}
+      />
+      <ContextMenuBtn
+        icon={<FileText size={10} />}
+        label="Documentation"
+        shortcut="?"
+        onClick={() => {
+          const node = usePipelineStore.getState().nodes.find((n) => n.id === nodeId)
+          if (node && onShowDoc) onShowDoc(node.data.type)
+          onClose()
+        }}
       />
       <div style={{ height: 1, background: T.border, margin: '2px 0' }} />
       <ContextMenuBtn
