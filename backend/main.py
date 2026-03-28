@@ -26,7 +26,7 @@ from .routers import (
     artifacts, block_generator, blocks, connectors, control_tower, custom_blocks,
     datasets, events, execution, inference, marketplace, models, outputs,
     papers, pipelines, plugins, projects, registry, runs, secrets, sweeps,
-    system, workspace,
+    system, templates, workspace,
 )
 from .utils.structured_logger import init_structured_logging, log_event, log_recovery
 
@@ -84,15 +84,38 @@ def _recover_stale_runs():
 
 
 def _periodic_recovery_loop():
-    """Background thread that checks for stale runs every RECOVERY_CHECK_INTERVAL seconds."""
+    """Background thread that checks for stale runs every RECOVERY_CHECK_INTERVAL seconds.
+
+    Also performs periodic decision log cleanup (daily cadence — runs when the
+    interval counter aligns, not on every check).
+    """
+    _cycle_count = 0
+    # Run decision cleanup roughly once per hour (RECOVERY_CHECK_INTERVAL is 120s,
+    # so every 30 cycles ≈ 3600s = 1 hour).
+    _DECISION_CLEANUP_CYCLES = max(1, 3600 // RECOVERY_CHECK_INTERVAL)
+
     while not _recovery_stop.is_set():
         _recovery_stop.wait(RECOVERY_CHECK_INTERVAL)
         if _recovery_stop.is_set():
             break
+        _cycle_count += 1
+
         try:
             _recover_stale_runs()
         except Exception as e:
             _recovery_logger.warning("Periodic recovery check failed: %s", e)
+
+        # Decision log cleanup — hourly cadence
+        if _cycle_count % _DECISION_CLEANUP_CYCLES == 0:
+            try:
+                from .services.decision_cleanup import cleanup_old_decisions
+                result = cleanup_old_decisions()
+                if result.get("deleted", 0) > 0:
+                    _recovery_logger.info(
+                        "Decision cleanup: deleted %d records", result["deleted"],
+                    )
+            except Exception as e:
+                _recovery_logger.debug("Decision cleanup skipped: %s", e)
 
 
 _shutdown_once = threading.Event()
@@ -114,6 +137,16 @@ def _full_shutdown():
 
     log_event("server_stop", message="Blueprint server shutting down")
     _recovery_stop.set()
+
+    # 0. Terminate all tracked worker subprocesses
+    try:
+        from .engine.worker_tracker import terminate_all_workers, write_pid_manifest
+        from .config import BASE_DIR
+        terminated = terminate_all_workers()
+        if terminated:
+            _shutdown_logger.info("Terminated %d worker subprocess(es)", terminated)
+    except Exception:
+        pass
 
     # 1. Pipeline executor (bounded timeout)
     try:
@@ -180,6 +213,12 @@ async def lifespan(app: FastAPI):
     registry.discover_all([BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR])
     app.state.registry = registry
     set_global_registry(registry)
+
+    # Initialize template service with registry for block validation
+    from .services.templates import TemplateService, set_template_service
+    tpl_svc = TemplateService(registry=registry)
+    set_template_service(tpl_svc)
+
     health = registry.get_health()
     logging.getLogger("blueprint.registry").info(
         "Block registry ready: %d total, %d valid, %d broken",
@@ -201,8 +240,32 @@ async def lifespan(app: FastAPI):
     app.state.process_manager = proc_mgr
     set_process_manager(proc_mgr)
 
-    # Recover stale runs from previous crash
+    # Recover stale runs from previous crash (heartbeat-based, existing mechanism)
     _recover_stale_runs()
+
+    # Recover runs stuck in running/pending from hard crashes (subprocess-aware)
+    try:
+        from .engine.worker_tracker import recover_stale_runs_on_startup, write_pid_manifest
+        from .config import BASE_DIR
+        crashed_ids = recover_stale_runs_on_startup(SessionLocal)
+        if crashed_ids:
+            logging.getLogger("blueprint.recovery").info(
+                "Recovered %d crashed run(s) on startup: %s",
+                len(crashed_ids), crashed_ids,
+            )
+        # Write initial PID manifest for orphan detection
+        write_pid_manifest(BASE_DIR)
+    except Exception as exc:
+        logging.getLogger("blueprint.recovery").warning(
+            "Worker recovery on startup failed: %s", exc
+        )
+
+    # Clean up old execution decisions on startup
+    try:
+        from .services.decision_cleanup import cleanup_old_decisions
+        cleanup_old_decisions()
+    except Exception:
+        pass  # Non-critical — cleanup will run periodically
 
     # Start periodic stale-run recovery thread
     _recovery_stop.clear()
@@ -296,6 +359,7 @@ app.include_router(outputs.router)
 app.include_router(workspace.router)
 app.include_router(artifacts.router)
 app.include_router(registry.router)
+app.include_router(templates.router)
 if ENABLE_MARKETPLACE:
     app.include_router(marketplace.router)
 

@@ -438,6 +438,29 @@ class BlockRegistryService:
         alias_map = self.get_output_alias_map(block_type)
         return alias_map.get(handle, handle)
 
+    def get_block_version(self, block_type: str) -> str:
+        """Return the version string from block.yaml, or '0.0.0' if absent."""
+        schema = self._blocks.get(block_type)
+        return schema.version if schema else "0.0.0"
+
+    def get_block_schema_defaults(self, block_type: str) -> dict[str, Any]:
+        """Return a dict of {field_name: default_value} from block.yaml config."""
+        config_schema = self.get_block_config_schema(block_type)
+        defaults: dict[str, Any] = {}
+        for field_name, field_def in config_schema.items():
+            if isinstance(field_def, dict) and "default" in field_def:
+                defaults[field_name] = field_def["default"]
+        return defaults
+
+    def get_file_path_fields(self, block_type: str) -> frozenset[str]:
+        """Return config field names that have type ``file_path``."""
+        config_schema = self.get_block_config_schema(block_type)
+        return frozenset(
+            field_name
+            for field_name, field_def in config_schema.items()
+            if isinstance(field_def, dict) and field_def.get("type") == "file_path"
+        )
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Module-level singleton — the canonical way to access the registry

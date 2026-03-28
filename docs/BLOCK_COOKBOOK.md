@@ -137,6 +137,65 @@ config:
 | `multiselect` | Multi-choice (requires `options` list) |
 | `file_path` | File picker |
 
+#### Config-to-Input Port Mapping (Connected Input Satisfaction)
+
+When an input port is connected, mandatory config fields that correspond to that
+port are automatically satisfied — the executor skips the "required" check.
+This means blocks like `lora_finetuning` can have `model_name` marked as
+`mandatory: true` in the config schema, but if the `model` input port is
+connected, the user does not need to fill in `model_name` manually.
+
+The built-in mapping (in `schema_validator.py`) is:
+
+| Config Field | Satisfied by Input Port |
+|--------------|------------------------|
+| `model_name` | `model` |
+| `model_id` | `model` |
+| `dataset_name` | `dataset` |
+| `file_path` | `dataset` |
+| `directory_path` | `dataset` |
+| `teacher_model` | `teacher` |
+| `student_model` | `student` |
+| `reward_model` | `reward_model` |
+| `checkpoint_dir` | `model` |
+| `url` | `config` |
+
+**Example:** A block with `mandatory: true` on `model_name`:
+
+```yaml
+config:
+  model_name:
+    type: string
+    label: Model Name
+    mandatory: true
+```
+
+If the block also has an input port with `id: model`, connecting that port
+removes the need for the user to set `model_name` in the UI.
+
+#### Input Port Type Checking and Multi-Input
+
+Input ports support optional type family and cardinality declarations:
+
+```yaml
+inputs:
+  - id: model
+    label: Model
+    data_type: model
+    expected_type_family: dict    # dict | str | list | path | any (default: any)
+    cardinality: scalar           # scalar | list | any (default: any)
+    multi_input: error            # aggregate | last_write | error (default: aggregate)
+```
+
+- **`expected_type_family`** — In V1, mismatches produce a warning log (not an
+  error), so existing blocks continue to work. Declare this when you want to
+  catch wiring mistakes early.
+- **`cardinality`** — `scalar` warns if a list arrives, `list` warns if a non-list
+  arrives, `any` accepts both.
+- **`multi_input`** — Controls behavior when multiple edges connect to the same
+  input port: `aggregate` collects values into a list, `last_write` keeps only
+  the last value, `error` rejects the pipeline.
+
 ### 2.2 run.py API Reference
 
 Every `run.py` must export a single function:

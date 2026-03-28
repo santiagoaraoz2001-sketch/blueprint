@@ -1,13 +1,20 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, JSONResponse, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from typing import Literal
 
 from ..database import get_db
 from ..models.pipeline import Pipeline
 from ..schemas.pipeline import PipelineCreate, PipelineUpdate, PipelineResponse
 
 router = APIRouter(prefix="/api/pipelines", tags=["pipelines"])
+
+
+class ExportRequest(BaseModel):
+    format: Literal["python", "jupyter"] = "python"
+    bundle: bool = False
 
 
 @router.get("", response_model=list[PipelineResponse])
@@ -95,6 +102,91 @@ def clone_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
     return clone
 
 
+@router.get("/{pipeline_id}/plan")
+def get_pipeline_plan(pipeline_id: str, db: Session = Depends(get_db)):
+    """Run the planner on the current pipeline and return a JSON-serialized plan summary.
+
+    Read-only — does not trigger execution. For each node returns:
+    resolved_config, config_sources, cache_fingerprint, cache_eligible, in_loop.
+
+    Config merge precedence: global workspace → project → pipeline definition.
+    """
+    from ..engine.planner import GraphPlanner
+    from ..engine.config_merge import merge_workspace_config
+    from ..services.registry import get_global_registry
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+
+    # Merge config from all scopes: global → project → definition
+    workspace_config = merge_workspace_config(
+        definition_config=definition.get("workspace_config") or None,
+        project_id=pipeline.project_id,
+        db=db,
+    )
+
+    if not nodes:
+        return {
+            "is_valid": True,
+            "errors": [],
+            "plan_hash": "empty",
+            "nodes": {},
+            "execution_order": [],
+            "warnings": [],
+        }
+
+    registry = get_global_registry()
+    if registry is None:
+        from ..services.registry import BlockRegistryService
+        registry = BlockRegistryService()
+
+    planner = GraphPlanner(registry)
+    result = planner.plan(nodes, edges, workspace_config=workspace_config or None)
+
+    if not result.is_valid or result.plan is None:
+        return {
+            "is_valid": False,
+            "errors": list(result.errors),
+            "plan_hash": None,
+            "nodes": {},
+            "execution_order": [],
+            "warnings": [],
+        }
+
+    plan = result.plan
+    node_map = {n["id"]: n for n in nodes}
+
+    nodes_summary = {}
+    for node_id, rn in plan.nodes.items():
+        node_label = node_map.get(node_id, {}).get("data", {}).get("label", node_id)
+        nodes_summary[node_id] = {
+            "node_id": rn.node_id,
+            "label": node_label,
+            "block_type": rn.block_type,
+            "block_version": rn.block_version,
+            "resolved_config": rn.resolved_config,
+            "config_sources": rn.config_sources,
+            "cache_fingerprint": rn.cache_fingerprint,
+            "cache_eligible": rn.cache_eligible,
+            "in_loop": rn.in_loop,
+            "loop_id": rn.loop_id,
+        }
+
+    return {
+        "is_valid": True,
+        "errors": [],
+        "plan_hash": plan.plan_hash,
+        "nodes": nodes_summary,
+        "execution_order": list(plan.execution_order),
+        "warnings": list(plan.warnings),
+    }
+
+
 @router.post("/{pipeline_id}/resolve-config")
 def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
     """Resolve config inheritance for preview in the UI (dry run)."""
@@ -105,6 +197,7 @@ def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
         CATEGORY_PROPAGATION_KEYS,
     )
     from ..engine.block_registry import BlockRegistryService
+    from ..engine.config_merge import merge_workspace_config
 
     pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
     if not pipeline:
@@ -113,7 +206,11 @@ def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
     definition = pipeline.definition or {}
     nodes = definition.get("nodes", [])
     edges = definition.get("edges", [])
-    workspace_config = definition.get("workspace_config") or None
+    workspace_config = merge_workspace_config(
+        definition_config=definition.get("workspace_config") or None,
+        project_id=pipeline.project_id,
+        db=db,
+    ) or None
 
     if not nodes:
         return {"resolved": {}, "propagation_keys": {}}
@@ -179,3 +276,220 @@ def compile_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
 
     script = compile_pipeline_to_python(pipeline.name, definition)
     return PlainTextResponse(content=script, media_type="text/x-python")
+
+
+@router.post("/{pipeline_id}/export")
+def export_pipeline(pipeline_id: str, body: ExportRequest, db: Session = Depends(get_db)):
+    """Export a pipeline as a standalone Python script or Jupyter notebook.
+
+    Uses the planner to produce an ExecutionPlan, then compiles from it so
+    the exported code uses identical execution order and resolved configs.
+
+    Body: { "format": "python" | "jupyter" }
+    """
+    from ..engine.compiler import compile_pipeline_from_plan
+    from ..engine.graph_utils import validate_exportable
+    from ..engine.planner import GraphPlanner
+    from ..services.registry import BlockRegistryService
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+
+    # Kill switch: block export for unsupported pipelines
+    export_errors = validate_exportable(nodes, edges)
+    if export_errors:
+        raise HTTPException(
+            400,
+            detail={
+                "error": "export_unsupported",
+                "reasons": export_errors,
+                "remediation": "Remove unsupported blocks or use the full executor instead.",
+            },
+        )
+
+    # Plan the pipeline to get resolved configs and execution order
+    registry = BlockRegistryService()
+    planner = GraphPlanner(registry)
+    workspace_config = definition.get("workspace_config") or None
+    result = planner.plan(nodes, edges, workspace_config=workspace_config)
+
+    if not result.is_valid or result.plan is None:
+        raise HTTPException(
+            400,
+            detail={
+                "error": "plan_failed",
+                "reasons": list(result.errors),
+            },
+        )
+
+    plan = result.plan
+
+    if body.format == "jupyter":
+        from ..engine.jupyter_export import compile_pipeline_to_jupyter, notebook_to_json
+
+        nb = compile_pipeline_to_jupyter(
+            pipeline_name=pipeline.name,
+            plan=plan,
+            edges=edges,
+            nodes=nodes,
+            description=pipeline.description or "",
+        )
+        content = notebook_to_json(nb)
+        ext = "ipynb"
+        media_type = "application/x-ipynb+json"
+    else:
+        content = compile_pipeline_from_plan(
+            pipeline_name=pipeline.name,
+            plan=plan,
+            edges=edges,
+            nodes=nodes,
+            description=pipeline.description or "",
+        )
+        ext = "py"
+        media_type = "text/x-python"
+
+    if body.bundle:
+        # Create a zip with the script + required block directories
+        import io
+        import zipfile
+        from ..engine.executor import _find_block_module
+        from ..engine.block_registry import get_block_yaml
+
+        buf = io.BytesIO()
+        base_name = f"pipeline_{pipeline_id[:8]}"
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            # Write the main script/notebook
+            zf.writestr(f"{base_name}/{base_name}.{ext}", content)
+
+            # Copy each block's directory into blocks/<category>/<type>/
+            bundled: set[str] = set()
+            for node_id in plan.execution_order:
+                resolved_node = plan.nodes.get(node_id)
+                if not resolved_node:
+                    continue
+                bt = resolved_node.block_type
+                if bt in bundled:
+                    continue
+                block_dir = _find_block_module(bt)
+                if not block_dir:
+                    continue
+                schema = get_block_yaml(bt)
+                category = (schema or {}).get("category", "unknown")
+                block_dir_path = Path(str(block_dir))
+                if not block_dir_path.is_dir():
+                    continue
+
+                bundled.add(bt)
+                rel_base = f"{base_name}/blocks/{category}/{bt}"
+                for file_path in block_dir_path.rglob("*"):
+                    if file_path.is_file():
+                        # Skip __pycache__ and .pyc files
+                        if "__pycache__" in str(file_path) or file_path.suffix == ".pyc":
+                            continue
+                        arc_name = f"{rel_base}/{file_path.relative_to(block_dir_path)}"
+                        zf.write(str(file_path), arc_name)
+
+            # Write a requirements.txt
+            from ..engine.export_dependencies import collect_pip_dependencies_for_plan
+            pip_deps = collect_pip_dependencies_for_plan(plan)
+            if pip_deps:
+                req_content = "# Generated by Blueprint — pip install -r requirements.txt\n"
+                req_content += "\n".join(pip_deps) + "\n"
+                zf.writestr(f"{base_name}/requirements.txt", req_content)
+
+        buf.seek(0)
+        filename = f"{base_name}.zip"
+        return Response(
+            content=buf.getvalue(),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
+
+    filename = f"pipeline_{pipeline_id[:8]}.{ext}"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+@router.get("/{pipeline_id}/export/preflight")
+def export_preflight(pipeline_id: str, db: Session = Depends(get_db)):
+    """Pre-flight check for export: returns supported features, warnings, and blockers.
+
+    The frontend uses this to show a pre-flight check panel before generating
+    the export, not after.
+    """
+    from ..engine.graph_utils import validate_exportable, contains_loop_or_cycle
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(404, "Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+
+    supported = [
+        {"label": "DAG execution", "status": "ok"},
+        {"label": "Config resolution", "status": "ok"},
+    ]
+
+    warnings = [
+        {"label": "No SSE progress events", "status": "warning"},
+        {"label": "No artifact storage integration", "status": "warning"},
+        {"label": "No partial rerun support", "status": "warning"},
+    ]
+
+    blockers = []
+
+    # Check loops
+    if contains_loop_or_cycle(nodes, edges):
+        blockers.append({
+            "label": "Loop graphs cannot be exported",
+            "status": "error",
+            "detail": "The compiler cannot faithfully reproduce loop semantics in a standalone script.",
+        })
+
+    # Check custom/non-exportable blocks
+    from ..engine.block_registry import get_block_yaml
+    _NON_EXPORTABLE_BLOCK_TYPES = {"python_runner"}
+    for node in nodes:
+        if node.get("type") in ("groupNode", "stickyNote"):
+            continue
+        data = node.get("data", {})
+        block_type = data.get("type", "")
+        label = data.get("label", block_type)
+
+        if block_type in _NON_EXPORTABLE_BLOCK_TYPES:
+            blockers.append({
+                "label": f"Custom code blocks cannot be exported",
+                "status": "error",
+                "detail": f"Block '{label}' is a {block_type} block.",
+            })
+
+        schema = get_block_yaml(block_type)
+        if schema and schema.get("exportable") is False:
+            blockers.append({
+                "label": f"Block '{label}' is not exportable",
+                "status": "error",
+                "detail": f"{block_type} is marked as non-exportable in its block.yaml.",
+            })
+
+    can_export = len(blockers) == 0
+
+    return {
+        "can_export": can_export,
+        "supported": supported,
+        "warnings": warnings,
+        "blockers": blockers,
+    }

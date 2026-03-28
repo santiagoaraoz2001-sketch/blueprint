@@ -1,9 +1,14 @@
-import { useEffect, useRef } from 'react'
-import { T, F, FS } from '@/lib/design-tokens'
+import { useEffect, useMemo, lazy, Suspense } from 'react'
+import { T, F, FS, FCODE } from '@/lib/design-tokens'
 import { useUIStore } from '@/stores/uiStore'
 import { useRunStore } from '@/stores/runStore'
+import { useMonitorStore } from '@/stores/monitorStore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Circle, Loader, XCircle, X, ChevronDown, Maximize2 } from 'lucide-react'
+import { X, ChevronDown, Maximize2, BarChart3, Terminal, FolderOutput } from 'lucide-react'
+
+const ExecutionTimeline = lazy(() => import('@/components/Monitor/ExecutionTimeline'))
+const LogViewer = lazy(() => import('@/components/Monitor/LogViewer'))
+const ArtifactBrowser = lazy(() => import('@/components/Artifacts/ArtifactBrowser'))
 
 export interface MonitorBlock {
   id: string
@@ -22,61 +27,56 @@ interface PipelineMonitorProps {
   onClose: () => void
 }
 
-function formatElapsed(seconds?: number): string {
-  if (seconds == null) return '--'
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return m > 0 ? `${m}m ${s}s` : `${s}s`
-}
+type MonitorTab = 'timeline' | 'logs' | 'outputs'
 
-function StatusIcon({ status }: { status: string }) {
-  switch (status) {
-    case 'done':
-    case 'complete':
-      return <CheckCircle2 size={12} color={T.green} />
-    case 'running':
-      return (
-        <Loader
-          size={12}
-          color={T.cyan}
-          style={{ animation: 'spin 1s linear infinite' }}
-        />
-      )
-    case 'error':
-    case 'failed':
-      return <XCircle size={12} color={T.red} />
-    default:
-      return <Circle size={12} color={T.dim} />
-  }
-}
-
-function estimateETA(progress: number, blocks: MonitorBlock[]): string {
-  if (progress <= 0) return '--'
-  if (progress >= 1) return '0s'
-  const totalElapsed = blocks.reduce((sum, b) => sum + (b.elapsed || 0), 0)
-  if (totalElapsed === 0) return '--'
-  const estimated = totalElapsed / progress - totalElapsed
-  return formatElapsed(Math.round(estimated))
-}
+const TABS: { key: MonitorTab; label: string; icon: typeof BarChart3 }[] = [
+  { key: 'timeline', label: 'Timeline', icon: BarChart3 },
+  { key: 'logs', label: 'Logs', icon: Terminal },
+  { key: 'outputs', label: 'Outputs', icon: FolderOutput },
+]
 
 export default function PipelineMonitor({
   visible,
   blocks,
   progress,
-  logs,
   onClose,
 }: PipelineMonitorProps) {
-  const logContainerRef = useRef<HTMLDivElement>(null)
+  const activeRunId = useRunStore((s) => s.activeRunId)
+  const runStatus = useRunStore((s) => s.status)
+  const activeTab = useMonitorStore((s) => s.activeTab)
+  const setActiveTab = useMonitorStore((s) => s.setActiveTab)
+  const startMonitoring = useMonitorStore((s) => s.startMonitoring)
 
-  // Auto-scroll logs to bottom
-  useEffect(() => {
-    if (logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight
+  // Build node labels map from blocks prop (pipeline node labels)
+  const nodeLabels = useMemo(() => {
+    const labels: Record<string, string> = {}
+    for (const b of blocks) {
+      labels[b.id] = b.name
     }
-  }, [logs])
+    return labels
+  }, [blocks])
 
-  const displayLogs = logs.slice(-50)
+  // Start/stop monitoring when run starts/stops
+  useEffect(() => {
+    if (activeRunId && runStatus === 'running') {
+      startMonitoring(activeRunId, nodeLabels)
+    }
+    return () => {
+      // Don't stop monitoring when component unmounts during a run —
+      // only stop when the run actually ends
+    }
+  }, [activeRunId, runStatus, startMonitoring, nodeLabels])
+
+  // Stop monitoring when run completes
+  useEffect(() => {
+    if (runStatus !== 'running' && runStatus !== 'idle') {
+      // Don't stop — keep the data for historical viewing
+    }
+  }, [runStatus])
+
   const pct = Math.round(progress * 100)
+  const monitorRunStatus = useMonitorStore((s) => s.runStatus)
+  const logCount = useMonitorStore((s) => s.logs.length)
 
   return (
     <AnimatePresence>
@@ -91,7 +91,7 @@ export default function PipelineMonitor({
             bottom: 0,
             left: 0,
             right: 0,
-            height: 280,
+            height: 320,
             background: T.surface1,
             borderTop: `1px solid ${T.borderHi}`,
             display: 'flex',
@@ -99,58 +99,115 @@ export default function PipelineMonitor({
             zIndex: 50,
           }}
         >
-          {/* Header */}
+          {/* Header with tab bar */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              padding: '6px 12px',
-              gap: 10,
+              padding: '0 12px',
+              gap: 0,
               borderBottom: `1px solid ${T.border}`,
               flexShrink: 0,
+              height: 34,
             }}
           >
-            <span
-              style={{
-                fontFamily: F,
-                fontSize: FS.sm,
-                fontWeight: 700,
-                color: T.text,
-                letterSpacing: '0.08em',
-              }}
-            >
-              PIPELINE MONITOR
-            </span>
-
-            {/* Progress bar */}
-            <div
-              style={{
-                flex: 1,
-                height: 4,
-                background: T.surface3,
-                overflow: 'hidden',
-                maxWidth: 200,
-              }}
-            >
-              <div
-                style={{
-                  width: `${pct}%`,
-                  height: '100%',
-                  background: T.cyan,
-                  transition: 'width 0.3s ease',
-                }}
-              />
-            </div>
-
-            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.cyan }}>
-              {pct}%
-            </span>
-
-            <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>
-              ETA {estimateETA(progress, blocks)}
-            </span>
+            {/* Tab buttons */}
+            {TABS.map((tab) => {
+              const Icon = tab.icon
+              const isActive = activeTab === tab.key
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '0 14px',
+                    height: '100%',
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: isActive ? `2px solid ${T.cyan}` : '2px solid transparent',
+                    color: isActive ? T.text : T.dim,
+                    fontFamily: F,
+                    fontSize: FS.xxs,
+                    fontWeight: isActive ? 700 : 500,
+                    letterSpacing: '0.08em',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <Icon size={11} />
+                  {tab.label}
+                  {/* Badge for log count */}
+                  {tab.key === 'logs' && logCount > 0 && (
+                    <span
+                      style={{
+                        fontFamily: FCODE,
+                        fontSize: 9,
+                        color: T.dim,
+                        padding: '0 4px',
+                        background: T.surface3,
+                        borderRadius: 8,
+                      }}
+                    >
+                      {logCount > 999 ? '999+' : logCount}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
 
             <div style={{ flex: 1 }} />
+
+            {/* Progress indicator */}
+            {runStatus === 'running' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 10 }}>
+                <div
+                  style={{
+                    width: 80,
+                    height: 3,
+                    background: T.surface3,
+                    borderRadius: 999,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${pct}%`,
+                      height: '100%',
+                      background: T.cyan,
+                      transition: 'width 0.3s ease',
+                      borderRadius: 999,
+                    }}
+                  />
+                </div>
+                <span style={{ fontFamily: FCODE, fontSize: FS.xxs, color: T.cyan }}>
+                  {pct}%
+                </span>
+              </div>
+            )}
+
+            {/* Status badge */}
+            {monitorRunStatus !== 'idle' && monitorRunStatus !== 'running' && (
+              <span
+                style={{
+                  fontFamily: F,
+                  fontSize: 9,
+                  padding: '1px 6px',
+                  borderRadius: 3,
+                  marginRight: 8,
+                  background: monitorRunStatus === 'complete' ? `${T.green}18` :
+                              monitorRunStatus === 'failed' ? `${T.red}18` : `${T.amber}18`,
+                  color: monitorRunStatus === 'complete' ? T.green :
+                         monitorRunStatus === 'failed' ? T.red : T.amber,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {monitorRunStatus}
+              </span>
+            )}
 
             <button
               onClick={() => {
@@ -168,7 +225,7 @@ export default function PipelineMonitor({
               }}
               title="Open in Monitor view"
             >
-              <Maximize2 size={14} />
+              <Maximize2 size={13} />
             </button>
             <button
               onClick={onClose}
@@ -183,7 +240,7 @@ export default function PipelineMonitor({
               }}
               title="Minimize"
             >
-              <ChevronDown size={14} />
+              <ChevronDown size={13} />
             </button>
             <button
               onClick={onClose}
@@ -198,151 +255,48 @@ export default function PipelineMonitor({
               }}
               title="Close"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           </div>
 
-          {/* Content */}
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-            {/* Block status list */}
-            <div
-              style={{
-                width: 280,
-                borderRight: `1px solid ${T.border}`,
-                overflowY: 'auto',
-                flexShrink: 0,
-              }}
+          {/* Tab content */}
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <Suspense
+              fallback={
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  fontFamily: F,
+                  fontSize: FS.xs,
+                  color: T.dim,
+                }}>
+                  Loading...
+                </div>
+              }
             >
-              {blocks.map((block) => (
-                <div
-                  key={block.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '5px 10px',
-                    borderBottom: `1px solid ${T.border}`,
-                  }}
-                >
-                  <StatusIcon status={block.status} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: F,
-                        fontSize: FS.xs,
-                        color: T.text,
-                        fontWeight: 600,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {block.name}
-                    </div>
-                    {block.log && (
-                      <div
-                        style={{
-                          fontFamily: F,
-                          fontSize: FS.xxs,
-                          color: T.dim,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {block.log}
-                      </div>
-                    )}
-                  </div>
-                  <span
-                    style={{
-                      fontFamily: F,
-                      fontSize: FS.xxs,
-                      color: T.dim,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {formatElapsed(block.elapsed)}
-                  </span>
-                </div>
-              ))}
-              {blocks.length === 0 && (
-                <div
-                  style={{
-                    padding: 16,
-                    fontFamily: F,
-                    fontSize: FS.xs,
-                    color: T.dim,
-                    textAlign: 'center',
-                  }}
-                >
-                  No blocks in execution
+              {activeTab === 'timeline' && <ExecutionTimeline />}
+              {activeTab === 'logs' && <LogViewer />}
+              {activeTab === 'outputs' && activeRunId && (
+                <div style={{ height: '100%', overflow: 'auto' }}>
+                  <ArtifactBrowser runId={activeRunId} />
                 </div>
               )}
-            </div>
-
-            {/* Right: Log stream + output preview */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div
-                ref={logContainerRef}
-                style={{
-                  flex: 1,
-                  overflowY: 'auto',
-                  padding: '6px 10px',
-                  background: T.surface0,
-                }}
-              >
-                {displayLogs.length === 0 ? (
-                  <div
-                    style={{
-                      fontFamily: F,
-                      fontSize: FS.xs,
-                      color: T.dim,
-                      padding: 10,
-                      textAlign: 'center',
-                    }}
-                  >
-                    Waiting for log output...
-                  </div>
-                ) : (
-                  displayLogs.map((line, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        fontFamily: F,
-                        fontSize: FS.xxs,
-                        color: T.sec,
-                        lineHeight: 1.6,
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-all',
-                      }}
-                    >
-                      <span style={{ color: T.dim, marginRight: 8 }}>
-                        {String(i + 1).padStart(3, ' ')}
-                      </span>
-                      {line}
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Output preview section */}
-              {blocks.filter(b => b.status === 'complete' && b.output && Object.keys(b.output).length > 0).length > 0 && (
-                <div style={{ borderTop: `1px solid ${T.border}`, flexShrink: 0, maxHeight: 100, overflowY: 'auto', padding: '6px 10px', background: T.surface1 }}>
-                  <div style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim, letterSpacing: '0.1em', marginBottom: 4 }}>BLOCK OUTPUTS</div>
-                  {blocks.filter(b => b.output && Object.keys(b.output).length > 0).map(b => (
-                    <div key={b.id} style={{ display: 'flex', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
-                      <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.purple, fontWeight: 700 }}>{b.name}:</span>
-                      {Object.entries(b.output!).map(([k, v]) => (
-                        <span key={k} style={{ fontFamily: F, fontSize: FS.xxs, color: T.sec }}>
-                          <span style={{ color: T.cyan }}>{k}</span>={typeof v === 'object' ? JSON.stringify(v).slice(0, 40) + (JSON.stringify(v).length > 40 ? '…' : '') : String(v).slice(0, 40)}
-                        </span>
-                      ))}
-                    </div>
-                  ))}
+              {activeTab === 'outputs' && !activeRunId && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  fontFamily: F,
+                  fontSize: FS.xs,
+                  color: T.dim,
+                }}>
+                  Run a pipeline to see output artifacts
                 </div>
               )}
-            </div>
+            </Suspense>
           </div>
         </motion.div>
       )}

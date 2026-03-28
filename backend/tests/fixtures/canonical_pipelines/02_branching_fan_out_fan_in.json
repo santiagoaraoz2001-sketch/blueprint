@@ -1,0 +1,114 @@
+{
+  "name": "branching_fan_out_fan_in",
+  "description": "5-block diamond: source fans out to two branches, both merge into a sink via aggregator.",
+  "nodes": [
+    {
+      "id": "source",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Source Text",
+        "category": "data",
+        "config": {"text": "Sample input data for branching test"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "branch_a",
+      "type": "blockNode",
+      "data": {
+        "type": "text_concatenator",
+        "label": "Branch A",
+        "category": "data",
+        "config": {
+          "separator": " ",
+          "template": "Branch A processed: {text_a}",
+          "trim_whitespace": true,
+          "skip_empty": true
+        },
+        "inputs": [
+          {"id": "text_a", "dataType": "text", "required": true},
+          {"id": "text_b", "dataType": "text", "required": true}
+        ],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "branch_b",
+      "type": "blockNode",
+      "data": {
+        "type": "text_concatenator",
+        "label": "Branch B",
+        "category": "data",
+        "config": {
+          "separator": " ",
+          "template": "Branch B processed: {text_a}",
+          "trim_whitespace": true,
+          "skip_empty": true
+        },
+        "inputs": [
+          {"id": "text_a", "dataType": "text", "required": true},
+          {"id": "text_b", "dataType": "text", "required": true}
+        ],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "merger",
+      "type": "blockNode",
+      "data": {
+        "type": "aggregator",
+        "label": "Merge Results",
+        "category": "flow",
+        "config": {
+          "strategy": "concatenate"
+        },
+        "inputs": [
+          {"id": "in_1", "dataType": "any", "required": true},
+          {"id": "in_2", "dataType": "any", "required": true},
+          {"id": "in_3", "dataType": "any", "required": false}
+        ],
+        "outputs": [
+          {"id": "output", "dataType": "dataset"},
+          {"id": "metrics", "dataType": "metrics"}
+        ]
+      }
+    },
+    {
+      "id": "sink",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Export Sink",
+        "category": "endpoints",
+        "config": {"format": "json"},
+        "inputs": [
+          {"id": "data", "dataType": "any", "required": true}
+        ],
+        "outputs": [
+          {"id": "file_path", "dataType": "artifact"},
+          {"id": "status", "dataType": "metrics"},
+          {"id": "summary", "dataType": "metrics"}
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "source", "target": "branch_a", "sourceHandle": "text", "targetHandle": "text_a"},
+    {"id": "e2", "source": "source", "target": "branch_a", "sourceHandle": "text", "targetHandle": "text_b"},
+    {"id": "e3", "source": "source", "target": "branch_b", "sourceHandle": "text", "targetHandle": "text_a"},
+    {"id": "e4", "source": "source", "target": "branch_b", "sourceHandle": "text", "targetHandle": "text_b"},
+    {"id": "e5", "source": "branch_a", "target": "merger", "sourceHandle": "text", "targetHandle": "in_1"},
+    {"id": "e6", "source": "branch_b", "target": "merger", "sourceHandle": "text", "targetHandle": "in_2"},
+    {"id": "e7", "source": "merger", "target": "sink", "sourceHandle": "output", "targetHandle": "data"}
+  ],
+  "expected": {
+    "validation": "pass",
+    "execution_order": ["source", "branch_a", "branch_b", "merger", "sink"],
+    "final_status": "completed",
+    "expected_errors": [],
+    "partial_rerun_allowed": true,
+    "export_allowed": true
+  }
+}
