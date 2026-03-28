@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { T, F, FS } from '@/lib/design-tokens'
-import { getAllBlocks, getBlockDefinition, type BlockDefinition, type ConfigField } from '@/lib/block-registry'
+import { getBlockDefinition, type BlockDefinition, type ConfigField } from '@/lib/block-registry'
 import { CATEGORY_COLORS } from '@/lib/design-tokens'
 import { X, Copy, Save, Trash2, Plus } from 'lucide-react'
 
@@ -69,6 +69,7 @@ export default function CustomModuleEditor({ visible, onClose, duplicateFrom, on
             outputs: base?.outputs ? [...base.outputs] : [],
             defaultConfig: { ...defaultConfig },
             configFields: [...configFields],
+            version: '1.0.0',
             isCustom: true,
             baseType: base?.type || '',
             maturity: 'experimental',

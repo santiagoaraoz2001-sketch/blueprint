@@ -494,7 +494,7 @@ export default function RunControls() {
               {useMemo(() => (
                 <Editor
                   language="python"
-                  theme="vs-dark"
+                  theme={document.documentElement.dataset.theme === 'light' ? 'vs' : 'vs-dark'}
                   value={generatedCode}
                   options={{
                     readOnly: true,

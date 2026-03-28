@@ -149,6 +149,7 @@ def run(inputs: dict, config: dict) -> dict:
       outputs: outputs.map(p => ({ id: p.id, label: p.label, dataType: p.dataType, required: true })),
       defaultConfig: {},
       configFields: [...configFields],
+      version: '1.0.0',
       isCustom: true,
       maturity: 'stable',
       baseType: '',

@@ -7,7 +7,7 @@
  * - Error count badge on the toggle button
  */
 
-import { useState, useCallback } from 'react'
+import { useCallback } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useValidationStore } from '@/stores/validationStore'
@@ -30,7 +30,6 @@ export default function BackendValidationPanel() {
   const panelVisible = useValidationStore((s) => s.panelVisible)
   const togglePanel = useValidationStore((s) => s.togglePanel)
   const setPanelVisible = useValidationStore((s) => s.setPanelVisible)
-  const nodeErrors = useValidationStore((s) => s.nodeErrors)
   const isPending = isValidating || isStale
 
   const nodes = usePipelineStore((s) => s.nodes)

@@ -63,6 +63,8 @@ export default function StatusBar() {
 
   return (
     <footer
+      role="contentinfo"
+      aria-label="Pipeline status bar"
       style={{
         height: 28,
         background: `linear-gradient(180deg, ${T.surface2}f6 0%, ${T.surface0}f4 100%)`,
