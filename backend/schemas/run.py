@@ -17,5 +17,6 @@ class RunResponse(BaseModel):
     metrics: dict[str, Any]
     outputs_snapshot: dict[str, Any] | None = None
     data_fingerprints: dict[str, Any] | None = None
+    starred: str | None = "false"
 
     model_config = {"from_attributes": True}

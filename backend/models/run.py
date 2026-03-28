@@ -22,6 +22,7 @@ class Run(Base):
     metrics_log = Column(JSON, nullable=True)
     data_fingerprints = Column(JSON, nullable=True)  # {node_id: {input_name: fingerprint}}
     config_fingerprints = Column(JSON, nullable=True)  # {node_id: sha256_hex} — Merkle-chain config hashes
+    starred = Column(String, default="false")  # "true" | "false" — stored as string for SQLite compat
 
 
 class LiveRun(Base):
