@@ -28,6 +28,7 @@ import ResearchDashboardView from '@/views/ResearchDashboardView'
 import PaperDetailView from '@/views/PaperDetailView'
 import MonitorView from '@/views/MonitorView'
 import ExperimentDashboard from '@/views/ExperimentDashboard'
+import ModelRegistryView from '@/views/ModelRegistryView'
 import ProjectView from '@/views/ProjectView'
 
 // Lazy-loaded views
@@ -49,6 +50,7 @@ const baseViewComponents: Record<string, React.ComponentType> = {
   'research-detail': PaperDetailView,
   monitor: MonitorView,
   'experiment-dashboard': ExperimentDashboard,
+  models: ModelRegistryView,
   project: ProjectView,
 }
 
