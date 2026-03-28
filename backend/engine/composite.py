@@ -219,9 +219,10 @@ def execute_sub_pipeline(
         # We intentionally skip input validation for composite children:
         # root nodes may not have all required inputs wired (they get data
         # via config instead), and the child block handles this gracefully.
+        # Pass inputs= so connected ports satisfy mandatory config fields.
         block_schema = load_block_schema(block_dir)
         if block_schema:
-            child_config = validate_config(block_schema, child_config)
+            child_config = validate_config(block_schema, child_config, inputs=child_inputs)
 
         # Detect if child is itself a composite block (for nested composites).
         is_child_composite = block_schema.get("composite", False) if block_schema else False

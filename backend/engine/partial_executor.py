@@ -42,6 +42,7 @@ from .config_resolver import resolve_configs
 from .block_registry import resolve_output_handle
 from .composite import CompositeBlockContext
 from .schema_validator import load_block_schema
+from .runtime_prep import prepare_node_runtime, PreparedNode, apply_multi_input_policy
 from .graph_utils import is_cache_valid
 from .artifact_registry import register_block_artifacts, _sha256_file
 from ..models.artifact import Artifact
@@ -516,22 +517,39 @@ async def execute_partial_pipeline(
                         else:
                             node_inputs[tgt_handle] = value
 
-            # Find and run block
-            block_dir = _find_block_module(block_type)
+            # --- Prepare node: resolve block dir, schema, validation, secrets ---
+            try:
+                prepared = prepare_node_runtime(
+                    node_id=node_id,
+                    block_type=block_type,
+                    config=config,
+                    node_inputs=node_inputs,
+                    run_id=run_id,
+                    find_block_fn=_find_block_module,
+                    resolve_secrets_fn=_resolve_secrets,
+                    block_aliases=BLOCK_ALIASES,
+                    safe_block_type_re=SAFE_BLOCK_TYPE,
+                )
+            except RuntimeError:
+                prepared = None
 
-            # Custom block fallback
-            if block_dir is None:
-                base_type = config.get("baseType", "")
-                if base_type and SAFE_BLOCK_TYPE.match(base_type):
-                    base_type = BLOCK_ALIASES.get(base_type, base_type)
-                    block_dir = _find_block_module(base_type)
+            if prepared:
+                block_dir = prepared.block_dir
+                block_schema = prepared.block_schema
+                config = prepared.cleaned_config
+                run_dir = prepared.run_dir
+                context_cls = prepared.context_cls
 
-            run_dir = str(ARTIFACTS_DIR / run_id / node_id)
+                # Apply multi-input aggregation policy
+                if block_schema and _multi_counts:
+                    node_inputs = apply_multi_input_policy(
+                        block_schema, node_inputs, _multi_counts,
+                    )
 
-            # Resolve secrets
-            config = _resolve_secrets(config)
+                # Embed block version into config_snapshot for cache validation
+                if prepared.block_version:
+                    node_data["block_version"] = prepared.block_version
 
-            if block_dir:
                 _last_progress_commit = time.time()
 
                 def progress_cb(current, total):
@@ -589,16 +607,6 @@ async def execute_partial_pipeline(
                     metrics_file.write(json.dumps(metric_event) + "\n")
                     metrics_file.flush()
                     metrics_log_buffer.append(metric_event)
-
-                # Detect composite blocks + read timeout from schema
-                block_schema = load_block_schema(block_dir)
-                is_composite = block_schema.get("composite", False) if block_schema else False
-                context_cls = CompositeBlockContext if is_composite else None
-                timeout_seconds = block_schema.get("timeout") if block_schema else None
-
-                # Embed block version into config_snapshot for cache validation
-                if block_schema and block_schema.get("version"):
-                    node_data["block_version"] = block_schema["version"]
 
                 try:
                     node_outputs, data_fingerprints = _load_and_run_block(
