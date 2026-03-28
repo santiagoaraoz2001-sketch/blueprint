@@ -6,8 +6,9 @@ import { usePaperStore } from '@/stores/paperStore'
 import { useEffect, useState } from 'react'
 import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
-import { ArrowLeft, GitBranch, Plus, Trash2, FileText } from 'lucide-react'
+import { ArrowLeft, GitBranch, Plus, Trash2, FileText, BarChart3 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { ExperimentDashboard } from '@/views/ExperimentDashboard'
 
 interface ProjectDetailProps {
   project: Project
@@ -20,6 +21,7 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
   const deleteProject = useProjectStore((s) => s.deleteProject)
 
   const accent = STATUS_COLORS[project.status] || T.dim
+  const [activeTab, setActiveTab] = useState<'overview' | 'dashboard'>('overview')
 
   const pipelines = usePipelineStore((s) => s.pipelines)
   const fetchPipelines = usePipelineStore((s) => s.fetchPipelines)
@@ -176,10 +178,45 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
         </div>
       </div>
 
+      {/* Tab Bar */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${T.border}`, marginBottom: 16 }}>
+        {(['overview', 'dashboard'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              padding: '8px 16px',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === tab ? `2px solid ${T.cyan}` : '2px solid transparent',
+              color: activeTab === tab ? T.text : T.dim,
+              fontFamily: F,
+              fontSize: FS.sm,
+              fontWeight: activeTab === tab ? 600 : 400,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              textTransform: 'capitalize',
+            }}
+          >
+            {tab === 'dashboard' && <BarChart3 size={12} />}
+            {tab === 'overview' ? 'Overview' : 'Experiment Dashboard'}
+          </button>
+        ))}
+      </div>
+
+      {/* Dashboard Tab */}
+      {activeTab === 'dashboard' && (
+        <div style={{ margin: '-20px', height: 'calc(100vh - 180px)' }}>
+          <ExperimentDashboard projectId={project.id} />
+        </div>
+      )}
+
       {/* Pipelines section */}
+      {activeTab === 'overview' && <>
       <div
         style={{
-          borderTop: `1px solid ${T.border}`,
           paddingTop: 16,
         }}
       >
@@ -379,6 +416,7 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
           </div>
         )}
       </div>
+      </>}
     </div>
   )
 }
