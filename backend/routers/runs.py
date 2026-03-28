@@ -114,6 +114,69 @@ def compare_runs(
     }
 
 
+@router.post("/{run_id}/star")
+def toggle_star(run_id: str, db: Session = Depends(get_db)):
+    """Toggle the starred status of a run."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    run.starred = not bool(run.starred)
+    db.commit()
+    return {"run_id": run_id, "starred": run.starred}
+
+
+@router.post("/batch-metrics-log")
+def batch_metrics_log(
+    body: dict,
+    db: Session = Depends(get_db),
+):
+    """Return metrics logs for multiple runs in one request.
+
+    Body: {"run_ids": ["id1", "id2", ...]}
+    Returns: {"run_id": [...events...], ...}
+
+    Each run's log is sourced from Layer 2 (SQLite metrics_log column)
+    with Layer 1 (JSONL file) fallback, same as the single-run endpoint.
+    """
+    run_ids = body.get("run_ids", [])
+    if not run_ids or not isinstance(run_ids, list):
+        raise HTTPException(400, "Provide run_ids list")
+    if len(run_ids) > 20:
+        raise HTTPException(400, "Maximum 20 run IDs per batch request")
+
+    runs = db.query(Run).filter(Run.id.in_(run_ids)).all()
+    run_map = {r.id: r for r in runs}
+
+    result = {}
+    for rid in run_ids:
+        run = run_map.get(rid)
+        if not run:
+            result[rid] = []
+            continue
+
+        # Layer 2: SQLite metrics_log
+        if run.metrics_log:
+            result[rid] = run.metrics_log
+            continue
+
+        # Layer 1 fallback: JSONL file
+        jsonl_path = ARTIFACTS_DIR / rid / "metrics.jsonl"
+        if jsonl_path.exists():
+            events = []
+            for line in jsonl_path.read_text().splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        events.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+            result[rid] = events
+        else:
+            result[rid] = []
+
+    return result
+
+
 @router.get("/{run_id}/metrics-log")
 def get_metrics_log(run_id: str, db: Session = Depends(get_db)):
     """Return the full metrics event log for a run.

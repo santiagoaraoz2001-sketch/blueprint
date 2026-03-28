@@ -24,7 +24,7 @@ from .services.process_manager import ProcessManager, set_process_manager
 from .models.run import LiveRun, Run
 from .routers import (
     artifacts, block_generator, blocks, connectors, control_tower, custom_blocks,
-    datasets, events, execution, inference, marketplace, models, outputs,
+    dashboard, datasets, events, execution, inference, marketplace, models, outputs,
     papers, pipelines, plugins, presets, projects, registry, runs, secrets,
     sweeps, system, templates, workspace,
 )
@@ -155,14 +155,21 @@ def _full_shutdown():
     except Exception:
         pass
 
-    # 2. Sweep executor
+    # 2. Sequential pipeline sequences
+    try:
+        from .routers.dashboard import shutdown_sequences
+        shutdown_sequences()
+    except Exception:
+        pass
+
+    # 3. Sweep executor
     try:
         from .routers.sweeps import shutdown_sweep_executor
         shutdown_sweep_executor()
     except Exception:
         pass
 
-    # 3. Kill spawned inference servers (Ollama, mlx_lm.server)
+    # 4. Kill spawned inference servers (Ollama, mlx_lm.server)
     try:
         from .routers.inference import shutdown_spawned_servers
         shutdown_spawned_servers()
@@ -176,14 +183,14 @@ def _full_shutdown():
     except Exception:
         pass
 
-    # 4. Model watcher
+    # 5. Model watcher
     try:
         from .utils.model_watcher import stop_watcher
         stop_watcher()
     except Exception:
         pass
 
-    # 5. Inbox watcher
+    # 6. Inbox watcher
     try:
         from .services.inbox_watcher import stop_watcher as stop_inbox_watcher
         stop_inbox_watcher()
@@ -240,8 +247,13 @@ async def lifespan(app: FastAPI):
     app.state.process_manager = proc_mgr
     set_process_manager(proc_mgr)
 
-    # Recover stale runs from previous crash (heartbeat-based, existing mechanism)
+    # Recover stale runs and orphaned sequences from previous crash
     _recover_stale_runs()
+    try:
+        from .routers.dashboard import recover_orphaned_sequences
+        recover_orphaned_sequences()
+    except Exception as e:
+        logging.getLogger("blueprint.recovery").warning("Sequence recovery failed: %s", e)
 
     # Recover runs stuck in running/pending from hard crashes (subprocess-aware)
     try:
@@ -338,6 +350,7 @@ app.add_middleware(
 
 # Mount routers
 app.include_router(projects.router)
+app.include_router(dashboard.router)
 app.include_router(pipelines.router)
 app.include_router(runs.router)
 app.include_router(datasets.router)
