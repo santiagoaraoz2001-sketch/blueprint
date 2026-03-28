@@ -3,8 +3,9 @@ import { T, F, FS } from '@/lib/design-tokens'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useRunStore } from '@/stores/runStore'
 import { useReactFlow } from '@xyflow/react'
-import { Settings, Copy, Maximize, Trash2, RotateCcw, Eye, GitCompare } from 'lucide-react'
+import { Settings, Copy, Maximize, Trash2, RotateCcw, Eye, GitCompare, Circle, Filter, FileText, Search } from 'lucide-react'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import BreakpointConditionDialog from '@/components/Debug/BreakpointConditionDialog'
 import { containsLoopOrCycle } from '@/lib/graph-utils'
 
 interface NodeContextMenuProps {
@@ -13,15 +14,18 @@ interface NodeContextMenuProps {
   y: number
   nodeId: string
   onClose: () => void
+  onShowDoc?: (blockType: string) => void
+  onInspectConfig?: (nodeId: string) => void
 }
 
-export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: NodeContextMenuProps) {
+export default function NodeContextMenu({ visible, x, y, nodeId, onClose, onShowDoc, onInspectConfig }: NodeContextMenuProps) {
   const { fitView } = useReactFlow()
   const runStatus = useRunStore((s) => s.status)
   const activeRunId = useRunStore((s) => s.activeRunId)
   const nodeStatuses = useRunStore((s) => s.nodeStatuses)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  if (!visible && !showDeleteConfirm) return null
+  const [showConditionDialog, setShowConditionDialog] = useState(false)
+  if (!visible && !showDeleteConfirm && !showConditionDialog) return null
 
   const isRunComplete = runStatus === 'complete' || runStatus === 'failed'
   const nodeRunStatus = nodeStatuses[nodeId]
@@ -71,6 +75,17 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
 
   const handleFocus = () => {
     fitView({ nodes: [{ id: nodeId }], duration: 400, padding: 0.5 })
+    onClose()
+  }
+
+  // Breakpoint state
+  const hasBreakpoint = usePipelineStore((s) => {
+    const node = s.nodes.find((n) => n.id === nodeId)
+    return !!node?.data?.breakpoint
+  })
+
+  const handleToggleBreakpoint = () => {
+    usePipelineStore.getState().toggleBreakpoint(nodeId)
     onClose()
   }
 
@@ -142,12 +157,38 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
         </>
       )}
 
+      {/* Breakpoint toggle */}
+      <ContextMenuBtn
+        icon={<Circle size={10} fill={hasBreakpoint ? T.red : 'none'} color={T.red} />}
+        label={hasBreakpoint ? 'Remove Breakpoint' : 'Toggle Breakpoint'}
+        shortcut="B"
+        onClick={handleToggleBreakpoint}
+      />
+      {hasBreakpoint && (
+        <ContextMenuBtn
+          icon={<Filter size={10} />}
+          label="Set Condition"
+          shortcut=""
+          onClick={() => { setShowConditionDialog(true); onClose() }}
+        />
+      )}
+      <div style={{ height: 1, background: T.border, margin: '2px 0' }} />
+
       {/* Standard actions */}
       <ContextMenuBtn
         icon={<Settings size={10} />}
         label="Edit Config"
         shortcut=""
         onClick={handleEditConfig}
+      />
+      <ContextMenuBtn
+        icon={<Search size={10} />}
+        label="Inspect Config"
+        shortcut=""
+        onClick={() => {
+          onInspectConfig?.(nodeId)
+          onClose()
+        }}
       />
       <ContextMenuBtn
         icon={<Copy size={10} />}
@@ -160,6 +201,16 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
         label="Focus"
         shortcut="F"
         onClick={handleFocus}
+      />
+      <ContextMenuBtn
+        icon={<FileText size={10} />}
+        label="Documentation"
+        shortcut="?"
+        onClick={() => {
+          const node = usePipelineStore.getState().nodes.find((n) => n.id === nodeId)
+          if (node && onShowDoc) onShowDoc(node.data.type)
+          onClose()
+        }}
       />
       <div style={{ height: 1, background: T.border, margin: '2px 0' }} />
       <ContextMenuBtn
@@ -178,6 +229,11 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
       confirmColor={T.red}
       onConfirm={confirmDelete}
       onCancel={() => setShowDeleteConfirm(false)}
+    />
+    <BreakpointConditionDialog
+      nodeId={nodeId}
+      open={showConditionDialog}
+      onClose={() => setShowConditionDialog(false)}
     />
     </div>
   )

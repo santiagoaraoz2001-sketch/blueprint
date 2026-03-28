@@ -14,13 +14,18 @@ import BackendValidationPanel from '@/components/Validation/ValidationPanel'
 import PipelineTabBar from '@/components/Pipeline/PipelineTabBar'
 import { validatePipelineClient, type DiagnosticReport } from '@/lib/pipeline-validator'
 import PipelineMonitor, { type MonitorBlock } from '@/components/Pipeline/PipelineMonitor'
-import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp, AlertCircle, WifiOff } from 'lucide-react'
+import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp, AlertCircle, WifiOff, History } from 'lucide-react'
 import TemplateGallery from '@/components/Pipeline/TemplateGallery'
+import TemplateLanding from '@/components/Templates/TemplateLanding'
 import ToolbarDropdown from '@/components/Pipeline/ToolbarDropdown'
 import MissionController from '@/components/Mission/MissionController'
 import { useRunStore } from '@/stores/runStore'
 import { useValidationStore } from '@/stores/validationStore'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import KeyboardCheatsheet from '@/components/Pipeline/KeyboardCheatsheet'
+import HistoryTimeline from '@/components/History/HistoryTimeline'
+import AutosaveRecoveryDialog from '@/components/Pipeline/AutosaveRecoveryDialog'
+import { checkAutosave, discardAutosave } from '@/hooks/useAutoSave'
 import toast from 'react-hot-toast'
 
 const btnStyle: React.CSSProperties = {
@@ -50,6 +55,8 @@ export default function PipelineEditorView() {
   })))
   const pastLength = usePipelineStore((s) => s.past.length)
   const futureLength = usePipelineStore((s) => s.future.length)
+  const pipelineNotes = usePipelineStore((s) => s.pipelineNotes)
+  const setPipelineNotes = usePipelineStore((s) => s.setPipelineNotes)
 
   // Actions — stable function refs, don't cause re-renders
   const setName = usePipelineStore((s) => s.setName)
@@ -76,6 +83,28 @@ export default function PipelineEditorView() {
     }
   }, [selectedProjectId, setView])
 
+  // First-launch detection: show template landing when no pipelines exist
+  const [firstLaunchChecked, setFirstLaunchChecked] = useState(false)
+  const [showFirstLaunch, setShowFirstLaunch] = useState(false)
+
+  useEffect(() => {
+    if (firstLaunchChecked) return
+    fetchPipelines().then(() => {
+      const state = usePipelineStore.getState()
+      if (state.pipelines.length === 0 && state.nodes.length === 0 && !state.id) {
+        setShowFirstLaunch(true)
+      }
+      setFirstLaunchChecked(true)
+    })
+  }, [firstLaunchChecked, fetchPipelines])
+
+  // Exit first-launch when a pipeline is loaded or created
+  useEffect(() => {
+    if (showFirstLaunch && (nodes.length > 0 || pipelines.length > 0)) {
+      setShowFirstLaunch(false)
+    }
+  }, [showFirstLaunch, nodes.length, pipelines.length])
+
   const [showAgent, setShowAgent] = useState(false)
   const [showPipelineList, setShowPipelineList] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
@@ -85,6 +114,14 @@ export default function PipelineEditorView() {
   const [validationReport, setValidationReport] = useState<DiagnosticReport | null>(null)
   const [validating, setValidating] = useState(false)
   const [showMonitor, setShowMonitor] = useState(false)
+  const [showPipelineNotes, setShowPipelineNotes] = useState(false)
+  const [showCheatsheet, setShowCheatsheet] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [recoveryData, setRecoveryData] = useState<{
+    pipelineId: string
+    timestamp: string
+    definition: any
+  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Run monitor state from store — SSE is handled exclusively by RunControls
@@ -156,6 +193,30 @@ export default function PipelineEditorView() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [undo, redo, handleSave])
 
+  // Hoist pipelineId — needed by autosave check and backend validation
+  const pipelineId = usePipelineStore((s) => s.id)
+
+  // Check for autosave recovery when pipeline loads
+  useEffect(() => {
+    if (!pipelineId) return
+    checkAutosave(pipelineId).then((result) => {
+      if (result?.exists && result.timestamp && result.definition) {
+        setRecoveryData({
+          pipelineId,
+          timestamp: result.timestamp,
+          definition: result.definition,
+        })
+      }
+    })
+  }, [pipelineId])
+
+  // Listen for cheatsheet toggle from canvas shortcuts
+  useEffect(() => {
+    const handler = () => setShowCheatsheet((v) => !v)
+    window.addEventListener('blueprint:toggle-cheatsheet', handler)
+    return () => window.removeEventListener('blueprint:toggle-cheatsheet', handler)
+  }, [])
+
   // Warn before closing tab with unsaved changes
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -207,13 +268,7 @@ export default function PipelineEditorView() {
   }, [])
 
   // ── Debounced backend validation on graph changes ──
-  const pipelineId = usePipelineStore((s) => s.id)
   const edges = usePipelineStore((s) => s.edges)
-  const backendValidation = useValidationStore((s) => s.result)
-  const isBackendValidating = useValidationStore((s) => s.isValidating)
-  const isBackendStale = useValidationStore((s) => s.isStale)
-  const backendNodeErrors = useValidationStore((s) => s.nodeErrors)
-  const backendPanelVisible = useValidationStore((s) => s.panelVisible)
   const validateBackend = useValidationStore((s) => s.validate)
   const markStale = useValidationStore((s) => s.markStale)
 
@@ -241,9 +296,10 @@ export default function PipelineEditorView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipelineId, nodes.length, edges.length, validateBackend, markStale, configFingerprint])
 
-  // Count backend validation errors for the panel toggle badge
-  const backendErrorCount = backendValidation ? backendValidation.errors.length : 0
-  const backendWarningCount = backendValidation ? backendValidation.warnings.length : 0
+  // Show TemplateLanding for first-launch (no pipelines exist)
+  if (showFirstLaunch) {
+    return <TemplateLanding />
+  }
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -450,12 +506,37 @@ export default function PipelineEditorView() {
           >
             <Redo2 size={12} />
           </button>
+
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            style={{
+              ...btnStyle,
+              color: showHistory ? T.cyan : T.dim,
+              border: showHistory ? `1px solid ${T.cyan}50` : `1px solid ${T.border}`,
+              background: showHistory ? `${T.cyan}10` : 'transparent',
+            }}
+            title="History Timeline"
+          >
+            <History size={12} />
+          </button>
         </div>
 
         <div style={{ width: 1, height: 14, background: T.border }} />
 
         <button onClick={handleAddStickyNote} style={btnStyle} title="Add sticky note">
           <StickyNote size={10} />
+        </button>
+        <button
+          onClick={() => setShowPipelineNotes(!showPipelineNotes)}
+          style={{
+            ...btnStyle,
+            color: showPipelineNotes || pipelineNotes ? '#FFB74D' : T.dim,
+            borderColor: showPipelineNotes ? 'rgba(255, 183, 77, 0.3)' : T.border,
+          }}
+          title="Pipeline notes"
+        >
+          <StickyNote size={10} color={showPipelineNotes || pipelineNotes ? '#FFB74D' : undefined} />
+          <span style={{ fontSize: FS.xxs }}>Notes</span>
         </button>
 
         <ToolbarDropdown
@@ -596,6 +677,112 @@ export default function PipelineEditorView() {
           />
           <BlockConfig />
 
+          {/* Pipeline notes side panel — uses store for state, saved via savePipeline */}
+          {showPipelineNotes && (
+            <div
+              style={{
+                width: 300,
+                minWidth: 300,
+                height: '100%',
+                background: `linear-gradient(180deg, ${T.surface1} 0%, ${T.surface0} 100%)`,
+                borderLeft: `1px solid rgba(255, 183, 77, 0.2)`,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{
+                padding: '12px 16px',
+                borderBottom: `1px solid ${T.border}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <span style={{
+                  fontFamily: F,
+                  fontSize: FS.sm,
+                  color: '#FFB74D',
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}>
+                  <StickyNote size={14} color="#FFB74D" />
+                  Pipeline Notes
+                </span>
+                <button
+                  onClick={() => setShowPipelineNotes(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: T.dim,
+                    cursor: 'pointer',
+                    padding: 4,
+                  }}
+                >
+                  &times;
+                </button>
+              </div>
+              <div style={{ flex: 1, padding: 16, overflow: 'auto' }}>
+                <textarea
+                  value={pipelineNotes}
+                  onChange={(e) => setPipelineNotes(e.target.value)}
+                  placeholder="Add hypotheses, reminders, reasoning..."
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    minHeight: 200,
+                    padding: '10px 12px',
+                    background: T.surface3,
+                    border: `1px solid ${T.border}`,
+                    borderRadius: 6,
+                    color: T.text,
+                    fontFamily: F,
+                    fontSize: FS.sm,
+                    resize: 'none',
+                    outline: 'none',
+                    lineHeight: 1.6,
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 183, 77, 0.4)' }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = T.border }}
+                />
+              </div>
+              <div style={{
+                padding: '12px 16px',
+                borderTop: `1px solid ${T.border}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <span style={{
+                  fontFamily: F,
+                  fontSize: FS.xxs,
+                  color: T.dim,
+                  flex: 1,
+                }}>
+                  {isDirty ? 'Unsaved changes' : 'Saved'}
+                </span>
+                <button
+                  onClick={handleSave}
+                  style={{
+                    padding: '6px 16px',
+                    background: 'rgba(255, 183, 77, 0.15)',
+                    border: '1px solid rgba(255, 183, 77, 0.3)',
+                    borderRadius: 6,
+                    color: '#FFB74D',
+                    fontFamily: F,
+                    fontSize: FS.xs,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Validation panel modal – must be inside ReactFlowProvider (uses useReactFlow hook) */}
           <ValidationPanel
             visible={showValidation}
@@ -619,6 +806,12 @@ export default function PipelineEditorView() {
           progress={overallProgress}
           logs={runLogs}
           onClose={() => setShowMonitor(false)}
+        />
+
+        {/* History timeline panel */}
+        <HistoryTimeline
+          visible={showHistory}
+          onClose={() => setShowHistory(false)}
         />
       </div>
 
@@ -650,6 +843,42 @@ export default function PipelineEditorView() {
         confirmColor={T.amber}
         onConfirm={() => { newPipeline(); setShowNewConfirm(false) }}
         onCancel={() => setShowNewConfirm(false)}
+      />
+
+      {/* Keyboard shortcuts cheatsheet */}
+      <KeyboardCheatsheet
+        visible={showCheatsheet}
+        onClose={() => setShowCheatsheet(false)}
+      />
+
+      {/* Autosave recovery dialog */}
+      <AutosaveRecoveryDialog
+        open={!!recoveryData}
+        timestamp={recoveryData?.timestamp || ''}
+        onRestore={() => {
+          if (recoveryData) {
+            const def = recoveryData.definition
+            if (def && Array.isArray(def.nodes)) {
+              // Restore autosaved state into the current pipeline (preserving ID)
+              const store = usePipelineStore.getState()
+              store.pushHistory() // save current state so user can undo the restore
+              usePipelineStore.setState({
+                nodes: def.nodes,
+                edges: def.edges || [],
+                isDirty: true,
+              })
+              toast.success('Unsaved changes restored')
+            }
+            discardAutosave(recoveryData.pipelineId)
+          }
+          setRecoveryData(null)
+        }}
+        onDiscard={() => {
+          if (recoveryData) {
+            discardAutosave(recoveryData.pipelineId)
+          }
+          setRecoveryData(null)
+        }}
       />
     </div>
   )

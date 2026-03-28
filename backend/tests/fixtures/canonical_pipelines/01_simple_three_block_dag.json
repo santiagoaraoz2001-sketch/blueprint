@@ -1,0 +1,92 @@
+{
+  "name": "simple_three_block_dag",
+  "description": "local_file_loader → text_chunker → results_formatter: simplest 3-block DAG.",
+  "nodes": [
+    {
+      "id": "loader",
+      "type": "blockNode",
+      "data": {
+        "type": "local_file_loader",
+        "label": "File Loader",
+        "category": "data",
+        "config": {
+          "file_path": "/tmp/test_input.txt",
+          "format": "txt"
+        },
+        "inputs": [
+          {"id": "config", "dataType": "config", "required": false}
+        ],
+        "outputs": [
+          {"id": "dataset", "dataType": "dataset"},
+          {"id": "dataset_meta", "dataType": "config"},
+          {"id": "metrics", "dataType": "metrics"}
+        ]
+      }
+    },
+    {
+      "id": "chunker",
+      "type": "blockNode",
+      "data": {
+        "type": "text_chunker",
+        "label": "Text Chunker",
+        "category": "data",
+        "config": {
+          "chunk_size": 500,
+          "strategy": "recursive",
+          "text_column": "text"
+        },
+        "inputs": [
+          {"id": "dataset", "dataType": "dataset", "required": true}
+        ],
+        "outputs": [
+          {"id": "chunked_dataset", "dataType": "dataset"},
+          {"id": "output_dataset_meta", "dataType": "config"},
+          {"id": "stats", "dataType": "metrics"}
+        ]
+      }
+    },
+    {
+      "id": "formatter",
+      "type": "blockNode",
+      "data": {
+        "type": "results_formatter",
+        "label": "Results Formatter",
+        "category": "output",
+        "config": {
+          "format": "json",
+          "include_config": true
+        },
+        "inputs": [
+          {"id": "metrics", "dataType": "metrics", "required": false}
+        ],
+        "outputs": [
+          {"id": "artifact", "dataType": "artifact"}
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "loader",
+      "target": "chunker",
+      "sourceHandle": "dataset",
+      "targetHandle": "dataset"
+    },
+    {
+      "id": "e2",
+      "source": "chunker",
+      "target": "formatter",
+      "sourceHandle": "stats",
+      "targetHandle": "metrics"
+    }
+  ],
+  "expected": {
+    "validation": "pass",
+    "execution_order": ["loader", "chunker", "formatter"],
+    "final_status": "completed",
+    "expected_errors": [],
+    "partial_rerun_allowed": true,
+    "export_allowed": true
+  }
+}

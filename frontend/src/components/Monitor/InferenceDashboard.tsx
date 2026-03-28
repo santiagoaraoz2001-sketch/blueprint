@@ -52,7 +52,7 @@ export default function InferenceDashboard({ blockId }: Props) {
         <AutoLineChart
           metricName="tokens/sec"
           blockId={blockId}
-          color="#00BFA5"
+          color={T.cyan}
           height={200}
           title="TOKENS / SECOND"
         />

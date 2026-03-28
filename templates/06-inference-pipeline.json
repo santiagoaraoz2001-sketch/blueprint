@@ -1,0 +1,141 @@
+{
+  "id": "inference-pipeline",
+  "name": "Inference Pipeline",
+  "description": "Select a model, create a prompt template, run LLM inference, and save the generated output. Great for batch inference workflows.",
+  "difficulty": "beginner",
+  "estimated_runtime": "5 min",
+  "required_services": [
+    "ollama"
+  ],
+  "required_capabilities": [],
+  "tags": [
+    "inference",
+    "llm",
+    "beginner"
+  ],
+  "nodes": [
+    {
+      "id": "ip_1",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 80
+      },
+      "data": {
+        "type": "model_selector",
+        "label": "Model Selector",
+        "category": "data",
+        "icon": "Box",
+        "accent": "#62B8D9",
+        "config": {},
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "ip_2",
+      "type": "blockNode",
+      "position": {
+        "x": 700,
+        "y": 80
+      },
+      "data": {
+        "type": "prompt_template",
+        "label": "Prompt Template",
+        "category": "inference",
+        "icon": "FileText",
+        "accent": "#8FD07A",
+        "config": {
+          "template": "Summarize the following text:\n\n{{text}}",
+          "system_prompt": "You are a helpful assistant."
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "ip_3",
+      "type": "blockNode",
+      "position": {
+        "x": 550,
+        "y": 300
+      },
+      "data": {
+        "type": "llm_inference",
+        "label": "LLM Inference",
+        "category": "inference",
+        "icon": "Cpu",
+        "accent": "#8FD07A",
+        "config": {
+          "temperature": 0.7,
+          "max_tokens": 1024
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "ip_4",
+      "type": "blockNode",
+      "position": {
+        "x": 550,
+        "y": 500
+      },
+      "data": {
+        "type": "data_export",
+        "label": "Save Output",
+        "category": "endpoints",
+        "icon": "Download",
+        "accent": "#56C4B0",
+        "config": {
+          "format": "txt",
+          "filename": "inference_output"
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "ip_e1",
+      "source": "ip_1",
+      "target": "ip_3",
+      "sourceHandle": "model",
+      "targetHandle": "model",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#B29CEA",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "ip_e2",
+      "source": "ip_2",
+      "target": "ip_3",
+      "sourceHandle": "rendered_text",
+      "targetHandle": "prompt",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#7B9BE3",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "ip_e3",
+      "source": "ip_3",
+      "target": "ip_4",
+      "sourceHandle": "response",
+      "targetHandle": "data",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#7B9BE3",
+        "strokeWidth": 1.5
+      }
+    }
+  ],
+  "default_config": {}
+}

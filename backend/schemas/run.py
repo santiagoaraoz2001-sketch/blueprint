@@ -3,6 +3,12 @@ from datetime import datetime
 from typing import Any
 
 
+class RunMetadataUpdate(BaseModel):
+    notes: str | None = None
+    tags: str | None = None
+    starred: bool | None = None
+
+
 class RunResponse(BaseModel):
     id: str
     pipeline_id: str
@@ -18,5 +24,8 @@ class RunResponse(BaseModel):
     outputs_snapshot: dict[str, Any] | None = None
     data_fingerprints: dict[str, Any] | None = None
     best_in_project: bool = False
+    notes: str | None = None
+    tags: str | None = None
+    starred: bool = False
 
     model_config = {"from_attributes": True}

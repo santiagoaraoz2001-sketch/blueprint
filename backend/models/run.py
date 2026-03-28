@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime, Float, Integer, JSON, ForeignKey, Boolean
+from sqlalchemy import Column, String, Text, DateTime, Float, Integer, JSON, Boolean, ForeignKey
 from ..database import Base
 
 
@@ -23,6 +23,9 @@ class Run(Base):
     data_fingerprints = Column(JSON, nullable=True)  # {node_id: {input_name: fingerprint}}
     config_fingerprints = Column(JSON, nullable=True)  # {node_id: sha256_hex} — Merkle-chain config hashes
     best_in_project = Column(Boolean, default=False, nullable=False, server_default="0")
+    notes = Column(Text, nullable=True)  # Post-run annotation
+    tags = Column(String, nullable=True)  # Comma-separated tags
+    starred = Column(Boolean, default=False)  # Starred/bookmarked run
 
 
 class LiveRun(Base):

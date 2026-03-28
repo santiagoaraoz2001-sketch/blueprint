@@ -1,0 +1,177 @@
+{
+  "id": "lora-finetune",
+  "name": "LoRA Fine-Tune",
+  "description": "End-to-end LoRA fine-tuning: select a base model, load a dataset, fine-tune with LoRA adapters, save the merged model, and evaluate with LM Eval Harness.",
+  "difficulty": "intermediate",
+  "estimated_runtime": "2 hours",
+  "required_services": [],
+  "required_capabilities": [
+    "torch"
+  ],
+  "tags": [
+    "lora",
+    "fine-tuning",
+    "evaluation"
+  ],
+  "nodes": [
+    {
+      "id": "lf_1",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 80
+      },
+      "data": {
+        "type": "model_selector",
+        "label": "Base Model",
+        "category": "data",
+        "icon": "Box",
+        "accent": "#62B8D9",
+        "config": {},
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "lf_2",
+      "type": "blockNode",
+      "position": {
+        "x": 700,
+        "y": 80
+      },
+      "data": {
+        "type": "huggingface_loader",
+        "label": "Dataset Loader",
+        "category": "source",
+        "icon": "Download",
+        "accent": "#DE9A68",
+        "config": {
+          "dataset_name": "tatsu-lab/alpaca",
+          "split": "train",
+          "max_samples": 5000
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "lf_3",
+      "type": "blockNode",
+      "position": {
+        "x": 550,
+        "y": 280
+      },
+      "data": {
+        "type": "lora_finetuning",
+        "label": "LoRA Fine-Tuning",
+        "category": "training",
+        "icon": "Zap",
+        "accent": "#7B9BE3",
+        "config": {
+          "r": 16,
+          "alpha": 32,
+          "lr": 0.0001,
+          "epochs": 3,
+          "batch_size": 4
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "lf_4",
+      "type": "blockNode",
+      "position": {
+        "x": 550,
+        "y": 480
+      },
+      "data": {
+        "type": "save_model",
+        "label": "Save Model",
+        "category": "endpoints",
+        "icon": "Save",
+        "accent": "#56C4B0",
+        "config": {},
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "lf_5",
+      "type": "blockNode",
+      "position": {
+        "x": 550,
+        "y": 660
+      },
+      "data": {
+        "type": "lm_eval_harness",
+        "label": "LM Eval Harness",
+        "category": "evaluation",
+        "icon": "ClipboardCheck",
+        "accent": "#65D68B",
+        "config": {
+          "tasks": "hellaswag,arc_easy",
+          "num_fewshot": 0,
+          "batch_size": "auto"
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "lf_e1",
+      "source": "lf_1",
+      "target": "lf_3",
+      "sourceHandle": "model",
+      "targetHandle": "model",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#B29CEA",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "lf_e2",
+      "source": "lf_2",
+      "target": "lf_3",
+      "sourceHandle": "dataset",
+      "targetHandle": "dataset",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#5FB8E8",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "lf_e3",
+      "source": "lf_3",
+      "target": "lf_4",
+      "sourceHandle": "trained_model",
+      "targetHandle": "model",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#B29CEA",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "lf_e4",
+      "source": "lf_3",
+      "target": "lf_5",
+      "sourceHandle": "trained_model",
+      "targetHandle": "model",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#B29CEA",
+        "strokeWidth": 1.5
+      }
+    }
+  ],
+  "default_config": {}
+}

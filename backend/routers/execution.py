@@ -1,3 +1,4 @@
+import os
 import uuid
 import logging
 import threading
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db, SessionLocal
 from ..models.pipeline import Pipeline
 from ..models.run import Run
-from ..engine.executor import execute_pipeline, request_cancel
+from ..engine.executor import execute_pipeline, request_cancel, debug_action
 from ..engine.partial_executor import execute_partial_pipeline
 from ..engine.validator import validate_pipeline
 from ..engine.graph_utils import contains_loop_or_cycle
@@ -31,13 +32,19 @@ from ..schemas.execution import (
     GatewayValidationResponse,
     BlockConfigValidationResponse,
     PipelineTestResponse,
+    DryRunResponse,
+    AutofixRequest,
+    AutofixResponse,
 )
 
 router = APIRouter(prefix="/api", tags=["execution"])
 _logger = logging.getLogger("blueprint.execution")
 
-# Bounded thread pool prevents resource exhaustion from concurrent runs
-_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="pipeline-run")
+# Thread pool sized larger than the active-run limit (MAX_ACTIVE_RUNS, default 4)
+# to accommodate threads paused at breakpoints. Active concurrency is controlled
+# by the _active_run_semaphore in executor.py, not by the pool size.
+_MAX_POOL_WORKERS = int(os.environ.get("BLUEPRINT_MAX_POOL_WORKERS", "12"))
+_executor = ThreadPoolExecutor(max_workers=_MAX_POOL_WORKERS, thread_name_prefix="pipeline-run")
 
 
 class PartialExecuteRequest(BaseModel):
@@ -247,6 +254,26 @@ def cancel_run(run_id: str, db: Session = Depends(get_db)):
     return {"status": "cancelling", "run_id": run_id}
 
 
+@router.post("/runs/{run_id}/debug/{action}")
+def debug_run(run_id: str, action: str, db: Session = Depends(get_db)):
+    """Debug action for a paused pipeline run.
+
+    Actions:
+      resume — continue to next breakpoint
+      step   — execute one node then pause again
+      abort  — cancel the run
+    """
+    if action not in ("resume", "step", "abort"):
+        raise HTTPException(400, f"Invalid debug action: {action}. Must be resume, step, or abort.")
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    success = debug_action(run_id, action)
+    if not success:
+        raise HTTPException(400, "Run is not paused at a breakpoint")
+    return {"status": "ok", "action": action, "run_id": run_id}
+
+
 @router.get("/runs/{run_id}/outputs", response_model=RunOutputsResponse)
 def get_run_outputs(run_id: str, db: Session = Depends(get_db)):
     """Get partial or complete outputs for a run."""
@@ -278,6 +305,139 @@ def validate_pipeline_endpoint(pipeline_id: str, db: Session = Depends(get_db)):
         "block_count": report.block_count,
         "edge_count": report.edge_count,
     }
+
+
+@router.post("/pipelines/{pipeline_id}/dry-run", response_model=DryRunResponse)
+def dry_run_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
+    """Simulate pipeline execution and estimate resource requirements.
+
+    Runs the planner and dry-run simulator without triggering actual execution.
+    Returns viability assessment, blockers, warnings, and per-node estimates.
+    """
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    if not nodes:
+        raise HTTPException(400, "Pipeline has no blocks")
+
+    # Plan the pipeline
+    from ..engine.planner import GraphPlanner
+    registry = get_global_registry()
+    planner = GraphPlanner(registry)
+    plan_result = planner.plan(nodes, definition.get("edges", []))
+
+    if not plan_result.is_valid or plan_result.plan is None:
+        # Return as non-viable with planner errors as blockers
+        from ..schemas.execution import TotalEstimateResponse
+        return {
+            "viable": False,
+            "blockers": list(plan_result.errors),
+            "warnings": [],
+            "per_node_estimates": {},
+            "total_estimate": TotalEstimateResponse(
+                peak_memory_mb=0,
+                total_artifact_volume_mb=0,
+                runtime_class="seconds",
+                confidence="low",
+            ).model_dump(),
+        }
+
+    # Detect system capabilities (cached for session lifetime)
+    from ..services.capability_detector import detect_capabilities
+    capabilities = detect_capabilities()
+
+    # Gather historical run data (per-node timing from metrics_log)
+    from ..services.run_history import gather_run_history
+    run_history = gather_run_history(db, plan_result.plan, pipeline_id=pipeline_id)
+
+    # Simulate
+    from ..engine.dry_run import simulate
+    result = simulate(plan_result.plan, capabilities, run_history, registry)
+
+    return {
+        "viable": result.viable,
+        "blockers": result.blockers,
+        "warnings": result.warnings,
+        "per_node_estimates": {
+            nid: {
+                "estimated_memory_mb": est.estimated_memory_mb,
+                "estimated_duration_class": est.estimated_duration_class,
+                "confidence": est.confidence,
+            }
+            for nid, est in result.per_node_estimates.items()
+        },
+        "total_estimate": {
+            "peak_memory_mb": result.total_estimate.peak_memory_mb,
+            "total_artifact_volume_mb": result.total_estimate.total_artifact_volume_mb,
+            "runtime_class": result.total_estimate.runtime_class,
+            "confidence": result.total_estimate.confidence,
+        },
+    }
+
+
+@router.post("/pipelines/{pipeline_id}/autofix", response_model=AutofixResponse)
+def autofix_pipeline(pipeline_id: str, body: AutofixRequest, db: Session = Depends(get_db)):
+    """Propose or apply deterministic fixes for pipeline validation errors.
+
+    action='propose': validate the pipeline and return proposed fixes.
+    action='apply': apply selected patches (by patch_id), save the pipeline,
+                    and return the updated definition.
+    """
+    from ..engine.autofix import AutofixEngine
+    from ..engine.validator import validate_pipeline as _validate
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+
+    registry = get_global_registry()
+    engine = AutofixEngine(registry)
+
+    if body.action == "propose":
+        # Run validation to get current errors
+        report = _validate(definition)
+        patches = engine.propose_fixes(report.errors, report.warnings, nodes, edges)
+        return {
+            "patches": [p.to_dict() for p in patches],
+            "applied": [],
+            "skipped": [],
+            "definition": None,
+        }
+
+    elif body.action == "apply":
+        if not body.patch_ids:
+            raise HTTPException(400, "patch_ids required for action='apply'")
+
+        # First propose to get the patches, then apply selected ones
+        report = _validate(definition)
+        patches = engine.propose_fixes(report.errors, report.warnings, nodes, edges)
+        new_nodes, new_edges, result = engine.apply_fixes(
+            body.patch_ids, nodes, edges, all_patches=patches,
+        )
+
+        if result.applied:
+            # Save the updated pipeline
+            updated_def = {**definition, "nodes": new_nodes, "edges": new_edges}
+            pipeline.definition = updated_def
+            db.commit()
+            db.refresh(pipeline)
+
+        return {
+            "patches": [p.to_dict() for p in patches],
+            "applied": result.applied,
+            "skipped": result.skipped,
+            "definition": pipeline.definition if result.applied else None,
+        }
+
+    else:
+        raise HTTPException(400, f"Invalid action: {body.action}. Use 'propose' or 'apply'.")
 
 
 @router.post("/blocks/{block_type}/validate-config", response_model=BlockConfigValidationResponse)

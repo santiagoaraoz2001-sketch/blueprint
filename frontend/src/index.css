@@ -15,7 +15,7 @@
     --bg-alt:       #090C11;
     --text:         #F2F4F8;
     --sec:          #C4CDDE;
-    --dim:          #7A8799;
+    --dim:          #90A0B5;
     --surface0:     #0B0D13;
     --surface1:     #0F1319;
     --surface2:     #141922;
@@ -66,12 +66,45 @@
   }
 
   :focus-visible {
-    outline: 1.5px solid var(--cyan);
+    outline: 2px solid var(--cyan);
     outline-offset: 2px;
   }
 
   :focus:not(:focus-visible) {
     outline: none;
+  }
+
+  /* Screen-reader-only utility */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Skip-to-content link for keyboard users */
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 16px;
+    z-index: 99999;
+    padding: 8px 16px;
+    background: var(--cyan);
+    color: #060709;
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: 0 0 8px 8px;
+    text-decoration: none;
+    transition: top 0.15s ease;
+  }
+
+  .skip-link:focus {
+    top: 0;
   }
 
   ::selection {

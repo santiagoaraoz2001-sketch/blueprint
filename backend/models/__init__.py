@@ -7,5 +7,6 @@ from .dataset import Dataset
 from .artifact import Artifact, ArtifactRecord
 from .sweep import Sweep
 from .experiment_note import ExperimentNote
+from .execution_decision import ExecutionDecision
 
-__all__ = ["Project", "Experiment", "ExperimentPhase", "Pipeline", "Run", "LiveRun", "Dataset", "Artifact", "ArtifactRecord", "Sweep", "ExperimentNote"]
+__all__ = ["Project", "Experiment", "ExperimentPhase", "Pipeline", "Run", "LiveRun", "Dataset", "Artifact", "ArtifactRecord", "Sweep", "ExperimentNote", "ExecutionDecision"]

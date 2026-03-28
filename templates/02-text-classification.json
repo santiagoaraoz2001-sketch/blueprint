@@ -1,0 +1,146 @@
+{
+  "id": "text-classification",
+  "name": "Text Classification",
+  "description": "Load a dataset from HuggingFace, split it into train/val/test sets, fine-tune a model, and evaluate the results.",
+  "difficulty": "intermediate",
+  "estimated_runtime": "30 min",
+  "required_services": [],
+  "required_capabilities": [
+    "torch"
+  ],
+  "tags": [
+    "training",
+    "classification",
+    "evaluation"
+  ],
+  "nodes": [
+    {
+      "id": "tc_1",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 80
+      },
+      "data": {
+        "type": "huggingface_loader",
+        "label": "Load Dataset",
+        "category": "source",
+        "icon": "Download",
+        "accent": "#DE9A68",
+        "config": {
+          "dataset_name": "ag_news",
+          "split": "train",
+          "max_samples": 5000
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "tc_2",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 260
+      },
+      "data": {
+        "type": "train_val_test_split",
+        "label": "Train/Val/Test Split",
+        "category": "data",
+        "icon": "Split",
+        "accent": "#62B8D9",
+        "config": {
+          "train_ratio": 0.8,
+          "val_ratio": 0.1,
+          "test_ratio": 0.1,
+          "seed": 42
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "tc_3",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 440
+      },
+      "data": {
+        "type": "full_finetuning",
+        "label": "Fine-Tune",
+        "category": "training",
+        "icon": "Zap",
+        "accent": "#7B9BE3",
+        "config": {
+          "model_name": "distilbert-base-uncased",
+          "epochs": 3,
+          "batch_size": 16,
+          "lr": 2e-05
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "tc_4",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 620
+      },
+      "data": {
+        "type": "custom_eval",
+        "label": "Evaluate",
+        "category": "evaluation",
+        "icon": "ClipboardCheck",
+        "accent": "#65D68B",
+        "config": {},
+        "status": "idle",
+        "progress": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "tc_e1",
+      "source": "tc_1",
+      "target": "tc_2",
+      "sourceHandle": "dataset",
+      "targetHandle": "dataset",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#5FB8E8",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "tc_e2",
+      "source": "tc_2",
+      "target": "tc_3",
+      "sourceHandle": "train",
+      "targetHandle": "dataset",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#5FB8E8",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "tc_e3",
+      "source": "tc_3",
+      "target": "tc_4",
+      "sourceHandle": "trained_model",
+      "targetHandle": "predictions",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#B29CEA",
+        "strokeWidth": 1.5
+      }
+    }
+  ],
+  "default_config": {}
+}
