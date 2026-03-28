@@ -1,0 +1,53 @@
+{
+  "compiler": {
+    "code_length": 9951,
+    "generated": true,
+    "has_blocks": true
+  },
+  "fixture_name": "legal_loop",
+  "loop_aware_sort": {
+    "order": [
+      "data_source",
+      "loop_ctrl",
+      "loop_body",
+      "after_loop"
+    ]
+  },
+  "loop_detection": {
+    "loop_count": 1,
+    "loops": [
+      {
+        "body_node_ids": [
+          "loop_body"
+        ],
+        "controller_id": "loop_ctrl",
+        "entry_edge_count": 1,
+        "feedback_edge_count": 1
+      }
+    ]
+  },
+  "partial_rerun_safety": {
+    "has_loop_controller": true,
+    "safe_per_contract": false
+  },
+  "topological_sort": {
+    "all_nodes_included": false,
+    "node_count": 1,
+    "order": [
+      "data_source"
+    ]
+  },
+  "validation": {
+    "block_count": 4,
+    "edge_count": 4,
+    "error_count": 0,
+    "errors": [],
+    "estimated_runtime_s": 25,
+    "valid": true,
+    "warning_count": 2,
+    "warnings": [
+      "Pipeline contains 1 loop(s): 'Loop Controller' (1 body block)",
+      "Block 'Loop Controller': 'context_management' value 'retain' not in allowed options: ['clear', 'keep', 'summarize']"
+    ]
+  }
+}

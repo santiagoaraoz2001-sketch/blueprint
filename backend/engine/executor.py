@@ -239,6 +239,22 @@ def _detect_loops(
                     stack_b.append(nb)
         sccs.append(component)
 
+    # ── Step 2b: Filter stuck-downstream nodes ──
+    # Kahn's residual includes nodes whose in-degree never reached 0 because
+    # a cyclic predecessor was never processed — but they may NOT be in any
+    # actual cycle. Kosaraju correctly places them in single-node SCCs.
+    # A single-node SCC with no self-loop edge is NOT a real cycle — discard it.
+    def _has_self_loop(nid: str) -> bool:
+        return any(
+            e.get("source") == nid and e.get("target") == nid
+            for e in edges
+        )
+
+    sccs = [scc for scc in sccs if len(scc) > 1 or _has_self_loop(scc[0])]
+
+    if not sccs:
+        return []
+
     # ── Step 3: Validate each SCC and build LoopDefinitions ──
     def _is_loop_controller(nid: str) -> bool:
         n = node_map.get(nid, {})
@@ -248,10 +264,16 @@ def _detect_loops(
     for scc in sccs:
         controllers = [n for n in scc if _is_loop_controller(n)]
         if len(controllers) != 1:
-            raise ValueError(
-                "Pipeline contains a cycle that doesn't pass through "
-                "a Loop Controller block."
-            )
+            if len(controllers) == 0:
+                raise ValueError(
+                    "Pipeline contains a cycle that doesn't pass through "
+                    "a Loop Controller block."
+                )
+            else:
+                raise ValueError(
+                    f"Pipeline cycle contains {len(controllers)} Loop Controller "
+                    f"blocks; exactly 1 is required per cycle."
+                )
 
         controller_id = controllers[0]
         body_nodes_set = set(scc) - {controller_id}

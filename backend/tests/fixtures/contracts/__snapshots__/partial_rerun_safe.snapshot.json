@@ -1,0 +1,43 @@
+{
+  "compiler": {
+    "code_length": 7918,
+    "generated": true,
+    "has_blocks": true
+  },
+  "fixture_name": "partial_rerun_safe",
+  "loop_aware_sort": {
+    "note": "no loops \u2014 same as simple sort",
+    "order": [
+      "upstream",
+      "rerun_start",
+      "downstream"
+    ]
+  },
+  "loop_detection": {
+    "loop_count": 0,
+    "loops": []
+  },
+  "partial_rerun_safety": {
+    "has_loop_controller": false,
+    "safe_per_contract": true
+  },
+  "topological_sort": {
+    "all_nodes_included": true,
+    "node_count": 3,
+    "order": [
+      "upstream",
+      "rerun_start",
+      "downstream"
+    ]
+  },
+  "validation": {
+    "block_count": 3,
+    "edge_count": 2,
+    "error_count": 0,
+    "errors": [],
+    "estimated_runtime_s": 20,
+    "valid": true,
+    "warning_count": 0,
+    "warnings": []
+  }
+}

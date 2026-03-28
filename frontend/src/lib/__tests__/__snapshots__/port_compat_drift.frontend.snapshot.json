@@ -1,0 +1,21 @@
+{
+  "fixture_name": "port_compat_drift",
+  "loop_detection": {
+    "legal_loops": [],
+    "illegal_cycle": false
+  },
+  "edge_compatibility": {
+    "e_text_config": {
+      "source": "text",
+      "target": "config",
+      "compatible": false
+    },
+    "e_model_llm": {
+      "source": "model",
+      "target": "llm",
+      "compatible": true
+    }
+  },
+  "node_count": 4,
+  "edge_count": 2
+}

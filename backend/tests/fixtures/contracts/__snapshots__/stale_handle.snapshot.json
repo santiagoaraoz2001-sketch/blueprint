@@ -1,0 +1,50 @@
+{
+  "compiler": {
+    "code_length": 6482,
+    "generated": true,
+    "has_blocks": true
+  },
+  "fixture_name": "stale_handle",
+  "handle_resolution": {
+    "e_stale": {
+      "changed": true,
+      "original": "output",
+      "resolved": "response"
+    }
+  },
+  "loop_aware_sort": {
+    "note": "no loops \u2014 same as simple sort",
+    "order": [
+      "producer",
+      "consumer"
+    ]
+  },
+  "loop_detection": {
+    "loop_count": 0,
+    "loops": []
+  },
+  "partial_rerun_safety": {
+    "has_loop_controller": false,
+    "safe_per_contract": true
+  },
+  "topological_sort": {
+    "all_nodes_included": true,
+    "node_count": 2,
+    "order": [
+      "producer",
+      "consumer"
+    ]
+  },
+  "validation": {
+    "block_count": 2,
+    "edge_count": 1,
+    "error_count": 0,
+    "errors": [],
+    "estimated_runtime_s": 15,
+    "valid": true,
+    "warning_count": 1,
+    "warnings": [
+      "Edge from 'Producer' references non-existent output port 'output'"
+    ]
+  }
+}
