@@ -81,6 +81,7 @@ from ..block_sdk.exceptions import BlockError, BlockInputError, BlockConfigError
 from .composite import CompositeBlockContext, execute_sub_pipeline
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
+from ..utils.redact import scrub_traceback
 from .block_registry import resolve_output_handle
 from .schema_validator import load_block_schema, validate_inputs, validate_config
 from ..utils.structured_logger import (
@@ -1395,7 +1396,7 @@ async def execute_pipeline(
                     except Exception:
                         pass
                     run.status = "failed"
-                    run.error_message = f"Loop {block_type} failed: {str(e)}\n\n{tb}"
+                    run.error_message = scrub_traceback(f"Loop {block_type} failed: {str(e)}\n\n{tb}")
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     run.data_fingerprints = all_fingerprints
                     live.status = "failed"
@@ -1616,7 +1617,7 @@ async def execute_pipeline(
                     except Exception:
                         pass
                     run.status = "failed"
-                    run.error_message = f"Block {block_type} failed: {str(e)}\n\n{tb}"
+                    run.error_message = scrub_traceback(f"Block {block_type} failed: {str(e)}\n\n{tb}")
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     run.data_fingerprints = all_fingerprints
                     live.status = "failed"
@@ -1734,7 +1735,7 @@ async def execute_pipeline(
     except Exception as e:
         tb = traceback.format_exc()
         run.status = "failed"
-        run.error_message = f"{str(e)}\n\n{tb}"
+        run.error_message = scrub_traceback(f"{str(e)}\n\n{tb}")
         run.finished_at = datetime.now(timezone.utc)
         run.duration_seconds = time.time() - start_time
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
@@ -1791,6 +1792,6 @@ def _write_error_log(run_id: str, tb: str):
     try:
         error_dir = ARTIFACTS_DIR / run_id
         error_dir.mkdir(parents=True, exist_ok=True)
-        (error_dir / "error.log").write_text(tb)
+        (error_dir / "error.log").write_text(scrub_traceback(tb))
     except Exception:
         pass

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from ..config import ARTIFACTS_DIR
 from ..models.run import Run, LiveRun
 from ..routers.events import publish_event
+from ..utils.redact import scrub_traceback
 from .executor import (
     _topological_sort,
     _find_block_module,
@@ -512,7 +513,7 @@ async def execute_partial_pipeline(
                     except Exception:
                         pass
                     run.status = "failed"
-                    run.error_message = f"Block {block_type} failed: {str(e)}\n\n{tb}"
+                    run.error_message = scrub_traceback(f"Block {block_type} failed: {str(e)}\n\n{tb}")
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     live.status = "failed"
                     db.commit()
@@ -620,7 +621,7 @@ async def execute_partial_pipeline(
     except Exception as e:
         tb = traceback.format_exc()
         run.status = "failed"
-        run.error_message = f"{str(e)}\n\n{tb}"
+        run.error_message = scrub_traceback(f"{str(e)}\n\n{tb}")
         run.finished_at = datetime.now(timezone.utc)
         run.duration_seconds = time.time() - start_time
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
