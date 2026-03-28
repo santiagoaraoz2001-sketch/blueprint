@@ -24,10 +24,10 @@ from .services.process_manager import ProcessManager, set_process_manager
 from .models.run import LiveRun, Run
 from .routers import (
     artifacts, block_generator, blocks, connectors, control_tower, copilot,
-    custom_blocks, dashboard, datasets, events, execution, inference, marketplace,
-    models, model_registry, outputs, papers, pipelines, pipeline_versions, plugins,
-    presets, projects, registry, replay, runs, secrets, sweeps, system, templates,
-    workspace,
+    custom_blocks, dashboard, datasets, deploy, events, execution, inference,
+    marketplace, models, model_registry, outputs, papers, pipelines,
+    pipeline_versions, plugins, presets, projects, registry, replay, runs,
+    secrets, sweeps, system, templates, workspace,
 )
 from .utils.structured_logger import init_structured_logging, log_event, log_recovery
 
@@ -377,6 +377,7 @@ app.include_router(registry.router)
 app.include_router(dashboard.router)
 app.include_router(pipeline_versions.router)
 app.include_router(model_registry.router)
+app.include_router(deploy.router)
 app.include_router(replay.router)
 app.include_router(presets.router)
 app.include_router(templates.router)
