@@ -38,6 +38,7 @@ from ..utils.secrets import get_secret
 from ..utils.redact import scrub_traceback
 from .block_registry import resolve_output_handle
 from .schema_validator import load_block_schema, validate_inputs, validate_config
+from .runtime_prep import prepare_node_runtime, PreparedNode, apply_multi_input_policy
 from ..utils.structured_logger import (
     log_run_start, log_run_complete, log_run_failed,
     log_block_start, log_block_complete, log_block_failed,
@@ -902,51 +903,47 @@ async def _execute_loop(
             body_node_id, body_data.get("config", {}),
         )
         body_config = {k: v for k, v in body_config.items() if k != "_inherited"}
-        body_config = _resolve_secrets(body_config)
 
         category = body_data.get("category", "flow")
 
-        block_dir = _find_block_module(body_type)
-        if block_dir is None:
-            base_type = body_config.get("baseType", "")
-            if base_type and SAFE_BLOCK_TYPE.match(base_type):
-                base_type = BLOCK_ALIASES.get(base_type, base_type)
-                block_dir = _find_block_module(base_type)
-
-        if block_dir is None:
-            raise RuntimeError(
-                f"Block type '{body_type}' not found in loop body"
-            )
-
-        block_schema = load_block_schema(block_dir)
-        timeout_seconds = block_schema.get("timeout") if block_schema else None
-        is_composite = block_schema.get("composite", False) if block_schema else False
-
-        # Embed block version into config_snapshot for cache validation
-        if block_schema and block_schema.get("version"):
-            body_data["block_version"] = block_schema["version"]
-
-        # Validate config once (static across iterations)
-        if block_schema:
-            body_config = validate_config(block_schema, body_config)
-
-        context_cls = CompositeBlockContext if is_composite else None
-        run_dir = str(ARTIFACTS_DIR / run_id / body_node_id)
-
         # Pre-filter edges targeting this body node
         incoming_edges = [e for e in edges if e.get("target") == body_node_id]
+
+        # Build placeholder inputs from connected edges so validate_config
+        # knows which mandatory config fields are satisfied by connections
+        placeholder_inputs: dict[str, Any] = {}
+        for edge in incoming_edges:
+            tgt_handle = edge.get("targetHandle", "")
+            if tgt_handle:
+                placeholder_inputs[tgt_handle] = True  # non-None placeholder
+
+        prepared = prepare_node_runtime(
+            node_id=body_node_id,
+            block_type=body_type,
+            config=body_config,
+            node_inputs=placeholder_inputs,
+            run_id=run_id,
+            find_block_fn=_find_block_module,
+            resolve_secrets_fn=_resolve_secrets,
+            block_aliases=BLOCK_ALIASES,
+            safe_block_type_re=SAFE_BLOCK_TYPE,
+        )
+
+        # Embed block version into config_snapshot for cache validation
+        if prepared.block_version:
+            body_data["block_version"] = prepared.block_version
 
         body_block_infos.append(_BodyBlockInfo(
             node_id=body_node_id,
             block_type=body_type,
             category=category,
-            block_dir=block_dir,
-            schema=block_schema,
-            config=body_config,
-            timeout_seconds=timeout_seconds,
-            is_composite=is_composite,
-            context_cls=context_cls,
-            run_dir=run_dir,
+            block_dir=prepared.block_dir,
+            schema=prepared.block_schema,
+            config=prepared.cleaned_config,
+            timeout_seconds=prepared.timeout_seconds,
+            is_composite=prepared.is_composite,
+            context_cls=prepared.context_cls,
+            run_dir=prepared.run_dir,
             incoming_edges=incoming_edges,
         ))
 
@@ -1603,22 +1600,41 @@ async def execute_pipeline(
                         else:
                             node_inputs[tgt_handle] = value
 
-            # Find and run block
-            block_dir = _find_block_module(block_type)
+            # --- Prepare node: resolve block dir, schema, validation, secrets ---
+            try:
+                prepared = prepare_node_runtime(
+                    node_id=node_id,
+                    block_type=block_type,
+                    config=config,
+                    node_inputs=node_inputs,
+                    run_id=run_id,
+                    find_block_fn=_find_block_module,
+                    resolve_secrets_fn=_resolve_secrets,
+                    block_aliases=BLOCK_ALIASES,
+                    safe_block_type_re=SAFE_BLOCK_TYPE,
+                )
+            except RuntimeError:
+                prepared = None
 
-            # Custom block fallback: if no run.py found, try the baseType
-            if block_dir is None:
-                base_type = config.get("baseType", "")
-                if base_type and SAFE_BLOCK_TYPE.match(base_type):
-                    base_type = BLOCK_ALIASES.get(base_type, base_type)
-                    block_dir = _find_block_module(base_type)
+            if prepared:
+                block_dir = prepared.block_dir
+                block_schema = prepared.block_schema
+                config = prepared.cleaned_config
+                run_dir = prepared.run_dir
+                timeout_seconds = prepared.timeout_seconds
+                max_retries = prepared.max_retries
+                context_cls = prepared.context_cls
 
-            run_dir = str(ARTIFACTS_DIR / run_id / node_id)
+                # Apply multi-input aggregation policy
+                if block_schema and _multi_counts:
+                    node_inputs = apply_multi_input_policy(
+                        block_schema, node_inputs, _multi_counts,
+                    )
 
-            # Resolve any $secret: references in config
-            config = _resolve_secrets(config)
+                # Embed block version into config_snapshot for cache validation
+                if prepared.block_version:
+                    node_data["block_version"] = prepared.block_version
 
-            if block_dir:
                 # Progress commit throttling: commit at most every 2 seconds
                 _last_progress_commit = time.time()
 
@@ -1679,24 +1695,6 @@ async def execute_pipeline(
                     # Layer 2: buffer
                     metrics_log_buffer.append(event_dict)
 
-                # --- Load schema once for validation, timeout, and retry ---
-                block_schema = load_block_schema(block_dir)
-                timeout_seconds = block_schema.get("timeout") if block_schema else None
-                max_retries = block_schema.get("max_retries", 0) if block_schema else 0
-                is_composite = block_schema.get("composite", False) if block_schema else False
-
-                # --- Embed block version into config_snapshot for cache validation ---
-                if block_schema and block_schema.get("version"):
-                    node_data["block_version"] = block_schema["version"]
-
-                # --- Pre-execution validation ---
-                if block_schema:
-                    validate_inputs(block_schema, node_inputs)
-                    config = validate_config(block_schema, config)
-
-                # Choose context class: composite blocks get CompositeBlockContext
-                context_cls = CompositeBlockContext if is_composite else None
-
                 # Check isolation mode from block schema
                 isolation_mode = "inprocess"  # default
                 if block_schema:
@@ -1708,6 +1706,7 @@ async def execute_pipeline(
                 # Sub-pipeline execution requires in-process access to the
                 # executor internals (_load_and_run_block, CompositeBlockContext).
                 # Fall back gracefully with a warning instead of crashing.
+                is_composite = block_schema.get("composite", False) if block_schema else False
                 if isolation_mode == "subprocess" and is_composite:
                     import logging as _lg
                     _lg.getLogger("blueprint.executor").warning(

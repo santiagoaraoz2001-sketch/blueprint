@@ -18,6 +18,7 @@ pytest>=7.0.0
 alembic>=1.12.0
 cryptography>=41.0.0
 keyring>=24.0.0
+nbformat>=5.9.0
 
 # ── Optional ML dependencies ────────────────────────────────
 # Uncomment the libraries you need for your specific workflows.
