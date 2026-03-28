@@ -406,3 +406,70 @@ def test_services_endpoint():
     data = response.json()
     assert "services" in data
     assert isinstance(data["services"], list)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Dry-Run Hardware Detection (detect_capabilities)
+# ═══════════════════════════════════════════════════════════════════════════
+
+from backend.services.capability_detector import (
+    detect_capabilities,
+    invalidate_cache,
+    _detect_system_memory_mb,
+    _detect_apple_silicon,
+    _detect_torch_hardware,
+    _detect_mlx_hardware,
+    _check_mps,
+)
+
+
+@pytest.fixture(autouse=False)
+def clear_hw_cache():
+    """Clear the lru_cache before/after hardware detection tests."""
+    invalidate_cache()
+    yield
+    invalidate_cache()
+
+
+class TestDetectCapabilities:
+    def test_caching(self, clear_hw_cache):
+        result1 = detect_capabilities()
+        result2 = detect_capabilities()
+        assert result1 is result2
+
+    def test_returns_required_keys(self, clear_hw_cache):
+        caps = detect_capabilities()
+        for key in ("torch", "mlx", "gpu_backend", "gpu_name",
+                     "gpu_memory_mb", "system_memory_mb", "unified_memory",
+                     "accelerators", "metal_active_mb", "disk_free_gb"):
+            assert key in caps
+
+    def test_system_memory_positive(self, clear_hw_cache):
+        caps = detect_capabilities()
+        assert caps["system_memory_mb"] > 0
+
+
+class TestSystemMemoryDetection:
+    def test_positive(self):
+        assert _detect_system_memory_mb() > 0
+
+    def test_reasonable_range(self):
+        mem = _detect_system_memory_mb()
+        assert 256 <= mem <= 2_097_152
+
+
+class TestMLXHardware:
+    def _mlx_available(self) -> bool:
+        try:
+            import mlx.core  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
+    def test_mlx_detection_when_available(self):
+        if not self._mlx_available():
+            pytest.skip("MLX not installed")
+        caps = {"mlx": False, "metal_active_mb": 0}
+        _detect_mlx_hardware(caps)
+        assert caps["mlx"] is True
+        assert isinstance(caps["metal_active_mb"], int)

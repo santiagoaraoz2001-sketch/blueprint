@@ -84,6 +84,38 @@ class PipelineTestResponse(BaseModel):
     block_count: int
 
 
+# ---------------------------------------------------------------------------
+# Dry-run simulation
+# ---------------------------------------------------------------------------
+
+class NodeEstimateResponse(BaseModel):
+    """Per-node resource estimate."""
+    estimated_memory_mb: int
+    estimated_duration_class: str  # 'seconds' | 'minutes' | 'hours'
+    confidence: str  # 'high' | 'medium' | 'low'
+
+
+class TotalEstimateResponse(BaseModel):
+    """Aggregate resource estimate for the whole pipeline."""
+    peak_memory_mb: int
+    total_artifact_volume_mb: int
+    runtime_class: str  # 'seconds' | 'minutes' | 'hours'
+    confidence: str  # 'high' | 'medium' | 'low'
+
+
+class DryRunResponse(BaseModel):
+    """Returned from the dry-run simulation endpoint."""
+    viable: bool
+    blockers: list[str]
+    warnings: list[str]
+    per_node_estimates: dict[str, NodeEstimateResponse]
+    total_estimate: TotalEstimateResponse
+
+
+# ---------------------------------------------------------------------------
+# Autofix
+# ---------------------------------------------------------------------------
+
 class AutofixPatchResponse(BaseModel):
     """A single proposed autofix patch."""
     patch_id: str
