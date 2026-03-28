@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from .block_registry import is_known_block, get_block_types, get_block_config_schema
+from ..services.registry import get_global_registry
 from .executor import _detect_loops
 from ..block_sdk.config_validator import (
     validate_and_apply_defaults,
@@ -39,52 +39,6 @@ CATEGORY_RUNTIME = {
     "endpoints": 3,
 }
 
-# Port type compatibility matrix.
-# AUTHORITATIVE SOURCE: frontend/src/lib/block-registry-types.ts COMPAT (line 123).
-# This dict MUST be kept in exact sync with the frontend.
-# SOURCE → set of CAN-CONNECT-TO types.
-COMPAT: dict[str, set[str]] = {
-    "dataset":   {"dataset", "text", "any"},
-    "text":      {"text", "dataset", "any"},
-    "model":     {"model", "llm", "any"},
-    "config":    {"config", "text", "llm", "any"},
-    "metrics":   {"metrics", "dataset", "text", "any"},
-    "embedding": {"embedding", "dataset", "any"},
-    "artifact":  {"artifact", "text", "any"},
-    "agent":     {"agent", "any"},
-    "llm":       {"llm", "model", "config", "any"},
-    "any":       {"any", "dataset", "text", "model", "config", "metrics",
-                  "embedding", "artifact", "agent", "llm"},
-}
-
-# Backward-compat aliases for legacy port type names.
-# AUTHORITATIVE SOURCE: frontend/src/lib/block-registry-types.ts PORT_TYPE_ALIASES.
-_PORT_TYPE_ALIASES: dict[str, str] = {
-    "data": "dataset",
-    "external": "dataset",
-    "training": "model",
-    "intervention": "any",
-    "checkpoint": "model",
-    "optimizer": "config",
-    "schedule": "config",
-    "api": "dataset",
-    "file": "dataset",
-    "cloud": "config",
-    "llm_config": "llm",
-}
-
-
-def _resolve_port_type(port_type: str) -> str:
-    """Resolve legacy port type aliases."""
-    return _PORT_TYPE_ALIASES.get(port_type, port_type)
-
-
-def _port_compatible(src_type: str, tgt_type: str) -> bool:
-    """Check if source port type can connect to target port type."""
-    src = _resolve_port_type(src_type)
-    tgt = _resolve_port_type(tgt_type)
-    return tgt in COMPAT.get(src, set())
-
 # Critical config fields that must be set for specific block types
 CRITICAL_CONFIG_FIELDS = {
     "llm_inference": ["model_name"],
@@ -108,6 +62,7 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         ValidationReport with errors, warnings, and metadata.
     """
     report = ValidationReport()
+    registry = get_global_registry()
 
     nodes = definition.get("nodes", [])
     edges = definition.get("edges", [])
@@ -129,7 +84,7 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         node_map[nid] = node
 
     # ── 1. Check for unknown node types ──
-    known_types = get_block_types()
+    known_types = registry.get_block_types()
     for node in nodes:
         if node.get("type") in ("groupNode", "stickyNote"):
             continue
@@ -185,7 +140,7 @@ def validate_pipeline(definition: dict) -> ValidationReport:
                 node_data = node_map.get(did, {})
                 node_label = node_data.get("data", {}).get("label", did)
                 report.warnings.append(f"Block '{node_label}' ({did}) is not connected to any other block")
-                
+
     for node in nodes:
         if node.get("type") in ("groupNode", "stickyNote"):
             continue
@@ -213,26 +168,26 @@ def validate_pipeline(definition: dict) -> ValidationReport:
             report.errors.append(f"Self-loop detected on node: {src}")
             report.valid = False
             continue
-            
+
         src_data = node_map[src].get("data", {})
         tgt_data = node_map[tgt].get("data", {})
         src_handle = edge.get("sourceHandle")
         tgt_handle = edge.get("targetHandle")
-        
+
         src_port_type = "any"
         tgt_port_type = "any"
-        
+
         for out_port in src_data.get("outputs", []):
             if out_port.get("id") == src_handle:
                 src_port_type = out_port.get("dataType", "any")
                 break
-                
+
         for in_port in tgt_data.get("inputs", []):
             if in_port.get("id") == tgt_handle:
                 tgt_port_type = in_port.get("dataType", "any")
                 break
-                
-        if not _port_compatible(src_port_type, tgt_port_type):
+
+        if not registry.is_port_compatible(src_port_type, tgt_port_type):
             src_label = src_data.get("label", src)
             tgt_label = tgt_data.get("label", tgt)
             report.errors.append(f"Incompatible connection: Cannot connect {src_port_type.upper()} ({src_label}) to {tgt_port_type.upper()} ({tgt_label})")
@@ -269,7 +224,7 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         if not block_type:
             continue
 
-        schema = get_block_config_schema(block_type)
+        schema = registry.get_block_config_schema(block_type)
         if not schema:
             continue
 

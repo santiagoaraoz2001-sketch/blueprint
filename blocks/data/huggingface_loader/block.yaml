@@ -1,97 +1,103 @@
 name: HuggingFace Dataset Loader
 type: huggingface_loader
 category: source
-description: Load a dataset from HuggingFace Hub with support for subsets, streaming, column filtering, and private datasets
-version: "2.0.0"
-
+description: Load a dataset from HuggingFace Hub with support for subsets, streaming,
+  column filtering, and private datasets
+version: 2.0.0
 inputs:
-  - id: config
-    label: Config Override
-    data_type: config
-    required: false
-    description: "JSON config to override dataset_name, split, subset, columns, token, revision, max_samples dynamically"
-
+- id: config
+  label: Config Override
+  data_type: config
+  required: false
+  description: JSON config to override dataset_name, split, subset, columns, token,
+    revision, max_samples dynamically
 outputs:
-  - id: dataset
-    label: Dataset
-    data_type: dataset
-    description: "JSON output (dataset/data.json): array of objects, one per row. Each object has keys matching dataset columns. Native mode: HuggingFace Arrow format."
-  - id: dataset_meta
-    label: Dataset Info
-    data_type: config
-    required: false
-    description: "Metadata about the dataset: text_column, columns, num_rows, seed, shuffle, source"
-  - id: metrics
-    label: Stats
-    data_type: metrics
-    required: false
-    description: "JSON object: {dataset_name, split, row_count, column_count, columns[], streaming, output_format}"
-
+- id: dataset
+  label: Dataset
+  data_type: dataset
+  description: 'JSON output (dataset/data.json): array of objects, one per row. Each
+    object has keys matching dataset columns. Native mode: HuggingFace Arrow format.'
+- id: dataset_meta
+  label: Dataset Info
+  data_type: config
+  required: false
+  description: 'Metadata about the dataset: text_column, columns, num_rows, seed,
+    shuffle, source'
+- id: metrics
+  label: Stats
+  data_type: metrics
+  required: false
+  description: 'JSON object: {dataset_name, split, row_count, column_count, columns[],
+    streaming, output_format}'
 config:
   dataset_name:
     type: string
     label: Dataset Name
-    description: "HuggingFace dataset identifier (e.g. 'imdb', 'squad', 'databricks/dolly-15k')"
+    description: HuggingFace dataset identifier (e.g. 'imdb', 'squad', 'databricks/dolly-15k')
     mandatory: true
   subset:
     type: string
     label: Subset
-    description: "Dataset subset/config name (e.g. 'closed_qa' for dolly)"
-    default: ""
+    description: Dataset subset/config name (e.g. 'closed_qa' for dolly)
+    default: ''
   split:
     type: select
     label: Split
-    options: [train, validation, test, all]
+    options:
+    - train
+    - validation
+    - test
+    - all
     default: train
-    description: "'all' concatenates every available split"
+    description: '''all'' concatenates every available split'
   max_samples:
     type: integer
     label: Max Samples
     default: 0
     min: 0
-    description: "0 = load all samples"
+    description: 0 = load all samples
   streaming:
     type: boolean
     label: Streaming
     default: false
-    description: "Stream instead of downloading — useful for very large datasets"
+    description: Stream instead of downloading — useful for very large datasets
   revision:
     type: string
     label: Revision
-    default: "main"
-    description: "Git revision, branch, or tag"
+    default: main
+    description: Git revision, branch, or tag
   trust_remote_code:
     type: boolean
     label: Trust Remote Code
     default: false
-    description: "Allow execution of remote code in dataset scripts"
+    description: Allow execution of remote code in dataset scripts
   columns:
     type: string
     label: Columns
-    default: ""
-    description: "Comma-separated column names to keep (empty = all)"
+    default: ''
+    description: Comma-separated column names to keep (empty = all)
   token:
     type: string
     label: HF Token
-    default: ""
-    description: "HuggingFace API token for private/gated datasets"
+    default: ''
+    description: HuggingFace API token for private/gated datasets
   cache_dir:
     type: file_path
     label: Cache Directory
-    default: ""
-    description: "Custom cache directory for downloaded datasets (empty = HF default)"
+    default: ''
+    description: Custom cache directory for downloaded datasets (empty = HF default)
     path_mode: directory
   shuffle:
     type: boolean
     label: Shuffle
     default: false
-    description: "Randomly shuffle the dataset before sampling"
+    description: Randomly shuffle the dataset before sampling
   seed:
     type: integer
     label: Random Seed
     default: 42
     min: 0
-    description: "Seed for reproducible shuffling"
+    description: Seed for reproducible shuffling
     depends_on:
       field: shuffle
       value: true
@@ -101,16 +107,24 @@ config:
     default: 0
     min: 0
     max: 100
-    description: "Load this percentage of the dataset (0 = disabled, use max_samples instead)"
+    description: Load this percentage of the dataset (0 = disabled, use max_samples
+      instead)
   output_format:
     type: select
     label: Output Format
-    options: [json, native]
+    options:
+    - json
+    - native
     default: json
-    description: "json = pipeline-compatible JSON array (recommended). native = HuggingFace Arrow format (faster for HF workflows)."
-
+    description: json = pipeline-compatible JSON array (recommended). native = HuggingFace
+      Arrow format (faster for HF workflows).
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

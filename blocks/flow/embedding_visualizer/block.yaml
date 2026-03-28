@@ -1,44 +1,46 @@
 name: Embedding Visualizer
 type: embedding_visualizer
 category: embedding
-description: Reduce high-dimensional embeddings to 2D/3D coordinates using UMAP, t-SNE, or PCA for visualization
-version: "2.0.0"
-
+description: Reduce high-dimensional embeddings to 2D/3D coordinates using UMAP, t-SNE,
+  or PCA for visualization
+version: 2.0.0
 inputs:
-  - id: embeddings
-    label: Embeddings
-    data_type: embedding
-    required: false
-  - id: dataset
-    label: Dataset
-    data_type: dataset
-    required: false
-  - id: labels
-    label: Labels / Clusters
-    data_type: dataset
-    required: false
-
+- id: embeddings
+  label: Embeddings
+  data_type: embedding
+  required: false
+- id: dataset
+  label: Dataset
+  data_type: dataset
+  required: false
+- id: labels
+  label: Labels / Clusters
+  data_type: dataset
+  required: false
 outputs:
-  - id: artifact
-    label: Visualization
-    data_type: artifact
-    description: >
-      {method, dimensions, num_points, original_dimension,
-      points: [{index, label, x, y, [z], [cluster]}]}.
-      Full visualization payload for chart rendering.
-  - id: viz_dataset
-    label: Coordinates
-    data_type: dataset
-    aliases: [dataset]
-    description: >
-      Array of rows: [{index, label, x, y, [z], [cluster], ...metadata_fields}].
-      Enable include_metadata to carry through original source fields (text, title, etc.).
+- id: artifact
+  label: Visualization
+  data_type: artifact
+  description: '{method, dimensions, num_points, original_dimension, points: [{index,
+    label, x, y, [z], [cluster]}]}. Full visualization payload for chart rendering.
+
+    '
+- id: viz_dataset
+  label: Coordinates
+  data_type: dataset
+  aliases:
+  - dataset
+  description: 'Array of rows: [{index, label, x, y, [z], [cluster], ...metadata_fields}].
+    Enable include_metadata to carry through original source fields (text, title,
+    etc.).
+
+    '
 config:
   embedding_column:
     type: string
     label: Embedding Column
     description: Column name containing embeddings in dataset input
-    default: "_embedding"
+    default: _embedding
   normalize:
     type: boolean
     label: Normalize Embeddings
@@ -47,20 +49,26 @@ config:
   include_metadata:
     type: boolean
     label: Include Source Metadata
-    description: Carry through original text/metadata fields to coordinates output (for interactive chart tooltips)
+    description: Carry through original text/metadata fields to coordinates output
+      (for interactive chart tooltips)
     default: false
   method:
     type: select
     label: Method
     description: Dimensionality reduction algorithm
     default: pca
-    options: [pca, tsne, umap]
+    options:
+    - pca
+    - tsne
+    - umap
   dimensions:
     type: select
     label: Dimensions
     description: Output dimensionality for the scatter plot
-    default: "2"
-    options: ["2", "3"]
+    default: '2'
+    options:
+    - '2'
+    - '3'
   perplexity:
     type: integer
     label: Perplexity
@@ -85,13 +93,18 @@ config:
   min_dist:
     type: float
     label: Min Distance
-    description: Minimum distance between points in UMAP output (smaller = tighter clusters)
+    description: Minimum distance between points in UMAP output (smaller = tighter
+      clusters)
     default: 0.1
     min: 0.0
     max: 1.0
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

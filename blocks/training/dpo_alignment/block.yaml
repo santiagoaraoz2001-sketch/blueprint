@@ -1,29 +1,27 @@
 name: DPO Alignment
 type: dpo_alignment
 category: training
-description: Direct Preference Optimization — align a model using chosen/rejected preference pairs
-version: "1.0.0"
-
+description: Direct Preference Optimization — align a model using chosen/rejected
+  preference pairs
+version: 1.0.0
 inputs:
-  - id: dataset
-    label: Preference Data
-    data_type: dataset
-    required: true
-  - id: model
-    label: Base Model
-    data_type: model
-    required: false
-
+- id: dataset
+  label: Preference Data
+  data_type: dataset
+  required: true
+- id: model
+  label: Base Model
+  data_type: model
+  required: false
 outputs:
-  - id: aligned_model
-    label: Aligned Model
-    aliases: [model]
-    data_type: model
-
-  - id: metrics
-    label: DPO Metrics
-    data_type: metrics
-
+- id: aligned_model
+  label: Aligned Model
+  aliases:
+  - model
+  data_type: model
+- id: metrics
+  label: DPO Metrics
+  data_type: metrics
 config:
   model_name:
     type: string
@@ -33,15 +31,15 @@ config:
   beta:
     type: float
     label: Beta
-    description: "DPO temperature parameter — lower values make the model more deterministic"
+    description: DPO temperature parameter — lower values make the model more deterministic
     default: 0.1
     min: 0.01
     max: 1.0
   lr:
     type: float
     label: Learning Rate
-    default: 0.0000005
-    min: 0.00000001
+    default: 5.0e-07
+    min: 1.0e-08
     max: 0.001
   epochs:
     type: integer
@@ -87,19 +85,26 @@ config:
   eval_split:
     type: float
     label: Eval Split
-    description: "Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)"
+    description: Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)
     default: 0.0
     min: 0.0
     max: 0.3
   prefer_framework:
     type: select
     label: Preferred Framework
-    options: ["auto", "mlx", "pytorch"]
-    default: "auto"
-    description: "Force a specific training framework. 'auto' detects the best available."
-
+    options:
+    - auto
+    - mlx
+    - pytorch
+    default: auto
+    description: Force a specific training framework. 'auto' detects the best available.
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

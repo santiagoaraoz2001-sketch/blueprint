@@ -2,100 +2,110 @@ name: Token Counter
 type: token_counter
 category: inference
 description: Count and estimate tokens for text using tiktoken or heuristics
-version: "1.0.0"
-
+version: 1.0.0
 inputs:
-  - id: text
-    label: Input Text
-    data_type: text
-    required: true
-
+- id: text
+  label: Input Text
+  data_type: text
+  required: true
 outputs:
-  - id: token_text
-    label: Token Breakdown
-    data_type: text
-    aliases: [text, response, output]
-    description: >
-      Plain text file (breakdown.txt) with a human-readable summary. Contains lines:
-      Tokens: <count>, Characters: <count>, Words: <count>, Lines: <count>,
-      Chars/Token: <ratio>, Method: <method_used>.
+- id: token_text
+  label: Token Breakdown
+  data_type: text
+  aliases:
+  - text
+  - response
+  - output
+  description: 'Plain text file (breakdown.txt) with a human-readable summary. Contains
+    lines: Tokens: <count>, Characters: <count>, Words: <count>, Lines: <count>, Chars/Token:
+    <ratio>, Method: <method_used>.
 
-  - id: dataset
-    label: Token Analysis
-    data_type: dataset
-    description: >
-      JSON array with a single row containing token analysis fields:
-      text (str) — first 500 characters of the analyzed text;
-      token_count (int) — number of tokens;
-      character_count (int) — number of characters;
-      word_count (int) — number of words;
-      line_count (int) — number of lines;
-      chars_per_token (float) — average characters per token;
-      method (str) — tokenization method used;
-      model (str) — model name;
-      estimated_cost (float, optional) — USD cost estimate if configured;
-      fits_in_context (bool, optional) — whether text fits in context window;
-      context_utilization (float, optional) — fraction of context window used.
-      Output format configurable via dataset_format (json, jsonl, csv).
-  - id: metrics
-    label: Token Counts
-    data_type: metrics
-    description: >
-      Dictionary with fields:
-      token_count (int) — number of tokens in the input text;
-      char_count (int) — number of characters;
-      word_count (int) — number of whitespace-delimited words;
-      line_count (int) — number of lines;
-      method (str) — tokenization method used, one of "tiktoken", "transformers", "char_estimate";
-      model (str) — model name used for tokenizer selection;
-      chars_per_token (float) — average characters per token;
-      estimated_cost (float, optional) — estimated USD cost if cost_per_1k_tokens > 0;
-      cost_per_1k_tokens (float, optional) — configured cost rate;
-      context_window (int, optional) — context window size if configured > 0;
-      fits_in_context (bool, optional) — whether token count fits within context window;
-      context_utilization (float, optional) — token_count / context_window ratio;
-      output_cost_per_1k_tokens (float, optional) — output token cost rate if configured > 0.
+    '
+- id: dataset
+  label: Token Analysis
+  data_type: dataset
+  description: 'JSON array with a single row containing token analysis fields: text
+    (str) — first 500 characters of the analyzed text; token_count (int) — number
+    of tokens; character_count (int) — number of characters; word_count (int) — number
+    of words; line_count (int) — number of lines; chars_per_token (float) — average
+    characters per token; method (str) — tokenization method used; model (str) — model
+    name; estimated_cost (float, optional) — USD cost estimate if configured; fits_in_context
+    (bool, optional) — whether text fits in context window; context_utilization (float,
+    optional) — fraction of context window used. Output format configurable via dataset_format
+    (json, jsonl, csv).
 
+    '
+- id: metrics
+  label: Token Counts
+  data_type: metrics
+  description: 'Dictionary with fields: token_count (int) — number of tokens in the
+    input text; char_count (int) — number of characters; word_count (int) — number
+    of whitespace-delimited words; line_count (int) — number of lines; method (str)
+    — tokenization method used, one of "tiktoken", "transformers", "char_estimate";
+    model (str) — model name used for tokenizer selection; chars_per_token (float)
+    — average characters per token; estimated_cost (float, optional) — estimated USD
+    cost if cost_per_1k_tokens > 0; cost_per_1k_tokens (float, optional) — configured
+    cost rate; context_window (int, optional) — context window size if configured
+    > 0; fits_in_context (bool, optional) — whether token count fits within context
+    window; context_utilization (float, optional) — token_count / context_window ratio;
+    output_cost_per_1k_tokens (float, optional) — output token cost rate if configured
+    > 0.
+
+    '
 config:
   tokenizer:
     type: select
     label: Tokenizer
-    options: [auto, tiktoken, transformers, estimate]
+    options:
+    - auto
+    - tiktoken
+    - transformers
+    - estimate
     default: auto
-    description: "auto tries tiktoken first, falls back to estimation"
+    description: auto tries tiktoken first, falls back to estimation
   model_name:
     type: string
     label: Model Name
-    default: "gpt-4o"
-    description: "Model name for tokenizer selection (tiktoken/transformers)"
+    default: gpt-4o
+    description: Model name for tokenizer selection (tiktoken/transformers)
   cost_per_1k_tokens:
     type: float
     label: Cost per 1K Tokens
     default: 0.0
     min: 0.0
-    description: "USD cost per 1K tokens for cost estimation. Set to model's pricing (e.g. 0.0025 for GPT-4o input)"
+    description: USD cost per 1K tokens for cost estimation. Set to model's pricing
+      (e.g. 0.0025 for GPT-4o input)
   context_window:
     type: integer
     label: Context Window
     default: 0
     min: 0
     max: 1000000
-    description: "Model context window size (0 = skip check). Adds fits_in_context and utilization to output."
+    description: Model context window size (0 = skip check). Adds fits_in_context
+      and utilization to output.
   output_cost_per_1k_tokens:
     type: float
     label: Output Cost per 1K Tokens
     default: 0
     min: 0
-    description: "Cost per 1K output/completion tokens (for asymmetric pricing models)"
+    description: Cost per 1K output/completion tokens (for asymmetric pricing models)
   dataset_format:
     type: select
     label: Dataset Format
-    description: "Output format for token analysis — json (default), jsonl (one JSON object per line), csv (comma-separated values)"
+    description: Output format for token analysis — json (default), jsonl (one JSON
+      object per line), csv (comma-separated values)
     default: json
-    options: [json, jsonl, csv]
-
+    options:
+    - json
+    - jsonl
+    - csv
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

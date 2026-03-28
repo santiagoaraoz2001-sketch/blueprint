@@ -1,78 +1,86 @@
 name: Conditional Branch
 type: conditional_branch
 category: flow
-description: Route data to one of two outputs based on a field comparison, operator check, or custom expression
-version: "1.0.0"
-
+description: Route data to one of two outputs based on a field comparison, operator
+  check, or custom expression
+version: 1.0.0
 inputs:
-  - id: input
-    label: Input Data
-    data_type: any
-    required: true
-  - id: condition_data
-    label: Condition Data
-    data_type: any
-    required: false
-
+- id: input
+  label: Input Data
+  data_type: any
+  required: true
+- id: condition_data
+  label: Condition Data
+  data_type: any
+  required: false
 outputs:
-  - id: true_branch
-    label: If True
-    data_type: any
-  - id: false_branch
-    label: If False
-    data_type: any
-  - id: result
-    label: Result
-    data_type: metrics
-
-    aliases: [metrics]
+- id: true_branch
+  label: If True
+  data_type: any
+- id: false_branch
+  label: If False
+  data_type: any
+- id: result
+  label: Result
+  data_type: metrics
+  aliases:
+  - metrics
 config:
   field:
     type: string
     label: Field to Check
-    default: ""
-    description: "Field name to evaluate. Supports dot notation for nested access (e.g. 'accuracy', 'model.metrics.f1', 'results.0.score')"
+    default: ''
+    description: Field name to evaluate. Supports dot notation for nested access (e.g.
+      'accuracy', 'model.metrics.f1', 'results.0.score')
   operator:
     type: select
     label: Operator
     default: equals
     options:
-      - equals
-      - not_equals
-      - greater_than
-      - less_than
-      - greater_equal
-      - less_equal
-      - contains
-      - not_contains
-      - is_empty
-      - is_not_empty
-      - matches_regex
-      - is_true
-      - is_false
-      - row_count_gt
-      - row_count_lt
-      - row_count_eq
-      - type_is
-    description: "Comparison operator. row_count_* checks length of lists/dicts. type_is checks Python type (list, dict, str, int, float, bool, none)."
+    - equals
+    - not_equals
+    - greater_than
+    - less_than
+    - greater_equal
+    - less_equal
+    - contains
+    - not_contains
+    - is_empty
+    - is_not_empty
+    - matches_regex
+    - is_true
+    - is_false
+    - row_count_gt
+    - row_count_lt
+    - row_count_eq
+    - type_is
+    description: Comparison operator. row_count_* checks length of lists/dicts. type_is
+      checks Python type (list, dict, str, int, float, bool, none).
   value:
     type: string
     label: Compare Value
-    default: ""
-    description: "Value to compare against (not used for is_empty, is_not_empty, is_true, is_false)"
+    default: ''
+    description: Value to compare against (not used for is_empty, is_not_empty, is_true,
+      is_false)
   condition:
     type: text_area
     label: Custom Expression
-    default: ""
-    description: "Advanced: a Python expression evaluated against input fields. Overrides field/operator/value when set."
+    default: ''
+    description: 'Advanced: a Python expression evaluated against input fields. Overrides
+      field/operator/value when set.'
   use_condition_data:
     type: boolean
     label: Use External Condition Data
     default: false
-    description: "When enabled, evaluates the condition against the 'Condition Data' input port instead of the main input"
-
+    description: When enabled, evaluates the condition against the 'Condition Data'
+      input port instead of the main input
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

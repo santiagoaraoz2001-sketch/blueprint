@@ -148,23 +148,24 @@ class TestPortTypeSystem:
 
     def test_text_to_config_blocked(self):
         """text->config compatibility should be REMOVED (was a dangerous connection)."""
-        from backend.engine.validator import _port_compatible
+        from backend.services.registry import get_global_registry
 
-        assert not _port_compatible("text", "config"), "text->config should no longer be compatible"
+        registry = get_global_registry()
+        assert not registry.is_port_compatible("text", "config"), "text->config should no longer be compatible"
 
     def test_port_alias_resolution(self):
         """Output ports with aliases should be resolvable via the alias map."""
-        from backend.engine.block_registry import get_output_alias_map, scan_blocks
+        from backend.services.registry import get_global_registry
 
-        scan_blocks()
+        registry = get_global_registry()
 
         # chain_of_thought.response has aliases: [text, output]
-        aliases = get_output_alias_map("chain_of_thought")
+        aliases = registry.get_output_alias_map("chain_of_thought")
         assert "text" in aliases, "chain_of_thought should have 'text' alias for response"
         assert aliases["text"] == "response", "text alias should map to response"
 
         # llm_inference.response has aliases: [text, output]
-        aliases = get_output_alias_map("llm_inference")
+        aliases = registry.get_output_alias_map("llm_inference")
         assert "text" in aliases, "llm_inference should have 'text' alias for response"
         assert aliases["text"] == "response"
 
@@ -496,10 +497,10 @@ class TestBlockRegistryCompleteness:
 
     def test_block_registry_scan(self):
         """The block registry should scan all blocks without errors."""
-        from backend.engine.block_registry import scan_blocks, get_block_types
+        from backend.services.registry import get_global_registry
 
-        scan_blocks()
-        types = get_block_types()
+        registry = get_global_registry()
+        types = registry.get_block_types()
         assert len(types) > 0, "Block registry found no blocks"
         assert "text_input" in types, "text_input not in registry"
         assert "llm_inference" in types, "llm_inference not in registry"

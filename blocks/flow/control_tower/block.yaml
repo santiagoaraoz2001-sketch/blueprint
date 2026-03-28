@@ -2,34 +2,37 @@ name: Control Tower
 type: control_tower
 category: flow
 description: Pipe telemetry and data to a local Control Tower instance
-version: "1.0.0"
-
+version: 1.0.0
 inputs:
-  - id: telemetry
-    label: Data / Telemetry
-    data_type: any
-    required: true
-
+- id: telemetry
+  label: Data / Telemetry
+  data_type: any
+  required: true
 outputs:
-  - id: output_telemetry
-    label: Telemetry Sent
-    data_type: any
-    aliases: [telemetry]
-    description: "Copy of the telemetry payload sent to Control Tower (saved locally)"
+- id: output_telemetry
+  label: Telemetry Sent
+  data_type: any
+  aliases:
+  - telemetry
+  description: Copy of the telemetry payload sent to Control Tower (saved locally)
 config:
   host:
     type: string
     label: CT Host
     description: Control Tower host address
-    default: "http://localhost"
+    default: http://localhost
   port:
     type: integer
     label: CT Port
     description: Control Tower port number
     default: 4173
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

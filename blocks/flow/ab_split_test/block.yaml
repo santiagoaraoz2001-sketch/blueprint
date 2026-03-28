@@ -1,30 +1,30 @@
 name: A/B Split Test
 type: ab_split_test
 category: interventions
-description: Route data to two paths for comparison testing with configurable split ratio and method
-version: "1.0.0"
-
+description: Route data to two paths for comparison testing with configurable split
+  ratio and method
+version: 1.0.0
 inputs:
-  - id: data
-    label: Input Data
-    data_type: any
-    required: true
-
+- id: data
+  label: Input Data
+  data_type: any
+  required: true
 outputs:
-  - id: path_a
-    label: Path A
-    data_type: any
-    description: "Subset of input data routed to Path A based on split_ratio"
-  - id: path_b
-    label: Path B
-    data_type: any
-    description: "Remaining input data routed to Path B"
-  - id: comparison
-    label: Comparison
-    data_type: metrics
-    description: "JSON: {split_ratio, split_method, random_seed, label_a, label_b, count_a, count_b, total_items}"
-
-    aliases: [metrics]
+- id: path_a
+  label: Path A
+  data_type: any
+  description: Subset of input data routed to Path A based on split_ratio
+- id: path_b
+  label: Path B
+  data_type: any
+  description: Remaining input data routed to Path B
+- id: comparison
+  label: Comparison
+  data_type: metrics
+  description: 'JSON: {split_ratio, split_method, random_seed, label_a, label_b, count_a,
+    count_b, total_items}'
+  aliases:
+  - metrics
 config:
   split_ratio:
     type: float
@@ -32,37 +32,46 @@ config:
     default: 0.5
     min: 0.01
     max: 0.99
-    description: "Fraction of data routed to Path A (rest goes to Path B)"
+    description: Fraction of data routed to Path A (rest goes to Path B)
   random_seed:
     type: integer
     label: Random Seed
     default: 42
     min: 0
-    description: "Seed for reproducible splits"
+    description: Seed for reproducible splits
   split_method:
     type: select
     label: Split Method
-    default: "random"
-    options: ["random", "sequential", "deterministic"]
-    description: "random = shuffled split, sequential = first N% to A, deterministic = hash-based (same item always in same bucket)"
+    default: random
+    options:
+    - random
+    - sequential
+    - deterministic
+    description: random = shuffled split, sequential = first N% to A, deterministic
+      = hash-based (same item always in same bucket)
   label_a:
     type: string
     label: Label A
-    default: "A"
-    description: "Label for Path A (used in comparison report)"
+    default: A
+    description: Label for Path A (used in comparison report)
   label_b:
     type: string
     label: Label B
-    default: "B"
-    description: "Label for Path B (used in comparison report)"
+    default: B
+    description: Label for Path B (used in comparison report)
   stratify_by:
     type: string
     label: Stratify By Column
-    default: ""
-    description: "Column name for stratified splits — ensures proportional representation in each path (e.g., 'category')"
-
+    default: ''
+    description: Column name for stratified splits — ensures proportional representation
+      in each path (e.g., 'category')
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

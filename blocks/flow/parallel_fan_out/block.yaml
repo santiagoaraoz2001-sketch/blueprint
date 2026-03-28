@@ -1,40 +1,43 @@
 name: Parallel Fan-Out
 type: parallel_fan_out
 category: flow
-description: Split input data across multiple branches or broadcast a full copy to each branch for parallel processing
-version: "1.0.0"
-
+description: Split input data across multiple branches or broadcast a full copy to
+  each branch for parallel processing
+version: 1.0.0
 inputs:
-  - id: input
-    label: Input Data
-    data_type: any
-    required: true
-
+- id: input
+  label: Input Data
+  data_type: any
+  required: true
 outputs:
-  - id: out_1
-    label: Branch 1
-    data_type: dataset
-    aliases: [dataset]
-  - id: out_2
-    label: Branch 2
-    data_type: dataset
-    aliases: [dataset]
-  - id: out_3
-    label: Branch 3
-    data_type: dataset
-    aliases: [dataset]
-  - id: out_4
-    label: Branch 4
-    data_type: dataset
-    aliases: [dataset]
-  - id: out_5
-    label: Branch 5
-    data_type: dataset
-    aliases: [dataset]
-  - id: metrics
-    label: Split Metrics
-    data_type: metrics
-
+- id: out_1
+  label: Branch 1
+  data_type: dataset
+  aliases:
+  - dataset
+- id: out_2
+  label: Branch 2
+  data_type: dataset
+  aliases:
+  - dataset
+- id: out_3
+  label: Branch 3
+  data_type: dataset
+  aliases:
+  - dataset
+- id: out_4
+  label: Branch 4
+  data_type: dataset
+  aliases:
+  - dataset
+- id: out_5
+  label: Branch 5
+  data_type: dataset
+  aliases:
+  - dataset
+- id: metrics
+  label: Split Metrics
+  data_type: metrics
 config:
   num_branches:
     type: integer
@@ -42,37 +45,47 @@ config:
     default: 2
     min: 2
     max: 5
-    description: "How many output branches to activate"
+    description: How many output branches to activate
   split_mode:
     type: select
     label: Split Mode
     default: split_equal
     options:
-      - split_equal
-      - split_round_robin
-      - split_ratio
-      - broadcast
-      - split_by_field
-    description: "split_equal: divide into equal chunks; split_round_robin: round-robin; split_ratio: custom proportions (e.g. 80/20 train/test); broadcast: full copy to all; split_by_field: group by field value"
+    - split_equal
+    - split_round_robin
+    - split_ratio
+    - broadcast
+    - split_by_field
+    description: 'split_equal: divide into equal chunks; split_round_robin: round-robin;
+      split_ratio: custom proportions (e.g. 80/20 train/test); broadcast: full copy
+      to all; split_by_field: group by field value'
   split_ratio:
     type: string
     label: Split Ratios
-    default: ""
-    description: "Comma-separated ratios for each branch (e.g. '0.8,0.2' for 80/20 train/test, '0.7,0.15,0.15' for train/val/test). Rows are randomly shuffled before splitting."
+    default: ''
+    description: Comma-separated ratios for each branch (e.g. '0.8,0.2' for 80/20
+      train/test, '0.7,0.15,0.15' for train/val/test). Rows are randomly shuffled
+      before splitting.
   split_field:
     type: string
     label: Split Field
-    default: ""
-    description: "Field name to group by when split_mode is 'split_by_field' (e.g. 'language', 'category')"
+    default: ''
+    description: Field name to group by when split_mode is 'split_by_field' (e.g.
+      'language', 'category')
   random_seed:
     type: integer
     label: Random Seed
     default: 0
     min: 0
-    description: "Seed for reproducible random splits (split_ratio mode). 0 = different each run."
-
+    description: Seed for reproducible random splits (split_ratio mode). 0 = different
+      each run.
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

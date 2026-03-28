@@ -1,53 +1,57 @@
 name: HumanEval
 type: human_eval
 category: evaluation
-description: Evaluate code generation quality using the HumanEval benchmark with pass@k metrics
-version: "2.0.0"
-
+description: Evaluate code generation quality using the HumanEval benchmark with pass@k
+  metrics
+version: 2.0.0
 inputs:
-  - id: model
-    label: Model
-    data_type: model
-    required: false
-    description: Code generation model to evaluate (Ollama, HF, or MLX)
-
+- id: model
+  label: Model
+  data_type: model
+  required: false
+  description: Code generation model to evaluate (Ollama, HF, or MLX)
 outputs:
-  - id: metrics
-    label: Pass@k Scores
-    data_type: metrics
-    description: 'Aggregate: pass@{k} for each configured k, num_problems, total_samples, model, temperature'
-  - id: results
-    label: Detailed Results
-    data_type: artifact
-    description: 'human_eval_results.json: metrics dict, per-problem results with task_id, passed, completions'
-
-  - id: dataset
-    label: Problem Results
-    data_type: dataset
-    description: "Per-problem results: task_id, prompt_preview, passed, num_samples, difficulty"
-
+- id: metrics
+  label: Pass@k Scores
+  data_type: metrics
+  description: 'Aggregate: pass@{k} for each configured k, num_problems, total_samples,
+    model, temperature'
+- id: results
+  label: Detailed Results
+  data_type: artifact
+  description: 'human_eval_results.json: metrics dict, per-problem results with task_id,
+    passed, completions'
+- id: dataset
+  label: Problem Results
+  data_type: dataset
+  description: 'Per-problem results: task_id, prompt_preview, passed, num_samples,
+    difficulty'
 config:
   model_name:
     type: string
     label: Model Name
-    default: ""
-    description: "Model identifier (overridden by connected model input)"
+    default: ''
+    description: Model identifier (overridden by connected model input)
   provider:
     type: select
     label: Provider (fallback)
-    default: "ollama"
-    options: ["ollama", "mlx", "openai", "anthropic"]
-    description: "Inference provider (used when model input not connected)"
+    default: ollama
+    options:
+    - ollama
+    - mlx
+    - openai
+    - anthropic
+    description: Inference provider (used when model input not connected)
   endpoint:
     type: string
     label: Endpoint (fallback)
-    default: "http://localhost:11434"
-    description: "API endpoint URL (used when model input not connected)"
+    default: http://localhost:11434
+    description: API endpoint URL (used when model input not connected)
   k_values:
     type: string
     label: k Values
-    default: "1,10,100"
-    description: "Comma-separated k values for pass@k evaluation"
+    default: 1,10,100
+    description: Comma-separated k values for pass@k evaluation
   temperature:
     type: float
     label: Temperature
@@ -68,7 +72,7 @@ config:
     default: 0
     min: 0
     max: 200
-    description: "Completions per problem (0 = auto based on max k)"
+    description: Completions per problem (0 = auto based on max k)
   timeout:
     type: float
     label: Execution Timeout (s)
@@ -99,19 +103,25 @@ config:
   output_format:
     type: select
     label: Output Format
-    options: [json, csv]
+    options:
+    - json
+    - csv
     default: json
-    description: "Format for dataset and report outputs (json or csv)"
+    description: Format for dataset and report outputs (json or csv)
   decimal_precision:
     type: integer
     label: Decimal Precision
     default: 4
     min: 1
     max: 6
-    description: "Decimal places for all computed scores"
-
+    description: Decimal places for all computed scores
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

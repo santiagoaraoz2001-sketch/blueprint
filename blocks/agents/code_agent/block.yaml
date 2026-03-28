@@ -2,63 +2,68 @@ name: Code Agent
 type: code_agent
 category: agents
 description: Generate code solutions from natural language tasks with optional execution
-version: "1.1.0"
-
+version: 1.1.0
 inputs:
-  - id: llm
-    label: LLM
-    data_type: llm
-    required: false
-    description: "LLM config from llm_inference or model info from model_selector"
-  - id: model
-    label: Model
-    data_type: model
-    required: false
-    description: "Direct model connection (alternative to LLM port)"
-  - id: input
-    label: Task Description
-    data_type: text
-    required: true
-  - id: context
-    label: Code Context
-    data_type: text
-    required: false
-
+- id: llm
+  label: LLM
+  data_type: llm
+  required: false
+  description: LLM config from llm_inference or model info from model_selector
+- id: model
+  label: Model
+  data_type: model
+  required: false
+  description: Direct model connection (alternative to LLM port)
+- id: input
+  label: Task Description
+  data_type: text
+  required: true
+- id: context
+  label: Code Context
+  data_type: text
+  required: false
 outputs:
-  - id: text
-    label: Generated Code
-    data_type: text
-    aliases: [response, output]
-  - id: artifact
-    label: Code File
-    data_type: artifact
-  - id: dataset
-    label: Full Results
-    data_type: dataset
-  - id: metrics
-    label: Code Metrics
-    data_type: metrics
-  - id: llm_config
-    label: LLM Config
-    data_type: llm
-    aliases: [llm]
-    description: "Passthrough of the LLM configuration — enables agent chaining and downstream inference"
-
+- id: text
+  label: Generated Code
+  data_type: text
+  aliases:
+  - response
+  - output
+- id: artifact
+  label: Code File
+  data_type: artifact
+- id: dataset
+  label: Full Results
+  data_type: dataset
+- id: metrics
+  label: Code Metrics
+  data_type: metrics
+- id: llm_config
+  label: LLM Config
+  data_type: llm
+  aliases:
+  - llm
+  description: Passthrough of the LLM configuration — enables agent chaining and downstream
+    inference
 config:
   task:
     type: text_area
     label: Task
-    default: ""
-    description: "Code task description (used when input port not connected)"
+    default: ''
+    description: Code task description (used when input port not connected)
   system_prompt:
     type: text_area
     label: System Prompt
-    default: ""
-    description: "Custom code generation instructions. Leave empty for default behavior."
+    default: ''
+    description: Custom code generation instructions. Leave empty for default behavior.
   language:
     type: select
     label: Language
-    options: [python, javascript, bash, typescript]
+    options:
+    - python
+    - javascript
+    - bash
+    - typescript
     default: python
   execute:
     type: boolean
@@ -80,20 +85,27 @@ config:
     default: 1
     min: 1
     max: 5
-    description: "If execution fails, regenerate and retry up to N times"
+    description: If execution fails, regenerate and retry up to N times
     depends_on:
       field: execute
       value: true
   output_format:
     type: select
     label: Output Format
-    options: [raw, markdown, json]
+    options:
+    - raw
+    - markdown
+    - json
     default: raw
-    description: "raw: code only, markdown: fenced code block, json: structured object"
+    description: 'raw: code only, markdown: fenced code block, json: structured object'
     section: advanced
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

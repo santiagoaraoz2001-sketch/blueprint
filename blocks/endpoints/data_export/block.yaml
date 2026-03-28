@@ -1,49 +1,63 @@
 name: Data Export
 type: data_export
 category: endpoints
-description: Export pipeline data as CSV, JSON, JSONL, Parquet, YAML, or plain text with format-specific options
-version: "1.0.0"
-aliases: [save_csv, save_json, save_parquet, save_txt, save_yaml, save_local]
-
+description: Export pipeline data as CSV, JSON, JSONL, Parquet, YAML, or plain text
+  with format-specific options
+version: 1.0.0
+aliases:
+- save_csv
+- save_json
+- save_parquet
+- save_txt
+- save_yaml
+- save_local
 inputs:
-  - id: data
-    label: Data
-    data_type: any
-    required: true
-    description: "Structured data (list of dicts) for CSV/Parquet, or any data for JSON/YAML/TXT"
-
+- id: data
+  label: Data
+  data_type: any
+  required: true
+  description: Structured data (list of dicts) for CSV/Parquet, or any data for JSON/YAML/TXT
 outputs:
-  - id: file_path
-    label: Saved File Path
-    data_type: artifact
-    description: "Absolute path to the saved file"
-  - id: status
-    label: Save Status
-    data_type: metrics
-  - id: summary
-    label: Export Summary
-    data_type: metrics
-    description: "Object with format-specific stats: rows, columns, file_size_bytes, etc."
-    aliases: [metrics]
-
+- id: file_path
+  label: Saved File Path
+  data_type: artifact
+  description: Absolute path to the saved file
+- id: status
+  label: Save Status
+  data_type: metrics
+- id: summary
+  label: Export Summary
+  data_type: metrics
+  description: 'Object with format-specific stats: rows, columns, file_size_bytes,
+    etc.'
+  aliases:
+  - metrics
 config:
   format:
     type: select
     label: Format
-    options: [auto, csv, json, jsonl, parquet, txt, yaml]
+    options:
+    - auto
+    - csv
+    - json
+    - jsonl
+    - parquet
+    - txt
+    - yaml
     default: auto
-    description: "Output format. 'auto' detects from data type (list of dicts → CSV, string → TXT, else JSON)."
+    description: Output format. 'auto' detects from data type (list of dicts → CSV,
+      string → TXT, else JSON).
   output_path:
     type: file_path
     label: Output Path
     default: ./output
-    description: "Directory to save to (relative to run directory or absolute)"
+    description: Directory to save to (relative to run directory or absolute)
     path_mode: directory
   filename:
     type: string
     label: Filename
     default: output
-    description: "Filename (extension auto-added based on format)"
+    description: Filename (extension auto-added based on format)
   overwrite_existing:
     type: boolean
     label: Overwrite Existing
@@ -52,76 +66,80 @@ config:
     type: boolean
     label: Timestamp Filename
     default: false
-    description: "Append timestamp to filename for versioning"
+    description: Append timestamp to filename for versioning
   create_dirs:
     type: boolean
     label: Create Directories
     default: true
-    description: "Create output directories if they don't exist"
+    description: Create output directories if they don't exist
   include_metadata:
     type: boolean
     label: Include Metadata
     default: false
-    description: "Write a .meta.json sidecar with run info"
-
-  # ── CSV-specific ──
+    description: Write a .meta.json sidecar with run info
   delimiter:
     type: select
     label: Delimiter
-    options: [",", ";", "\\t", "|"]
-    default: ","
+    options:
+    - ','
+    - ;
+    - \t
+    - '|'
+    default: ','
     depends_on:
       field: format
-      value: "csv"
+      value: csv
   include_header:
     type: boolean
     label: Include Header
     default: true
     depends_on:
       field: format
-      value: "csv"
+      value: csv
   csv_encoding:
     type: select
     label: Encoding
-    options: [utf-8, ascii, latin-1, utf-16]
+    options:
+    - utf-8
+    - ascii
+    - latin-1
+    - utf-16
     default: utf-8
     depends_on:
       field: format
-      value: "csv"
+      value: csv
   quote_all:
     type: boolean
     label: Quote All Fields
     default: false
-    description: "Wrap every field in quotes"
+    description: Wrap every field in quotes
     depends_on:
       field: format
-      value: "csv"
+      value: csv
   columns:
     type: string
     label: Columns Filter
-    default: ""
-    description: "Comma-separated column names to include (empty = all)"
+    default: ''
+    description: Comma-separated column names to include (empty = all)
     depends_on:
       field: format
-      value: "csv"
+      value: csv
   na_value:
     type: string
     label: Missing Value
-    default: ""
-    description: "String to use for missing/null values"
+    default: ''
+    description: String to use for missing/null values
     depends_on:
       field: format
-      value: "csv"
-
-  # ── JSON-specific ──
+      value: csv
   pretty_print:
     type: boolean
     label: Pretty Print
     default: true
-    description: "Format JSON with indentation"
+    description: Format JSON with indentation
     depends_on:
       field: format
-      value: "json"
+      value: json
   indent:
     type: integer
     label: Indent Spaces
@@ -135,127 +153,137 @@ config:
     type: boolean
     label: Sort Keys
     default: false
-    description: "Alphabetically sort keys"
+    description: Alphabetically sort keys
   ensure_ascii:
     type: boolean
     label: Ensure ASCII
     default: false
-    description: "Escape non-ASCII characters"
+    description: Escape non-ASCII characters
     depends_on:
       field: format
-      value: "json"
+      value: json
   root_key:
     type: string
     label: Root Key
-    default: ""
-    description: 'Wrap data under a root key (e.g. "results" produces {"results": [...]})'
+    default: ''
+    description: 'Wrap data under a root key (e.g. "results" produces {"results":
+      [...]})'
     depends_on:
       field: format
-      value: "json"
-
-  # ── Parquet-specific ──
+      value: json
   compression:
     type: select
     label: Compression
-    options: [snappy, gzip, zstd, lz4, none]
+    options:
+    - snappy
+    - gzip
+    - zstd
+    - lz4
+    - none
     default: snappy
-    description: "Parquet compression codec"
+    description: Parquet compression codec
     depends_on:
       field: format
-      value: "parquet"
+      value: parquet
   row_group_size:
     type: integer
     label: Row Group Size
     default: 0
     min: 0
-    description: "Rows per group (0 = auto)"
+    description: Rows per group (0 = auto)
     depends_on:
       field: format
-      value: "parquet"
-
-  # ── TXT-specific ──
+      value: parquet
   txt_encoding:
     type: select
     label: Encoding
-    options: [utf-8, ascii, latin-1, utf-16]
+    options:
+    - utf-8
+    - ascii
+    - latin-1
+    - utf-16
     default: utf-8
     depends_on:
       field: format
-      value: "txt"
+      value: txt
   append_mode:
     type: boolean
     label: Append Mode
     default: false
-    description: "Append to file instead of overwriting"
+    description: Append to file instead of overwriting
     depends_on:
       field: format
-      value: "txt"
+      value: txt
   max_length:
     type: integer
     label: Max Length (chars)
     default: 0
     min: 0
-    description: "Truncate output at this many characters (0 = no limit)"
+    description: Truncate output at this many characters (0 = no limit)
     depends_on:
       field: format
-      value: "txt"
+      value: txt
   line_ending:
     type: select
     label: Line Ending
-    options: [LF, CRLF]
+    options:
+    - LF
+    - CRLF
     default: LF
     depends_on:
       field: format
-      value: "txt"
+      value: txt
   prefix:
     type: string
     label: Prefix Text
-    default: ""
+    default: ''
     depends_on:
       field: format
-      value: "txt"
+      value: txt
   suffix:
     type: string
     label: Suffix Text
-    default: ""
+    default: ''
     depends_on:
       field: format
-      value: "txt"
+      value: txt
   trim_whitespace:
     type: boolean
     label: Trim Whitespace
     default: false
     depends_on:
       field: format
-      value: "txt"
-
-  # ── YAML-specific ──
+      value: txt
   default_flow_style:
     type: boolean
     label: Compact Style
     default: false
-    description: "Use flow (inline) style for short sequences/mappings"
+    description: Use flow (inline) style for short sequences/mappings
     depends_on:
       field: format
-      value: "yaml"
+      value: yaml
   allow_unicode:
     type: boolean
     label: Allow Unicode
     default: true
     depends_on:
       field: format
-      value: "yaml"
+      value: yaml
   header_comment:
     type: text_area
     label: Header Comment
-    default: ""
-    description: "Comment block prepended to YAML file (each line gets # prefix)"
+    default: ''
+    description: 'Comment block prepended to YAML file (each line gets # prefix)'
     depends_on:
       field: format
-      value: "yaml"
-
+      value: yaml
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

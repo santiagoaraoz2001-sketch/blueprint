@@ -2,55 +2,65 @@ name: Column Transform
 type: column_transform
 category: data
 description: Rename, drop, keep, cast, or derive columns in a dataset
-version: "2.0.0"
+version: 2.0.0
 deprecated: true
-deprecated_message: "Use the Dataset Builder block instead — it provides column mapping, keep/drop columns, and Python script transforms that cover all column_transform operations."
-
+deprecated_message: Use the Dataset Builder block instead — it provides column mapping,
+  keep/drop columns, and Python script transforms that cover all column_transform
+  operations.
 inputs:
-  - id: dataset
-    label: Dataset
-    data_type: dataset
-    required: true
-
+- id: dataset
+  label: Dataset
+  data_type: dataset
+  required: true
 outputs:
-  - id: transformed_dataset
-    label: Transformed
-    data_type: dataset
-    aliases: [dataset]
-    description: "JSON array with columns transformed according to the selected operation. Schema depends on operation: rename changes column names, drop/keep modifies which columns exist, cast changes value types, template adds a new derived column, lowercase lowercases string values."
-
-  - id: stats
-    label: Transform Stats
-    data_type: metrics
-    description: "Object with rows, columns_before, columns_after, operation, original_columns, result_columns"
-
-    aliases: [metrics]
+- id: transformed_dataset
+  label: Transformed
+  data_type: dataset
+  aliases:
+  - dataset
+  description: 'JSON array with columns transformed according to the selected operation.
+    Schema depends on operation: rename changes column names, drop/keep modifies which
+    columns exist, cast changes value types, template adds a new derived column, lowercase
+    lowercases string values.'
+- id: stats
+  label: Transform Stats
+  data_type: metrics
+  description: Object with rows, columns_before, columns_after, operation, original_columns,
+    result_columns
+  aliases:
+  - metrics
 config:
   operation:
     type: select
     label: Operation
-    options: [rename, drop, keep, cast, template, lowercase]
+    options:
+    - rename
+    - drop
+    - keep
+    - cast
+    - template
+    - lowercase
     default: rename
     description: Which transformation to apply
   rename_map:
     type: text_area
     label: Rename Map (JSON)
-    default: "{}"
+    default: '{}'
     description: 'JSON mapping old column names to new names, e.g. {"old_name": "new_name"}'
   drop_columns:
     type: string
     label: Columns to Drop
-    default: ""
+    default: ''
     description: Comma-separated list of column names to remove
   keep_columns:
     type: string
     label: Columns to Keep
-    default: ""
+    default: ''
     description: Comma-separated list of column names to keep (all others dropped)
   cast_map:
     type: text_area
     label: Cast Map (JSON)
-    default: "{}"
+    default: '{}'
     description: 'JSON mapping column names to types: int, float, str, bool'
   template_column:
     type: string
@@ -60,16 +70,21 @@ config:
   template_expr:
     type: text_area
     label: Template Expression
-    default: ""
-    description: "Template string using {column_name} placeholders, e.g. {question} - {context}"
+    default: ''
+    description: Template string using {column_name} placeholders, e.g. {question}
+      - {context}
   lowercase_columns:
     type: string
     label: Columns to Lowercase
-    default: ""
+    default: ''
     description: Comma-separated columns to convert to lowercase
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

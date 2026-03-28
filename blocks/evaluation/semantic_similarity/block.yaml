@@ -1,55 +1,56 @@
 name: Semantic Similarity
 type: semantic_similarity
 category: evaluation
-description: Compute embedding-based semantic similarity between text pairs — cosine similarity, paraphrase detection, and consistency analysis
-version: "1.0.0"
-
+description: Compute embedding-based semantic similarity between text pairs — cosine
+  similarity, paraphrase detection, and consistency analysis
+version: 1.0.0
 inputs:
-  - id: dataset
-    label: Text Pairs
-    data_type: dataset
-    required: true
-    description: "Dataset with text pairs to compare (text_a/text_b columns)"
-
+- id: dataset
+  label: Text Pairs
+  data_type: dataset
+  required: true
+  description: Dataset with text pairs to compare (text_a/text_b columns)
 outputs:
-  - id: metrics
-    label: Similarity Scores
-    data_type: metrics
-    description: 'Aggregate: total_pairs, avg/min/max/median/std similarity, above_threshold count/rate, threshold'
-  - id: similarity_dataset
-    label: Annotated Pairs
-    data_type: dataset
-    aliases: [dataset]
-    description: 'Per-pair: index, text_a, text_b, similarity score, is_similar (bool) — filterable'
-
-  - id: report
-    label: Similarity Report
-    data_type: artifact
-    description: "Similarity analysis: distribution stats, threshold analysis, outlier pairs, score histogram"
-
+- id: metrics
+  label: Similarity Scores
+  data_type: metrics
+  description: 'Aggregate: total_pairs, avg/min/max/median/std similarity, above_threshold
+    count/rate, threshold'
+- id: similarity_dataset
+  label: Annotated Pairs
+  data_type: dataset
+  aliases:
+  - dataset
+  description: 'Per-pair: index, text_a, text_b, similarity score, is_similar (bool)
+    — filterable'
+- id: report
+  label: Similarity Report
+  data_type: artifact
+  description: 'Similarity analysis: distribution stats, threshold analysis, outlier
+    pairs, score histogram'
 config:
   text_a_column:
     type: string
     label: Text A Column
-    default: "text_a"
-    description: "Column for first text (or model output)"
+    default: text_a
+    description: Column for first text (or model output)
   text_b_column:
     type: string
     label: Text B Column
-    default: "text_b"
-    description: "Column for second text (or reference)"
+    default: text_b
+    description: Column for second text (or reference)
   embedding_model:
     type: string
     label: Embedding Model
-    default: "all-MiniLM-L6-v2"
-    description: "sentence-transformers model name for embeddings"
+    default: all-MiniLM-L6-v2
+    description: sentence-transformers model name for embeddings
   similarity_threshold:
     type: float
     label: Similarity Threshold
     default: 0.8
     min: 0.0
     max: 1.0
-    description: "Minimum similarity to consider texts as semantically equivalent"
+    description: Minimum similarity to consider texts as semantically equivalent
   batch_size:
     type: integer
     label: Batch Size
@@ -62,23 +63,29 @@ config:
     label: Max Samples
     default: 0
     min: 0
-    description: "Limit to N pairs (0 = all)"
+    description: Limit to N pairs (0 = all)
   output_format:
     type: select
     label: Output Format
-    options: [json, csv]
+    options:
+    - json
+    - csv
     default: json
-    description: "Format for dataset and report outputs (json or csv)"
+    description: Format for dataset and report outputs (json or csv)
   decimal_precision:
     type: integer
     label: Decimal Precision
     default: 4
     min: 1
     max: 6
-    description: "Decimal places for all computed scores"
-
+    description: Decimal places for all computed scores
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

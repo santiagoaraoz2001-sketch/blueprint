@@ -1,65 +1,74 @@
 name: API Publisher
 type: api_publisher
 category: endpoints
-description: Push pipeline results to an external REST API endpoint with auth and retry.
-version: "1.0.0"
-
+description: Push pipeline results to an external REST API endpoint with auth and
+  retry.
+version: 1.0.0
 inputs:
-  - id: data
-    label: Data
-    data_type: any
-    required: true
-  - id: config
-    label: Auth Config
-    data_type: config
-    required: false
-
+- id: data
+  label: Data
+  data_type: any
+  required: true
+- id: config
+  label: Auth Config
+  data_type: config
+  required: false
 outputs:
-  - id: status
-    label: Response Status
-    data_type: text
-    description: "Human-readable status message (e.g. 'Published 100/100 records')"
-  - id: summary
-    label: Publish Summary
-    data_type: metrics
-    description: "Object with keys: records_sent (int), records_failed (int), batches (int), url (string), method (string)"
-    aliases: [metrics]
-  - id: results
-    label: Response Data
-    data_type: dataset
-    description: "Array of per-batch results with keys: batch (int), status (int) or error (string), records (int)"
-
-    aliases: [dataset]
+- id: status
+  label: Response Status
+  data_type: text
+  description: Human-readable status message (e.g. 'Published 100/100 records')
+- id: summary
+  label: Publish Summary
+  data_type: metrics
+  description: 'Object with keys: records_sent (int), records_failed (int), batches
+    (int), url (string), method (string)'
+  aliases:
+  - metrics
+- id: results
+  label: Response Data
+  data_type: dataset
+  description: 'Array of per-batch results with keys: batch (int), status (int) or
+    error (string), records (int)'
+  aliases:
+  - dataset
 config:
   url:
     type: string
     label: Target URL
-    default: ""
+    default: ''
     description: REST API endpoint URL
   method:
     type: select
     label: HTTP Method
-    options: [POST, PUT, PATCH]
+    options:
+    - POST
+    - PUT
+    - PATCH
     default: POST
   headers:
     type: text_area
     label: Headers
-    default: "{}"
+    default: '{}'
     description: JSON object of custom headers
   auth_type:
     type: select
     label: Auth Type
-    options: [none, bearer, basic, api_key]
+    options:
+    - none
+    - bearer
+    - basic
+    - api_key
     default: none
   auth_token:
     type: string
     label: Auth Token / API Key
-    default: ""
+    default: ''
     description: Bearer token, password, or API key. Supports $secret:NAME syntax
   auth_username:
     type: string
     label: Username (Basic Auth)
-    default: ""
+    default: ''
     depends_on:
       field: auth_type
       value: basic
@@ -91,12 +100,14 @@ config:
   payload_template:
     type: text_area
     label: Payload Template
-    default: ""
-    description: "JSON template with {data} placeholder. Empty = send data directly"
+    default: ''
+    description: JSON template with {data} placeholder. Empty = send data directly
   content_type:
     type: select
     label: Content Type
-    options: [application/json, application/x-ndjson]
+    options:
+    - application/json
+    - application/x-ndjson
     default: application/json
   rate_limit:
     type: float
@@ -107,12 +118,18 @@ config:
   on_error:
     type: select
     label: On Error
-    options: [skip, fail]
+    options:
+    - skip
+    - fail
     default: skip
-    description: "skip = continue on error, fail = abort entire batch"
-
+    description: skip = continue on error, fail = abort entire batch
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess
