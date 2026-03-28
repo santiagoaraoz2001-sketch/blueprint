@@ -98,13 +98,13 @@ def clone_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
 @router.post("/{pipeline_id}/resolve-config")
 def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
     """Resolve config inheritance for preview in the UI (dry run)."""
-    from ..engine.executor import _topological_sort, _find_block_module
+    from ..engine.executor import _topological_sort
     from ..engine.config_resolver import (
         resolve_configs,
         GLOBAL_PROPAGATION_KEYS,
         CATEGORY_PROPAGATION_KEYS,
-        _load_block_propagation_keys,
     )
+    from ..engine.block_registry import BlockRegistryService
 
     pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
     if not pipeline:
@@ -113,42 +113,41 @@ def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
     definition = pipeline.definition or {}
     nodes = definition.get("nodes", [])
     edges = definition.get("edges", [])
+    workspace_config = definition.get("workspace_config") or None
 
     if not nodes:
         return {"resolved": {}, "propagation_keys": {}}
 
     try:
         order = _topological_sort(nodes, edges)
-        resolved = resolve_configs(nodes, edges, order, _find_block_module)
+        _registry = BlockRegistryService()
+        resolved_tuples = resolve_configs(
+            nodes, edges, order,
+            workspace_config=workspace_config,
+            registry=_registry,
+        )
+        # Extract configs and sources for the UI response
+        resolved = {
+            nid: cfg for nid, (cfg, _src) in resolved_tuples.items()
+        }
+        config_sources = {
+            nid: src for nid, (_cfg, src) in resolved_tuples.items()
+        }
     except Exception as exc:
         raise HTTPException(
             500,
             f"Config resolution failed: {exc}",
         ) from exc
 
-    # Collect block-declared propagation keys per node
-    block_declared: dict[str, list[str]] = {}
-    for n in nodes:
-        nid = n.get("id", "")
-        bt = n.get("data", {}).get("type", "")
-        if bt:
-            try:
-                bdir = _find_block_module(bt)
-                bkeys = _load_block_propagation_keys(str(bdir))
-                if bkeys:
-                    block_declared[nid] = sorted(bkeys)
-            except Exception:
-                pass
-
     return {
         "resolved": resolved,
+        "config_sources": config_sources,
         "propagation_keys": {
             "global": sorted(GLOBAL_PROPAGATION_KEYS),
             "by_category": {
                 cat: sorted(keys)
                 for cat, keys in CATEGORY_PROPAGATION_KEYS.items()
             },
-            "by_block": block_declared,
         },
     }
 
