@@ -1,7 +1,8 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case, literal_column
+from sqlalchemy.sql import label
 
 from ..database import get_db
 from ..models.project import Project
@@ -19,12 +20,82 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 # ── Project CRUD ──────────────────────────────────────────────────────
 
-@router.get("", response_model=list[ProjectResponse])
+@router.get("")
 def list_projects(status: str | None = None, db: Session = Depends(get_db)):
     q = db.query(Project)
     if status:
         q = q.filter(Project.status == status)
-    return q.order_by(Project.updated_at.desc()).all()
+    projects = q.order_by(Project.updated_at.desc()).all()
+
+    if not projects:
+        return []
+
+    project_ids = [p.id for p in projects]
+
+    # ── Single query: pipelines with run count + latest run status ──
+    # Subquery: per-pipeline run count
+    run_count_sq = (
+        db.query(
+            Run.pipeline_id,
+            func.count(Run.id).label("run_count"),
+        )
+        .group_by(Run.pipeline_id)
+        .subquery()
+    )
+
+    # Subquery: per-pipeline latest run (by started_at DESC)
+    latest_run_sq = (
+        db.query(
+            Run.pipeline_id,
+            Run.status.label("latest_status"),
+            func.max(Run.started_at).label("max_started"),
+        )
+        .group_by(Run.pipeline_id)
+        .subquery()
+    )
+
+    # Join pipelines with both subqueries
+    pipe_rows = (
+        db.query(
+            Pipeline.id,
+            Pipeline.name,
+            Pipeline.project_id,
+            Pipeline.source_pipeline_id,
+            Pipeline.variant_notes,
+            Pipeline.config_diff,
+            func.coalesce(run_count_sq.c.run_count, 0).label("run_count"),
+            latest_run_sq.c.latest_status,
+        )
+        .outerjoin(run_count_sq, Pipeline.id == run_count_sq.c.pipeline_id)
+        .outerjoin(latest_run_sq, Pipeline.id == latest_run_sq.c.pipeline_id)
+        .filter(Pipeline.project_id.in_(project_ids))
+        .all()
+    )
+
+    # Group pipeline rows by project_id
+    pipes_by_project: dict[str, list[dict]] = {pid: [] for pid in project_ids}
+    for row in pipe_rows:
+        pid = row.project_id
+        if pid in pipes_by_project:
+            pipes_by_project[pid].append({
+                "id": row.id,
+                "name": row.name,
+                "run_count": row.run_count,
+                "latest_run_status": row.latest_status,
+                "source_pipeline_id": row.source_pipeline_id,
+                "variant_notes": row.variant_notes,
+                "config_diff": row.config_diff,
+            })
+
+    result = []
+    for project in projects:
+        p_dict = ProjectResponse.model_validate(project).model_dump()
+        pipeline_summaries = pipes_by_project.get(project.id, [])
+        p_dict["pipelines"] = pipeline_summaries
+        p_dict["total_pipeline_count"] = len(pipeline_summaries)
+        result.append(p_dict)
+
+    return result
 
 
 @router.post("", response_model=ProjectResponse, status_code=201)
@@ -99,12 +170,69 @@ def project_dashboard(db: Session = Depends(get_db)):
     }
 
 
-@router.get("/{project_id}", response_model=ProjectResponse)
+@router.get("/{project_id}")
 def get_project(project_id: str, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(404, "Project not found")
-    return project
+
+    p_dict = ProjectResponse.model_validate(project).model_dump()
+
+    # Query 1: All pipelines for this project
+    pipelines = (
+        db.query(Pipeline)
+        .filter(Pipeline.project_id == project_id)
+        .order_by(Pipeline.updated_at.desc())
+        .all()
+    )
+    pipeline_ids = [p.id for p in pipelines]
+
+    # Query 2: All runs for all pipelines in one query, grouped by pipeline
+    runs_by_pipeline: dict[str, list] = {pid: [] for pid in pipeline_ids}
+    if pipeline_ids:
+        all_runs = (
+            db.query(Run)
+            .filter(Run.pipeline_id.in_(pipeline_ids))
+            .order_by(Run.started_at.desc())
+            .all()
+        )
+        for r in all_runs:
+            if r.pipeline_id in runs_by_pipeline:
+                runs_by_pipeline[r.pipeline_id].append(r)
+
+    pipeline_details = []
+    for pipe in pipelines:
+        runs = runs_by_pipeline.get(pipe.id, [])
+        pipeline_details.append({
+            "id": pipe.id,
+            "name": pipe.name,
+            "description": pipe.description,
+            "source_pipeline_id": pipe.source_pipeline_id,
+            "variant_notes": pipe.variant_notes,
+            "config_diff": pipe.config_diff,
+            "notes": pipe.notes,
+            "created_at": pipe.created_at.isoformat() if pipe.created_at else None,
+            "updated_at": pipe.updated_at.isoformat() if pipe.updated_at else None,
+            "run_count": len(runs),
+            "latest_run_status": runs[0].status if runs else None,
+            "runs": [
+                {
+                    "id": r.id,
+                    "status": r.status,
+                    "started_at": r.started_at.isoformat() if r.started_at else None,
+                    "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+                    "duration_seconds": r.duration_seconds,
+                    "metrics": r.metrics or {},
+                    "notes": r.notes,
+                    "tags": r.tags,
+                    "starred": r.starred or False,
+                }
+                for r in runs
+            ],
+        })
+
+    p_dict["pipelines"] = pipeline_details
+    return p_dict
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)

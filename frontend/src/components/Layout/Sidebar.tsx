@@ -261,13 +261,25 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Active project */}
+      {/* Active project — click navigates to ProjectView */}
       <div
         role="button"
         tabIndex={0}
-        onClick={() => setView('dashboard')}
+        onClick={() => {
+          if (selectedProjectId) {
+            setView('project' as any)
+          } else {
+            setView('dashboard')
+          }
+        }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') setView('dashboard')
+          if (e.key === 'Enter' || e.key === ' ') {
+            if (selectedProjectId) {
+              setView('project' as any)
+            } else {
+              setView('dashboard')
+            }
+          }
         }}
         style={{
           borderTop:    `0.5px solid ${T.border}`,

@@ -10,6 +10,10 @@ class PipelineCreate(BaseModel):
     experiment_phase_id: str | None = None
     description: str = ""
     definition: dict[str, Any] = {}
+    notes: str | None = None
+    source_pipeline_id: str | None = None
+    variant_notes: str | None = None
+    config_diff: dict[str, Any] | None = None
 
 
 class PipelineUpdate(BaseModel):
@@ -17,6 +21,14 @@ class PipelineUpdate(BaseModel):
     description: str | None = None
     experiment_phase_id: str | None = None
     definition: dict[str, Any] | None = None
+    notes: str | None = None
+    variant_notes: str | None = None
+
+
+class CloneAsVariantRequest(BaseModel):
+    name: str | None = None
+    project_id: str | None = None
+    variant_notes: str | None = None
 
 
 class PipelineResponse(BaseModel):
@@ -27,6 +39,10 @@ class PipelineResponse(BaseModel):
     experiment_phase_id: str | None
     description: str
     definition: dict[str, Any]
+    notes: str | None = None
+    source_pipeline_id: str | None = None
+    variant_notes: str | None = None
+    config_diff: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
 
