@@ -1,0 +1,146 @@
+{
+  "id": "dpo-training",
+  "name": "DPO Training",
+  "description": "Direct Preference Optimization: select a base model, load a preference dataset, train with DPO alignment, and evaluate the aligned model.",
+  "difficulty": "advanced",
+  "estimated_runtime": "3 hours",
+  "required_services": [],
+  "required_capabilities": [
+    "torch"
+  ],
+  "tags": [
+    "dpo",
+    "alignment",
+    "rlhf",
+    "advanced"
+  ],
+  "nodes": [
+    {
+      "id": "dpo_1",
+      "type": "blockNode",
+      "position": {
+        "x": 400,
+        "y": 80
+      },
+      "data": {
+        "type": "model_selector",
+        "label": "Base Model",
+        "category": "data",
+        "icon": "Box",
+        "accent": "#62B8D9",
+        "config": {},
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "dpo_2",
+      "type": "blockNode",
+      "position": {
+        "x": 700,
+        "y": 80
+      },
+      "data": {
+        "type": "huggingface_loader",
+        "label": "Preference Dataset",
+        "category": "source",
+        "icon": "Download",
+        "accent": "#DE9A68",
+        "config": {
+          "dataset_name": "Anthropic/hh-rlhf",
+          "split": "train",
+          "max_samples": 10000
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "dpo_3",
+      "type": "blockNode",
+      "position": {
+        "x": 550,
+        "y": 300
+      },
+      "data": {
+        "type": "dpo_alignment",
+        "label": "DPO Trainer",
+        "category": "training",
+        "icon": "Zap",
+        "accent": "#7B9BE3",
+        "config": {
+          "beta": 0.1,
+          "lr": 5e-07,
+          "epochs": 1,
+          "batch_size": 4
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "dpo_4",
+      "type": "blockNode",
+      "position": {
+        "x": 550,
+        "y": 520
+      },
+      "data": {
+        "type": "lm_eval_harness",
+        "label": "Evaluate Aligned",
+        "category": "evaluation",
+        "icon": "ClipboardCheck",
+        "accent": "#65D68B",
+        "config": {
+          "tasks": "hellaswag,truthfulqa_mc2",
+          "num_fewshot": 0,
+          "batch_size": "auto"
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "dpo_e1",
+      "source": "dpo_1",
+      "target": "dpo_3",
+      "sourceHandle": "model",
+      "targetHandle": "model",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#B29CEA",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "dpo_e2",
+      "source": "dpo_2",
+      "target": "dpo_3",
+      "sourceHandle": "dataset",
+      "targetHandle": "dataset",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#5FB8E8",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "dpo_e3",
+      "source": "dpo_3",
+      "target": "dpo_4",
+      "sourceHandle": "aligned_model",
+      "targetHandle": "model",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#B29CEA",
+        "strokeWidth": 1.5
+      }
+    }
+  ],
+  "default_config": {}
+}

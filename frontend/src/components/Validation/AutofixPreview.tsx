@@ -14,7 +14,6 @@ import {
   X,
   Wrench,
   CheckCircle2,
-  AlertTriangle,
   ChevronRight,
   Loader2,
 } from 'lucide-react'

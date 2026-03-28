@@ -1,0 +1,103 @@
+{
+  "name": "aliased_ports",
+  "description": "Edges use aliased port IDs that must be resolved to canonical names.",
+  "nodes": [
+    {
+      "id": "producer",
+      "type": "blockNode",
+      "data": {
+        "type": "text_chunker",
+        "label": "Producer (has aliases)",
+        "category": "data",
+        "config": {"chunk_size": 500, "strategy": "recursive", "text_column": "text"},
+        "inputs": [
+          {"id": "dataset", "dataType": "dataset", "required": true}
+        ],
+        "outputs": [
+          {"id": "chunked_dataset", "dataType": "dataset", "aliases": ["dataset"]},
+          {"id": "output_dataset_meta", "dataType": "config", "aliases": ["dataset_meta"]},
+          {"id": "stats", "dataType": "metrics", "aliases": ["metrics"]}
+        ]
+      }
+    },
+    {
+      "id": "data_src",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Data Source",
+        "category": "data",
+        "config": {"text": "Some text data to chunk"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "text_to_ds",
+      "type": "blockNode",
+      "data": {
+        "type": "text_to_dataset",
+        "label": "Text to Dataset",
+        "category": "data",
+        "config": {},
+        "inputs": [
+          {"id": "text", "dataType": "text", "required": true}
+        ],
+        "outputs": [
+          {"id": "dataset", "dataType": "dataset"}
+        ]
+      }
+    },
+    {
+      "id": "consumer",
+      "type": "blockNode",
+      "data": {
+        "type": "results_formatter",
+        "label": "Consumer (uses alias)",
+        "category": "output",
+        "config": {"format": "json", "include_config": true},
+        "inputs": [
+          {"id": "metrics", "dataType": "metrics", "required": false}
+        ],
+        "outputs": [
+          {"id": "artifact", "dataType": "artifact"}
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "data_src",
+      "target": "text_to_ds",
+      "sourceHandle": "text",
+      "targetHandle": "text"
+    },
+    {
+      "id": "e1",
+      "source": "text_to_ds",
+      "target": "producer",
+      "sourceHandle": "dataset",
+      "targetHandle": "dataset"
+    },
+    {
+      "id": "e_alias",
+      "source": "producer",
+      "target": "consumer",
+      "sourceHandle": "metrics",
+      "targetHandle": "metrics",
+      "_note": "sourceHandle 'metrics' is an alias for canonical 'stats'"
+    }
+  ],
+  "expected": {
+    "validation": "pass",
+    "execution_order": ["data_src", "text_to_ds", "producer", "consumer"],
+    "final_status": "completed",
+    "expected_errors": [],
+    "partial_rerun_allowed": true,
+    "export_allowed": true,
+    "handle_resolution": {
+      "metrics_alias": "stats is the canonical port, 'metrics' is its alias"
+    }
+  }
+}

@@ -33,7 +33,6 @@ export default function BackendValidationPanel() {
   const panelVisible = useValidationStore((s) => s.panelVisible)
   const togglePanel = useValidationStore((s) => s.togglePanel)
   const setPanelVisible = useValidationStore((s) => s.setPanelVisible)
-  const nodeErrors = useValidationStore((s) => s.nodeErrors)
   const validate = useValidationStore((s) => s.validate)
   const isPending = isValidating || isStale
 

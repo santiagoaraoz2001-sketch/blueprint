@@ -1,0 +1,67 @@
+name: Contract Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same branch/PR
+concurrency:
+  group: contract-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Prevent blocks from attempting GPU detection or model downloads
+  CUDA_VISIBLE_DEVICES: ""
+  TRANSFORMERS_OFFLINE: "1"
+  HF_HUB_OFFLINE: "1"
+  # Use a temp directory for Blueprint data so tests don't touch user state
+  BLUEPRINT_DATA_DIR: ${{ github.workspace }}/.blueprint-test-data
+
+jobs:
+  contract-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-test.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-test.txt
+
+      - name: Create Blueprint data directories
+        run: mkdir -p "$BLUEPRINT_DATA_DIR"
+
+      - name: Run contract tests (validate + execute + compile)
+        run: |
+          python -m pytest \
+            backend/tests/test_contract_validate.py \
+            backend/tests/test_contract_execute.py \
+            backend/tests/test_contract_compile.py \
+            -v --timeout=60 --tb=short
+
+      - name: Run block I/O verification
+        run: |
+          python -m pytest \
+            backend/tests/test_block_io.py \
+            -v --timeout=60 --tb=short
+
+      - name: Run block coverage (YAML parse + run.py import)
+        run: |
+          python -m pytest \
+            backend/tests/test_block_coverage.py \
+            -v --timeout=120 --tb=short
