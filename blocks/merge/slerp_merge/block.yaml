@@ -2,41 +2,38 @@ name: SLERP Merge
 type: slerp_merge
 category: merge
 description: Spherical linear interpolation of model weights
-version: "1.0.0"
-
+version: 1.0.0
 inputs:
-  - id: model_a
-    label: Model A
-    data_type: model
-    required: true
-  - id: model_b
-    label: Model B
-    data_type: model
-    required: true
-
+- id: model_a
+  label: Model A
+  data_type: model
+  required: true
+- id: model_b
+  label: Model B
+  data_type: model
+  required: true
 outputs:
-  - id: model
-    label: SLERP Model
-    data_type: model
-  - id: metrics
-    label: Merge Metrics
-    data_type: metrics
-
+- id: model
+  label: SLERP Model
+  data_type: model
+- id: metrics
+  label: Merge Metrics
+  data_type: metrics
 config:
   model_a_name:
     type: string
     label: Model A (fallback)
-    default: ""
-    description: "HuggingFace model ID for Model A (used when input port not connected)"
+    default: ''
+    description: HuggingFace model ID for Model A (used when input port not connected)
   model_b_name:
     type: string
     label: Model B (fallback)
-    default: ""
-    description: "HuggingFace model ID for Model B (used when input port not connected)"
+    default: ''
+    description: HuggingFace model ID for Model B (used when input port not connected)
   weight:
     type: float
-    label: "Interpolation Weight (t)"
-    description: "0 = all Model A, 1 = all Model B"
+    label: Interpolation Weight (t)
+    description: 0 = all Model A, 1 = all Model B
     default: 0.5
     min: 0
     max: 1
@@ -44,10 +41,14 @@ config:
     type: string
     label: Output Name
     description: Name for the merged model
-    default: "slerp-merged-model"
-
+    default: slerp-merged-model
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

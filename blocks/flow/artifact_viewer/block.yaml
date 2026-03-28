@@ -2,21 +2,19 @@ name: Artifact Viewer
 type: artifact_viewer
 category: flow
 description: View, inspect, and download generated artifacts
-version: "1.0.0"
-
+version: 1.0.0
 inputs:
-  - id: artifact
-    label: Artifact
-    data_type: artifact
-    required: true
-
+- id: artifact
+  label: Artifact
+  data_type: artifact
+  required: true
 outputs:
-  - id: summary
-    label: Artifact Manifest
-    data_type: metrics
-    description: "JSON manifest with artifact type, size, preview, and path information"
-
-    aliases: [metrics]
+- id: summary
+  label: Artifact Manifest
+  data_type: metrics
+  description: JSON manifest with artifact type, size, preview, and path information
+  aliases:
+  - metrics
 config:
   auto_open:
     type: boolean
@@ -28,10 +26,17 @@ config:
     label: Display
     description: How to display the artifact
     default: preview
-    options: [preview, raw, download]
-
+    options:
+    - preview
+    - raw
+    - download
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

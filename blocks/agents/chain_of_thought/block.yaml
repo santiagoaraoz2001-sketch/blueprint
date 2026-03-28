@@ -1,48 +1,50 @@
 name: Chain of Thought
 type: chain_of_thought
 category: agents
-description: Multi-step LLM reasoning with chain-of-thought prompting and optional self-consistency
-version: "1.1.0"
-
+description: Multi-step LLM reasoning with chain-of-thought prompting and optional
+  self-consistency
+version: 1.1.0
 inputs:
-  - id: llm
-    label: LLM
-    data_type: llm
-    required: false
-    description: "LLM config from llm_inference or model info from model_selector"
-  - id: model
-    label: Model
-    data_type: model
-    required: false
-    description: "Direct model connection (alternative to LLM port)"
-  - id: input
-    label: Question / Prompt
-    data_type: text
-    required: true
-
+- id: llm
+  label: LLM
+  data_type: llm
+  required: false
+  description: LLM config from llm_inference or model info from model_selector
+- id: model
+  label: Model
+  data_type: model
+  required: false
+  description: Direct model connection (alternative to LLM port)
+- id: input
+  label: Question / Prompt
+  data_type: text
+  required: true
 outputs:
-  - id: response
-    label: Final Answer
-    data_type: text
-    aliases: [text, output]
-  - id: dataset
-    label: Reasoning Chain
-    data_type: dataset
-  - id: metrics
-    label: Reasoning Metrics
-    data_type: metrics
-  - id: llm_config
-    label: LLM Config
-    data_type: llm
-    aliases: [llm]
-    description: "Passthrough of the LLM configuration — enables agent chaining and downstream inference"
-
+- id: response
+  label: Final Answer
+  data_type: text
+  aliases:
+  - text
+  - output
+- id: dataset
+  label: Reasoning Chain
+  data_type: dataset
+- id: metrics
+  label: Reasoning Metrics
+  data_type: metrics
+- id: llm_config
+  label: LLM Config
+  data_type: llm
+  aliases:
+  - llm
+  description: Passthrough of the LLM configuration — enables agent chaining and downstream
+    inference
 config:
   input_text:
     type: text_area
     label: Input Text
-    default: ""
-    description: "Question or prompt for reasoning (used when input port not connected)"
+    default: ''
+    description: Question or prompt for reasoning (used when input port not connected)
   num_steps:
     type: integer
     label: Reasoning Steps
@@ -72,28 +74,41 @@ config:
     default: 1
     min: 1
     max: 20
-    description: "Generate N independent chains and select the most consistent answer (1 = disabled)"
+    description: Generate N independent chains and select the most consistent answer
+      (1 = disabled)
   output_mode:
     type: select
     label: Output Mode
-    options: [full_chain, final_only]
+    options:
+    - full_chain
+    - final_only
     default: full_chain
-    description: "full_chain: include all reasoning steps in output, final_only: only the last step's answer"
+    description: 'full_chain: include all reasoning steps in output, final_only: only
+      the last step''s answer'
   custom_steps:
     type: text_area
     label: Custom Step Prompts
-    default: ""
-    description: "Optional: one prompt template per line. Use {input}, {previous}, {step_num} as placeholders."
+    default: ''
+    description: 'Optional: one prompt template per line. Use {input}, {previous},
+      {step_num} as placeholders.'
   output_format:
     type: select
     label: Output Format
-    options: [plain, markdown, json]
+    options:
+    - plain
+    - markdown
+    - json
     default: markdown
-    description: "plain: raw text, markdown: headers per step, json: structured {steps, final_answer, metadata}"
+    description: 'plain: raw text, markdown: headers per step, json: structured {steps,
+      final_answer, metadata}'
     section: advanced
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

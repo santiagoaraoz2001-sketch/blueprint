@@ -2,32 +2,29 @@ name: Curriculum Training
 type: curriculum_training
 category: training
 description: Multi-stage training with progressively harder examples
-version: "1.0.0"
-
+version: 1.0.0
 inputs:
-  - id: dataset
-    label: Training Data
-    data_type: dataset
-    required: true
-  - id: model
-    label: Base Model
-    data_type: model
-    required: false
-  - id: dataset_meta
-    label: Dataset Info
-    data_type: config
-    required: false
-
+- id: dataset
+  label: Training Data
+  data_type: dataset
+  required: true
+- id: model
+  label: Base Model
+  data_type: model
+  required: false
+- id: dataset_meta
+  label: Dataset Info
+  data_type: config
+  required: false
 outputs:
-  - id: trained_model
-    label: Trained Model
-    aliases: [model]
-    data_type: model
-
-  - id: metrics
-    label: Curriculum Metrics
-    data_type: metrics
-
+- id: trained_model
+  label: Trained Model
+  aliases:
+  - model
+  data_type: model
+- id: metrics
+  label: Curriculum Metrics
+  data_type: metrics
 config:
   model_name:
     type: string
@@ -61,8 +58,8 @@ config:
   lr:
     type: float
     label: Learning Rate
-    default: 0.00005
-    min: 0.0000001
+    default: 5.0e-05
+    min: 1.0e-07
     max: 0.01
   batch_size:
     type: integer
@@ -80,22 +77,31 @@ config:
   text_column:
     type: string
     label: Text Column
-    description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
-    default: ""
+    description: 'JSON key containing training text (leave empty for auto-detect:
+      ''text'' or first key)'
+    default: ''
   training_format:
     type: text_area
     label: Training Format
-    description: "Template for structuring training examples. Use {text}, {instruction}, {output} placeholders."
-    default: ""
+    description: Template for structuring training examples. Use {text}, {instruction},
+      {output} placeholders.
+    default: ''
   prefer_framework:
     type: select
     label: Preferred Framework
-    options: ["auto", "mlx", "pytorch"]
-    default: "auto"
-    description: "Force a specific training framework. 'auto' detects the best available."
-
+    options:
+    - auto
+    - mlx
+    - pytorch
+    default: auto
+    description: Force a specific training framework. 'auto' detects the best available.
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

@@ -1,52 +1,61 @@
 name: Dataset to Text
 type: dataset_to_text
 category: data
-version: "2.0.0"
-description: Extract a text column from a dataset, joining all rows into a single text output
+version: 2.0.0
+description: Extract a text column from a dataset, joining all rows into a single
+  text output
 maturity: stable
-tags: [adapter, conversion, text, dataset]
-
+tags:
+- adapter
+- conversion
+- text
+- dataset
 inputs:
-  - id: dataset
-    label: Dataset
-    data_type: dataset
-    required: true
-
+- id: dataset
+  label: Dataset
+  data_type: dataset
+  required: true
 outputs:
-  - id: text
-    label: Extracted Text
-    data_type: text
-    aliases: [response, output]
-  - id: metrics
-    label: Metrics
-    data_type: metrics
-
+- id: text
+  label: Extracted Text
+  data_type: text
+  aliases:
+  - response
+  - output
+- id: metrics
+  label: Metrics
+  data_type: metrics
 config:
   column:
     type: string
     label: Column Name
-    default: "text"
-    description: "Which column to extract (leave empty to auto-detect)"
+    default: text
+    description: Which column to extract (leave empty to auto-detect)
   join_with:
     type: string
     label: Join Separator
-    default: "\n"
-    description: "Separator between rows"
+    default: '
+
+      '
+    description: Separator between rows
   max_rows:
     type: integer
     label: Max Rows
     default: 0
     min: 0
-    description: "Limit rows (0 = all)"
+    description: Limit rows (0 = all)
   row_index:
     type: integer
     label: Single Row Index
     default: -1
     min: -1
-    description: "Extract a single row by index (-1 = all rows)"
-
+    description: Extract a single row by index (-1 = all rows)
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

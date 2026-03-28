@@ -2,94 +2,103 @@ name: Reranker
 type: reranker
 category: inference
 description: Re-rank search results using a cross-encoder model
-version: "1.0.0"
-
+version: 1.0.0
 inputs:
-  - id: dataset
-    label: Search Results
-    data_type: dataset
-    required: true
-  - id: query
-    label: Query
-    data_type: text
-    required: false
-  - id: dataset_meta
-    label: Dataset Info
-    data_type: config
-    required: false
-
+- id: dataset
+  label: Search Results
+  data_type: dataset
+  required: true
+- id: query
+  label: Query
+  data_type: text
+  required: false
+- id: dataset_meta
+  label: Dataset Info
+  data_type: config
+  required: false
 outputs:
-  - id: reranked_dataset
-    label: Reranked Results
-    data_type: dataset
-    aliases: [dataset]
-    description: >
-      Array of reranked result objects. Each row: {...original_row_fields, <score_column>, _rank}.
-      score_column: reranking relevance score (configurable name, default: "_rerank_score").
-      _rank: 1-based position after reranking (1 = most relevant).
-      Results are sorted descending by score. Rows below score_threshold are filtered out.
-      Only top_k results are returned. Output format configurable via dataset_format (json, jsonl, csv).
+- id: reranked_dataset
+  label: Reranked Results
+  data_type: dataset
+  aliases:
+  - dataset
+  description: 'Array of reranked result objects. Each row: {...original_row_fields,
+    <score_column>, _rank}. score_column: reranking relevance score (configurable
+    name, default: "_rerank_score"). _rank: 1-based position after reranking (1 =
+    most relevant). Results are sorted descending by score. Rows below score_threshold
+    are filtered out. Only top_k results are returned. Output format configurable
+    via dataset_format (json, jsonl, csv).
 
-  - id: metrics
-    label: Reranking Metrics
-    data_type: metrics
-    description: >
-      {total_items, reranked_items, top_score, model, used_real_model}.
-      total_items: number of input rows before filtering. reranked_items: number of rows in final output.
-      top_score: highest reranking score in results. model: cross-encoder model identifier used.
-      used_real_model: boolean indicating if sentence-transformers CrossEncoder was used (false = word-overlap fallback).
+    '
+- id: metrics
+  label: Reranking Metrics
+  data_type: metrics
+  description: '{total_items, reranked_items, top_score, model, used_real_model}.
+    total_items: number of input rows before filtering. reranked_items: number of
+    rows in final output. top_score: highest reranking score in results. model: cross-encoder
+    model identifier used. used_real_model: boolean indicating if sentence-transformers
+    CrossEncoder was used (false = word-overlap fallback).
 
+    '
 config:
   model_name:
     type: string
     label: Cross-Encoder Model
-    default: "cross-encoder/ms-marco-MiniLM-L-6-v2"
-    description: "Sentence-transformers CrossEncoder model"
+    default: cross-encoder/ms-marco-MiniLM-L-6-v2
+    description: Sentence-transformers CrossEncoder model
   query_column:
     type: string
     label: Query Column
-    default: "query"
-    description: "Column containing the search query"
+    default: query
+    description: Column containing the search query
   text_column:
     type: string
     label: Text Column
-    default: "text"
-    description: "Column containing the passage/document text"
+    default: text
+    description: Column containing the passage/document text
   top_k:
     type: integer
     label: Top K
     default: 10
     min: 1
     max: 1000
-    description: "Return top K results after reranking"
+    description: Return top K results after reranking
   score_column:
     type: string
     label: Score Column
-    default: "_rerank_score"
-    description: "Column name for the reranking score"
+    default: _rerank_score
+    description: Column name for the reranking score
   score_threshold:
     type: float
     label: Score Threshold
     default: 0.0
     min: 0.0
     max: 1.0
-    description: "Minimum score to include in results (0 = no filter)"
+    description: Minimum score to include in results (0 = no filter)
   batch_size:
     type: integer
     label: Batch Size
     default: 64
     min: 1
     max: 512
-    description: "Batch size for CrossEncoder prediction"
+    description: Batch size for CrossEncoder prediction
   dataset_format:
     type: select
     label: Dataset Format
-    description: "Output format for the dataset — json (default), jsonl (one JSON object per line), csv (comma-separated values)"
+    description: Output format for the dataset — json (default), jsonl (one JSON object
+      per line), csv (comma-separated values)
     default: json
-    options: [json, jsonl, csv]
-
+    options:
+    - json
+    - jsonl
+    - csv
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

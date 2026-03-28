@@ -1,37 +1,45 @@
 name: Dataset Row Selector
 type: dataset_row_selector
 category: data
-version: "2.0.0"
-description: Extract specific rows from a dataset by index, column value, or random sampling
+version: 2.0.0
+description: Extract specific rows from a dataset by index, column value, or random
+  sampling
 maturity: stable
-tags: [adapter, selection, dataset]
-
+tags:
+- adapter
+- selection
+- dataset
 inputs:
-  - id: dataset
-    label: Dataset
-    data_type: dataset
-    required: true
-
+- id: dataset
+  label: Dataset
+  data_type: dataset
+  required: true
 outputs:
-  - id: selected_dataset
-    label: Selected Rows
-    aliases: [dataset]
-    data_type: dataset
-
-  - id: text
-    label: First Row as Text
-    data_type: text
-    aliases: [response, output]
-  - id: metrics
-    label: Metrics
-    data_type: metrics
-
+- id: selected_dataset
+  label: Selected Rows
+  aliases:
+  - dataset
+  data_type: dataset
+- id: text
+  label: First Row as Text
+  data_type: text
+  aliases:
+  - response
+  - output
+- id: metrics
+  label: Metrics
+  data_type: metrics
 config:
   mode:
     type: select
     label: Selection Mode
-    default: "first"
-    options: ["first", "last", "index", "random", "filter"]
+    default: first
+    options:
+    - first
+    - last
+    - index
+    - random
+    - filter
   index:
     type: integer
     label: Row Index
@@ -47,14 +55,14 @@ config:
   filter_column:
     type: string
     label: Filter Column
-    default: ""
+    default: ''
     depends_on:
       field: mode
       value: filter
   filter_value:
     type: string
     label: Filter Value
-    default: ""
+    default: ''
     depends_on:
       field: mode
       value: filter
@@ -62,18 +70,21 @@ config:
     type: integer
     label: Random Seed
     default: 42
-    description: "Seed for reproducible random sampling"
+    description: Seed for reproducible random sampling
     depends_on:
       field: mode
       value: random
   text_column:
     type: string
     label: Text Column for Text Output
-    default: "text"
-    description: "Which column to output as text (auto-detects if not found)"
-
+    default: text
+    description: Which column to output as text (auto-detects if not found)
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

@@ -2,71 +2,79 @@ name: Data Merger
 type: data_merger
 category: data
 description: Merge or concatenate multiple datasets
-version: "2.0.0"
-
+version: 2.0.0
 inputs:
-  - id: dataset_a
-    label: Dataset A
-    data_type: dataset
-    required: true
-  - id: dataset_b
-    label: Dataset B
-    data_type: dataset
-    required: true
-  - id: dataset_c
-    label: Dataset C
-    data_type: dataset
-    required: false
-  - id: dataset_meta
-    label: Dataset Info
-    data_type: config
-    required: false
-
+- id: dataset_a
+  label: Dataset A
+  data_type: dataset
+  required: true
+- id: dataset_b
+  label: Dataset B
+  data_type: dataset
+  required: true
+- id: dataset_c
+  label: Dataset C
+  data_type: dataset
+  required: false
+- id: dataset_meta
+  label: Dataset Info
+  data_type: config
+  required: false
 outputs:
-  - id: dataset
-    label: Merged
-    data_type: dataset
-    description: "JSON array of merged rows. concat: all rows stacked. join: matched rows combined (conflicting column names get join_suffix appended). interleave: rows alternated from each source. dedup: unique rows only."
-  - id: output_dataset_meta
-    label: Dataset Info
-    data_type: config
-    aliases: [dataset_meta]
-    required: false
-
-  - id: stats
-    label: Merge Stats
-    data_type: metrics
-    description: "Object with rows_a, rows_b, rows_c, merged_rows, method"
-
-    aliases: [metrics]
+- id: dataset
+  label: Merged
+  data_type: dataset
+  description: 'JSON array of merged rows. concat: all rows stacked. join: matched
+    rows combined (conflicting column names get join_suffix appended). interleave:
+    rows alternated from each source. dedup: unique rows only.'
+- id: output_dataset_meta
+  label: Dataset Info
+  data_type: config
+  aliases:
+  - dataset_meta
+  required: false
+- id: stats
+  label: Merge Stats
+  data_type: metrics
+  description: Object with rows_a, rows_b, rows_c, merged_rows, method
+  aliases:
+  - metrics
 config:
   method:
     type: select
     label: Method
-    options: [concat, join, interleave, dedup]
+    options:
+    - concat
+    - join
+    - interleave
+    - dedup
     default: concat
     description: Merge strategy
   join_key:
     type: string
     label: Join Key
-    default: ""
+    default: ''
     description: Column name to join on (for join method)
   join_type:
     type: select
     label: Join Type
-    options: [inner, left, outer]
+    options:
+    - inner
+    - left
+    - outer
     default: inner
     description: Type of join operation
   join_suffix:
     type: string
     label: Join Suffix
-    default: "_b"
-    description: Suffix appended to conflicting column names from Dataset B during join
+    default: _b
+    description: Suffix appended to conflicting column names from Dataset B during
+      join
   dedup_columns:
     type: string
     label: Dedup Columns
-    default: ""
-    description: "Comma-separated columns for dedup (empty = all columns)"
+    default: ''
+    description: Comma-separated columns for dedup (empty = all columns)
   add_source_column:
     type: boolean
     label: Add Source Column
@@ -103,9 +111,13 @@ config:
     min: 1
     max: 50
     description: Repeat factor for Dataset C
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

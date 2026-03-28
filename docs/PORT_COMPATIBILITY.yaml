@@ -1,0 +1,64 @@
+# PORT_COMPATIBILITY.yaml — Single source of truth for port type compatibility.
+#
+# This file is the CANONICAL reference for which port types can connect to
+# which other port types. Both the backend (BlockRegistryService) and the
+# frontend (isPortCompatible) should derive their logic from this file.
+#
+# The frontend currently has its own copy in block-registry-types.ts (the
+# COMPAT map and PORT_TYPE_ALIASES). A future step will generate the frontend
+# constants from this file. Until then, keep the two in sync manually.
+
+# All recognized wire types that flow between blocks.
+connector_types:
+  - dataset      # structured tabular data (DataFrames, HF datasets)
+  - text         # raw text, prompts, strings, documents
+  - model        # model weights, adapters, checkpoints
+  - config       # configuration objects, hyperparameters, settings
+  - metrics      # evaluation scores, loss values, benchmark results
+  - embedding    # vector embeddings, dense representations
+  - artifact     # files, reports, packages, exported assets
+  - agent        # autonomous agent instances
+  - llm          # LLM provider config (model info dict or full llm_config)
+  - any          # accepts anything (generic utilities, interventions)
+  - number       # numeric scalar values
+  - boolean      # true/false flags
+  - file_path    # filesystem path references
+
+# Backward-compat aliases — map old type names to current types.
+# When a saved pipeline references one of these, resolve to the canonical type
+# before checking compatibility.
+aliases:
+  data: dataset
+  external: dataset
+  training: model
+  intervention: any
+  checkpoint: model
+  optimizer: config
+  schedule: config
+  api: dataset
+  file: dataset
+  cloud: config
+  llm_config: llm
+  model_path: model
+
+# Compatibility matrix.
+#
+# Each key is a SOURCE type. Its value is the list of TARGET types that
+# the source is allowed to connect to. "any" on either side is a wildcard.
+#
+# Rule: if source is "any", it can connect to every known type.
+#        if target is "any", every source type can connect to it.
+compatibility_matrix:
+  dataset:   [dataset, text, any]
+  text:      [text, dataset, any]
+  model:     [model, llm, any]
+  config:    [config, text, llm, any]
+  metrics:   [metrics, dataset, text, any]
+  embedding: [embedding, dataset, any]
+  artifact:  [artifact, text, any]
+  agent:     [agent, any]
+  llm:       [llm, model, config, any]
+  number:    [number, text, metrics, any]
+  boolean:   [boolean, config, any]
+  file_path: [file_path, text, artifact, any]
+  any:       [any, dataset, text, model, config, metrics, embedding, artifact, agent, llm, number, boolean, file_path]

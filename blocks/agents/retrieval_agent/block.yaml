@@ -1,51 +1,54 @@
 name: Retrieval Agent (RAG)
 type: retrieval_agent
 category: agents
-description: Retrieval-Augmented Generation agent that searches a vector store and generates answers
-version: "1.1.0"
-
+description: Retrieval-Augmented Generation agent that searches a vector store and
+  generates answers
+version: 1.1.0
 inputs:
-  - id: llm
-    label: LLM
-    data_type: llm
-    required: false
-    description: "LLM config from llm_inference or model info from model_selector"
-  - id: model
-    label: Model
-    data_type: model
-    required: false
-    description: "Direct model connection (alternative to LLM port)"
-  - id: store
-    label: Vector Store Config
-    data_type: config
-    required: true
-  - id: dataset
-    label: Queries
-    data_type: dataset
-    required: false
-  - id: query
-    label: Single Query
-    data_type: text
-    required: false
-
+- id: llm
+  label: LLM
+  data_type: llm
+  required: false
+  description: LLM config from llm_inference or model info from model_selector
+- id: model
+  label: Model
+  data_type: model
+  required: false
+  description: Direct model connection (alternative to LLM port)
+- id: store
+  label: Vector Store Config
+  data_type: config
+  required: true
+- id: dataset
+  label: Queries
+  data_type: dataset
+  required: false
+- id: query
+  label: Single Query
+  data_type: text
+  required: false
 outputs:
-  - id: response
-    label: Response Text
-    data_type: text
-    aliases: [text, output]
-  - id: retrieval_log
-    label: Responses
-    aliases: [dataset]
-    data_type: dataset
-  - id: metrics
-    label: RAG Metrics
-    data_type: metrics
-  - id: llm_config
-    label: LLM Config
-    data_type: llm
-    aliases: [llm]
-    description: "Passthrough of the LLM configuration — enables agent chaining and downstream inference"
-
+- id: response
+  label: Response Text
+  data_type: text
+  aliases:
+  - text
+  - output
+- id: retrieval_log
+  label: Responses
+  aliases:
+  - dataset
+  data_type: dataset
+- id: metrics
+  label: RAG Metrics
+  data_type: metrics
+- id: llm_config
+  label: LLM Config
+  data_type: llm
+  aliases:
+  - llm
+  description: Passthrough of the LLM configuration — enables agent chaining and downstream
+    inference
 config:
   top_k:
     type: integer
@@ -85,18 +88,34 @@ config:
   prompt_template:
     type: text_area
     label: Prompt Template
-    default: "Context:\n{context}\n\nQuestion: {query}\n\nAnswer based on the context above:"
-    description: "RAG prompt template. Use {context} for retrieved docs and {query} for the user question."
+    default: 'Context:
+
+      {context}
+
+
+      Question: {query}
+
+
+      Answer based on the context above:'
+    description: RAG prompt template. Use {context} for retrieved docs and {query}
+      for the user question.
   output_format:
     type: select
     label: Output Format
-    options: [plain, markdown, json]
+    options:
+    - plain
+    - markdown
+    - json
     default: plain
-    description: "Format for the response text output"
+    description: Format for the response text output
     section: advanced
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

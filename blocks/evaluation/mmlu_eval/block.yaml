@@ -1,42 +1,42 @@
 name: MMLU Evaluation
 type: mmlu_eval
 category: evaluation
-description: Massive Multitask Language Understanding benchmark — evaluate knowledge across 57 academic subjects
-version: "2.0.0"
-
+description: Massive Multitask Language Understanding benchmark — evaluate knowledge
+  across 57 academic subjects
+version: 2.0.0
 inputs:
-  - id: model
-    label: Model
-    data_type: model
-    required: false
-    description: Model to evaluate (HF name, local path, or upstream block)
-
+- id: model
+  label: Model
+  data_type: model
+  required: false
+  description: Model to evaluate (HF name, local path, or upstream block)
 outputs:
-  - id: metrics
-    label: MMLU Scores
-    data_type: metrics
-    description: 'Aggregate: mmlu_overall, mmlu_{category} for STEM/humanities/social/other, num_subjects, num_fewshot'
-  - id: results
-    label: Detailed Results
-    data_type: artifact
-    description: 'mmlu_results.json: model, overall, category_scores, subject_scores with acc per subject'
-
-  - id: dataset
-    label: Subject Scores
-    data_type: dataset
-    description: "Per-subject accuracy table: subject, category, accuracy, num_samples"
-
+- id: metrics
+  label: MMLU Scores
+  data_type: metrics
+  description: 'Aggregate: mmlu_overall, mmlu_{category} for STEM/humanities/social/other,
+    num_subjects, num_fewshot'
+- id: results
+  label: Detailed Results
+  data_type: artifact
+  description: 'mmlu_results.json: model, overall, category_scores, subject_scores
+    with acc per subject'
+- id: dataset
+  label: Subject Scores
+  data_type: dataset
+  description: 'Per-subject accuracy table: subject, category, accuracy, num_samples'
 config:
   model_name:
     type: string
     label: Model Name / Path
-    default: ""
-    description: "HuggingFace model ID or local path (overridden by connected model input)"
+    default: ''
+    description: HuggingFace model ID or local path (overridden by connected model
+      input)
   subjects:
     type: string
     label: Subjects
-    default: "all"
-    description: "Comma-separated subject names, or 'all' for full MMLU"
+    default: all
+    description: Comma-separated subject names, or 'all' for full MMLU
   num_fewshot:
     type: integer
     label: Few-shot Examples
@@ -47,14 +47,14 @@ config:
   batch_size:
     type: string
     label: Batch Size
-    default: "auto"
-    description: "'auto' for adaptive, or an integer"
+    default: auto
+    description: '''auto'' for adaptive, or an integer'
   limit:
     type: integer
     label: Sample Limit
     default: 0
     min: 0
-    description: "Limit samples per subject (0 = full dataset)"
+    description: Limit samples per subject (0 = full dataset)
   seed:
     type: integer
     label: Random Seed
@@ -64,7 +64,11 @@ config:
   device:
     type: select
     label: Device
-    options: [auto, cpu, cuda, mps]
+    options:
+    - auto
+    - cpu
+    - cuda
+    - mps
     default: auto
     description: Device to run evaluation on
   trust_remote_code:
@@ -75,19 +79,25 @@ config:
   output_format:
     type: select
     label: Output Format
-    options: [json, csv]
+    options:
+    - json
+    - csv
     default: json
-    description: "Format for dataset and report outputs (json or csv)"
+    description: Format for dataset and report outputs (json or csv)
   decimal_precision:
     type: integer
     label: Decimal Precision
     default: 4
     min: 1
     max: 6
-    description: "Decimal places for all computed scores"
-
+    description: Decimal places for all computed scores
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

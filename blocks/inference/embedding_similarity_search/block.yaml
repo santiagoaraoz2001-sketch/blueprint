@@ -1,52 +1,53 @@
 name: Embedding Similarity Search
 type: embedding_similarity_search
 category: inference
-description: Find nearest neighbors in an embedding corpus using cosine, dot-product, or euclidean similarity
-version: "2.1.0"
-
+description: Find nearest neighbors in an embedding corpus using cosine, dot-product,
+  or euclidean similarity
+version: 2.1.0
 inputs:
-  - id: embeddings
-    label: Corpus Embeddings
-    data_type: embedding
-    required: false
-  - id: dataset
-    label: Dataset
-    data_type: dataset
-    required: false
-  - id: query
-    label: Query Embedding
-    data_type: embedding
-    required: false
-  - id: metadata
-    label: Metadata
-    data_type: any
-    required: false
-
+- id: embeddings
+  label: Corpus Embeddings
+  data_type: embedding
+  required: false
+- id: dataset
+  label: Dataset
+  data_type: dataset
+  required: false
+- id: query
+  label: Query Embedding
+  data_type: embedding
+  required: false
+- id: metadata
+  label: Metadata
+  data_type: any
+  required: false
 outputs:
-  - id: search_results
-    label: Search Results
-    data_type: dataset
-    aliases: [dataset]
-    description: >
-      Array of result rows. Each row: {rank, index, label, score, ...metadata_fields}.
-      rank: 1-based position in results. index: original corpus index. label: text label from corpus.
-      score: similarity score (higher is more similar for cosine/dot_product).
-      Multi-query mode adds query_index field. Enable include_vectors to add _embedding vector to each row.
-      When include_metadata is true, all original metadata fields are merged into each result row.
-      Output format configurable via dataset_format (json, jsonl, csv).
+- id: search_results
+  label: Search Results
+  data_type: dataset
+  aliases:
+  - dataset
+  description: 'Array of result rows. Each row: {rank, index, label, score, ...metadata_fields}.
+    rank: 1-based position in results. index: original corpus index. label: text label
+    from corpus. score: similarity score (higher is more similar for cosine/dot_product).
+    Multi-query mode adds query_index field. Enable include_vectors to add _embedding
+    vector to each row. When include_metadata is true, all original metadata fields
+    are merged into each result row. Output format configurable via dataset_format
+    (json, jsonl, csv).
 
-  - id: metrics
-    label: Search Stats
-    data_type: metrics
-    description: >
-      {total_corpus_embeddings, embedding_dimension, num_queries, metric, top_k,
-      threshold, results_returned, best_score, worst_score, avg_score, metadata_attached}.
-      total_corpus_embeddings: number of vectors in corpus. embedding_dimension: vector dimensionality.
-      num_queries: number of query vectors searched. metric: similarity function used.
-      top_k: max results per query. threshold: minimum score filter applied.
-      results_returned: total result rows. best_score/worst_score/avg_score: score statistics.
-      metadata_attached: boolean indicating if metadata was included.
+    '
+- id: metrics
+  label: Search Stats
+  data_type: metrics
+  description: '{total_corpus_embeddings, embedding_dimension, num_queries, metric,
+    top_k, threshold, results_returned, best_score, worst_score, avg_score, metadata_attached}.
+    total_corpus_embeddings: number of vectors in corpus. embedding_dimension: vector
+    dimensionality. num_queries: number of query vectors searched. metric: similarity
+    function used. top_k: max results per query. threshold: minimum score filter applied.
+    results_returned: total result rows. best_score/worst_score/avg_score: score statistics.
+    metadata_attached: boolean indicating if metadata was included.
 
+    '
 config:
   top_k:
     type: integer
@@ -60,7 +61,10 @@ config:
     label: Similarity Metric
     description: Distance or similarity function
     default: cosine
-    options: [cosine, dot_product, euclidean]
+    options:
+    - cosine
+    - dot_product
+    - euclidean
   threshold:
     type: float
     label: Min Similarity
@@ -72,7 +76,7 @@ config:
     type: string
     label: Embedding Column
     description: Column name containing embeddings in dataset input
-    default: "_embedding"
+    default: _embedding
   include_metadata:
     type: boolean
     label: Include Metadata
@@ -86,28 +90,41 @@ config:
   sort_order:
     type: select
     label: Sort Order
-    description: Descending returns most-similar first; ascending returns least-similar (useful for outlier detection)
+    description: Descending returns most-similar first; ascending returns least-similar
+      (useful for outlier detection)
     default: descending
-    options: [descending, ascending]
+    options:
+    - descending
+    - ascending
   include_vectors:
     type: boolean
     label: Include Vectors in Output
-    description: Attach the matched embedding vector to each result row (large — use only when piping to Visualizer)
+    description: Attach the matched embedding vector to each result row (large — use
+      only when piping to Visualizer)
     default: false
   normalize_embeddings:
     type: boolean
     label: Normalize Embeddings
-    description: L2-normalize corpus and query embeddings before search (recommended for dot_product metric)
+    description: L2-normalize corpus and query embeddings before search (recommended
+      for dot_product metric)
     default: false
   dataset_format:
     type: select
     label: Dataset Format
-    description: "Output format for the dataset — json (default), jsonl (one JSON object per line), csv (comma-separated values)"
+    description: Output format for the dataset — json (default), jsonl (one JSON object
+      per line), csv (comma-separated values)
     default: json
-    options: [json, jsonl, csv]
-
+    options:
+    - json
+    - jsonl
+    - csv
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess
