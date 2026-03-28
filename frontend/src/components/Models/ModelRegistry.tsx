@@ -4,8 +4,10 @@ import { api } from '@/api/client'
 import { useUIStore } from '@/stores/uiStore'
 import {
   Package, Search, Tag, HardDrive, Calendar, Link, ChevronRight,
-  ArrowLeft, Trash2, Download, Filter, X,
+  ArrowLeft, Trash2, Download, Filter, X, Rocket, MessageSquare,
 } from 'lucide-react'
+import DeployModal from '@/components/Deploy/DeployModal'
+import ModelTestChat from '@/components/Deploy/ModelTestChat'
 import toast from 'react-hot-toast'
 
 interface ModelRecord {
@@ -73,6 +75,8 @@ function FormatBadge({ format }: { format: string }) {
 function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => void }) {
   const [card, setCard] = useState<ModelCard | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showDeploy, setShowDeploy] = useState(false)
+  const [showTestChat, setShowTestChat] = useState(false)
   const t = T()
 
   useEffect(() => {
@@ -168,16 +172,55 @@ function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => voi
       )}
 
       {/* Actions */}
-      {model.model_path && (
-        <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-          <button style={{
+      <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setShowDeploy(true)}
+          style={{
             ...F.xs, padding: '8px 16px', borderRadius: 6,
             background: t.cyan, color: t.bg, border: 'none',
+            cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
+          }}
+        >
+          <Rocket size={14} /> Deploy
+        </button>
+        <button
+          onClick={() => setShowTestChat(true)}
+          style={{
+            ...F.xs, padding: '8px 16px', borderRadius: 6,
+            background: 'none', color: t.cyan, border: `1px solid ${t.cyan}44`,
+            cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
+          }}
+        >
+          <MessageSquare size={14} /> Test Model
+        </button>
+        {model.model_path && (
+          <button style={{
+            ...F.xs, padding: '8px 16px', borderRadius: 6,
+            background: 'none', color: t.sec, border: `1px solid ${t.border}`,
             cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
           }}>
             <Download size={14} /> Download
           </button>
-        </div>
+        )}
+      </div>
+
+      {/* Deploy Modal */}
+      {showDeploy && (
+        <DeployModal
+          modelId={model.id}
+          modelName={model.name}
+          modelFormat={model.format}
+          modelPath={model.model_path}
+          onClose={() => setShowDeploy(false)}
+        />
+      )}
+
+      {/* Test Chat Modal */}
+      {showTestChat && (
+        <ModelTestChat
+          modelName={model.name.toLowerCase().replace(/\s+/g, '-')}
+          onClose={() => setShowTestChat(false)}
+        />
       )}
     </div>
   )

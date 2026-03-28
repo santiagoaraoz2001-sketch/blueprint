@@ -222,6 +222,118 @@ async def get_servers():
     return servers
 
 
+class OllamaGenerateRequest(BaseModel):
+    model: str
+    prompt: str
+    stream: bool = True
+    timeout_s: int = 600  # Default 10 minutes — covers cold model loading for large models
+
+
+# Absolute upper bound to prevent unbounded proxy connections.
+_MAX_GENERATE_TIMEOUT_S = 1800  # 30 minutes
+
+
+@router.post("/ollama/generate")
+async def ollama_generate(req: OllamaGenerateRequest):
+    """Proxy to Ollama's /api/generate endpoint.
+
+    Supports two modes:
+      • **stream=true** (default): Returns an SSE stream of partial tokens.
+        The frontend receives incremental text immediately, so cold model
+        loading (which can exceed 5 min for large quantised models) shows
+        progress naturally instead of timing out.
+      • **stream=false**: Waits for the full response and returns it as JSON.
+        Timeout is configurable via ``timeout_s`` (default 600 s, max 1800 s).
+    """
+    effective_timeout = min(max(req.timeout_s, 30), _MAX_GENERATE_TIMEOUT_S)
+
+    if req.stream:
+        return StreamingResponse(
+            _stream_ollama_generate(req.model, req.prompt, effective_timeout),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    # Non-streaming path
+    try:
+        payload = json.dumps({
+            "model": req.model,
+            "prompt": req.prompt,
+            "stream": False,
+        }).encode("utf-8")
+
+        http_req = urllib.request.Request(
+            f"{OLLAMA_URL}/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with urllib.request.urlopen(http_req, timeout=effective_timeout) as resp:
+            body = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            return body
+
+    except urllib.error.URLError as e:
+        raise HTTPException(503, f"Ollama not reachable: {e.reason}")
+    except TimeoutError:
+        raise HTTPException(504, f"Ollama did not respond within {effective_timeout}s. "
+                            "The model may still be loading — try again or increase timeout_s.")
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+async def _stream_ollama_generate(model: str, prompt: str, timeout_s: int):
+    """Stream tokens from Ollama's /api/generate endpoint as SSE events.
+
+    Event types:
+      token   — partial text token
+      stats   — final stats object (eval_count, eval_duration, etc.)
+      error   — error message
+    """
+    try:
+        payload = json.dumps({
+            "model": model,
+            "prompt": prompt,
+            "stream": True,
+        }).encode("utf-8")
+
+        http_req = urllib.request.Request(
+            f"{OLLAMA_URL}/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with urllib.request.urlopen(http_req, timeout=timeout_s) as resp:
+            for line in resp:
+                if not line:
+                    continue
+                try:
+                    chunk = json.loads(line.decode("utf-8", errors="ignore"))
+                    token = chunk.get("response", "")
+                    done = chunk.get("done", False)
+                    if token:
+                        yield f"data: {json.dumps({'token': token})}\n\n"
+                    if done:
+                        # Forward Ollama's final stats for latency / tok-per-sec display
+                        stats = {
+                            k: chunk[k] for k in
+                            ("eval_count", "eval_duration", "prompt_eval_count",
+                             "prompt_eval_duration", "total_duration", "load_duration")
+                            if k in chunk
+                        }
+                        yield f"data: {json.dumps({'done': True, 'stats': stats})}\n\n"
+                except (json.JSONDecodeError, ValueError):
+                    continue
+
+    except urllib.error.URLError as e:
+        yield f"data: {json.dumps({'error': f'Ollama not reachable: {e.reason}'})}\n\n"
+    except TimeoutError:
+        yield f"data: {json.dumps({'error': f'Ollama timed out after {timeout_s}s'})}\n\n"
+    except Exception as e:
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+
 @router.post("/servers/{name}/start")
 async def start_server(name: str):
     """Attempt to start a local inference server."""
