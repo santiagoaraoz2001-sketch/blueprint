@@ -1,0 +1,7 @@
+# Blueprint inference profile — adds model serving and inference capabilities
+-r requirements-base.txt
+transformers>=4.36.0
+tokenizers>=0.15.0
+safetensors>=0.4.0
+sentencepiece>=0.1.99
+pillow>=10.1.0

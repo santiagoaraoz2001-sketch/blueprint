@@ -1,0 +1,8 @@
+# Blueprint training profile — adds fine-tuning and training capabilities
+-r requirements-inference.txt
+torch>=2.1.0
+datasets>=2.16.0
+accelerate>=0.25.0
+peft>=0.7.0
+trl>=0.7.0
+bitsandbytes>=0.41.0; sys_platform == 'linux'

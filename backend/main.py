@@ -19,6 +19,8 @@ from sqlalchemy import text
 from .config import BLOCKS_DIR, BUILTIN_BLOCKS_DIR, CUSTOM_BLOCKS_DIR, ENABLE_MARKETPLACE, ensure_dirs
 from .database import SessionLocal, init_db
 from .services.registry import BlockRegistryService, set_global_registry
+from .services.capability_detector import CapabilityDetector, set_capability_detector
+from .services.process_manager import ProcessManager, set_process_manager
 from .models.run import LiveRun, Run
 from .routers import (
     artifacts, block_generator, blocks, connectors, control_tower, custom_blocks,
@@ -167,6 +169,13 @@ def _full_shutdown():
     except Exception:
         pass
 
+    # 3b. Kill processes tracked by ProcessManager (start-service, etc.)
+    try:
+        from .services.process_manager import get_process_manager
+        get_process_manager().shutdown()
+    except Exception:
+        pass
+
     # 4. Model watcher
     try:
         from .utils.model_watcher import stop_watcher
@@ -215,6 +224,21 @@ async def lifespan(app: FastAPI):
         "Block registry ready: %d total, %d valid, %d broken",
         health["total"], health["valid"], health["broken"],
     )
+
+    # Initialize capability detector (Phase 1: import checks + GPU, Phase 2: network probes in background)
+    cap_detector = CapabilityDetector()
+    app.state.capability_detector = cap_detector
+    set_capability_detector(cap_detector)
+    cap_report = cap_detector.detect()  # Phase 1 is synchronous (<50ms), Phase 2 runs in background
+    logging.getLogger("blueprint.capabilities").info(
+        "Capability detector Phase 1 ready: profile=%s (network probes running in background)",
+        cap_report["installed_profile"],
+    )
+
+    # Initialize process manager (tracks spawned child processes for clean shutdown)
+    proc_mgr = ProcessManager()
+    app.state.process_manager = proc_mgr
+    set_process_manager(proc_mgr)
 
     # Recover stale runs from previous crash (heartbeat-based, existing mechanism)
     _recover_stale_runs()
