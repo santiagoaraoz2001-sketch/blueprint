@@ -1,3 +1,4 @@
+import os
 import uuid
 import logging
 import threading
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db, SessionLocal
 from ..models.pipeline import Pipeline
 from ..models.run import Run
-from ..engine.executor import execute_pipeline, request_cancel
+from ..engine.executor import execute_pipeline, request_cancel, debug_action
 from ..engine.partial_executor import execute_partial_pipeline
 from ..engine.validator import validate_pipeline
 from ..engine.graph_utils import contains_loop_or_cycle
@@ -36,8 +37,11 @@ from ..schemas.execution import (
 router = APIRouter(prefix="/api", tags=["execution"])
 _logger = logging.getLogger("blueprint.execution")
 
-# Bounded thread pool prevents resource exhaustion from concurrent runs
-_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="pipeline-run")
+# Thread pool sized larger than the active-run limit (MAX_ACTIVE_RUNS, default 4)
+# to accommodate threads paused at breakpoints. Active concurrency is controlled
+# by the _active_run_semaphore in executor.py, not by the pool size.
+_MAX_POOL_WORKERS = int(os.environ.get("BLUEPRINT_MAX_POOL_WORKERS", "12"))
+_executor = ThreadPoolExecutor(max_workers=_MAX_POOL_WORKERS, thread_name_prefix="pipeline-run")
 
 
 class PartialExecuteRequest(BaseModel):
@@ -245,6 +249,26 @@ def cancel_run(run_id: str, db: Session = Depends(get_db)):
         raise HTTPException(400, f"Run is already {run.status}")
     request_cancel(run_id)
     return {"status": "cancelling", "run_id": run_id}
+
+
+@router.post("/runs/{run_id}/debug/{action}")
+def debug_run(run_id: str, action: str, db: Session = Depends(get_db)):
+    """Debug action for a paused pipeline run.
+
+    Actions:
+      resume — continue to next breakpoint
+      step   — execute one node then pause again
+      abort  — cancel the run
+    """
+    if action not in ("resume", "step", "abort"):
+        raise HTTPException(400, f"Invalid debug action: {action}. Must be resume, step, or abort.")
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    success = debug_action(run_id, action)
+    if not success:
+        raise HTTPException(400, "Run is not paused at a breakpoint")
+    return {"status": "ok", "action": action, "run_id": run_id}
 
 
 @router.get("/runs/{run_id}/outputs", response_model=RunOutputsResponse)

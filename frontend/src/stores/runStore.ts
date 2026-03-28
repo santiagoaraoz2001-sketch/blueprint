@@ -33,10 +33,18 @@ export interface SSEEventData {
   artifact_count?: number
 }
 
+export interface BreakpointState {
+  nodeId: string
+  completedNodes: string[]
+  outputsPreview: Record<string, Record<string, unknown>>
+  index: number
+  total: number
+}
+
 interface RunState {
   activeRunId: string | null
   pipelineId: string | null
-  status: 'idle' | 'running' | 'complete' | 'failed' | 'cancelled'
+  status: 'idle' | 'running' | 'paused' | 'complete' | 'failed' | 'cancelled'
   nodeStatuses: Record<string, NodeStatus>
   nodeOutputs: Record<string, Record<string, unknown>>
   overallProgress: number
@@ -47,6 +55,7 @@ interface RunState {
   sseStatus: 'connected' | 'reconnecting' | 'stale' | 'disconnected'
   isStarting: boolean
   partialRunMeta: PartialRunMeta | null
+  breakpoint: BreakpointState | null
   _demoTimer: number | null
   _elapsedTimer: number | null
   _sseUnsubscribe: (() => void) | null
@@ -55,6 +64,9 @@ interface RunState {
   startRun: (pipelineId: string) => Promise<void>
   startPartialRun: (pipelineId: string, sourceRunId: string, startNodeId: string, configOverrides: Record<string, Record<string, unknown>>, reusedNodes: string[]) => Promise<void>
   stopRun: () => Promise<void>
+  debugResume: () => Promise<void>
+  debugStep: () => Promise<void>
+  debugAbort: () => Promise<void>
   connectSSE: (runId: string) => void
   disconnectSSE: () => void
   handleSSEEvent: (event: string, data: SSEEventData) => void
@@ -90,6 +102,7 @@ export const useRunStore = create<RunState>((set, get) => ({
   sseStatus: 'disconnected' as const,
   isStarting: false,
   partialRunMeta: null,
+  breakpoint: null,
   _demoTimer: null,
   _elapsedTimer: null,
   _sseUnsubscribe: null,
@@ -244,6 +257,33 @@ export const useRunStore = create<RunState>((set, get) => ({
     }
   },
 
+  debugResume: async () => {
+    const { activeRunId } = get()
+    if (!activeRunId) return
+    try {
+      await api.post(`/runs/${activeRunId}/debug/resume`)
+      set({ status: 'running', breakpoint: null })
+    } catch { /* ignore */ }
+  },
+
+  debugStep: async () => {
+    const { activeRunId } = get()
+    if (!activeRunId) return
+    try {
+      await api.post(`/runs/${activeRunId}/debug/step`)
+      set({ status: 'running', breakpoint: null })
+    } catch { /* ignore */ }
+  },
+
+  debugAbort: async () => {
+    const { activeRunId } = get()
+    if (!activeRunId) return
+    try {
+      await api.post(`/runs/${activeRunId}/debug/abort`)
+      set({ status: 'cancelled', breakpoint: null, error: 'Aborted at breakpoint' })
+    } catch { /* ignore */ }
+  },
+
   connectSSE: (runId: string) => {
     const { _sseUnsubscribe } = get()
     if (_sseUnsubscribe) _sseUnsubscribe()
@@ -289,6 +329,19 @@ export const useRunStore = create<RunState>((set, get) => ({
               status: 'cached',
               progress: 1,
             },
+          },
+        })
+        break
+
+      case 'breakpoint_hit':
+        set({
+          status: 'paused',
+          breakpoint: {
+            nodeId: (data as any).node_id || '',
+            completedNodes: (data as any).completed_nodes || [],
+            outputsPreview: (data as any).outputs_preview || {},
+            index: (data as any).index || 0,
+            total: (data as any).total || 0,
           },
         })
         break
@@ -431,6 +484,7 @@ export const useRunStore = create<RunState>((set, get) => ({
       sseStatus: 'disconnected',
       isStarting: false,
       partialRunMeta: null,
+      breakpoint: null,
       _demoTimer: null,
       _elapsedTimer: null,
       _sseUnsubscribe: null,
