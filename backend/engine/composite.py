@@ -192,9 +192,9 @@ def execute_sub_pipeline(
             ) from e
 
         # Wrap callbacks to prefix child info for traceability
-        def child_message_cb(msg, _cid=child_id):
+        def child_message_cb(msg, explicit_severity=None, _cid=child_id):
             if message_cb:
-                message_cb(f"[{_cid}] {msg}")
+                message_cb(f"[{_cid}] {msg}", explicit_severity)
 
         def child_metric_cb(name, value, step, _cid=child_id):
             if metric_cb:

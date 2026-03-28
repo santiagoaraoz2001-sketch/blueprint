@@ -97,3 +97,16 @@ class DiagnosticsResponse(BaseModel):
     event_count: int
     truncated: bool = False
     max_events: int | None = None
+
+
+class HealthResponse(BaseModel):
+    """System health snapshot for status bar polling."""
+    cpu_percent: float
+    memory_percent: float
+    memory_total_gb: float
+    gpu_percent: float | None = None
+    gpu_name: str | None = None
+    disk_free_gb: float
+    ollama_connected: bool
+    active_runs: int
+    queued_runs: int

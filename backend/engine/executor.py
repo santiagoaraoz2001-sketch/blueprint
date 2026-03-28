@@ -75,6 +75,30 @@ def request_cancel(run_id: str):
             event.set()
 
 
+def _infer_severity(msg: object) -> str:
+    """Infer log severity from a message's text prefix.
+
+    Used as a fallback when the block does not provide an explicit severity
+    via ``ctx.log_message(msg, severity="...")``.
+
+    Recognized prefixes (case-insensitive):
+        [ERROR], ERROR:  → "error"
+        [WARN], [WARNING], WARNING:  → "warn"
+        [DEBUG]  → "debug"
+        everything else  → "info"
+    """
+    if not isinstance(msg, str):
+        return "info"
+    lower = msg.lower()
+    if lower.startswith("[error]") or lower.startswith("error:"):
+        return "error"
+    if lower.startswith(("[warn]", "[warning]", "warning:")):
+        return "warn"
+    if lower.startswith("[debug]"):
+        return "debug"
+    return "info"
+
+
 def _topological_sort(nodes: list[dict], edges: list[dict]) -> list[str]:
     """Topological sort of pipeline DAG. Returns node IDs in execution order."""
     in_degree: dict[str, int] = {n["id"]: 0 for n in nodes}
@@ -1106,10 +1130,14 @@ async def _execute_loop(
                 except Exception:
                     pass
 
-            def message_cb(msg, __nid=_nid):
+            def message_cb(msg, explicit_severity=None, __nid=_nid):
+                if explicit_severity:
+                    severity = explicit_severity
+                else:
+                    severity = _infer_severity(msg)
                 try:
                     publish_event(run_id, "node_log", {
-                        "node_id": __nid, "message": msg,
+                        "node_id": __nid, "message": msg, "severity": severity,
                     })
                 except Exception:
                     pass
@@ -1171,7 +1199,8 @@ async def _execute_loop(
                 pass
 
             # Emit node_completed for body block
-            completed_event = {"node_id": _nid, "iteration": i}
+            body_duration_ms = round((time.time() - body_block_start) * 1000)
+            completed_event = {"node_id": _nid, "iteration": i, "duration_ms": body_duration_ms}
             try:
                 publish_event(run_id, "node_completed", completed_event)
             except Exception:
@@ -1237,6 +1266,7 @@ async def _execute_loop(
                         publish_event(run_id, "node_log", {
                             "node_id": loop.controller_id,
                             "message": f"Early stop: {stop_metric}={metric_value} > {stop_threshold}",
+                            "severity": "info",
                         })
                     except Exception:
                         pass
@@ -1246,6 +1276,7 @@ async def _execute_loop(
                         publish_event(run_id, "node_log", {
                             "node_id": loop.controller_id,
                             "message": f"Early stop: {stop_metric}={metric_value} < {stop_threshold}",
+                            "severity": "info",
                         })
                     except Exception:
                         pass
@@ -1630,8 +1661,9 @@ async def execute_pipeline(
                 run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                 db.commit()
 
+                loop_duration_ms = round((time.time() - block_start_time) * 1000)
                 log_block_complete(run_id, node_id, block_type, time.time() - block_start_time)
-                completed_event = {"node_id": node_id, "index": idx}
+                completed_event = {"node_id": node_id, "index": idx, "duration_ms": loop_duration_ms}
                 try:
                     publish_event(run_id, "node_completed", completed_event)
                 except Exception:
@@ -1736,9 +1768,15 @@ async def execute_pipeline(
                     except Exception:
                         pass
 
-                def message_cb(msg):
+                def message_cb(msg, explicit_severity=None):
+                    if explicit_severity:
+                        severity = explicit_severity
+                    else:
+                        severity = _infer_severity(msg)
                     try:
-                        publish_event(run_id, "node_log", {"node_id": node_id, "message": msg})
+                        publish_event(run_id, "node_log", {
+                            "node_id": node_id, "message": msg, "severity": severity,
+                        })
                     except Exception:
                         pass
 
@@ -1953,11 +1991,13 @@ async def execute_pipeline(
 
             log_block_complete(run_id, node_id, block_type, time.time() - block_start_time)
 
+            block_duration_ms = round((time.time() - block_start_time) * 1000)
             completed_event = {
                 "node_id": node_id,
                 "index": idx,
                 "primary_output_type": primary_output_type,
                 "artifact_count": len(artifact_ids),
+                "duration_ms": block_duration_ms,
             }
             try:
                 publish_event(run_id, "node_completed", completed_event)
