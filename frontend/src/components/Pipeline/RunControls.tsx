@@ -264,7 +264,7 @@ export default function RunControls() {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div data-testid="run-controls" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       {isRunning && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 4 }}>
           {/* Progress bar */}
@@ -327,6 +327,7 @@ export default function RunControls() {
         <>
           <button
             onClick={isRunDisabled ? undefined : handleRun}
+            data-testid="btn-run"
             data-tour="btn-run-pipeline"
             title={
               nodes.length === 0 ? 'Add blocks to run'

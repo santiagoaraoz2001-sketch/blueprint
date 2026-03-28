@@ -5,6 +5,7 @@ import CommandPalette from '@/components/shared/CommandPalette'
 import StartScreen from '@/components/Layout/StartScreen'
 import WelcomeModal from '@/components/Layout/WelcomeModal'
 import SplashScreen from '@/components/Layout/SplashScreen'
+import OnboardingWizard from '@/components/Onboarding/OnboardingWizard'
 import { useUIStore } from '@/stores/uiStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
@@ -151,6 +152,7 @@ export default function App() {
       <CommandPalette />
       <StartScreen />
       <WelcomeModal />
+      <OnboardingWizard />
     </SplashScreen>
   )
 }
