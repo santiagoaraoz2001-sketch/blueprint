@@ -168,6 +168,11 @@ side_inputs:
   required: false
 maturity: stable
 exportable: true
-requires: []
+requires:
+  - torch
+  - transformers
+  - datasets
+  - peft
+  - bitsandbytes
 execution:
   isolation: inprocess

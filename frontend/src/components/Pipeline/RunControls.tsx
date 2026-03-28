@@ -10,6 +10,7 @@ import { Play, Square, Loader2, FileCode, LayoutTemplate, X, Download, Copy, Che
 import ToolbarDropdown from './ToolbarDropdown'
 import toast from 'react-hot-toast'
 import PipelineAnalysisPanel from './PipelineAnalysisPanel'
+import ExportPreflightPanel from './ExportPreflightPanel'
 import { getBlockDefinition } from '@/lib/block-registry'
 import { generateRequirements } from '@/lib/block-dependencies'
 import { isPipelineExportable, exportDisabledReason } from '@/lib/graph-utils'
@@ -30,6 +31,7 @@ export default function RunControls() {
   const [generatedCode, setGeneratedCode] = useState('')
   const [codeCopied, setCodeCopied] = useState(false)
   const [showAnalysis, setShowAnalysis] = useState(false)
+  const [showExportPreflight, setShowExportPreflight] = useState(false)
 
   const isRunning = status === 'running'
   const isStarting = useRunStore((s) => s.isStarting)
@@ -138,6 +140,16 @@ export default function RunControls() {
   }
 
   const handleEject = async () => {
+    if (!pipelineId) {
+      toast.error('Save pipeline first')
+      return
+    }
+
+    // Open the pre-flight check panel — export happens from there
+    setShowExportPreflight(true)
+  }
+
+  const handleLegacyEject = async () => {
     if (!pipelineId) {
       toast.error('Save pipeline first')
       return
@@ -252,7 +264,7 @@ export default function RunControls() {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div data-testid="run-controls" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       {isRunning && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 4 }}>
           {/* Progress bar */}
@@ -315,6 +327,7 @@ export default function RunControls() {
         <>
           <button
             onClick={isRunDisabled ? undefined : handleRun}
+            data-testid="btn-run"
             data-tour="btn-run-pipeline"
             title={
               nodes.length === 0 ? 'Add blocks to run'
@@ -362,7 +375,7 @@ export default function RunControls() {
             items={[
               { label: 'Save as Template', icon: <LayoutTemplate size={12} color={T.blue} />, onClick: handleSaveTemplate, color: T.blue },
               { label: 'Analyze Pipeline', icon: <Gauge size={12} color={T.amber} />, onClick: () => setShowAnalysis(true), color: T.amber },
-              { label: 'Eject to Python', icon: <FileCode size={12} color={isExportDisabled ? T.dim : T.purple} />, onClick: handleEject, color: T.purple, separator: true, disabled: isExportDisabled, tooltip: exportDisabledTooltip },
+              { label: 'Export Pipeline', icon: <FileCode size={12} color={isExportDisabled ? T.dim : T.purple} />, onClick: handleEject, color: T.purple, separator: true, disabled: isExportDisabled, tooltip: exportDisabledTooltip },
             ]}
           />
         </>
@@ -593,6 +606,15 @@ export default function RunControls() {
 
       {/* Pipeline Analysis Panel */}
       <PipelineAnalysisPanel open={showAnalysis} onClose={() => setShowAnalysis(false)} />
+
+      {/* Export Pre-flight Panel */}
+      {pipelineId && (
+        <ExportPreflightPanel
+          open={showExportPreflight}
+          onClose={() => setShowExportPreflight(false)}
+          pipelineId={pipelineId}
+        />
+      )}
 
       {/* Traceback expansion (GAP 13) */}
       {showTraceback && status === 'failed' && useRunStore.getState().error && (

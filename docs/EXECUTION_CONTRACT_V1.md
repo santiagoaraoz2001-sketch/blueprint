@@ -204,15 +204,28 @@ A cached output from a prior run is reusable if:
 
 ## 7. Export Parity Expectations
 
-The compiler (`compiler.py:compile_pipeline_to_python()`) generates a standalone Python script.
+The compiler generates standalone Python scripts and Jupyter notebooks.
 
-**V1 parity:**
-- DAG execution order: MATCHES executor (same `_topological_sort()`)
+**Two export paths:**
+- `compile_pipeline_from_plan()` — **preferred**: reads `execution_order` and `resolved_config` from the planner's `ExecutionPlan`, ensuring exact parity with in-app execution.
+- `compile_pipeline_to_python()` — **legacy**: reads raw node config directly (no planner).
+
+**Export formats:**
+- `POST /api/pipelines/{id}/export` with `{"format": "python"}` → `.py` script
+- `POST /api/pipelines/{id}/export` with `{"format": "jupyter"}` → `.ipynb` notebook
+
+**Pre-flight check:** `GET /api/pipelines/{id}/export/preflight` returns supported features (green), limitations (yellow warnings), and blockers (red errors) before export generation.
+
+**V1 parity (plan-aware path):**
+- DAG execution order: MATCHES executor (same topological sort via `ExecutionPlan.execution_order`)
+- Config resolution: MATCHES executor (uses `ResolvedNode.resolved_config` from planner)
 - Input gathering: MATCHES executor (edge-based, multi-connection → list)
 - Port alias resolution: MATCHES executor (same `resolve_output_handle()`)
-- Config inheritance: NOT SUPPORTED — exported script uses node-local config only
-- Loop execution: NOT SUPPORTED — loop body nodes are treated as regular nodes
+- Loop execution: NOT SUPPORTED — refused at export time with specific error
 - Secrets resolution: NOT SUPPORTED — `$secret:name` references are NOT resolved
+- SSE events: NOT SUPPORTED — no progress streaming in exported code
+- Artifact storage: NOT SUPPORTED — local filesystem only
+- Partial rerun: NOT SUPPORTED — full pipeline execution only
 
 **Error codes for unsupported features in export:**
 - `E_EXPORT_NO_LOOPS` — "Exported pipelines do not support loop execution."
