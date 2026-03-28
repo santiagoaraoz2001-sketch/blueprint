@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { T, F, FS } from '@/lib/design-tokens'
-import { BLOCK_REGISTRY, isPortCompatible } from '@/lib/block-registry'
+import { getAllBlocks, isPortCompatible } from '@/lib/block-registry'
 import { getIcon } from '@/lib/icon-utils'
 
 interface QuickPaletteProps {
@@ -23,7 +23,7 @@ export default function QuickPalette({ visible, x, y, sourceType, onClose, onSel
     }, [visible])
 
     // Filter blocks that have an input port compatible with the source output port type
-    const compatibleBlocks = Object.values(BLOCK_REGISTRY).filter((block) => {
+    const compatibleBlocks = getAllBlocks().filter((block) => {
         return block.inputs.some((input) => isPortCompatible(sourceType, input.dataType))
     })
 

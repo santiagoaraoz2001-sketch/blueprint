@@ -1,6 +1,6 @@
 // block-registry-types.ts — Hand-maintained type definitions and utility functions
-// The BLOCK_REGISTRY data is auto-generated in block-registry.generated.ts
-// Lookup helpers (getBlocksByCategory, getBlockDefinition) live in block-registry.ts
+// Block data is served by the backend registry API (see registry-client.ts).
+// Lookup helpers (getBlocksByCategory, getBlockDefinition) live in registry-client.ts.
 
 import { CONNECTOR_COLORS } from './design-tokens'
 import { COMPAT, PORT_TYPE_ALIASES } from './port-compatibility.generated'

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { T, F, FS, FD } from '@/lib/design-tokens'
-import { BLOCK_REGISTRY, type BlockDefinition } from '@/lib/block-registry'
+import { getBlockDefinition, type BlockDefinition } from '@/lib/block-registry'
 import type { Recipe } from '@/lib/recipes'
 import { getIcon } from '@/lib/icon-utils'
 import { usePipelineStore } from '@/stores/pipelineStore'
@@ -31,7 +31,7 @@ export default function RecipeDetailPage({ recipe, onBack, onSelectBlock }: Reci
   const recipeBlocks = useMemo(() => {
     const blocks: { nodeId: string; label: string; blockDef: BlockDefinition | null; accent: string; icon: string }[] = []
     for (const node of recipe.nodes) {
-      const def = BLOCK_REGISTRY.find((b) => b.type === node.data.type) || null
+      const def = getBlockDefinition(node.data.type) || null
       blocks.push({
         nodeId: node.id,
         label: node.data.label,

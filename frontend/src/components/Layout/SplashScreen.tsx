@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FD } from '@/lib/design-tokens'
+import { registry } from '@/lib/registry-client'
 
 const CYAN = '#4af6c3'
 
@@ -11,6 +12,7 @@ interface SplashScreenProps {
 export default function SplashScreen({ children }: SplashScreenProps) {
   const [ready,     setReady]     = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const [registryError, setRegistryError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -21,7 +23,16 @@ export default function SplashScreen({ children }: SplashScreenProps) {
       try {
         const res = await fetch('/api/health', { signal: AbortSignal.timeout(2000) })
         if (!cancelled && res.ok) {
-          setReady(true)
+          // Backend is up — initialize the block registry before proceeding
+          try {
+            await registry.initialize()
+          } catch (e) {
+            console.error('Registry initialization failed:', e)
+            if (!cancelled) {
+              setRegistryError('Cannot connect to Blueprint backend. Is the server running?')
+            }
+          }
+          if (!cancelled) setReady(true)
           return
         }
       } catch {
@@ -29,7 +40,10 @@ export default function SplashScreen({ children }: SplashScreenProps) {
       }
       attempts++
       if (attempts >= maxAttempts) {
-        if (!cancelled) setReady(true)
+        if (!cancelled) {
+          setRegistryError('Cannot connect to Blueprint backend. Is the server running?')
+          setReady(true)
+        }
         return
       }
       if (!cancelled) setTimeout(check, 500)
@@ -239,7 +253,7 @@ export default function SplashScreen({ children }: SplashScreenProps) {
                 textTransform: 'uppercase',
               }}
             >
-              {ready ? 'READY' : 'INITIALIZING'}
+              {registryError ? registryError : ready ? 'READY' : 'INITIALIZING'}
             </motion.div>
           </motion.div>
         )}
