@@ -32,6 +32,7 @@ from ..database import SessionLocal
 from ..models.run import Run, LiveRun
 from ..block_sdk.context import BlockContext
 from ..block_sdk.exceptions import BlockError, BlockInputError, BlockConfigError, BlockTimeoutError
+from .decision_recorder import record_decision, update_decision, flush_decisions, cleanup_decisions, measure_memory_mb
 from .composite import CompositeBlockContext, execute_sub_pipeline
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
@@ -1093,6 +1094,23 @@ async def _execute_loop(
             metrics_file.flush()
 
             body_block_start = time.time()
+            _body_mem_before = measure_memory_mb()
+
+            # Record decision for loop body block
+            _body_dec_key = record_decision(
+                db,
+                run_id=run_id,
+                node_id=_nid,
+                block_type=_block_type,
+                execution_order=body_block_infos.index(info),
+                decision="execute",
+                decision_reason=f"loop iteration {i}",
+                status="running",
+                started_at=datetime.now(timezone.utc),
+                resolved_config=info.config,
+                iteration=i,
+                loop_id=loop.controller_id,
+            )
 
             # Gather inputs from upstream edges (including controller outputs)
             node_inputs: dict[str, Any] = {}
@@ -1198,6 +1216,15 @@ async def _execute_loop(
             except Exception:
                 pass
 
+            # Update decision for loop body block on success
+            _body_mem_after = measure_memory_mb()
+            _body_mem_peak = max(_body_mem_before or 0, _body_mem_after or 0) if (_body_mem_before or _body_mem_after) else None
+            update_decision(db, _body_dec_key,
+                status="completed",
+                duration_ms=round((time.time() - body_block_start) * 1000, 1),
+                memory_peak_mb=_body_mem_peak,
+            )
+
             # Emit node_completed for body block
             body_duration_ms = round((time.time() - body_block_start) * 1000)
             completed_event = {"node_id": _nid, "iteration": i, "duration_ms": body_duration_ms}
@@ -1296,6 +1323,41 @@ async def _execute_loop(
             "early_stopped": last_iteration + 1 < iterations,
         },
     }
+
+
+def _record_downstream_not_executed(
+    db: Session,
+    run_id: str,
+    failed_node_id: str,
+    failed_idx: int,
+    order: list[str],
+    node_map: dict,
+    loop_body_node_ids: set[str],
+    resolved_configs: dict,
+    resolved_tuples: dict,
+):
+    """After a node fails, mark all subsequent nodes as not_executed."""
+    for later_idx in range(failed_idx + 1, len(order)):
+        nid = order[later_idx]
+        if nid in loop_body_node_ids:
+            continue
+        nd = node_map.get(nid)
+        if not nd or nd.get("type") == "groupNode":
+            continue
+        bt = nd.get("data", {}).get("type", "")
+        src = resolved_tuples.get(nid, (None, None))
+        record_decision(
+            db,
+            run_id=run_id,
+            node_id=nid,
+            block_type=bt,
+            execution_order=later_idx,
+            decision="skipped",
+            decision_reason=f"Not executed — upstream failure at {failed_node_id}",
+            status="not_executed",
+            resolved_config=resolved_configs.get(nid),
+            config_sources=src[1] if isinstance(src, tuple) and len(src) > 1 else None,
+        )
 
 
 async def execute_pipeline(
@@ -1581,6 +1643,24 @@ async def execute_pipeline(
             log_block_start(run_id, node_id, block_type, idx, len(nodes))
             block_start_time = time.time()
 
+            # Record execution decision and measure pre-execution memory
+            _mem_before = measure_memory_mb()
+            _config_src = _resolved_tuples.get(node_id, (None, None))
+            _dec_rec = record_decision(
+                db,
+                run_id=run_id,
+                node_id=node_id,
+                block_type=block_type,
+                execution_order=idx,
+                decision="execute",
+                decision_reason="full pipeline execution",
+                status="running",
+                started_at=datetime.now(timezone.utc),
+                resolved_config=resolved_configs.get(node_id),
+                config_sources=_config_src[1] if isinstance(_config_src, tuple) and len(_config_src) > 1 else None,
+                loop_id=None,
+            )
+
             # Handle loop_controller nodes: execute the full loop
             if node_id in loop_controller_ids:
                 loop_def = loop_by_controller[node_id]
@@ -1620,6 +1700,11 @@ async def execute_pipeline(
                     return
                 except BlockError as e:
                     log_block_failed(run_id, node_id, block_type, e.message)
+                    update_decision(db, _dec_rec,
+                        status="failed",
+                        duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                        error_json={"title": type(e).__name__, "message": e.message, "action": "", "severity": "error"},
+                    )
                     error_payload = {
                         "node_id": node_id,
                         "error": e.message,
@@ -1636,10 +1721,18 @@ async def execute_pipeline(
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     live.status = "failed"
                     db.commit()
+                    _record_downstream_not_executed(db, run_id, node_id, idx, order, node_map, loop_body_node_ids, resolved_configs, _resolved_tuples)
                     log_run_failed(run_id, e.message, node_id)
                     return
                 except Exception as e:
                     tb = traceback.format_exc()
+                    from .error_classifier import classify_error as _classify
+                    _cls = _classify(e, block_type=block_type)
+                    update_decision(db, _dec_rec,
+                        status="failed",
+                        duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                        error_json=_cls.to_dict(),
+                    )
                     log_block_failed(run_id, node_id, block_type, str(e), tb)
                     try:
                         publish_event(run_id, "node_failed", {"node_id": node_id, "error": str(e)})
@@ -1651,12 +1744,20 @@ async def execute_pipeline(
                     run.data_fingerprints = all_fingerprints
                     live.status = "failed"
                     db.commit()
+                    _record_downstream_not_executed(db, run_id, node_id, idx, order, node_map, loop_body_node_ids, resolved_configs, _resolved_tuples)
                     _write_error_log(run_id, tb)
                     log_run_failed(run_id, str(e), node_id)
                     return
 
                 # Loop completed — emit node_completed and continue
                 node_outputs = outputs.get(node_id, {})
+                _mem_after_loop = measure_memory_mb()
+                _mem_peak_loop = max(_mem_before or 0, _mem_after_loop or 0) if (_mem_before or _mem_after_loop) else None
+                update_decision(db, _dec_rec,
+                    status="completed",
+                    duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                    memory_peak_mb=_mem_peak_loop,
+                )
                 run.last_heartbeat = datetime.now(timezone.utc)
                 run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                 db.commit()
@@ -1881,6 +1982,11 @@ async def execute_pipeline(
                     return
                 except BlockError as e:
                     log_block_failed(run_id, node_id, block_type, e.message)
+                    update_decision(db, _dec_rec,
+                        status="failed",
+                        duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                        error_json={"title": type(e).__name__, "message": e.message, "action": "", "severity": "error"},
+                    )
                     error_payload = {
                         "node_id": node_id,
                         "error": e.message,
@@ -1901,6 +2007,8 @@ async def execute_pipeline(
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     live.status = "failed"
                     db.commit()
+                    # Record downstream nodes as not_executed
+                    _record_downstream_not_executed(db, run_id, node_id, idx, order, node_map, loop_body_node_ids, resolved_configs, _resolved_tuples)
                     log_run_failed(run_id, e.message, node_id)
                     return
                 except Exception as e:
@@ -1910,6 +2018,12 @@ async def execute_pipeline(
                     classified = classify_error(e, block_type=block_type)
                     classified_msg = f"[{classified.title}] {classified.message}"
                     classified_action = classified.action
+
+                    update_decision(db, _dec_rec,
+                        status="failed",
+                        duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                        error_json=classified.to_dict(),
+                    )
 
                     log_block_failed(run_id, node_id, block_type, str(e), tb)
                     try:
@@ -1926,11 +2040,18 @@ async def execute_pipeline(
                     run.data_fingerprints = all_fingerprints
                     live.status = "failed"
                     db.commit()
+                    # Record downstream nodes as not_executed
+                    _record_downstream_not_executed(db, run_id, node_id, idx, order, node_map, loop_body_node_ids, resolved_configs, _resolved_tuples)
                     _write_error_log(run_id, tb)
                     log_run_failed(run_id, str(e), node_id)
                     return
             else:
                 error_msg = f"Block type '{block_type}' not found. No run.py available."
+                update_decision(db, _dec_rec,
+                    status="failed",
+                    duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                    error_json={"title": "Block Not Found", "message": error_msg, "action": "Install the block or check block type", "severity": "error"},
+                )
                 log_block_failed(run_id, node_id, block_type, error_msg)
                 try:
                     publish_event(run_id, "node_failed", {"node_id": node_id, "error": f"Block type '{block_type}' not found"})
@@ -1944,6 +2065,15 @@ async def execute_pipeline(
                 db.commit()
                 log_run_failed(run_id, error_msg, node_id)
                 return
+
+            # Update decision record on success with memory measurement
+            _mem_after = measure_memory_mb()
+            _mem_peak = max(_mem_before or 0, _mem_after or 0) if (_mem_before or _mem_after) else None
+            update_decision(db, _dec_rec,
+                status="completed",
+                duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                memory_peak_mb=_mem_peak,
+            )
 
             # Cache block outputs as typed artifacts with SHA-256 verification (best-effort)
             _cache_block_outputs(node_id, run_id, node_outputs, block_schema, db)
@@ -2081,6 +2211,15 @@ async def execute_pipeline(
         except Exception:
             pass
     finally:
+        # Flush and clean up decision records
+        try:
+            flush_decisions(run_id)
+        except Exception:
+            pass
+        try:
+            cleanup_decisions(run_id)
+        except Exception:
+            pass
         # Clean up cancel event
         with _cancel_lock:
             _cancel_events.pop(run_id, None)

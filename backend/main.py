@@ -25,7 +25,7 @@ from .models.run import LiveRun, Run
 from .routers import (
     artifacts, block_generator, blocks, connectors, control_tower, custom_blocks,
     dashboard, datasets, events, execution, inference, marketplace, models, outputs,
-    papers, pipelines, plugins, presets, projects, registry, runs, secrets,
+    papers, pipelines, plugins, presets, projects, registry, replay, runs, secrets,
     sweeps, system, templates, workspace,
 )
 from .utils.structured_logger import init_structured_logging, log_event, log_recovery
@@ -372,6 +372,7 @@ app.include_router(outputs.router)
 app.include_router(workspace.router)
 app.include_router(artifacts.router)
 app.include_router(registry.router)
+app.include_router(replay.router)
 app.include_router(presets.router)
 app.include_router(templates.router)
 if ENABLE_MARKETPLACE:
