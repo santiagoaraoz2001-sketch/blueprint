@@ -11,7 +11,7 @@ from ..database import get_db
 from ..models.run import Run
 from ..models.pipeline import Pipeline
 from ..models.experiment_phase import ExperimentPhase
-from ..schemas.run import RunResponse
+from ..schemas.run import RunResponse, RunMetadataUpdate
 from ..schemas.pipeline import PipelineResponse
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
@@ -38,6 +38,8 @@ def list_runs(
     pipeline_id: str | None = None,
     project_id: str | None = None,
     status: str | None = None,
+    tag: str | None = None,
+    starred: bool | None = None,
     limit: int = 50,
     db: Session = Depends(get_db),
 ):
@@ -48,6 +50,10 @@ def list_runs(
         q = q.filter(Run.project_id == project_id)
     if status:
         q = q.filter(Run.status == status)
+    if tag:
+        q = q.filter(Run.tags.contains(tag))
+    if starred is not None:
+        q = q.filter(Run.starred == starred)
     return q.order_by(Run.started_at.desc()).limit(limit).all()
 
 
@@ -185,6 +191,19 @@ def get_run(run_id: str, db: Session = Depends(get_db)):
     run = db.query(Run).filter(Run.id == run_id).first()
     if not run:
         raise HTTPException(404, "Run not found")
+    return run
+
+
+@router.put("/{run_id}/metadata", response_model=RunResponse)
+def update_run_metadata(run_id: str, data: RunMetadataUpdate, db: Session = Depends(get_db)):
+    """Update run notes, tags, and/or starred status."""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(run, key, value)
+    db.commit()
+    db.refresh(run)
     return run
 
 

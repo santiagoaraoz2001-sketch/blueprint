@@ -55,6 +55,8 @@ export default function PipelineEditorView() {
   })))
   const pastLength = usePipelineStore((s) => s.past.length)
   const futureLength = usePipelineStore((s) => s.future.length)
+  const pipelineNotes = usePipelineStore((s) => s.pipelineNotes)
+  const setPipelineNotes = usePipelineStore((s) => s.setPipelineNotes)
 
   // Actions — stable function refs, don't cause re-renders
   const setName = usePipelineStore((s) => s.setName)
@@ -112,6 +114,7 @@ export default function PipelineEditorView() {
   const [validationReport, setValidationReport] = useState<DiagnosticReport | null>(null)
   const [validating, setValidating] = useState(false)
   const [showMonitor, setShowMonitor] = useState(false)
+  const [showPipelineNotes, setShowPipelineNotes] = useState(false)
   const [showCheatsheet, setShowCheatsheet] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [recoveryData, setRecoveryData] = useState<{
@@ -530,6 +533,18 @@ export default function PipelineEditorView() {
         <button onClick={handleAddStickyNote} style={btnStyle} title="Add sticky note">
           <StickyNote size={10} />
         </button>
+        <button
+          onClick={() => setShowPipelineNotes(!showPipelineNotes)}
+          style={{
+            ...btnStyle,
+            color: showPipelineNotes || pipelineNotes ? '#FFB74D' : T.dim,
+            borderColor: showPipelineNotes ? 'rgba(255, 183, 77, 0.3)' : T.border,
+          }}
+          title="Pipeline notes"
+        >
+          <StickyNote size={10} color={showPipelineNotes || pipelineNotes ? '#FFB74D' : undefined} />
+          <span style={{ fontSize: FS.xxs }}>Notes</span>
+        </button>
 
         <ToolbarDropdown
           label="GROUP"
@@ -668,6 +683,112 @@ export default function PipelineEditorView() {
             onShowAgent={() => setShowAgent(true)}
           />
           <BlockConfig />
+
+          {/* Pipeline notes side panel — uses store for state, saved via savePipeline */}
+          {showPipelineNotes && (
+            <div
+              style={{
+                width: 300,
+                minWidth: 300,
+                height: '100%',
+                background: `linear-gradient(180deg, ${T.surface1} 0%, ${T.surface0} 100%)`,
+                borderLeft: `1px solid rgba(255, 183, 77, 0.2)`,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{
+                padding: '12px 16px',
+                borderBottom: `1px solid ${T.border}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <span style={{
+                  fontFamily: F,
+                  fontSize: FS.sm,
+                  color: '#FFB74D',
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}>
+                  <StickyNote size={14} color="#FFB74D" />
+                  Pipeline Notes
+                </span>
+                <button
+                  onClick={() => setShowPipelineNotes(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: T.dim,
+                    cursor: 'pointer',
+                    padding: 4,
+                  }}
+                >
+                  &times;
+                </button>
+              </div>
+              <div style={{ flex: 1, padding: 16, overflow: 'auto' }}>
+                <textarea
+                  value={pipelineNotes}
+                  onChange={(e) => setPipelineNotes(e.target.value)}
+                  placeholder="Add hypotheses, reminders, reasoning..."
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    minHeight: 200,
+                    padding: '10px 12px',
+                    background: T.surface3,
+                    border: `1px solid ${T.border}`,
+                    borderRadius: 6,
+                    color: T.text,
+                    fontFamily: F,
+                    fontSize: FS.sm,
+                    resize: 'none',
+                    outline: 'none',
+                    lineHeight: 1.6,
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 183, 77, 0.4)' }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = T.border }}
+                />
+              </div>
+              <div style={{
+                padding: '12px 16px',
+                borderTop: `1px solid ${T.border}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <span style={{
+                  fontFamily: F,
+                  fontSize: FS.xxs,
+                  color: T.dim,
+                  flex: 1,
+                }}>
+                  {isDirty ? 'Unsaved changes' : 'Saved'}
+                </span>
+                <button
+                  onClick={handleSave}
+                  style={{
+                    padding: '6px 16px',
+                    background: 'rgba(255, 183, 77, 0.15)',
+                    border: '1px solid rgba(255, 183, 77, 0.3)',
+                    borderRadius: 6,
+                    color: '#FFB74D',
+                    fontFamily: F,
+                    fontSize: FS.xs,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Validation panel modal – must be inside ReactFlowProvider (uses useReactFlow hook) */}
           <ValidationPanel

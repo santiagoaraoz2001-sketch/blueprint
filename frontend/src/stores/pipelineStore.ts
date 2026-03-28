@@ -43,6 +43,7 @@ export interface BlockNodeData {
   block_version?: string
   status: 'idle' | 'running' | 'complete' | 'failed'
   progress: number
+  notes?: string  // Inline canvas note
   [key: string]: unknown
 }
 
@@ -155,6 +156,19 @@ interface PipelineState {
   propagationKeys: PropagationKeys | null
   resolveConfigs: (pipelineId: string) => Promise<void>
 
+  // Variant config diff tracking
+  configDiff: {
+    source_pipeline_id: string
+    source_pipeline_name: string
+    changed_keys: Record<string, Record<string, { source: any; current: any }>>
+    inherited_count: number
+    total_count: number
+  } | null
+
+  // Pipeline-level notes (markdown, persisted to backend)
+  pipelineNotes: string
+  setPipelineNotes: (notes: string) => void
+
   // Multi-pipeline management
   pipelines: PipelineSummary[]
   pipelinesLoading: boolean
@@ -187,6 +201,7 @@ interface PipelineState {
   removeSelectedNodes: () => void
   duplicateNodes: (nodeIds: string[], offset?: { x: number; y: number }) => void
   updateNodeConfig: (id: string, config: Record<string, unknown>) => void
+  updateNodeData: (id: string, data: Partial<BlockNodeData>) => void
   selectNode: (id: string | null) => void
   focusErrorNode: (id: string | null) => void
   saveAsTemplate: (name: string, description: string, category: string) => void
@@ -417,6 +432,8 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
   activeTabId: DEFAULT_TAB_ID,
   resolvedConfigs: {},
   propagationKeys: null,
+  configDiff: null,
+  pipelineNotes: '',
   versions: [],
   past: [],
   future: [],
@@ -828,6 +845,27 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
     })
   },
 
+  updateNodeData: (id, data) => {
+    set((state) => {
+      _pushHistory(state)
+      const node = state.nodes.find((n: Node<BlockNodeData>) => n.id === id)
+      if (node) {
+        for (const [key, value] of Object.entries(data)) {
+          if (value === undefined) {
+            delete (node.data as any)[key]
+          } else {
+            ;(node.data as any)[key] = value
+          }
+        }
+      }
+      state.isDirty = true
+    })
+  },
+
+  setPipelineNotes: (notes: string) => {
+    set({ pipelineNotes: notes, isDirty: true })
+  },
+
   selectNode: (id) => set({ selectedNodeId: id }),
 
   focusErrorNode: (id) => {
@@ -978,6 +1016,8 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
         inheritanceOverlay: null,
         resolvedConfigs: {},
         propagationKeys: null,
+        configDiff: (pipeline as any).config_diff || null,
+        pipelineNotes: (pipeline as any).notes || '',
         past: [],
         future: [],
       })
@@ -1014,7 +1054,7 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
   },
 
   savePipeline: async () => {
-    const { id, name, nodes, edges } = get()
+    const { id, name, nodes, edges, pipelineNotes } = get()
     const definition = { nodes, edges }
 
     // Save a version snapshot before persisting
@@ -1028,11 +1068,12 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
     }
 
     if (id) {
-      await api.put(`/pipelines/${id}`, { name, definition })
+      await api.put(`/pipelines/${id}`, { name, definition, notes: pipelineNotes || null })
     } else {
       const projectId = useUIStore.getState().selectedProjectId
-      const payload: { name: string; definition: { nodes: Node<BlockNodeData>[]; edges: Edge[] }; project_id?: string } = { name, definition }
+      const payload: { name: string; definition: { nodes: Node<BlockNodeData>[]; edges: Edge[] }; project_id?: string; notes?: string } = { name, definition }
       if (projectId) payload.project_id = projectId
+      if (pipelineNotes) payload.notes = pipelineNotes
 
       const created = await api.post<PipelineResponse>('/pipelines', payload)
       set({ id: created.id })
@@ -1061,6 +1102,8 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
       state.inheritanceOverlay = null
       state.resolvedConfigs = {}
       state.propagationKeys = null
+      state.configDiff = null
+      state.pipelineNotes = ''
       const tab = state.tabs.find((t: PipelineTab) => t.id === activeTabId)
       if (tab) {
         tab.nodes = []

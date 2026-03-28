@@ -5,7 +5,7 @@ import { usePresetStore } from '@/stores/presetStore'
 import { evaluateConfigRules, getFieldValidationFailures, type ValidationFailure } from '@/lib/config-validation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getIcon } from '@/lib/icon-utils'
-import { Trash2, X, Save, ChevronDown, ChevronRight, AlertTriangle, GitBranch, FolderOpen, Search, Copy, ClipboardPaste, RotateCcw, Info, Zap, ArrowRight, Plus, Play, Loader2 } from 'lucide-react'
+import { Trash2, X, Save, ChevronDown, ChevronRight, AlertTriangle, GitBranch, FolderOpen, Search, Copy, ClipboardPaste, RotateCcw, Info, Zap, ArrowRight, Plus, Play, Loader2, GitCompare } from 'lucide-react'
 import type { Node } from '@xyflow/react'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { api } from '@/api/client'
@@ -299,6 +299,17 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
 
   // Config Inheritance summary section state
   const [showInheritanceSummary, setShowInheritanceSummary] = useState(false)
+
+  // Variant config diff — loaded from pipeline's config_diff when this pipeline is a variant
+  const configDiff = usePipelineStore((s) => s.configDiff)
+  const sourcePipelineName = configDiff?.source_pipeline_name || null
+  const changedKeys = configDiff?.changed_keys || {}
+  const variantDiffCount = Object.values(changedKeys).reduce(
+    (acc: number, nodeKeys: any) => acc + (typeof nodeKeys === 'object' ? Object.keys(nodeKeys).length : 0), 0
+  )
+
+  // Per-field diff lookup for the current node
+  const nodeChangedKeys: Record<string, { source: any; current: any }> = changedKeys[node.id] || {}
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -651,6 +662,28 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
         )}
       </AnimatePresence>
 
+      {/* Variant diff badge */}
+      {sourcePipelineName && variantDiffCount > 0 && (
+        <div
+          style={{
+            padding: '8px 16px',
+            background: `${T.cyan}10`,
+            borderBottom: `1px solid ${T.cyan}20`,
+            fontSize: FS.xs,
+            color: T.cyan,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontFamily: F,
+          }}
+        >
+          <GitCompare size={10} />
+          <span style={{ fontWeight: 600 }}>
+            {variantDiffCount} change{variantDiffCount !== 1 ? 's' : ''} from {sourcePipelineName}
+          </span>
+        </div>
+      )}
+
       {/* Config fields */}
       <div style={{ flex: 1, overflow: 'auto', padding: '20px', scrollbarWidth: 'thin' }}>
         <div
@@ -836,6 +869,8 @@ function BlockConfigInner({ node }: { node: Node<BlockNodeData> }) {
                         const originId = inherited ? inherited.sourceId : node.id
                         activateInheritanceOverlay(field.name, originId)
                       } : undefined}
+                      variantDiff={nodeChangedKeys[field.name]}
+                      sourcePipelineName={sourcePipelineName}
                     />
                   )
                 })}
@@ -1018,6 +1053,8 @@ function ConfigFieldInput({
   hideInheritance,
   crossFieldFailures,
   onShowInheritance,
+  variantDiff,
+  sourcePipelineName,
 }: {
   field: ConfigField
   value: ConfigValue
@@ -1031,6 +1068,8 @@ function ConfigFieldInput({
   hideInheritance?: boolean
   crossFieldFailures?: ValidationFailure[]
   onShowInheritance?: () => void
+  variantDiff?: { source: any; current: any }
+  sourcePipelineName?: string | null
 }) {
   const [hovered, setHovered] = useState(false)
   const [tooltipVisible, setTooltipVisible] = useState(false)
@@ -1383,6 +1422,41 @@ function ConfigFieldInput({
         }}>
           <AlertTriangle size={9} />
           {validationError}
+        </div>
+      )}
+
+      {/* Variant diff indicator — shows source value when field differs from source experiment */}
+      {variantDiff && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '4px 8px',
+          background: `${T.cyan}08`,
+          border: `1px solid ${T.cyan}20`,
+          borderRadius: 4,
+          fontFamily: F,
+          fontSize: FS.xxs,
+        }}>
+          <GitCompare size={9} color={T.cyan} style={{ flexShrink: 0 }} />
+          <span style={{ color: T.dim, textDecoration: 'line-through' }}>
+            {String(variantDiff.source ?? '(empty)')}
+          </span>
+          <ArrowRight size={8} color={T.dim} />
+          <span style={{ color: T.cyan, fontWeight: 600 }}>
+            {String(variantDiff.current ?? '(empty)')}
+          </span>
+        </div>
+      )}
+      {!variantDiff && sourcePipelineName && (
+        <div style={{
+          fontFamily: F,
+          fontSize: '7px',
+          color: T.dim,
+          opacity: 0.5,
+          letterSpacing: '0.06em',
+        }}>
+          inherited
         </div>
       )}
 
