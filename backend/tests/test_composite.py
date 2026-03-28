@@ -514,7 +514,7 @@ class TestExecuteSubPipeline:
         nodes = _make_sub_nodes(("A", "typeA"))
         messages = []
 
-        def message_cb(msg):
+        def message_cb(msg, severity=None):
             messages.append(msg)
 
         def run_fn(block_dir, config, inputs, run_dir, run_id,

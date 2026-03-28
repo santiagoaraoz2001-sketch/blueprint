@@ -22,58 +22,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# Path safety: block types must be simple identifiers
-SAFE_BLOCK_TYPE = re.compile(r'^[a-zA-Z0-9_]+$')
-
-# Backward-compat aliases for renamed blocks
-BLOCK_ALIASES = {
-    "model_prompt": "llm_inference",
-    "huggingface_dataset_loader": "huggingface_loader",
-    "huggingface_model": "huggingface_model_loader",
-    "model_loader": "model_selector",
-    "data_exporter": "data_export",
-    "results_exporter": "data_export",
-    # Block consolidation aliases
-    "debate_composite": "multi_agent_debate",
-    "checkpoint_gate": "quality_gate",
-    "notification_sender": "notification_hub",
-    "manual_review": "human_review_gate",
-    "save_csv": "data_export",
-    "save_json": "data_export",
-    "save_parquet": "data_export",
-    "save_txt": "data_export",
-    "save_yaml": "data_export",
-    "save_local": "data_export",
-    # Deprecated inference blocks → llm_inference
-    "batch_inference": "llm_inference",
-    "few_shot_prompting": "llm_inference",
-    "text_translator": "llm_inference",
-    "text_classifier": "llm_inference",
-    "streaming_server": "llm_inference",
-    "text_summarizer": "llm_inference",
-    "structured_output": "llm_inference",
-    "function_calling": "llm_inference",
-    "chat_completion": "llm_inference",
-    # Deprecated model blocks → model_selector
-    "gguf_model": "model_selector",
-    "mlx_model": "model_selector",
-    "ollama_model": "model_selector",
-}
-
-# Config defaults injected when an aliased block resolves to its new type.
-# This ensures saved workflows that used the old block type still work correctly.
-CONFIG_MIGRATIONS: dict[str, dict[str, object]] = {
-    "save_csv": {"format": "csv"},
-    "save_json": {"format": "json"},
-    "save_parquet": {"format": "parquet"},
-    "save_txt": {"format": "txt"},
-    "save_yaml": {"format": "yaml"},
-    "save_local": {"format": "auto"},
-}
+# Single source of truth for block aliases — shared with subprocess worker
+from .block_aliases import SAFE_BLOCK_TYPE, BLOCK_ALIASES, CONFIG_MIGRATIONS
 
 from sqlalchemy.orm import Session
 
-from ..config import ARTIFACTS_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR
+from ..config import ARTIFACTS_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR, MAX_PARALLEL_BLOCKS
 from ..database import SessionLocal
 from ..models.run import Run, LiveRun
 from ..block_sdk.context import BlockContext
@@ -84,6 +38,7 @@ from ..utils.secrets import get_secret
 from ..utils.redact import scrub_traceback
 from .block_registry import resolve_output_handle
 from .schema_validator import load_block_schema, validate_inputs, validate_config
+from .runtime_prep import prepare_node_runtime, PreparedNode, apply_multi_input_policy
 from ..utils.structured_logger import (
     log_run_start, log_run_complete, log_run_failed,
     log_block_start, log_block_complete, log_block_failed,
@@ -95,6 +50,9 @@ from .metrics_schema import create_metric
 from .artifact_registry import register_block_artifacts
 from .artifacts import ArtifactStore
 from ..models.artifact import ArtifactRecord
+from .subprocess_runner import SubprocessBlockRunner
+from .worker_tracker import track_worker, untrack_worker
+from ..models.execution_decision import ExecutionDecision
 
 # Ensure the repo root is on sys.path so blocks can do cross-block imports
 # like `from blocks.inference._inference_utils import ...`.
@@ -115,6 +73,30 @@ def request_cancel(run_id: str):
         event = _cancel_events.get(run_id)
         if event:
             event.set()
+
+
+def _infer_severity(msg: object) -> str:
+    """Infer log severity from a message's text prefix.
+
+    Used as a fallback when the block does not provide an explicit severity
+    via ``ctx.log_message(msg, severity="...")``.
+
+    Recognized prefixes (case-insensitive):
+        [ERROR], ERROR:  → "error"
+        [WARN], [WARNING], WARNING:  → "warn"
+        [DEBUG]  → "debug"
+        everything else  → "info"
+    """
+    if not isinstance(msg, str):
+        return "info"
+    lower = msg.lower()
+    if lower.startswith("[error]") or lower.startswith("error:"):
+        return "error"
+    if lower.startswith(("[warn]", "[warning]", "warning:")):
+        return "warn"
+    if lower.startswith("[debug]"):
+        return "debug"
+    return "info"
 
 
 def _topological_sort(nodes: list[dict], edges: list[dict]) -> list[str]:
@@ -535,6 +517,52 @@ def _load_and_run_block_with_timeout(
     return result[0]
 
 
+# Module-level subprocess runner (reused across all runs)
+_subprocess_runner = SubprocessBlockRunner()
+
+
+def _run_block_subprocess(
+    block_type: str,
+    config: dict,
+    inputs: dict[str, Any],
+    run_id: str,
+    node_id: str,
+    timeout_seconds: int | None = None,
+    progress_cb=None,
+    message_cb=None,
+) -> tuple[dict[str, Any], dict[str, dict]]:
+    """Execute a block in an isolated subprocess.
+
+    Returns (outputs, data_fingerprints). The subprocess writes fingerprints
+    to a JSON file which the runner reads back after completion.
+    """
+    def _progress_forwarder(percent: float, message: str):
+        if progress_cb and percent >= 0:
+            total = 100
+            current = int(percent * total)
+            try:
+                progress_cb(current, total)
+            except Exception:
+                pass
+        if message_cb and message and not message.startswith("Progress:"):
+            try:
+                message_cb(message)
+            except Exception:
+                pass
+
+    outputs, fingerprints = _subprocess_runner.run_block(
+        block_type=block_type,
+        config=config,
+        inputs=inputs,
+        timeout_seconds=timeout_seconds or 3600,
+        progress_callback=_progress_forwarder,
+        run_id=run_id,
+        node_id=node_id,
+    )
+
+    return outputs, fingerprints
+
+
 def _resolve_secrets(config: dict) -> dict:
     """Replace $secret:<name> references in config values with actual secrets."""
     resolved = {}
@@ -647,6 +675,36 @@ def _safe_commit(db: Session):
         db.commit()
     except Exception:
         db.rollback()
+
+
+def _record_decision(
+    db: Session,
+    run_id: str,
+    node_id: str,
+    decision: str,
+    reason: str,
+    cache_fingerprint: str | None = None,
+    plan_hash: str | None = None,
+) -> None:
+    """Write an ExecutionDecision record. Best-effort — never raises."""
+    try:
+        record = ExecutionDecision(
+            id=str(uuid.uuid4()),
+            run_id=run_id,
+            node_id=node_id,
+            decision=decision,
+            reason=reason,
+            cache_fingerprint=cache_fingerprint,
+            plan_hash=plan_hash,
+            timestamp=datetime.now(timezone.utc),
+        )
+        db.add(record)
+        _safe_commit(db)
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
 
 def _start_heartbeat(run_id: str, interval: float = 30.0):
@@ -900,51 +958,47 @@ async def _execute_loop(
             body_node_id, body_data.get("config", {}),
         )
         body_config = {k: v for k, v in body_config.items() if k != "_inherited"}
-        body_config = _resolve_secrets(body_config)
 
         category = body_data.get("category", "flow")
 
-        block_dir = _find_block_module(body_type)
-        if block_dir is None:
-            base_type = body_config.get("baseType", "")
-            if base_type and SAFE_BLOCK_TYPE.match(base_type):
-                base_type = BLOCK_ALIASES.get(base_type, base_type)
-                block_dir = _find_block_module(base_type)
-
-        if block_dir is None:
-            raise RuntimeError(
-                f"Block type '{body_type}' not found in loop body"
-            )
-
-        block_schema = load_block_schema(block_dir)
-        timeout_seconds = block_schema.get("timeout") if block_schema else None
-        is_composite = block_schema.get("composite", False) if block_schema else False
-
-        # Embed block version into config_snapshot for cache validation
-        if block_schema and block_schema.get("version"):
-            body_data["block_version"] = block_schema["version"]
-
-        # Validate config once (static across iterations)
-        if block_schema:
-            body_config = validate_config(block_schema, body_config)
-
-        context_cls = CompositeBlockContext if is_composite else None
-        run_dir = str(ARTIFACTS_DIR / run_id / body_node_id)
-
         # Pre-filter edges targeting this body node
         incoming_edges = [e for e in edges if e.get("target") == body_node_id]
+
+        # Build placeholder inputs from connected edges so validate_config
+        # knows which mandatory config fields are satisfied by connections
+        placeholder_inputs: dict[str, Any] = {}
+        for edge in incoming_edges:
+            tgt_handle = edge.get("targetHandle", "")
+            if tgt_handle:
+                placeholder_inputs[tgt_handle] = True  # non-None placeholder
+
+        prepared = prepare_node_runtime(
+            node_id=body_node_id,
+            block_type=body_type,
+            config=body_config,
+            node_inputs=placeholder_inputs,
+            run_id=run_id,
+            find_block_fn=_find_block_module,
+            resolve_secrets_fn=_resolve_secrets,
+            block_aliases=BLOCK_ALIASES,
+            safe_block_type_re=SAFE_BLOCK_TYPE,
+        )
+
+        # Embed block version into config_snapshot for cache validation
+        if prepared.block_version:
+            body_data["block_version"] = prepared.block_version
 
         body_block_infos.append(_BodyBlockInfo(
             node_id=body_node_id,
             block_type=body_type,
             category=category,
-            block_dir=block_dir,
-            schema=block_schema,
-            config=body_config,
-            timeout_seconds=timeout_seconds,
-            is_composite=is_composite,
-            context_cls=context_cls,
-            run_dir=run_dir,
+            block_dir=prepared.block_dir,
+            schema=prepared.block_schema,
+            config=prepared.cleaned_config,
+            timeout_seconds=prepared.timeout_seconds,
+            is_composite=prepared.is_composite,
+            context_cls=prepared.context_cls,
+            run_dir=prepared.run_dir,
             incoming_edges=incoming_edges,
         ))
 
@@ -1076,10 +1130,14 @@ async def _execute_loop(
                 except Exception:
                     pass
 
-            def message_cb(msg, __nid=_nid):
+            def message_cb(msg, explicit_severity=None, __nid=_nid):
+                if explicit_severity:
+                    severity = explicit_severity
+                else:
+                    severity = _infer_severity(msg)
                 try:
                     publish_event(run_id, "node_log", {
-                        "node_id": __nid, "message": msg,
+                        "node_id": __nid, "message": msg, "severity": severity,
                     })
                 except Exception:
                     pass
@@ -1141,7 +1199,8 @@ async def _execute_loop(
                 pass
 
             # Emit node_completed for body block
-            completed_event = {"node_id": _nid, "iteration": i}
+            body_duration_ms = round((time.time() - body_block_start) * 1000)
+            completed_event = {"node_id": _nid, "iteration": i, "duration_ms": body_duration_ms}
             try:
                 publish_event(run_id, "node_completed", completed_event)
             except Exception:
@@ -1207,6 +1266,7 @@ async def _execute_loop(
                         publish_event(run_id, "node_log", {
                             "node_id": loop.controller_id,
                             "message": f"Early stop: {stop_metric}={metric_value} > {stop_threshold}",
+                            "severity": "info",
                         })
                     except Exception:
                         pass
@@ -1216,6 +1276,7 @@ async def _execute_loop(
                         publish_event(run_id, "node_log", {
                             "node_id": loop.controller_id,
                             "message": f"Early stop: {stop_metric}={metric_value} < {stop_threshold}",
+                            "severity": "info",
                         })
                     except Exception:
                         pass
@@ -1246,9 +1307,17 @@ async def execute_pipeline(
     project_id: str | None = None,
 ):
     """Execute a full pipeline. Called in a background thread."""
+    from .config_merge import merge_workspace_config
+
     nodes = definition.get("nodes", [])
     edges = definition.get("edges", [])
-    workspace_config = definition.get("workspace_config") or None
+
+    # Merge config from all scopes: global workspace → project → pipeline definition
+    workspace_config = merge_workspace_config(
+        definition_config=definition.get("workspace_config") or None,
+        project_id=project_id,
+        db=db,
+    ) or None
 
     if not nodes:
         # Create a completed Run record so clients don't get a 404
@@ -1332,8 +1401,11 @@ async def execute_pipeline(
                 pass
             # Layer 2: buffer
             metrics_log_buffer.append(event_data)
-            # SSE
-            publish_event(run_id, "system_metric", event_data)
+            # SSE (crash-safe — must never kill the metrics loop)
+            try:
+                publish_event(run_id, "system_metric", event_data)
+            except Exception:
+                pass
 
     system_thread = threading.Thread(target=_system_metrics_loop, daemon=True)
     system_thread.start()
@@ -1376,6 +1448,14 @@ async def execute_pipeline(
             nid: cfg for nid, (cfg, _src) in _resolved_tuples.items()
         }
 
+        # Compute plan hash for decision log
+        import hashlib as _hashlib
+        _plan_hasher = _hashlib.sha256()
+        for _nid in order:
+            _plan_hasher.update(_nid.encode())
+            _plan_hasher.update(config_fps.get(_nid, "").encode())
+        _plan_hash = _plan_hasher.hexdigest()[:16]
+
         for idx, node_id in enumerate(order):
             node = node_map.get(node_id)
             if not node:
@@ -1383,10 +1463,17 @@ async def execute_pipeline(
 
             # Skip visual grouping nodes
             if node.get("type") == "groupNode":
+                _record_decision(db, run_id, node_id, "skipped", "Visual-only groupNode", plan_hash=_plan_hash)
                 continue
 
             # Skip loop body nodes — they are executed by _execute_loop
             if node_id in loop_body_node_ids:
+                _record_decision(
+                    db, run_id, node_id, "skipped",
+                    "Loop body node — executed by loop controller",
+                    cache_fingerprint=config_fps.get(node_id),
+                    plan_hash=_plan_hash,
+                )
                 continue
 
             # Check for cancellation before each block
@@ -1460,6 +1547,21 @@ async def execute_pipeline(
             db.commit()
 
             category = node_data.get("category", "flow")
+
+            # Record execution decision
+            _node_fp = config_fps.get(node_id)
+            if node_id in loop_controller_ids:
+                _record_decision(
+                    db, run_id, node_id, "execute",
+                    f"Loop controller — executing loop body ({block_type})",
+                    cache_fingerprint=_node_fp, plan_hash=_plan_hash,
+                )
+            else:
+                _record_decision(
+                    db, run_id, node_id, "execute",
+                    f"Executing block {block_type} (step {idx + 1}/{len(nodes)})",
+                    cache_fingerprint=_node_fp, plan_hash=_plan_hash,
+                )
 
             started_event = {
                 "node_id": node_id,
@@ -1559,8 +1661,9 @@ async def execute_pipeline(
                 run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                 db.commit()
 
+                loop_duration_ms = round((time.time() - block_start_time) * 1000)
                 log_block_complete(run_id, node_id, block_type, time.time() - block_start_time)
-                completed_event = {"node_id": node_id, "index": idx}
+                completed_event = {"node_id": node_id, "index": idx, "duration_ms": loop_duration_ms}
                 try:
                     publish_event(run_id, "node_completed", completed_event)
                 except Exception:
@@ -1598,22 +1701,41 @@ async def execute_pipeline(
                         else:
                             node_inputs[tgt_handle] = value
 
-            # Find and run block
-            block_dir = _find_block_module(block_type)
+            # --- Prepare node: resolve block dir, schema, validation, secrets ---
+            try:
+                prepared = prepare_node_runtime(
+                    node_id=node_id,
+                    block_type=block_type,
+                    config=config,
+                    node_inputs=node_inputs,
+                    run_id=run_id,
+                    find_block_fn=_find_block_module,
+                    resolve_secrets_fn=_resolve_secrets,
+                    block_aliases=BLOCK_ALIASES,
+                    safe_block_type_re=SAFE_BLOCK_TYPE,
+                )
+            except RuntimeError:
+                prepared = None
 
-            # Custom block fallback: if no run.py found, try the baseType
-            if block_dir is None:
-                base_type = config.get("baseType", "")
-                if base_type and SAFE_BLOCK_TYPE.match(base_type):
-                    base_type = BLOCK_ALIASES.get(base_type, base_type)
-                    block_dir = _find_block_module(base_type)
+            if prepared:
+                block_dir = prepared.block_dir
+                block_schema = prepared.block_schema
+                config = prepared.cleaned_config
+                run_dir = prepared.run_dir
+                timeout_seconds = prepared.timeout_seconds
+                max_retries = prepared.max_retries
+                context_cls = prepared.context_cls
 
-            run_dir = str(ARTIFACTS_DIR / run_id / node_id)
+                # Apply multi-input aggregation policy
+                if block_schema and _multi_counts:
+                    node_inputs = apply_multi_input_policy(
+                        block_schema, node_inputs, _multi_counts,
+                    )
 
-            # Resolve any $secret: references in config
-            config = _resolve_secrets(config)
+                # Embed block version into config_snapshot for cache validation
+                if prepared.block_version:
+                    node_data["block_version"] = prepared.block_version
 
-            if block_dir:
                 # Progress commit throttling: commit at most every 2 seconds
                 _last_progress_commit = time.time()
 
@@ -1646,9 +1768,15 @@ async def execute_pipeline(
                     except Exception:
                         pass
 
-                def message_cb(msg):
+                def message_cb(msg, explicit_severity=None):
+                    if explicit_severity:
+                        severity = explicit_severity
+                    else:
+                        severity = _infer_severity(msg)
                     try:
-                        publish_event(run_id, "node_log", {"node_id": node_id, "message": msg})
+                        publish_event(run_id, "node_log", {
+                            "node_id": node_id, "message": msg, "severity": severity,
+                        })
                     except Exception:
                         pass
 
@@ -1674,34 +1802,48 @@ async def execute_pipeline(
                     # Layer 2: buffer
                     metrics_log_buffer.append(event_dict)
 
-                # --- Load schema once for validation, timeout, and retry ---
-                block_schema = load_block_schema(block_dir)
-                timeout_seconds = block_schema.get("timeout") if block_schema else None
-                max_retries = block_schema.get("max_retries", 0) if block_schema else 0
-                is_composite = block_schema.get("composite", False) if block_schema else False
-
-                # --- Embed block version into config_snapshot for cache validation ---
-                if block_schema and block_schema.get("version"):
-                    node_data["block_version"] = block_schema["version"]
-
-                # --- Pre-execution validation ---
+                # Check isolation mode from block schema
+                isolation_mode = "inprocess"  # default
                 if block_schema:
-                    validate_inputs(block_schema, node_inputs)
-                    config = validate_config(block_schema, config)
+                    execution_cfg = block_schema.get("execution", {})
+                    if isinstance(execution_cfg, dict):
+                        isolation_mode = execution_cfg.get("isolation", "inprocess")
 
-                # Choose context class: composite blocks get CompositeBlockContext
-                context_cls = CompositeBlockContext if is_composite else None
+                # Guard: composite blocks cannot run in subprocess isolation.
+                # Sub-pipeline execution requires in-process access to the
+                # executor internals (_load_and_run_block, CompositeBlockContext).
+                # Fall back gracefully with a warning instead of crashing.
+                is_composite = block_schema.get("composite", False) if block_schema else False
+                if isolation_mode == "subprocess" and is_composite:
+                    import logging as _lg
+                    _lg.getLogger("blueprint.executor").warning(
+                        "Block '%s' (type=%s) declares execution.isolation=subprocess "
+                        "but is also a composite block. Composite blocks require "
+                        "in-process execution for sub-pipeline support. "
+                        "Falling back to inprocess isolation.",
+                        node_id, block_type,
+                    )
+                    isolation_mode = "inprocess"
 
                 # --- Execute with retry + timeout ---
                 try:
                     for attempt in range(max_retries + 1):
                         try:
-                            node_outputs, data_fingerprints = _load_and_run_block_with_timeout(
-                                block_dir, config, node_inputs, run_dir,
-                                run_id, node_id, progress_cb, message_cb, metric_cb,
-                                timeout_seconds=timeout_seconds,
-                                context_cls=context_cls,
-                            )
+                            if isolation_mode == "subprocess":
+                                node_outputs, data_fingerprints = _run_block_subprocess(
+                                    block_type, config, node_inputs,
+                                    run_id, node_id,
+                                    timeout_seconds=timeout_seconds,
+                                    progress_cb=progress_cb,
+                                    message_cb=message_cb,
+                                )
+                            else:
+                                node_outputs, data_fingerprints = _load_and_run_block_with_timeout(
+                                    block_dir, config, node_inputs, run_dir,
+                                    run_id, node_id, progress_cb, message_cb, metric_cb,
+                                    timeout_seconds=timeout_seconds,
+                                    context_cls=context_cls,
+                                )
                             outputs[node_id] = node_outputs
                             if data_fingerprints:
                                 all_fingerprints[node_id] = data_fingerprints
@@ -1849,11 +1991,13 @@ async def execute_pipeline(
 
             log_block_complete(run_id, node_id, block_type, time.time() - block_start_time)
 
+            block_duration_ms = round((time.time() - block_start_time) * 1000)
             completed_event = {
                 "node_id": node_id,
                 "index": idx,
                 "primary_output_type": primary_output_type,
                 "artifact_count": len(artifact_ids),
+                "duration_ms": block_duration_ms,
             }
             try:
                 publish_event(run_id, "node_completed", completed_event)

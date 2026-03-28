@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import logging
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,36 @@ class BlockRegistryService:
         self._compat_matrix: dict[str, set[str]] | None = None
         self._compat_aliases: dict[str, str] | None = None
 
+    # ── Import → capability mapping (for auto-inference of 'requires') ──
+    # Maps a top-level Python import name found in run.py to the
+    # canonical capability name used in CapabilityDetector.
+    # Only ML-relevant modules are listed; stdlib and base deps are ignored.
+    _IMPORT_TO_CAPABILITY: dict[str, str] = {
+        "torch": "torch",
+        "torchvision": "torch",
+        "torchaudio": "torch",
+        "transformers": "transformers",
+        "sentence_transformers": "transformers",
+        "peft": "peft",
+        "bitsandbytes": "bitsandbytes",
+        "datasets": "datasets",
+        "accelerate": "accelerate",
+        "sklearn": "scikit_learn",
+        "pandas": "pandas",
+        "numpy": "numpy",
+        "scipy": "scipy",
+        "mlx": "mlx",
+        "mlx_lm": "mlx",
+        "sentencepiece": "sentencepiece",
+        "tokenizers": "tokenizers",
+        "safetensors": "safetensors",
+        "trl": "trl",
+        "PIL": "pillow",
+        "cv2": "opencv",
+        "matplotlib": "matplotlib",
+        "seaborn": "seaborn",
+    }
+
     # ── Discovery ─────────────────────────────────────────────────
 
     def discover_all(self, paths: list[Path]) -> None:
@@ -62,6 +93,11 @@ class BlockRegistryService:
                         continue
                     try:
                         schema = self._parse_block_yaml(yaml_path, source_type)
+                        # Auto-infer requires from run.py when not set in YAML
+                        if not schema.requires:
+                            inferred = self._infer_requires(block_dir)
+                            if inferred:
+                                schema.requires = inferred
                         issues = self._validate_schema(schema)
                         if issues:
                             logger.warning(
@@ -165,6 +201,7 @@ class BlockRegistryService:
             icon=raw.get("icon", ""),
             accent=raw.get("accent", ""),
             deprecated=raw.get("deprecated", False),
+            requires=raw.get("requires", []),
         )
 
     @staticmethod
@@ -187,6 +224,43 @@ class BlockRegistryService:
                 issues.append(f"Port '{port.id}' is required but also has a default")
 
         return issues
+
+    @classmethod
+    def _infer_requires(cls, block_dir: Path) -> list[str]:
+        """Auto-infer capability requirements from run.py imports.
+
+        Parses the AST of ``run.py`` in *block_dir*, maps top-level
+        import names to canonical capability names via ``_IMPORT_TO_CAPABILITY``,
+        and returns a deduplicated, sorted list.
+
+        Returns an empty list if run.py doesn't exist or has no ML imports.
+        This is a fallback for blocks whose ``block.yaml`` omits ``requires``.
+        """
+        run_py = block_dir / "run.py"
+        if not run_py.exists():
+            return []
+        try:
+            source = run_py.read_text()
+            tree = ast.parse(source)
+        except Exception:
+            return []
+
+        raw_modules: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    raw_modules.add(alias.name.split(".")[0])
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    raw_modules.add(node.module.split(".")[0])
+
+        caps: set[str] = set()
+        for mod in raw_modules:
+            cap = cls._IMPORT_TO_CAPABILITY.get(mod)
+            if cap:
+                caps.add(cap)
+
+        return sorted(caps)
 
     # ── Lookups ───────────────────────────────────────────────────
 
@@ -211,6 +285,34 @@ class BlockRegistryService:
 
     def get_version(self) -> int:
         return self._version
+
+    # ── Block Availability (capability-aware) ────────────────────
+
+    def get_block_availability(
+        self, capabilities: dict[str, bool],
+    ) -> dict[str, dict]:
+        """Check each block's 'requires' against detected capabilities.
+
+        Args:
+            capabilities: Dict of capability_name -> bool from CapabilityDetector.
+
+        Returns:
+            Dict of block_type -> {"available": bool, "missing": list[str]}
+        """
+        result: dict[str, dict] = {}
+        for block_type, schema in self._blocks.items():
+            if not schema.requires:
+                result[block_type] = {"available": True, "missing": []}
+            else:
+                missing = [
+                    req for req in schema.requires
+                    if not capabilities.get(req, False)
+                ]
+                result[block_type] = {
+                    "available": len(missing) == 0,
+                    "missing": missing,
+                }
+        return result
 
     # ── Port Compatibility ────────────────────────────────────────
 
@@ -352,6 +454,29 @@ class BlockRegistryService:
         """Resolve an output handle ID, mapping old aliases to canonical IDs."""
         alias_map = self.get_output_alias_map(block_type)
         return alias_map.get(handle, handle)
+
+    def get_block_version(self, block_type: str) -> str:
+        """Return the version string from block.yaml, or '0.0.0' if absent."""
+        schema = self._blocks.get(block_type)
+        return schema.version if schema else "0.0.0"
+
+    def get_block_schema_defaults(self, block_type: str) -> dict[str, Any]:
+        """Return a dict of {field_name: default_value} from block.yaml config."""
+        config_schema = self.get_block_config_schema(block_type)
+        defaults: dict[str, Any] = {}
+        for field_name, field_def in config_schema.items():
+            if isinstance(field_def, dict) and "default" in field_def:
+                defaults[field_name] = field_def["default"]
+        return defaults
+
+    def get_file_path_fields(self, block_type: str) -> frozenset[str]:
+        """Return config field names that have type ``file_path``."""
+        config_schema = self.get_block_config_schema(block_type)
+        return frozenset(
+            field_name
+            for field_name, field_def in config_schema.items()
+            if isinstance(field_def, dict) and field_def.get("type") == "file_path"
+        )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

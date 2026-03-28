@@ -16,6 +16,16 @@ VALID_DATA_TYPES = frozenset({
 })
 
 
+# Valid values for PortSchema.expected_type_family
+VALID_TYPE_FAMILIES = frozenset({"dict", "str", "list", "path", "any"})
+
+# Valid values for PortSchema.cardinality
+VALID_CARDINALITIES = frozenset({"scalar", "list", "any"})
+
+# Valid values for PortSchema.multi_input
+VALID_MULTI_INPUT_MODES = frozenset({"aggregate", "last_write", "error"})
+
+
 class PortSchema(BaseModel):
     """Schema for a single input or output port on a block."""
     id: str
@@ -26,6 +36,9 @@ class PortSchema(BaseModel):
     aliases: list[str] = Field(default_factory=list)
     description: str = ""
     position: str | None = None
+    expected_type_family: str = "any"
+    cardinality: str = "any"
+    multi_input: str = "aggregate"
 
 
 class ConfigField(BaseModel):
@@ -104,6 +117,7 @@ class BlockSchema(BaseModel):
     icon: str = ""
     accent: str = ""
     deprecated: bool = False
+    requires: list[str] = Field(default_factory=list)
 
     @field_validator("version")
     @classmethod

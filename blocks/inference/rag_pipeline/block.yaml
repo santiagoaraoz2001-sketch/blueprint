@@ -148,6 +148,7 @@ side_inputs:
   required: false
 maturity: stable
 exportable: true
-requires: []
+requires:
+  - mlx
 execution:
   isolation: inprocess

@@ -175,6 +175,10 @@ side_inputs:
   required: false
 maturity: stable
 exportable: true
-requires: []
+requires:
+  - torch
+  - transformers
+  - datasets
+  - peft
 execution:
   isolation: inprocess

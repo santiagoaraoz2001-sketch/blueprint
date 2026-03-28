@@ -192,9 +192,9 @@ def execute_sub_pipeline(
             ) from e
 
         # Wrap callbacks to prefix child info for traceability
-        def child_message_cb(msg, _cid=child_id):
+        def child_message_cb(msg, explicit_severity=None, _cid=child_id):
             if message_cb:
-                message_cb(f"[{_cid}] {msg}")
+                message_cb(f"[{_cid}] {msg}", explicit_severity)
 
         def child_metric_cb(name, value, step, _cid=child_id):
             if metric_cb:
@@ -219,9 +219,10 @@ def execute_sub_pipeline(
         # We intentionally skip input validation for composite children:
         # root nodes may not have all required inputs wired (they get data
         # via config instead), and the child block handles this gracefully.
+        # Pass inputs= so connected ports satisfy mandatory config fields.
         block_schema = load_block_schema(block_dir)
         if block_schema:
-            child_config = validate_config(block_schema, child_config)
+            child_config = validate_config(block_schema, child_config, inputs=child_inputs)
 
         # Detect if child is itself a composite block (for nested composites).
         is_child_composite = block_schema.get("composite", False) if block_schema else False

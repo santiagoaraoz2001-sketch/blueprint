@@ -1,0 +1,80 @@
+{
+  "name": "model_substitution",
+  "description": "model_selector provides dynamic model path to llm_inference via model port.",
+  "nodes": [
+    {
+      "id": "model_src",
+      "type": "blockNode",
+      "data": {
+        "type": "model_selector",
+        "label": "Model Selector",
+        "category": "data",
+        "config": {"model_id": "test-model-v2"},
+        "inputs": [],
+        "outputs": [{"id": "model", "dataType": "model"}]
+      }
+    },
+    {
+      "id": "prompt_src",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Prompt Source",
+        "category": "data",
+        "config": {"text": "What is machine learning?"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "inference",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "LLM Inference",
+        "category": "inference",
+        "config": {"model_name": "placeholder-will-be-overridden"},
+        "inputs": [
+          {"id": "prompt", "dataType": "text", "required": true},
+          {"id": "model", "dataType": "model", "required": false}
+        ],
+        "outputs": [
+          {"id": "response", "dataType": "text"},
+          {"id": "metadata", "dataType": "metrics"}
+        ]
+      }
+    },
+    {
+      "id": "output",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Export Results",
+        "category": "endpoints",
+        "config": {"format": "json"},
+        "inputs": [
+          {"id": "data", "dataType": "any", "required": true}
+        ],
+        "outputs": [
+          {"id": "file_path", "dataType": "artifact"},
+          {"id": "status", "dataType": "metrics"},
+          {"id": "summary", "dataType": "metrics"}
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "model_src", "target": "inference", "sourceHandle": "model", "targetHandle": "model"},
+    {"id": "e2", "source": "prompt_src", "target": "inference", "sourceHandle": "text", "targetHandle": "prompt"},
+    {"id": "e3", "source": "inference", "target": "output", "sourceHandle": "response", "targetHandle": "data"}
+  ],
+  "expected": {
+    "validation": "pass",
+    "execution_order": ["model_src", "prompt_src", "inference", "output"],
+    "final_status": "completed",
+    "expected_errors": [],
+    "partial_rerun_allowed": true,
+    "export_allowed": true,
+    "notes": "model input port dynamically overrides model_name config at runtime"
+  }
+}

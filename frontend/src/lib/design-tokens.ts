@@ -278,6 +278,12 @@ export const CATEGORY_COLORS: Record<string, string> = {
   interventions: '#E8D05A',
   inference:     '#8FD07A',
   endpoints:     '#56C4B0',
+  // Registry categories that map to the same visual family
+  source:        '#DE9A68',  // same as external — source blocks (loaders, inputs)
+  evaluation:    '#65D68B',  // same as metrics — evaluation blocks
+  merge:         '#D87CB8',  // same as embedding — model merge blocks
+  output:        '#65D68B',  // same as metrics — output/formatting blocks
+  flow:          '#98A4B8',  // same as utilities — flow-control blocks
 }
 
 export const STATUS_COLORS: Record<string, string> = {
