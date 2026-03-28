@@ -1,0 +1,43 @@
+{
+  "compiler": {
+    "code_length": 6664,
+    "generated": true,
+    "has_blocks": true
+  },
+  "fixture_name": "input_satisfies_config",
+  "loop_aware_sort": {
+    "note": "no loops \u2014 same as simple sort",
+    "order": [
+      "model_provider",
+      "inference_block"
+    ]
+  },
+  "loop_detection": {
+    "loop_count": 0,
+    "loops": []
+  },
+  "partial_rerun_safety": {
+    "has_loop_controller": false,
+    "safe_per_contract": false
+  },
+  "topological_sort": {
+    "all_nodes_included": true,
+    "node_count": 2,
+    "order": [
+      "model_provider",
+      "inference_block"
+    ]
+  },
+  "validation": {
+    "block_count": 2,
+    "edge_count": 1,
+    "error_count": 1,
+    "errors": [
+      "Block 'LLM Inference': 'model_name' is required but empty"
+    ],
+    "estimated_runtime_s": 15,
+    "valid": false,
+    "warning_count": 0,
+    "warnings": []
+  }
+}

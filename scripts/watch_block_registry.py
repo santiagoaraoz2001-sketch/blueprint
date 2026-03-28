@@ -17,12 +17,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from generate_block_registry import main as generate  # noqa: E402
+from generate_port_compat import main as generate_port_compat  # noqa: E402
 
 BLOCKS_DIR = Path(__file__).resolve().parent.parent / "blocks"
+PORT_COMPAT_PATH = Path(__file__).resolve().parent.parent / "docs" / "PORT_COMPATIBILITY.yaml"
 
 
 def get_mtimes() -> dict[str, float]:
-    """Get modification times for all block.yaml files.
+    """Get modification times for all block.yaml files and PORT_COMPATIBILITY.yaml.
 
     Handles race conditions where a file may be deleted between
     discovery and stat.
@@ -34,6 +36,11 @@ def get_mtimes() -> dict[str, float]:
         except OSError:
             # File was deleted/moved between rglob and stat — skip it
             continue
+    # Also watch PORT_COMPATIBILITY.yaml
+    try:
+        mtimes[str(PORT_COMPAT_PATH)] = PORT_COMPAT_PATH.stat().st_mtime
+    except OSError:
+        pass
     return mtimes
 
 
@@ -62,6 +69,7 @@ def watch() -> None:
             )
             try:
                 generate()
+                generate_port_compat()
             except SystemExit:
                 # generate() calls sys.exit(1) on zero blocks — don't let
                 # that kill the watcher; log and continue polling

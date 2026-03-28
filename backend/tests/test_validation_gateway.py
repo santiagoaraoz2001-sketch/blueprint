@@ -201,8 +201,14 @@ class TestStaleHandleDetection:
 
         definition = {"nodes": [node], "edges": []}
 
-        with patch("backend.engine.validator.is_known_block", return_value=True), \
-             patch("backend.engine.validator.get_block_yaml", return_value=mock_yaml):
+        mock_registry = MagicMock()
+        mock_registry.get_block_types.return_value = {"llm_inference"}
+        mock_registry.is_known_block.return_value = True
+        mock_registry.get_block_yaml.return_value = mock_yaml
+        mock_registry.get_block_config_schema.return_value = {}
+        mock_registry.is_port_compatible.return_value = True
+
+        with patch("backend.engine.validator.get_global_registry", return_value=mock_registry):
             report = validate_pipeline(definition)
 
         # Should have a blocking error about removed ports
@@ -234,8 +240,14 @@ class TestStaleHandleDetection:
 
         definition = {"nodes": [node], "edges": []}
 
-        with patch("backend.engine.validator.is_known_block", return_value=True), \
-             patch("backend.engine.validator.get_block_yaml", return_value=mock_yaml):
+        mock_registry = MagicMock()
+        mock_registry.get_block_types.return_value = {"llm_inference"}
+        mock_registry.is_known_block.return_value = True
+        mock_registry.get_block_yaml.return_value = mock_yaml
+        mock_registry.get_block_config_schema.return_value = {}
+        mock_registry.is_port_compatible.return_value = True
+
+        with patch("backend.engine.validator.get_global_registry", return_value=mock_registry):
             report = validate_pipeline(definition)
 
         # Should pass (non-breaking change) with a warning

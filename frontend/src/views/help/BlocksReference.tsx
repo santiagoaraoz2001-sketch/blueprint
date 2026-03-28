@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { T, F, FS, CATEGORY_COLORS } from '@/lib/design-tokens'
-import { BLOCK_REGISTRY, type BlockDefinition } from '@/lib/block-registry'
+import { getAllBlocks, type BlockDefinition } from '@/lib/block-registry'
 import SectionAnchor from '@/components/Help/SectionAnchor'
 import {
   Blocks,
@@ -231,7 +231,7 @@ export default function BlocksReference() {
 
   const categories = useMemo(() => {
     const cats: Record<string, BlockDefinition[]> = {}
-    BLOCK_REGISTRY.forEach((b) => {
+    getAllBlocks().forEach((b) => {
       ;(cats[b.category] ??= []).push(b)
     })
     return Object.entries(cats).sort(([a], [b]) => a.localeCompare(b))
@@ -239,7 +239,7 @@ export default function BlocksReference() {
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim()
-    let blocks = BLOCK_REGISTRY
+    let blocks = getAllBlocks()
     if (selectedCategory) blocks = blocks.filter((b) => b.category === selectedCategory)
     if (q) {
       blocks = blocks.filter(
@@ -287,7 +287,7 @@ export default function BlocksReference() {
       </SectionAnchor>
       <div style={card}>
         <p style={body}>
-          {BLOCK_REGISTRY.length}+ blocks across {categories.length} categories. Click any block
+          {getAllBlocks().length}+ blocks across {categories.length} categories. Click any block
           below to see its full configuration.
         </p>
 
@@ -339,7 +339,7 @@ export default function BlocksReference() {
               letterSpacing: '0.06em',
             }}
           >
-            All ({BLOCK_REGISTRY.length})
+            All ({getAllBlocks().length})
           </span>
           {categories.map(([cat, blocks]) => {
             const catColor = CATEGORY_COLORS[cat] ?? T.cyan

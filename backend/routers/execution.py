@@ -12,7 +12,8 @@ from ..models.run import Run
 from ..engine.executor import execute_pipeline, request_cancel
 from ..engine.partial_executor import execute_partial_pipeline
 from ..engine.validator import validate_pipeline
-from ..engine.block_registry import get_block_config_schema, is_known_block
+from ..engine.graph_utils import contains_loop_or_cycle
+from ..services.registry import get_global_registry
 from ..block_sdk.config_validator import (
     validate_and_apply_defaults,
     _validate_type,
@@ -151,6 +152,18 @@ def execute_from_node(
     if not nodes:
         raise HTTPException(400, "Pipeline has no blocks")
 
+    # --- Kill switch: block partial rerun for loops/cycles ---
+    edges = definition.get("edges", [])
+    if contains_loop_or_cycle(nodes, edges):
+        raise HTTPException(
+            400,
+            detail={
+                "error": "partial_rerun_unsupported",
+                "message": "Partial re-run is not supported for pipelines containing loops. Please run the full pipeline instead.",
+                "remediation": "Remove the loop or run the full pipeline.",
+            },
+        )
+
     # --- Validate source run (fail-fast before thread submission) ---
     source_run = db.query(Run).filter(Run.id == body.source_run_id).first()
     if not source_run:
@@ -274,10 +287,11 @@ def validate_block_config(block_type: str, config: dict):
     Returns per-field validation results including type errors,
     bounds violations, and invalid select options.
     """
-    if not is_known_block(block_type):
+    registry = get_global_registry()
+    if not registry.is_known_block(block_type):
         raise HTTPException(404, f"Unknown block type: {block_type}")
 
-    schema = get_block_config_schema(block_type)
+    schema = registry.get_block_config_schema(block_type)
     if not schema:
         return {"valid": True, "errors": [], "validated_config": config}
 

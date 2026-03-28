@@ -59,6 +59,10 @@ cat > "$APP_DIR/Contents/Info.plist" << 'PLIST'
     <string>12.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>Blueprint needs access to its project files on the Desktop.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>Blueprint needs access to project files.</string>
 </dict>
 </plist>
 PLIST
@@ -128,10 +132,13 @@ echo "──── Blueprint launched at \$(date) ────" >> "\$LOG_FILE"
 osascript -e 'display notification "Starting backend and frontend..." with title "Blueprint" sound name "default"' 2>/dev/null || true
 
 # ── Launch Blueprint ──────────────────────────────────────────
-# Run the repo's launch.sh directly via bash — no bundled copy needed.
-# SCRIPT_DIR tells launch.sh where the repo root is.
+# Read launch.sh content and execute it inline to avoid macOS TCC
+# "Operation not permitted" errors that block .app bundles from
+# directly executing scripts in ~/Desktop or other protected folders.
+# Updates to launch.sh still take effect without rebuilding the .app.
 cd "\$REPO_ROOT"
-SCRIPT_DIR="\$REPO_ROOT" bash "\$LAUNCH_SCRIPT" >> "\$LOG_FILE" 2>&1
+export SCRIPT_DIR="\$REPO_ROOT"
+/bin/bash -c "\$(cat "\$LAUNCH_SCRIPT")" >> "\$LOG_FILE" 2>&1
 EXIT_CODE=\$?
 
 # ── Show error alert if launch failed ─────────────────────────

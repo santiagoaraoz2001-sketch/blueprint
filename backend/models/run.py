@@ -21,6 +21,7 @@ class Run(Base):
     outputs_snapshot = Column(JSON, nullable=True)
     metrics_log = Column(JSON, nullable=True)
     data_fingerprints = Column(JSON, nullable=True)  # {node_id: {input_name: fingerprint}}
+    config_fingerprints = Column(JSON, nullable=True)  # {node_id: sha256_hex} — Merkle-chain config hashes
 
 
 class LiveRun(Base):

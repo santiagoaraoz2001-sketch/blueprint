@@ -1,7 +1,12 @@
-from sqlalchemy import create_engine, event as sa_event
+import logging
+import os
+
+from sqlalchemy import create_engine, event as sa_event, inspect
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-from .config import DATABASE_URL, ensure_dirs
+from .config import DATABASE_URL, DB_PATH, ensure_dirs
+
+logger = logging.getLogger("blueprint.database")
 
 ensure_dirs()
 
@@ -52,15 +57,59 @@ def get_db():
         db.close()
 
 
+def _db_has_tables() -> bool:
+    """Check whether the database file exists and contains any tables."""
+    if not DB_PATH.exists():
+        return False
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    return len(tables) > 0
+
+
 def init_db():
+    """Initialize the database schema.
+
+    Behavior:
+    - Fresh install (no tables): Use Base.metadata.create_all() and stamp
+      Alembic to HEAD so future migrations start from the right place.
+    - Existing database (has tables): Run Alembic migrations only. If
+      migration fails, raise RuntimeError — never fall back to create_all()
+      which could silently create an inconsistent schema.
+    """
     # Import all models so they register with Base.metadata
     from .models import project, experiment, experiment_phase, pipeline, run, dataset, artifact, paper, sweep, workspace  # noqa: F401
-    try:
-        from alembic.config import Config
-        from alembic import command
-        import os
-        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "alembic.ini"))
-        command.upgrade(alembic_cfg, "head")
-    except Exception:
-        # Fallback for fresh installs or if alembic isn't available
+
+    has_tables = _db_has_tables()
+
+    if not has_tables:
+        # Fresh install — create all tables from current models
+        logger.info("Fresh database detected — creating schema from models")
         Base.metadata.create_all(bind=engine)
+
+        # Stamp Alembic HEAD so future migrations work correctly
+        try:
+            from alembic.config import Config
+            from alembic import command
+
+            alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "alembic.ini"))
+            command.stamp(alembic_cfg, "head")
+            logger.info("Stamped Alembic revision to HEAD")
+        except Exception as exc:
+            logger.warning(
+                "Could not stamp Alembic HEAD (non-critical for fresh install): %s",
+                exc,
+            )
+    else:
+        # Existing database — must use Alembic migrations
+        logger.info("Existing database detected — running Alembic migrations")
+        try:
+            from alembic.config import Config
+            from alembic import command
+
+            alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "alembic.ini"))
+            command.upgrade(alembic_cfg, "head")
+            logger.info("Alembic migrations completed successfully")
+        except Exception as exc:
+            raise RuntimeError(
+                f"Database migration failed. Run: alembic upgrade head. Error: {exc}"
+            ) from exc

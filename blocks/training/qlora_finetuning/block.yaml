@@ -1,33 +1,31 @@
 name: QLoRA Fine-Tuning
 type: qlora_finetuning
 category: training
-description: LoRA with 4-bit quantization for memory-efficient fine-tuning on consumer GPUs
-version: "1.0.0"
-
+description: LoRA with 4-bit quantization for memory-efficient fine-tuning on consumer
+  GPUs
+version: 1.0.0
 inputs:
-  - id: dataset
-    label: Training Data
-    data_type: dataset
-    required: true
-  - id: model
-    label: Base Model
-    data_type: model
-    required: false
-  - id: dataset_meta
-    label: Dataset Info
-    data_type: config
-    required: false
-
+- id: dataset
+  label: Training Data
+  data_type: dataset
+  required: true
+- id: model
+  label: Base Model
+  data_type: model
+  required: false
+- id: dataset_meta
+  label: Dataset Info
+  data_type: config
+  required: false
 outputs:
-  - id: trained_model
-    label: QLoRA Model
-    aliases: [model]
-    data_type: model
-
-  - id: metrics
-    label: Training Metrics
-    data_type: metrics
-
+- id: trained_model
+  label: QLoRA Model
+  aliases:
+  - model
+  data_type: model
+- id: metrics
+  label: Training Metrics
+  data_type: metrics
 config:
   model_name:
     type: string
@@ -54,8 +52,10 @@ config:
     type: select
     label: Quantization Bits
     description: Number of bits for base model quantization
-    default: "4"
-    options: ["4", "8"]
+    default: '4'
+    options:
+    - '4'
+    - '8'
   double_quant:
     type: boolean
     label: Double Quantization
@@ -72,14 +72,14 @@ config:
   target_modules:
     type: string
     label: Target Modules
-    description: "Comma-separated module names to apply LoRA to"
-    default: "q_proj,v_proj"
+    description: Comma-separated module names to apply LoRA to
+    default: q_proj,v_proj
     section: lora
   lr:
     type: float
     label: Learning Rate
     default: 0.0002
-    min: 0.0000001
+    min: 1.0e-07
     max: 0.01
     section: training
   epochs:
@@ -108,19 +108,21 @@ config:
   text_column:
     type: string
     label: Text Column
-    description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
-    default: ""
+    description: 'JSON key containing training text (leave empty for auto-detect:
+      ''text'' or first key)'
+    default: ''
     propagate: true
   training_format:
     type: text_area
     label: Training Format
-    description: "Template for structuring training examples. Use {text}, {instruction}, {output} placeholders."
-    default: ""
+    description: Template for structuring training examples. Use {text}, {instruction},
+      {output} placeholders.
+    default: ''
     propagate: true
   eval_split:
     type: float
     label: Eval Split
-    description: "Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)"
+    description: Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)
     default: 0.0
     min: 0.0
     max: 0.3
@@ -128,13 +130,14 @@ config:
   save_merged:
     type: boolean
     label: Save Merged Model
-    description: "Merge QLoRA adapters into base model weights before saving (creates standalone model instead of adapter-only)"
+    description: Merge QLoRA adapters into base model weights before saving (creates
+      standalone model instead of adapter-only)
     default: false
     section: advanced
   checkpoint_interval:
     type: integer
     label: Checkpoint Interval
-    description: "Save checkpoint every N epochs (0 = final only)"
+    description: Save checkpoint every N epochs (0 = final only)
     default: 0
     min: 0
     max: 100
@@ -145,18 +148,26 @@ config:
     default: 16
     min: 1
     max: 64
-    description: "Number of layers to apply LoRA to (MLX only). Lower = less memory, potentially less quality."
+    description: Number of layers to apply LoRA to (MLX only). Lower = less memory,
+      potentially less quality.
     section: advanced
   prefer_framework:
     type: select
     label: Preferred Framework
-    options: ["auto", "mlx", "pytorch"]
-    default: "auto"
-    description: "Force a specific training framework. 'auto' detects the best available."
+    options:
+    - auto
+    - mlx
+    - pytorch
+    default: auto
+    description: Force a specific training framework. 'auto' detects the best available.
     section: advanced
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

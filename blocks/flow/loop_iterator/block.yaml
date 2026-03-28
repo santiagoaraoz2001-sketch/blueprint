@@ -1,80 +1,88 @@
 name: Loop Iterator
 type: loop_iterator
 category: flow
-description: Iterate over dataset rows one-by-one, in batches, or repeat a fixed number of times
-version: "1.0.0"
-
+description: Iterate over dataset rows one-by-one, in batches, or repeat a fixed number
+  of times
+version: 1.0.0
 inputs:
-  - id: input
-    label: Input Data
-    data_type: any
-    required: false
-    description: "Data to iterate over. Required for iterate_rows and batch modes; optional for count mode."
-
+- id: input
+  label: Input Data
+  data_type: any
+  required: false
+  description: Data to iterate over. Required for iterate_rows and batch modes; optional
+    for count mode.
 outputs:
-  - id: item
-    label: Current Item
-    data_type: any
-  - id: dataset
-    label: All Items
-    data_type: dataset
-  - id: metrics
-    label: Iteration Metrics
-    data_type: metrics
-
+- id: item
+  label: Current Item
+  data_type: any
+- id: dataset
+  label: All Items
+  data_type: dataset
+- id: metrics
+  label: Iteration Metrics
+  data_type: metrics
 config:
   mode:
     type: select
     label: Mode
     default: iterate_rows
     options:
-      - iterate_rows
-      - count
-      - batch
-    description: "iterate_rows: emit each row; count: repeat N times passing input through; batch: emit groups of batch_size"
+    - iterate_rows
+    - count
+    - batch
+    description: 'iterate_rows: emit each row; count: repeat N times passing input
+      through; batch: emit groups of batch_size'
   count:
     type: integer
     label: Repeat Count
     default: 3
     min: 1
-    description: "Number of repetitions (only used in 'count' mode)"
+    description: Number of repetitions (only used in 'count' mode)
   batch_size:
     type: integer
     label: Batch Size
     default: 1
     min: 1
-    description: "Items per batch (used in 'iterate_rows' and 'batch' modes)"
+    description: Items per batch (used in 'iterate_rows' and 'batch' modes)
   start_index:
     type: integer
     label: Start Index
     default: 0
     min: 0
-    description: "Skip the first N items before iterating"
+    description: Skip the first N items before iterating
   max_iterations:
     type: integer
     label: Max Iterations
     default: 0
     min: 0
-    description: "Safety cap on total iterations (0 = unlimited)"
+    description: Safety cap on total iterations (0 = unlimited)
   shuffle:
     type: boolean
     label: Shuffle Before Iterating
     default: false
-    description: "Randomly shuffle the input rows before iterating (useful for cross-validation, data augmentation, grid search)"
+    description: Randomly shuffle the input rows before iterating (useful for cross-validation,
+      data augmentation, grid search)
   stride:
     type: integer
     label: Stride (Sliding Window)
     default: 0
     min: 0
-    description: "Step size between window starts in batch mode. When stride < batch_size, creates overlapping windows (e.g. batch_size=512, stride=256 for NLP token windows). 0 = use batch_size (no overlap)."
+    description: Step size between window starts in batch mode. When stride < batch_size,
+      creates overlapping windows (e.g. batch_size=512, stride=256 for NLP token windows).
+      0 = use batch_size (no overlap).
   emit_index:
     type: boolean
     label: Emit Iteration Index
     default: false
-    description: "Add an '_index' field to each output item so downstream blocks know which iteration they are in"
-
+    description: Add an '_index' field to each output item so downstream blocks know
+      which iteration they are in
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

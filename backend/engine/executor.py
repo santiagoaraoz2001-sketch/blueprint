@@ -81,15 +81,20 @@ from ..block_sdk.exceptions import BlockError, BlockInputError, BlockConfigError
 from .composite import CompositeBlockContext, execute_sub_pipeline
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
+from ..utils.redact import scrub_traceback
 from .block_registry import resolve_output_handle
 from .schema_validator import load_block_schema, validate_inputs, validate_config
 from ..utils.structured_logger import (
     log_run_start, log_run_complete, log_run_failed,
     log_block_start, log_block_complete, log_block_failed,
 )
-from .config_resolver import resolve_configs
+from .config_resolver import resolve_configs, inject_workspace_file_paths
+from .fingerprint import compute_fingerprints
+from .block_registry import BlockRegistryService
 from .metrics_schema import create_metric
 from .artifact_registry import register_block_artifacts
+from .artifacts import ArtifactStore
+from ..models.artifact import ArtifactRecord
 
 # Ensure the repo root is on sys.path so blocks can do cross-block imports
 # like `from blocks.inference._inference_utils import ...`.
@@ -239,6 +244,22 @@ def _detect_loops(
                     stack_b.append(nb)
         sccs.append(component)
 
+    # ── Step 2b: Filter stuck-downstream nodes ──
+    # Kahn's residual includes nodes whose in-degree never reached 0 because
+    # a cyclic predecessor was never processed — but they may NOT be in any
+    # actual cycle. Kosaraju correctly places them in single-node SCCs.
+    # A single-node SCC with no self-loop edge is NOT a real cycle — discard it.
+    def _has_self_loop(nid: str) -> bool:
+        return any(
+            e.get("source") == nid and e.get("target") == nid
+            for e in edges
+        )
+
+    sccs = [scc for scc in sccs if len(scc) > 1 or _has_self_loop(scc[0])]
+
+    if not sccs:
+        return []
+
     # ── Step 3: Validate each SCC and build LoopDefinitions ──
     def _is_loop_controller(nid: str) -> bool:
         n = node_map.get(nid, {})
@@ -248,10 +269,16 @@ def _detect_loops(
     for scc in sccs:
         controllers = [n for n in scc if _is_loop_controller(n)]
         if len(controllers) != 1:
-            raise ValueError(
-                "Pipeline contains a cycle that doesn't pass through "
-                "a Loop Controller block."
-            )
+            if len(controllers) == 0:
+                raise ValueError(
+                    "Pipeline contains a cycle that doesn't pass through "
+                    "a Loop Controller block."
+                )
+            else:
+                raise ValueError(
+                    f"Pipeline cycle contains {len(controllers)} Loop Controller "
+                    f"blocks; exactly 1 is required per cycle."
+                )
 
         controller_id = controllers[0]
         body_nodes_set = set(scc) - {controller_id}
@@ -691,6 +718,105 @@ def _safe_bool(value: Any, default: bool) -> bool:
     return default
 
 
+# ── Artifact Cache Integration ────────────────────────────────────────
+# Module-level ArtifactStore instance, reused across all runs.
+_artifact_store = ArtifactStore(base_path=Path(ARTIFACTS_DIR))
+
+# Logger for artifact cache (best-effort, never crashes execution)
+import logging as _logging
+_artifact_cache_logger = _logging.getLogger("blueprint.artifact_cache")
+
+
+def _infer_port_data_type(port_id: str, value: Any, block_schema: dict | None) -> str:
+    """Infer the data_type for an output port.
+
+    1. Check block_schema outputs for a declared data_type
+    2. Fall back to heuristic type detection from the value
+    """
+    if block_schema:
+        for output_def in block_schema.get("outputs", []):
+            if isinstance(output_def, dict) and output_def.get("id") == port_id:
+                return output_def.get("data_type", "text")
+
+    # Heuristic fallback
+    if isinstance(value, str):
+        return "text"
+    if isinstance(value, dict):
+        # Dicts with numeric values look like metrics
+        if value and all(isinstance(v, (int, float)) for v in value.values()):
+            return "metrics"
+        return "config"
+    if isinstance(value, list):
+        return "dataset"
+    if isinstance(value, bytes):
+        return "artifact"
+    return "text"
+
+
+def _is_json_serializable(value: Any) -> bool:
+    """Quick check if a value can be serialized as JSON."""
+    try:
+        json.dumps(value)
+        return True
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+def _cache_block_outputs(
+    node_id: str,
+    run_id: str,
+    node_outputs: dict[str, Any],
+    block_schema: dict | None,
+    db: Session,
+) -> None:
+    """Store each output port as a cached artifact with SHA-256 verification.
+
+    Best-effort: logs warnings on failure, never raises.
+    Skips values that are not serializable by the artifact cache.
+    Persists ArtifactRecord rows in the DB for later retrieval.
+    """
+    if not node_outputs:
+        return
+
+    records: list[ArtifactRecord] = []
+    for port_id, value in node_outputs.items():
+        try:
+            data_type = _infer_port_data_type(port_id, value, block_schema)
+
+            # Skip non-serializable values for non-raw types
+            if data_type != "artifact" and not _is_json_serializable(value):
+                # Fall back to text serialization of the string representation
+                data_type = "text"
+                value = str(value)
+
+            manifest = _artifact_store.store(
+                node_id=node_id,
+                port_id=port_id,
+                run_id=run_id,
+                data=value,
+                data_type=data_type,
+            )
+            records.append(ArtifactRecord.from_manifest(manifest))
+        except Exception as exc:
+            _artifact_cache_logger.debug(
+                "Artifact cache: skipped port %s/%s: %s", node_id, port_id, exc
+            )
+
+    if records:
+        try:
+            for record in records:
+                db.add(record)
+            db.flush()  # flush within the existing transaction, committed by caller
+        except Exception as exc:
+            _artifact_cache_logger.warning(
+                "Artifact cache: DB flush failed for node %s: %s", node_id, exc
+            )
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+
 @dataclass
 class _BodyBlockInfo:
     """Pre-computed per-body-block metadata (computed once, reused each iteration)."""
@@ -793,6 +919,10 @@ async def _execute_loop(
         block_schema = load_block_schema(block_dir)
         timeout_seconds = block_schema.get("timeout") if block_schema else None
         is_composite = block_schema.get("composite", False) if block_schema else False
+
+        # Embed block version into config_snapshot for cache validation
+        if block_schema and block_schema.get("version"):
+            body_data["block_version"] = block_schema["version"]
 
         # Validate config once (static across iterations)
         if block_schema:
@@ -981,6 +1111,9 @@ async def _execute_loop(
             if data_fingerprints:
                 all_fingerprints[_nid] = data_fingerprints
 
+            # Cache loop body outputs as typed artifacts (best-effort)
+            _cache_block_outputs(_nid, run_id, node_outputs, info.schema, db)
+
             # Register artifacts produced by this loop body block (best-effort)
             try:
                 register_block_artifacts(
@@ -1115,6 +1248,7 @@ async def execute_pipeline(
     """Execute a full pipeline. Called in a background thread."""
     nodes = definition.get("nodes", [])
     edges = definition.get("edges", [])
+    workspace_config = definition.get("workspace_config") or None
 
     if not nodes:
         # Create a completed Run record so clients don't get a 404
@@ -1222,10 +1356,25 @@ async def execute_pipeline(
             loop_by_controller[loop_def.controller_id] = loop_def
 
         # Resolve config inheritance across the DAG
-        resolved_configs = resolve_configs(
+        _registry = BlockRegistryService()
+        _resolved_tuples = resolve_configs(
             nodes, edges, order,
-            find_block_dir_fn=_find_block_module,
+            workspace_config=workspace_config,
+            registry=_registry,
         )
+        # Post-resolution: auto-fill file_path fields from workspace settings
+        inject_workspace_file_paths(_resolved_tuples, nodes, _registry)
+
+        # Compute deterministic Merkle-chain config fingerprints
+        config_fps = compute_fingerprints(
+            _resolved_tuples, order, edges, _registry, nodes,
+        )
+        run.config_fingerprints = config_fps
+
+        # Extract just the config dicts for backward-compat with downstream code
+        resolved_configs = {
+            nid: cfg for nid, (cfg, _src) in _resolved_tuples.items()
+        }
 
         for idx, node_id in enumerate(order):
             node = node_map.get(node_id)
@@ -1395,7 +1544,7 @@ async def execute_pipeline(
                     except Exception:
                         pass
                     run.status = "failed"
-                    run.error_message = f"Loop {block_type} failed: {str(e)}\n\n{tb}"
+                    run.error_message = scrub_traceback(f"Loop {block_type} failed: {str(e)}\n\n{tb}")
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     run.data_fingerprints = all_fingerprints
                     live.status = "failed"
@@ -1531,6 +1680,10 @@ async def execute_pipeline(
                 max_retries = block_schema.get("max_retries", 0) if block_schema else 0
                 is_composite = block_schema.get("composite", False) if block_schema else False
 
+                # --- Embed block version into config_snapshot for cache validation ---
+                if block_schema and block_schema.get("version"):
+                    node_data["block_version"] = block_schema["version"]
+
                 # --- Pre-execution validation ---
                 if block_schema:
                     validate_inputs(block_schema, node_inputs)
@@ -1626,7 +1779,7 @@ async def execute_pipeline(
                     except Exception:
                         pass
                     run.status = "failed"
-                    run.error_message = f"{classified_msg}\nAction: {classified_action}\n\n{tb}"
+                    run.error_message = scrub_traceback(f"{classified_msg}\nAction: {classified_action}\n\n{tb}")
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     run.data_fingerprints = all_fingerprints
                     live.status = "failed"
@@ -1649,6 +1802,9 @@ async def execute_pipeline(
                 db.commit()
                 log_run_failed(run_id, error_msg, node_id)
                 return
+
+            # Cache block outputs as typed artifacts with SHA-256 verification (best-effort)
+            _cache_block_outputs(node_id, run_id, node_outputs, block_schema, db)
 
             # Register artifacts produced by this block (best-effort, never crashes)
             try:
@@ -1744,7 +1900,7 @@ async def execute_pipeline(
     except Exception as e:
         tb = traceback.format_exc()
         run.status = "failed"
-        run.error_message = f"{str(e)}\n\n{tb}"
+        run.error_message = scrub_traceback(f"{str(e)}\n\n{tb}")
         run.finished_at = datetime.now(timezone.utc)
         run.duration_seconds = time.time() - start_time
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)
@@ -1801,6 +1957,6 @@ def _write_error_log(run_id: str, tb: str):
     try:
         error_dir = ARTIFACTS_DIR / run_id
         error_dir.mkdir(parents=True, exist_ok=True)
-        (error_dir / "error.log").write_text(tb)
+        (error_dir / "error.log").write_text(scrub_traceback(tb))
     except Exception:
         pass

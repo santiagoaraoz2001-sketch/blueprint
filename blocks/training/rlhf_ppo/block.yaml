@@ -2,32 +2,29 @@ name: RLHF (PPO)
 type: rlhf_ppo
 category: training
 description: Reinforcement Learning from Human Feedback using Proximal Policy Optimization
-version: "1.0.0"
-
+version: 1.0.0
 inputs:
-  - id: dataset
-    label: Prompts
-    data_type: dataset
-    required: true
-  - id: model
-    label: Policy Model
-    data_type: model
-    required: false
-  - id: reward_model
-    label: Reward Model
-    data_type: model
-    required: false
-
+- id: dataset
+  label: Prompts
+  data_type: dataset
+  required: true
+- id: model
+  label: Policy Model
+  data_type: model
+  required: false
+- id: reward_model
+  label: Reward Model
+  data_type: model
+  required: false
 outputs:
-  - id: trained_model
-    label: RLHF Model
-    aliases: [model]
-    data_type: model
-
-  - id: metrics
-    label: PPO Metrics
-    data_type: metrics
-
+- id: trained_model
+  label: RLHF Model
+  aliases:
+  - model
+  data_type: model
+- id: metrics
+  label: PPO Metrics
+  data_type: metrics
 config:
   model_name:
     type: string
@@ -37,13 +34,14 @@ config:
   reward_model:
     type: string
     label: Reward Model
-    description: HuggingFace model name or path for the reward model (leave empty for heuristic reward)
+    description: HuggingFace model name or path for the reward model (leave empty
+      for heuristic reward)
     mandatory: true
   lr:
     type: float
     label: Learning Rate
-    default: 0.000014
-    min: 0.0000001
+    default: 1.4e-05
+    min: 1.0e-07
     max: 0.001
   epochs:
     type: integer
@@ -61,7 +59,8 @@ config:
   kl_coeff:
     type: float
     label: KL Coefficient
-    description: Weight for KL penalty to prevent policy from diverging too far from reference
+    description: Weight for KL penalty to prevent policy from diverging too far from
+      reference
     default: 0.2
     min: 0.0
     max: 1.0
@@ -75,8 +74,9 @@ config:
   prompt_column:
     type: string
     label: Prompt Column
-    description: "Column name for prompts in your dataset (leave empty for auto-detect: query, prompt, text)"
-    default: ""
+    description: 'Column name for prompts in your dataset (leave empty for auto-detect:
+      query, prompt, text)'
+    default: ''
   max_new_tokens:
     type: integer
     label: Max New Tokens
@@ -87,19 +87,26 @@ config:
   temperature:
     type: float
     label: Temperature
-    description: "Sampling temperature for PPO rollout generation (higher = more diverse)"
+    description: Sampling temperature for PPO rollout generation (higher = more diverse)
     default: 0.7
     min: 0.1
     max: 2.0
   prefer_framework:
     type: select
     label: Preferred Framework
-    options: ["auto", "mlx", "pytorch"]
-    default: "auto"
-    description: "Force a specific training framework. 'auto' detects the best available."
-
+    options:
+    - auto
+    - mlx
+    - pytorch
+    default: auto
+    description: Force a specific training framework. 'auto' detects the best available.
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

@@ -1,0 +1,83 @@
+{
+  "name": "branching_dag",
+  "description": "A→B, A→C, B→D, C→D diamond DAG. Tests fan-out and fan-in.",
+  "nodes": [
+    {
+      "id": "source",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Source",
+        "category": "data",
+        "config": {"text": "input data"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "branch_left",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "Branch Left",
+        "category": "inference",
+        "config": {"model_name": "model-a", "temperature": 0.5},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "response", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "branch_right",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "Branch Right",
+        "category": "inference",
+        "config": {"model_name": "model-b", "temperature": 0.9},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "response", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "sink",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Merge Sink",
+        "category": "output",
+        "config": {"format": "json"},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "dataset", "dataType": "dataset"}]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "source", "target": "branch_left", "sourceHandle": "text", "targetHandle": "text"},
+    {"id": "e2", "source": "source", "target": "branch_right", "sourceHandle": "text", "targetHandle": "text"},
+    {"id": "e3", "source": "branch_left", "target": "sink", "sourceHandle": "response", "targetHandle": "text"},
+    {"id": "e4", "source": "branch_right", "target": "sink", "sourceHandle": "response", "targetHandle": "text"}
+  ],
+  "expected": {
+    "validation": {
+      "valid": true,
+      "error_count": 0,
+      "has_cycle": false
+    },
+    "topological_order_starts_with": "source",
+    "topological_order_ends_with": "sink",
+    "topological_order_length": 4,
+    "loop_detection": {
+      "loop_count": 0,
+      "loops": []
+    },
+    "compiler": {
+      "should_generate": true,
+      "refusal_reason": null
+    },
+    "partial_rerun": {
+      "safe_from_branch_left": true,
+      "downstream_from_branch_left": ["branch_left", "sink"]
+    },
+    "notes": "sink receives two edges to same handle 'text' — executor should convert to list"
+  }
+}

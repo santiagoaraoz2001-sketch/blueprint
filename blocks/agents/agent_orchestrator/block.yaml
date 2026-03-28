@@ -2,59 +2,61 @@ name: Agent Orchestrator
 type: agent_orchestrator
 category: agents
 description: Multi-step agent that reasons through tasks using tools and memory
-version: "1.1.0"
-
+version: 1.1.0
 inputs:
-  - id: llm
-    label: LLM
-    data_type: llm
-    required: false
-    description: "LLM config from llm_inference or model info from model_selector"
-  - id: model
-    label: Model
-    data_type: model
-    required: false
-    description: "Direct model connection (alternative to LLM port)"
-  - id: input
-    label: Task / Prompt
-    data_type: text
-    required: true
-  - id: tools
-    label: Tool Registry
-    data_type: config
-    required: false
-  - id: memory
-    label: Agent Memory
-    data_type: config
-    required: false
-
+- id: llm
+  label: LLM
+  data_type: llm
+  required: false
+  description: LLM config from llm_inference or model info from model_selector
+- id: model
+  label: Model
+  data_type: model
+  required: false
+  description: Direct model connection (alternative to LLM port)
+- id: input
+  label: Task / Prompt
+  data_type: text
+  required: true
+- id: tools
+  label: Tool Registry
+  data_type: config
+  required: false
+- id: memory
+  label: Agent Memory
+  data_type: config
+  required: false
 outputs:
-  - id: response
-    label: Final Response
-    data_type: text
-    aliases: [text, output]
-  - id: dataset
-    label: Step Log
-    data_type: dataset
-  - id: metrics
-    label: Run Metrics
-    data_type: metrics
-  - id: llm_config
-    label: LLM Config
-    data_type: llm
-    aliases: [llm]
-    description: "Passthrough of the LLM configuration — enables agent chaining and downstream inference"
-
+- id: response
+  label: Final Response
+  data_type: text
+  aliases:
+  - text
+  - output
+- id: dataset
+  label: Step Log
+  data_type: dataset
+- id: metrics
+  label: Run Metrics
+  data_type: metrics
+- id: llm_config
+  label: LLM Config
+  data_type: llm
+  aliases:
+  - llm
+  description: Passthrough of the LLM configuration — enables agent chaining and downstream
+    inference
 config:
   task:
     type: text_area
     label: Task
-    default: ""
-    description: "Task description for the agent (used when input port not connected)"
+    default: ''
+    description: Task description for the agent (used when input port not connected)
   system_prompt:
     type: text_area
     label: System Prompt
-    default: "You are a helpful assistant that breaks down tasks into steps and uses tools when needed. Think step by step."
+    default: You are a helpful assistant that breaks down tasks into steps and uses
+      tools when needed. Think step by step.
     description: System instructions for the agent
   max_steps:
     type: integer
@@ -66,9 +68,13 @@ config:
   strategy:
     type: select
     label: Strategy
-    options: [sequential, react, plan_and_execute]
+    options:
+    - sequential
+    - react
+    - plan_and_execute
     default: sequential
-    description: "sequential: step-by-step, react: reason-act-observe loops, plan_and_execute: plan first then execute"
+    description: 'sequential: step-by-step, react: reason-act-observe loops, plan_and_execute:
+      plan first then execute'
   temperature:
     type: float
     label: Temperature
@@ -88,18 +94,26 @@ config:
   stop_phrase:
     type: string
     label: Completion Signal
-    default: "FINAL ANSWER:"
+    default: 'FINAL ANSWER:'
     description: Phrase the agent uses to signal it has finished
   output_format:
     type: select
     label: Output Format
-    options: [plain, markdown, json]
+    options:
+    - plain
+    - markdown
+    - json
     default: plain
-    description: "plain: raw text, markdown: formatted with headers, json: structured JSON object"
+    description: 'plain: raw text, markdown: formatted with headers, json: structured
+      JSON object'
     section: advanced
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

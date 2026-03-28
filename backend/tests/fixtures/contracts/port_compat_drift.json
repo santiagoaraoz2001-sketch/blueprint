@@ -1,0 +1,86 @@
+{
+  "name": "port_compat_drift",
+  "description": "Edges demonstrating text→config and model→llm drift between frontend and backend.",
+  "nodes": [
+    {
+      "id": "text_source",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Text Source",
+        "category": "data",
+        "config": {"text": "some config text"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "config_consumer",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "Config Consumer",
+        "category": "inference",
+        "config": {"model_name": "test"},
+        "inputs": [{"id": "config", "dataType": "config", "required": false}],
+        "outputs": [{"id": "response", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "model_source",
+      "type": "blockNode",
+      "data": {
+        "type": "model_selector",
+        "label": "Model Source",
+        "category": "data",
+        "config": {"model_id": "test-model"},
+        "inputs": [],
+        "outputs": [{"id": "model", "dataType": "model"}]
+      }
+    },
+    {
+      "id": "llm_consumer",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "LLM Consumer",
+        "category": "inference",
+        "config": {"model_name": "test"},
+        "inputs": [{"id": "llm", "dataType": "llm", "required": false}],
+        "outputs": [{"id": "response", "dataType": "text"}]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_text_config",
+      "source": "text_source",
+      "target": "config_consumer",
+      "sourceHandle": "text",
+      "targetHandle": "config",
+      "_note": "text→config: Frontend BLOCKS this, Backend ALLOWS it"
+    },
+    {
+      "id": "e_model_llm",
+      "source": "model_source",
+      "target": "llm_consumer",
+      "sourceHandle": "model",
+      "targetHandle": "llm",
+      "_note": "model→llm: Frontend ALLOWS this, Backend BLOCKS it"
+    }
+  ],
+  "expected": {
+    "frontend_validation": {
+      "text_to_config_compatible": false,
+      "model_to_llm_compatible": true
+    },
+    "backend_validation": {
+      "text_to_config_compatible": true,
+      "model_to_llm_compatible": false
+    },
+    "drift_summary": [
+      "text→config: frontend=BLOCKED, backend=ALLOWED",
+      "model→llm: frontend=ALLOWED, backend=BLOCKED"
+    ]
+  }
+}

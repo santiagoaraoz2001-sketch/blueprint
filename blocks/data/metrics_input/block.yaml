@@ -1,43 +1,52 @@
 name: Metrics Input
 type: metrics_input
 category: source
-description: Define metric key-value pairs manually for quality gates, leaderboards, and reports
-version: "1.0.0"
-
+description: Define metric key-value pairs manually for quality gates, leaderboards,
+  and reports
+version: 1.0.0
 inputs: []
-
 outputs:
-  - id: metrics
-    label: Metrics
-    data_type: metrics
-    description: >
-      Dictionary of metric key-value pairs. Keys are metric names, values are numbers or strings.
-      Connect to Quality Gate, Checkpoint Gate, Leaderboard Publisher, Report Generator,
-      A/B Significance Test, Experiment Logger, or any block that accepts metrics input.
+- id: metrics
+  label: Metrics
+  data_type: metrics
+  description: 'Dictionary of metric key-value pairs. Keys are metric names, values
+    are numbers or strings. Connect to Quality Gate, Checkpoint Gate, Leaderboard
+    Publisher, Report Generator, A/B Significance Test, Experiment Logger, or any
+    block that accepts metrics input.
 
+    '
 config:
   metrics_json:
     type: text_area
     label: Metrics (JSON)
     default: '{"accuracy": 0.95, "loss": 0.05}'
-    description: "JSON object with metric key-value pairs. Values should be numbers for numeric metrics."
+    description: JSON object with metric key-value pairs. Values should be numbers
+      for numeric metrics.
   format:
     type: select
     label: Input Format
-    options: [json, key_value]
+    options:
+    - json
+    - key_value
     default: json
-    description: "json: JSON object. key_value: one metric per line as 'name: value' (e.g., 'accuracy: 0.95')"
+    description: 'json: JSON object. key_value: one metric per line as ''name: value''
+      (e.g., ''accuracy: 0.95'')'
   key_value_text:
     type: text_area
     label: Metrics (Key-Value)
-    default: ""
-    description: "One metric per line: 'name: value'. Lines starting with # are ignored."
+    default: ''
+    description: 'One metric per line: ''name: value''. Lines starting with # are
+      ignored.'
     depends_on:
       field: format
       value: key_value
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

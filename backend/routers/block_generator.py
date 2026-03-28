@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..config import BUILTIN_BLOCKS_DIR
-from ..engine.block_registry import reset as _reset_block_registry
+from ..services.registry import reset_global_registry
 from ..services.llm_block_gen import VALID_CATEGORIES, generate_block as _generate_block
 
 logger = logging.getLogger("blueprint.block_generator")
@@ -116,7 +116,7 @@ def install_generated_block(body: InstallRequest):
         raise HTTPException(status_code=500, detail=f"Failed to write block files: {e}")
 
     # Reset block registry cache so the new block is discovered
-    _reset_block_registry()
+    reset_global_registry()
 
     # Regenerate frontend block registry (best-effort)
     _regenerate_frontend_registry()

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { T, F, FS } from '@/lib/design-tokens'
-import { BLOCK_REGISTRY, type BlockDefinition, isPortCompatible, getPortNames } from '@/lib/block-registry'
+import { getAllBlocks, getBlockDefinition, type BlockDefinition, isPortCompatible, getPortNames } from '@/lib/block-registry'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { getIcon } from '@/lib/icon-utils'
 import { Sparkles, Plus, Lightbulb, ArrowDownToLine, ArrowUpFromLine, Zap } from 'lucide-react'
@@ -252,7 +252,7 @@ function getEmptyPipelineRecommendations(): Recommendation[] {
   const starters = ['text_input', 'huggingface_loader', 'local_file_loader', 'model_selector', 'metrics_input', 'config_builder']
   return starters
     .map((type) => {
-      const block = BLOCK_REGISTRY.find((b) => b.type === type)
+      const block = getBlockDefinition(type)
       if (!block) return null
       return {
         block,
@@ -278,7 +278,7 @@ export function computeRecommendations(
 
   const openOutputs: { nodeId: string; nodeType: string; portId: string; portType: string; portLabel: string; portNames: Set<string> }[] = []
   for (const node of nodes) {
-    const def = BLOCK_REGISTRY.find((b) => b.type === node.data?.type)
+    const def = getBlockDefinition(node.data?.type ?? '')
     if (!def) continue
     for (const out of def.outputs) {
       const key = `${node.id}:${out.id}`
@@ -296,7 +296,7 @@ export function computeRecommendations(
   }
 
   for (const open of openOutputs) {
-    for (const candidate of BLOCK_REGISTRY) {
+    for (const candidate of getAllBlocks()) {
       if (existingTypes.has(candidate.type)) continue
       if (candidate.deprecated) continue
       const hasCompatibleInput = candidate.inputs.some((inp) =>
@@ -333,7 +333,7 @@ export function computeRecommendations(
 
   const openInputs: { nodeId: string; nodeType: string; portId: string; portType: string; portLabel: string; portNames: Set<string> }[] = []
   for (const node of nodes) {
-    const def = BLOCK_REGISTRY.find((b) => b.type === node.data?.type)
+    const def = getBlockDefinition(node.data?.type ?? '')
     if (!def) continue
     for (const inp of def.inputs) {
       if (!inp.required) continue
@@ -352,7 +352,7 @@ export function computeRecommendations(
   }
 
   for (const open of openInputs) {
-    for (const candidate of BLOCK_REGISTRY) {
+    for (const candidate of getAllBlocks()) {
       if (existingTypes.has(candidate.type)) continue
       if (candidate.deprecated) continue
       const hasCompatibleOutput = candidate.outputs.some((out) =>
@@ -403,7 +403,7 @@ export function computeRecommendations(
 
   // Has training but no evaluation
   if (categories.has('training') && !categories.has('evaluation')) {
-    const evalBlocks = BLOCK_REGISTRY.filter((b) => b.category === 'evaluation' && !types.has(b.type))
+    const evalBlocks = getAllBlocks().filter((b) => b.category === 'evaluation' && !types.has(b.type))
     for (const eb of evalBlocks.slice(0, 2)) {
       const existing = outputRecs.find((r) => r.block.type === eb.type)
       if (existing) {
@@ -420,7 +420,7 @@ export function computeRecommendations(
     const transformBlocks = ['filter_sample', 'train_val_test_split', 'data_preview']
     for (const tbType of transformBlocks) {
       if (types.has(tbType)) continue
-      const block = BLOCK_REGISTRY.find((b) => b.type === tbType)
+      const block = getBlockDefinition(tbType)
       if (block) {
         const existing = outputRecs.find((r) => r.block.type === block.type)
         if (existing) {
@@ -437,7 +437,7 @@ export function computeRecommendations(
     const exportBlocks = ['experiment_logger', 'report_generator', 'save_model']
     for (const ebType of exportBlocks) {
       if (types.has(ebType)) continue
-      const block = BLOCK_REGISTRY.find((b) => b.type === ebType)
+      const block = getBlockDefinition(ebType)
       if (block) {
         const existing = outputRecs.find((r) => r.block.type === block.type)
         if (existing) {
@@ -451,7 +451,7 @@ export function computeRecommendations(
 
   // No model selector but has training/inference
   if ((categories.has('training') || categories.has('inference')) && !types.has('model_selector')) {
-    const block = BLOCK_REGISTRY.find((b) => b.type === 'model_selector')
+    const block = getBlockDefinition('model_selector')
     if (block) {
       inputRecs.push({ block, reason: 'Select a base model for your pipeline', score: 6, connectTo: findConnectionForBlock(block) })
     }
@@ -460,11 +460,11 @@ export function computeRecommendations(
   // No text_input but has inference blocks needing text
   if (categories.has('inference') && !types.has('text_input')) {
     const needsText = nodes.some((n) => {
-      const def = BLOCK_REGISTRY.find((b) => b.type === n.data?.type)
+      const def = getBlockDefinition(n.data?.type ?? '')
       return def?.inputs.some((inp) => inp.dataType === 'text' && inp.required)
     })
     if (needsText) {
-      const block = BLOCK_REGISTRY.find((b) => b.type === 'text_input')
+      const block = getBlockDefinition('text_input')
       if (block) {
         inputRecs.push({ block, reason: 'Provide text input for inference', score: 5, connectTo: findConnectionForBlock(block) })
       }
@@ -473,7 +473,7 @@ export function computeRecommendations(
 
   // Has blocks but no human review gate
   if (nodes.length >= 3 && !types.has('human_review_gate')) {
-    const block = BLOCK_REGISTRY.find((b) => b.type === 'human_review_gate')
+    const block = getBlockDefinition('human_review_gate')
     if (block) {
       outputRecs.push({ block, reason: 'Add a review checkpoint', score: 2, connectTo: findConnectionForBlock(block) })
     }

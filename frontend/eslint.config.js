@@ -10,6 +10,7 @@ export default tseslint.config(
       'electron/**',
       'src/lib/block-registry.generated.ts',
       'src/lib/block-configs.generated.ts',
+      'src/lib/generated/**',
       'src/api/generated-types.ts',
     ],
   },

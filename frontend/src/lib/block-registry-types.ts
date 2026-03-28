@@ -1,8 +1,9 @@
 // block-registry-types.ts — Hand-maintained type definitions and utility functions
-// The BLOCK_REGISTRY data is auto-generated in block-registry.generated.ts
-// Lookup helpers (getBlocksByCategory, getBlockDefinition) live in block-registry.ts
+// Block data is served by the backend registry API (see registry-client.ts).
+// Lookup helpers (getBlocksByCategory, getBlockDefinition) live in registry-client.ts.
 
 import { CONNECTOR_COLORS } from './design-tokens'
+import { COMPAT, PORT_TYPE_ALIASES } from './port-compatibility.generated'
 
 /** The 10 wire types that flow between blocks */
 export type ConnectorType =
@@ -84,54 +85,10 @@ export interface BlockDefinition {
   side_inputs?: PortDefinition[]
 }
 
-/** Backward-compat aliases — map old type names to new 10-type system */
-const PORT_TYPE_ALIASES: Record<string, string> = {
-  data:         'dataset',     // old catch-all → dataset
-  external:     'dataset',     // old external → dataset
-  training:     'model',       // old training output → model
-  intervention: 'any',         // old intervention → any (pass-through)
-  // Sub-type aliases for backward compat with saved pipelines
-  checkpoint:   'model',
-  optimizer:    'config',
-  schedule:     'config',
-  api:          'dataset',
-  file:         'dataset',
-  cloud:        'config',
-  llm_config:   'llm',         // old type name → new llm type
-}
-
 /** Get port color from CONNECTOR_COLORS map (handles legacy port types) */
 export function getPortColor(dataType: ConnectorType | string): string {
   const resolved = PORT_TYPE_ALIASES[dataType] || dataType
   return CONNECTOR_COLORS[resolved] || CONNECTOR_COLORS.dataset
-}
-
-/**
- * Strict port compatibility matrix with smart coercion.
- *
- * SOURCE     → CAN CONNECT TO
- * dataset    → dataset, text, any
- * text       → text, dataset, any                (REMOVED config — no more text→config)
- * model      → model, llm, any                   (ADDED llm — model_selector→agent works)
- * config     → config, text, llm, any             (ADDED llm — config→llm for llm_config outputs)
- * metrics    → metrics, dataset, text, any
- * embedding  → embedding, dataset, any
- * artifact   → artifact, text, any
- * agent      → agent, any
- * llm        → llm, model, config, any            (accepts model AND config)
- * any        → ALL TYPES
- */
-const COMPAT: Record<string, Set<string>> = {
-  dataset:   new Set(['dataset', 'text', 'any']),
-  text:      new Set(['text', 'dataset', 'any']),
-  model:     new Set(['model', 'llm', 'any']),
-  config:    new Set(['config', 'text', 'llm', 'any']),
-  metrics:   new Set(['metrics', 'dataset', 'text', 'any']),
-  embedding: new Set(['embedding', 'dataset', 'any']),
-  artifact:  new Set(['artifact', 'text', 'any']),
-  agent:     new Set(['agent', 'any']),
-  llm:       new Set(['llm', 'model', 'config', 'any']),
-  any:       new Set(['any', 'dataset', 'text', 'model', 'config', 'metrics', 'embedding', 'artifact', 'agent', 'llm']),
 }
 
 export function isPortCompatible(source: ConnectorType | string, target: ConnectorType | string): boolean {

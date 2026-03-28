@@ -10,20 +10,21 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from .config import ENABLE_MARKETPLACE, ensure_dirs
+from .config import BLOCKS_DIR, BUILTIN_BLOCKS_DIR, CUSTOM_BLOCKS_DIR, ENABLE_MARKETPLACE, ensure_dirs
 from .database import SessionLocal, init_db
+from .services.registry import BlockRegistryService, set_global_registry
 from .models.run import LiveRun, Run
 from .routers import (
-    block_generator, blocks, connectors, control_tower, custom_blocks,
+    artifacts, block_generator, blocks, connectors, control_tower, custom_blocks,
     datasets, events, execution, inference, marketplace, models, outputs,
-    papers, pipelines, plugins, projects, runs, secrets, sweeps, system,
-    workspace,
+    papers, pipelines, plugins, projects, registry, runs, secrets, sweeps,
+    system, workspace,
 )
 from .utils.structured_logger import init_structured_logging, log_event, log_recovery
 
@@ -165,6 +166,17 @@ async def lifespan(app: FastAPI):
     log_event("server_start", message="Blueprint server starting",
               data={"heartbeat_timeout_s": HEARTBEAT_TIMEOUT})
 
+    # Initialize block registry (single source of truth for block discovery)
+    registry = BlockRegistryService()
+    registry.discover_all([BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR])
+    app.state.registry = registry
+    set_global_registry(registry)
+    health = registry.get_health()
+    logging.getLogger("blueprint.registry").info(
+        "Block registry ready: %d total, %d valid, %d broken",
+        health["total"], health["valid"], health["broken"],
+    )
+
     # Recover stale runs from previous crash
     _recover_stale_runs()
 
@@ -258,8 +270,15 @@ app.include_router(connectors.router)
 app.include_router(block_generator.router)
 app.include_router(outputs.router)
 app.include_router(workspace.router)
+app.include_router(artifacts.router)
+app.include_router(registry.router)
 if ENABLE_MARKETPLACE:
     app.include_router(marketplace.router)
+
+
+def get_registry(request: Request) -> BlockRegistryService:
+    """FastAPI dependency — retrieve the singleton BlockRegistryService."""
+    return request.app.state.registry
 
 
 @app.get("/api/health")

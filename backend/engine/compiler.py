@@ -1,6 +1,6 @@
 import json
 from .block_registry import resolve_output_handle
-from .executor import _topological_sort, _find_block_module
+from .executor import _topological_sort, _topological_sort_with_loops, _detect_loops, _find_block_module
 from ..config import BUILTIN_BLOCKS_DIR
 from pathlib import Path
 
@@ -12,8 +12,49 @@ def compile_pipeline_to_python(pipeline_name: str, definition: dict) -> str:
     if not nodes:
         return "# Empty pipeline definition - nothing to compile."
 
-    order = _topological_sort(nodes, edges)
     node_map = {n["id"]: n for n in nodes}
+
+    # Detect loops and use loop-aware sort so body nodes are included
+    loop_warning_lines: list[str] = []
+    try:
+        loops = _detect_loops(nodes, edges)
+        if loops:
+            loop_warning_lines = [
+                "# " + "=" * 70,
+                "# WARNING: This pipeline contains loop(s) that cannot be fully",
+                "# represented as a linear Python script. Loop body blocks are",
+                "# included below but execute only ONCE (no iteration).",
+                "#",
+            ]
+            for loop_def in loops:
+                ctrl_node = node_map.get(loop_def.controller_id, {})
+                ctrl_label = ctrl_node.get("data", {}).get("label", loop_def.controller_id)
+                body_labels = [
+                    node_map.get(nid, {}).get("data", {}).get("label", nid)
+                    for nid in loop_def.body_node_ids
+                ]
+                loop_warning_lines.append(
+                    f"#   Loop: {ctrl_label} -> {', '.join(body_labels)}"
+                )
+            loop_warning_lines.extend([
+                "#",
+                "# For iterative execution, use the Blueprint Workbench runtime.",
+                "# " + "=" * 70,
+                "",
+            ])
+            order = _topological_sort_with_loops(nodes, edges, loops)
+        else:
+            order = _topological_sort(nodes, edges)
+    except ValueError:
+        # Illegal cycle — generate warning, proceed with whatever Kahn's produced
+        loop_warning_lines = [
+            "# " + "=" * 70,
+            "# WARNING: This pipeline contains an illegal cycle (no Loop Controller).",
+            "# Some blocks may be missing from this script.",
+            "# " + "=" * 70,
+            "",
+        ]
+        order = _topological_sort(nodes, edges)
 
     # Pre-scan for missing blocks so we can skip them cleanly
     missing_blocks: set[str] = set()
@@ -42,6 +83,13 @@ def compile_pipeline_to_python(pipeline_name: str, definition: dict) -> str:
         f'and update the paths accordingly.',
         f'"""',
         "",
+    ]
+
+    # Insert loop warnings after docstring if applicable
+    if loop_warning_lines:
+        script_lines += loop_warning_lines
+
+    script_lines += [
         "import os",
         "import sys",
         "import uuid",

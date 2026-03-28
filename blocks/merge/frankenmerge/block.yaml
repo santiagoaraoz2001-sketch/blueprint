@@ -2,63 +2,68 @@ name: FrankenMerge
 type: frankenmerge
 category: merge
 description: Layer-by-layer model assembly from multiple sources
-version: "1.0.0"
-
+version: 1.0.0
 inputs:
-  - id: model_a
-    label: Model A
-    data_type: model
-    required: true
-  - id: model_b
-    label: Model B
-    data_type: model
-    required: true
-
+- id: model_a
+  label: Model A
+  data_type: model
+  required: true
+- id: model_b
+  label: Model B
+  data_type: model
+  required: true
 outputs:
-  - id: model
-    label: FrankenModel
-    data_type: model
-  - id: metrics
-    label: Merge Metrics
-    data_type: metrics
-
+- id: model
+  label: FrankenModel
+  data_type: model
+- id: metrics
+  label: Merge Metrics
+  data_type: metrics
 config:
   model_a_name:
     type: string
     label: Model A (fallback)
-    default: ""
-    description: "HuggingFace model ID for Model A (used when input port not connected)"
+    default: ''
+    description: HuggingFace model ID for Model A (used when input port not connected)
   model_b_name:
     type: string
     label: Model B (fallback)
-    default: ""
-    description: "HuggingFace model ID for Model B (used when input port not connected)"
+    default: ''
+    description: HuggingFace model ID for Model B (used when input port not connected)
   layer_config:
     type: text_area
-    label: "Layer Config (JSON)"
-    description: 'JSON array of slices, e.g. [{"model": "A", "layer_range": [0, 16]}, {"model": "B", "layer_range": [16, 32]}]'
-    default: "[]"
+    label: Layer Config (JSON)
+    description: 'JSON array of slices, e.g. [{"model": "A", "layer_range": [0, 16]},
+      {"model": "B", "layer_range": [16, 32]}]'
+    default: '[]'
   merge_embed:
     type: select
     label: Embedding From
     description: Which model provides the embedding and tokenizer
-    options: [a, b, average]
-    default: "a"
+    options:
+    - a
+    - b
+    - average
+    default: a
   output_name:
     type: string
     label: Output Name
     description: Name for the assembled model
-    default: "frankenmerge-model"
+    default: frankenmerge-model
   timeout:
     type: integer
     label: Timeout (seconds)
     default: 3600
     min: 60
     max: 7200
-    description: "Maximum execution time for the mergekit process"
-
+    description: Maximum execution time for the mergekit process
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

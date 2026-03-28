@@ -2,38 +2,49 @@ name: Text Input
 type: text_input
 category: source
 description: Provide raw text or prompt input with format hints for downstream blocks
-version: "2.0.0"
-
+version: 2.0.0
 inputs: []
-
 outputs:
-  - id: text
-    label: Text Output
-    data_type: text
-    description: "Plain text file (text_input.txt) with specified encoding. Sidecar metadata.json contains {format, encoding, char_count, line_count}."
-
-    aliases: [response, output]
+- id: text
+  label: Text Output
+  data_type: text
+  description: Plain text file (text_input.txt) with specified encoding. Sidecar metadata.json
+    contains {format, encoding, char_count, line_count}.
+  aliases:
+  - response
+  - output
 config:
   text_value:
     type: text_area
     label: Text Value
     description: Raw text to be used as input for other blocks
-    default: "Enter your text here..."
+    default: Enter your text here...
   format:
     type: select
     label: Format
-    options: [plain, markdown, json, csv]
+    options:
+    - plain
+    - markdown
+    - json
+    - csv
     default: plain
-    description: "Format hint for downstream blocks (json format is validated on save)"
+    description: Format hint for downstream blocks (json format is validated on save)
   encoding:
     type: select
     label: Encoding
-    options: [utf-8, ascii, latin-1]
+    options:
+    - utf-8
+    - ascii
+    - latin-1
     default: utf-8
-    description: "Output text encoding"
-
+    description: Output text encoding
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

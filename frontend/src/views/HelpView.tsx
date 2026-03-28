@@ -4,7 +4,7 @@ import { T, F, FD, FS } from '@/lib/design-tokens'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useHardwareStore } from '@/stores/hardwareStore'
 import { estimatePipeline, type HardwareSpec } from '@/lib/pipeline-estimator'
-import { BLOCK_REGISTRY } from '@/lib/block-registry'
+import { getAllBlocks } from '@/lib/block-registry'
 import {
   BookOpen,
   Sparkles,
@@ -227,7 +227,7 @@ const MachineProfile = memo(function MachineProfile() {
   const infeasibleBlocks = useMemo(() => {
     if (!profile) return []
     const result: { name: string; reason: string }[] = []
-    for (const block of BLOCK_REGISTRY) {
+    for (const block of getAllBlocks()) {
       const fakeNode = {
         id: block.type,
         type: 'blockNode',
@@ -611,7 +611,7 @@ export default function HelpView() {
                 lineHeight: 1.6,
               }}
             >
-              Blueprint by Specific Labs &middot; {BLOCK_REGISTRY.length}+ blocks &middot; Local-first
+              Blueprint by Specific Labs &middot; {getAllBlocks().length}+ blocks &middot; Local-first
               ML workbench
               <br />
               For issues and feedback:{' '}

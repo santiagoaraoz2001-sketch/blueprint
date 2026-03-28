@@ -1,0 +1,58 @@
+{
+  "name": "input_satisfies_config",
+  "description": "A model input port satisfies the mandatory model_name config field. Tests _config_to_port logic.",
+  "nodes": [
+    {
+      "id": "model_provider",
+      "type": "blockNode",
+      "data": {
+        "type": "model_selector",
+        "label": "Model Selector",
+        "category": "data",
+        "config": {"model_id": "test-model"},
+        "inputs": [],
+        "outputs": [{"id": "model", "dataType": "model"}]
+      }
+    },
+    {
+      "id": "inference_block",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "LLM Inference",
+        "category": "inference",
+        "config": {},
+        "_note": "model_name is mandatory but NOT set — should be satisfied by 'model' input port",
+        "inputs": [
+          {"id": "text", "dataType": "text", "required": false},
+          {"id": "model", "dataType": "model", "required": false}
+        ],
+        "outputs": [{"id": "response", "dataType": "text"}]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "model_provider",
+      "target": "inference_block",
+      "sourceHandle": "model",
+      "targetHandle": "model"
+    }
+  ],
+  "expected": {
+    "validation": {
+      "valid_per_contract": true,
+      "note": "model_name is mandatory in llm_inference but the connected 'model' input port satisfies it via _config_to_port mapping."
+    },
+    "schema_validation": {
+      "validate_config_skips_mandatory": true,
+      "reason": "_input_provides('model_name') returns True because 'model' port has data"
+    },
+    "config_precedence": [
+      "1. model input port provides model info at runtime",
+      "2. model_name config field check is skipped",
+      "3. Block's run.py uses ctx.inputs['model'] to determine the model"
+    ]
+  }
+}

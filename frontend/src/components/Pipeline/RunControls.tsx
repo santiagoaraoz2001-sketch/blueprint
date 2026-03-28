@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import PipelineAnalysisPanel from './PipelineAnalysisPanel'
 import { getBlockDefinition } from '@/lib/block-registry'
 import { generateRequirements } from '@/lib/block-dependencies'
+import { isPipelineExportable, exportDisabledReason } from '@/lib/graph-utils'
 import Editor from '@monaco-editor/react'
 
 export default function RunControls() {
@@ -40,6 +41,17 @@ export default function RunControls() {
   // Treat stale results as "still validating" — don't allow runs based on outdated state
   const isPendingValidation = isBackendValidating || isBackendStale
   const isRunDisabled = isRunning || isStarting || nodes.length === 0 || hasBackendErrors || isPendingValidation
+
+  // Kill switch: check if pipeline is exportable (loops, cycles, custom code)
+  const edges = usePipelineStore((s) => s.edges)
+  const isExportDisabled = useMemo(
+    () => !isPipelineExportable(nodes, edges),
+    [nodes, edges],
+  )
+  const exportDisabledTooltip = useMemo(
+    () => exportDisabledReason(nodes, edges),
+    [nodes, edges],
+  )
 
   // SSE subscription via centralized manager
   useEffect(() => {
@@ -350,7 +362,7 @@ export default function RunControls() {
             items={[
               { label: 'Save as Template', icon: <LayoutTemplate size={12} color={T.blue} />, onClick: handleSaveTemplate, color: T.blue },
               { label: 'Analyze Pipeline', icon: <Gauge size={12} color={T.amber} />, onClick: () => setShowAnalysis(true), color: T.amber },
-              { label: 'Eject to Python', icon: <FileCode size={12} color={T.purple} />, onClick: handleEject, color: T.purple, separator: true },
+              { label: 'Eject to Python', icon: <FileCode size={12} color={isExportDisabled ? T.dim : T.purple} />, onClick: handleEject, color: T.purple, separator: true, disabled: isExportDisabled, tooltip: exportDisabledTooltip },
             ]}
           />
         </>

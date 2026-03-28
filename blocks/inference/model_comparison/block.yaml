@@ -2,74 +2,66 @@ name: Model Comparison
 type: model_comparison
 category: inference
 description: Compare multiple models on the same prompts and rank by quality and speed
-version: "1.0.0"
-
+version: 1.0.0
 inputs:
-  - id: model
-    label: Model
-    data_type: model
-    required: false
-    description: "Optional model configuration (overrides endpoint/api_key config)"
-  - id: dataset
-    label: Prompt Dataset
-    data_type: dataset
-    required: false
-  - id: dataset_meta
-    label: Dataset Info
-    data_type: config
-    required: false
-
+- id: model
+  label: Model
+  data_type: model
+  required: false
+  description: Optional model configuration (overrides endpoint/api_key config)
+- id: dataset
+  label: Prompt Dataset
+  data_type: dataset
+  required: false
+- id: dataset_meta
+  label: Dataset Info
+  data_type: config
+  required: false
 outputs:
-  - id: comparison_results
-    label: Comparison Results
-    data_type: dataset
-    aliases: [dataset]
-    description: >
-      JSON array of per-prompt comparison objects. Each row contains:
-      prompt (str) — the input prompt text (truncated to 500 chars);
-      For each model (by index, e.g. model_1, model_2, model_3):
-        response_<N> (str) — the model's response;
-        latency_<N> (float) — request latency in seconds;
-        length_<N> (int) — response character count;
-        model_<N> (str) — the model identifier;
-        provider_<N> (str) — the provider used;
-        error_<N> (str, optional) — error message if the request failed.
-      fastest_model (str) — name of the model with lowest latency for this prompt;
-      longest_response_model (str) — name of the model with longest response.
-      Output format configurable via dataset_format (json, jsonl, csv).
-
-  - id: metrics
-    label: Comparison Summary
-    data_type: metrics
-    description: >
-      Aggregated comparison statistics. Fields:
-      num_prompts (int) — total prompts compared;
-      num_models (int) — number of models compared;
-      models (list of str) — list of model identifiers;
-      For each model (by index):
-        avg_latency_<N> (float) — mean latency in seconds;
-        avg_length_<N> (float) — mean response length in characters;
-        total_latency_<N> (float) — sum of all latencies;
-        errors_<N> (int) — number of failed requests;
-      fastest_model (str) — model with lowest average latency;
-      ranking_by_speed (list of str) — models sorted fastest to slowest.
-
+- id: comparison_results
+  label: Comparison Results
+  data_type: dataset
+  aliases:
+  - dataset
+  description: "JSON array of per-prompt comparison objects. Each row contains: prompt\
+    \ (str) — the input prompt text (truncated to 500 chars); For each model (by index,\
+    \ e.g. model_1, model_2, model_3):\n  response_<N> (str) — the model's response;\n\
+    \  latency_<N> (float) — request latency in seconds;\n  length_<N> (int) — response\
+    \ character count;\n  model_<N> (str) — the model identifier;\n  provider_<N>\
+    \ (str) — the provider used;\n  error_<N> (str, optional) — error message if the\
+    \ request failed.\nfastest_model (str) — name of the model with lowest latency\
+    \ for this prompt; longest_response_model (str) — name of the model with longest\
+    \ response. Output format configurable via dataset_format (json, jsonl, csv).\n"
+- id: metrics
+  label: Comparison Summary
+  data_type: metrics
+  description: "Aggregated comparison statistics. Fields: num_prompts (int) — total\
+    \ prompts compared; num_models (int) — number of models compared; models (list\
+    \ of str) — list of model identifiers; For each model (by index):\n  avg_latency_<N>\
+    \ (float) — mean latency in seconds;\n  avg_length_<N> (float) — mean response\
+    \ length in characters;\n  total_latency_<N> (float) — sum of all latencies;\n\
+    \  errors_<N> (int) — number of failed requests;\nfastest_model (str) — model\
+    \ with lowest average latency; ranking_by_speed (list of str) — models sorted\
+    \ fastest to slowest.\n"
 config:
   models:
     type: text_area
     label: Models (one per line)
-    default: "ollama:llama3.2\nollama:mistral"
-    description: "Format: provider:model_name per line (e.g. 'ollama:llama3.2', 'openai:gpt-4o')"
+    default: 'ollama:llama3.2
+
+      ollama:mistral'
+    description: 'Format: provider:model_name per line (e.g. ''ollama:llama3.2'',
+      ''openai:gpt-4o'')'
   endpoint:
     type: string
     label: Default Endpoint
-    default: "http://localhost:11434"
-    description: "Default endpoint for providers that need one (ollama, openai)"
+    default: http://localhost:11434
+    description: Default endpoint for providers that need one (ollama, openai)
   api_key:
     type: string
     label: API Key
-    default: ""
-    description: "API key for cloud providers"
+    default: ''
+    description: API key for cloud providers
   temperature:
     type: float
     label: Temperature
@@ -85,22 +77,32 @@ config:
   prompts:
     type: text_area
     label: Prompts (one per line)
-    default: "Explain quantum computing in simple terms.\nWrite a haiku about coding."
-    description: "One prompt per line. Used if no dataset is connected."
+    default: 'Explain quantum computing in simple terms.
+
+      Write a haiku about coding.'
+    description: One prompt per line. Used if no dataset is connected.
   text_column:
     type: string
     label: Text Column
-    default: "text"
-    description: "Column containing prompts when using a dataset input"
+    default: text
+    description: Column containing prompts when using a dataset input
   dataset_format:
     type: select
     label: Dataset Format
-    description: "Output format for results — json (default), jsonl (one JSON object per line), csv (comma-separated values)"
+    description: Output format for results — json (default), jsonl (one JSON object
+      per line), csv (comma-separated values)
     default: json
-    options: [json, jsonl, csv]
-
+    options:
+    - json
+    - jsonl
+    - csv
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess
