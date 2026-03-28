@@ -84,6 +84,18 @@ export type BlockSourceResponse = components['schemas']['BlockSourceResponse']
 export type CreateSweepRequest = components['schemas']['CreateSweepRequest']
 
 // ═══════════════════════════════════════════════════
+//  REGISTRY
+// ═══════════════════════════════════════════════════
+export type BlockSchema = components['schemas']['BlockSchema']
+export type PortSchema = components['schemas']['PortSchema']
+export type ConfigFieldSchema = components['schemas']['ConfigFieldSchema']
+export type BlockDetailSchema = components['schemas']['BlockDetailSchema']
+export type ValidateConnectionRequest = components['schemas']['ValidateConnectionRequest']
+export type ValidateConnectionResponse = components['schemas']['ValidateConnectionResponse']
+export type RegistryVersionResponse = components['schemas']['RegistryVersionResponse']
+export type RegistryHealthResponse = components['schemas']['RegistryHealthResponse']
+
+// ═══════════════════════════════════════════════════
 //  MARKETPLACE
 // ═══════════════════════════════════════════════════
 // Note: PublishRequest and ReviewRequest are defined in-router (not in schemas/)

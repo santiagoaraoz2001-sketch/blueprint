@@ -1,4 +1,4 @@
-"""Tests for the BlockRegistryService."""
+"""Tests for the BlockRegistryService and the registry API router."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 # Ensure project root is on sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -15,7 +16,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from backend.config import BUILTIN_BLOCKS_DIR
 from backend.models.block_schema import BlockSchema
 from backend.services.registry import BlockRegistryService
+from backend.main import app
 
+
+# ─── Service-level tests ─────────────────────────────────────────────
 
 @pytest.fixture
 def registry() -> BlockRegistryService:
@@ -143,3 +147,99 @@ class TestAppImport:
         from backend.main import app
         assert app is not None
         assert app.title == "Blueprint API"
+
+
+# ─── API-level tests (registry router) ───────────────────────────────
+
+client = TestClient(app)
+
+
+def test_api_list_blocks():
+    response = client.get("/api/registry/blocks")
+    assert response.status_code == 200
+    blocks = response.json()
+    assert isinstance(blocks, list)
+    assert len(blocks) > 0
+    block = blocks[0]
+    assert "type" in block
+    assert "name" in block
+    assert "category" in block
+    assert "inputs" in block
+    assert "outputs" in block
+    assert "configFields" in block
+
+
+def test_api_list_blocks_by_category():
+    response = client.get("/api/registry/blocks?category=agents")
+    assert response.status_code == 200
+    blocks = response.json()
+    assert all(b["category"] == "agents" for b in blocks)
+
+
+def test_api_get_single_block():
+    list_resp = client.get("/api/registry/blocks")
+    blocks = list_resp.json()
+    block_type = blocks[0]["type"]
+
+    response = client.get(f"/api/registry/blocks/{block_type}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["type"] == block_type
+
+
+def test_api_get_unknown_block_404():
+    response = client.get("/api/registry/blocks/nonexistent_block_xyz")
+    assert response.status_code == 404
+
+
+def test_api_registry_version():
+    response = client.get("/api/registry/version")
+    assert response.status_code == 200
+    data = response.json()
+    assert "version" in data
+    assert isinstance(data["version"], int)
+    assert data["version"] >= 1
+
+
+def test_api_validate_connection_compatible():
+    response = client.post("/api/registry/validate-connection", json={
+        "src_type": "text_block",
+        "src_port": "dataset",
+        "dst_type": "other_block",
+        "dst_port": "text",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["valid"] is True
+    assert data["error"] is None
+
+
+def test_api_validate_connection_incompatible():
+    response = client.post("/api/registry/validate-connection", json={
+        "src_type": "text_block",
+        "src_port": "agent",
+        "dst_type": "other_block",
+        "dst_port": "model",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["valid"] is False
+    assert data["error"] is not None
+
+
+def test_api_registry_health():
+    response = client.get("/api/registry/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert "total_blocks" in data
+    assert "categories" in data
+    assert "broken_blocks" in data
+    assert data["total_blocks"] > 0
+
+
+def test_api_refresh_registry():
+    response = client.post("/api/registry/refresh")
+    assert response.status_code == 200
+    data = response.json()
+    assert "version" in data
+    assert data["version"] >= 1

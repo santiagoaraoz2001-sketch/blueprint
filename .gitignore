@@ -63,5 +63,6 @@ pyinstaller_log.txt
 # Generated files (build artifacts from codegen)
 frontend/src/lib/block-registry.generated.ts
 frontend/src/lib/block-configs.generated.ts
+frontend/src/lib/generated/
 frontend/src/api/generated-types.ts
 frontend/src/api/schema.json

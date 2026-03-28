@@ -4,9 +4,13 @@
 # which other port types. Both the backend (BlockRegistryService) and the
 # frontend (isPortCompatible) should derive their logic from this file.
 #
-# The frontend currently has its own copy in block-registry-types.ts (the
-# COMPAT map and PORT_TYPE_ALIASES). A future step will generate the frontend
-# constants from this file. Until then, keep the two in sync manually.
+# Consumed by:
+#   - scripts/generate_compat.py  → frontend/src/lib/generated/port-compat.generated.ts
+#   - backend/routers/registry.py → validate-connection endpoint
+#   - backend/services/registry.py → BlockRegistryService
+#
+# EDITING: update this file, then run `python scripts/generate_compat.py`.
+# Do NOT edit port-compat.generated.ts or the COMPAT dict in registry.py by hand.
 
 # All recognized wire types that flow between blocks.
 connector_types:

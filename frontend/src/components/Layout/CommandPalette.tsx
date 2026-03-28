@@ -17,7 +17,7 @@ import {
   FileText,
   CornerDownLeft,
 } from 'lucide-react'
-import { BLOCK_REGISTRY } from '@/lib/block-registry'
+import { getAllBlocks } from '@/lib/block-registry'
 import { usePipelineStore } from '@/stores/pipelineStore'
 
 interface Command {
@@ -51,7 +51,7 @@ export default function CommandPalette() {
     { id: 'action-redo', label: 'Redo', category: 'Actions', icon: <Redo2 size={12} />, action: () => usePipelineStore.getState().redo() },
   ]
 
-  const blockCommands: Command[] = BLOCK_REGISTRY.map((block) => ({
+  const blockCommands: Command[] = getAllBlocks().map((block) => ({
     id: `add-${block.type}`,
     label: `Add ${block.name}`,
     category: 'Blocks',

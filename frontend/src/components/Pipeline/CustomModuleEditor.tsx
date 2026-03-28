@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { T, F, FS } from '@/lib/design-tokens'
-import { BLOCK_REGISTRY, type BlockDefinition, type ConfigField } from '@/lib/block-registry'
+import { getAllBlocks, getBlockDefinition, type BlockDefinition, type ConfigField } from '@/lib/block-registry'
 import { CATEGORY_COLORS } from '@/lib/design-tokens'
 import { X, Copy, Save, Trash2, Plus } from 'lucide-react'
 
@@ -33,7 +33,7 @@ interface Props {
 
 export default function CustomModuleEditor({ visible, onClose, duplicateFrom, onSaved }: Props) {
     const base = duplicateFrom
-        ? BLOCK_REGISTRY.find(b => b.type === duplicateFrom) || loadCustomBlocks().find(b => b.type === duplicateFrom)
+        ? getBlockDefinition(duplicateFrom) || loadCustomBlocks().find(b => b.type === duplicateFrom)
         : null
 
     const [name, setName] = useState(base ? `${base.name} (Custom)` : 'My Custom Module')

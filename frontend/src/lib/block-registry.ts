@@ -1,36 +1,18 @@
-// block-registry.ts — thin wrapper that re-exports types + generated data
+// block-registry.ts — Facade that delegates to registry-client.ts (backend API)
 //
-// Types & utilities (hand-maintained):  block-registry-types.ts
-// Block data (auto-generated):          block-registry.generated.ts
+// All types & pure utility functions remain in block-registry-types.ts.
+// Block DATA now comes from the backend registry, loaded at startup
+// via registry-client.ts.  This file preserves the same export surface
+// so existing imports across the codebase continue to work.
 //
-// To regenerate: python scripts/generate_block_registry.py
+// NOTE: The old `BLOCK_REGISTRY` constant is replaced by `getAllBlocks()`.
+// All consumer files have been updated.  Do not re-introduce BLOCK_REGISTRY.
 
 export * from './block-registry-types'
-export { BLOCK_REGISTRY } from './block-registry.generated'
 
-import { BLOCK_REGISTRY } from './block-registry.generated'
-import type { BlockDefinition } from './block-registry-types'
-
-// Group blocks by category
-export function getBlocksByCategory(): Record<string, BlockDefinition[]> {
-  const groups: Record<string, BlockDefinition[]> = {}
-  for (const block of BLOCK_REGISTRY) {
-    if (!groups[block.category]) groups[block.category] = []
-    groups[block.category].push(block)
-  }
-  return groups
-}
-
-export function getBlockDefinition(type: string): BlockDefinition | undefined {
-  const builtin = BLOCK_REGISTRY.find((b) => b.type === type)
-  if (builtin) return builtin
-  // Search custom blocks from localStorage
-  try {
-    const raw = localStorage.getItem('blueprint-custom-blocks')
-    if (raw) {
-      const customs: BlockDefinition[] = JSON.parse(raw)
-      return customs.find((b) => b.type === type)
-    }
-  } catch { /* ignore parse errors */ }
-  return undefined
-}
+export {
+  getBlockDefinition,
+  getBlocksByCategory,
+  getAllBlocks,
+  registry,
+} from './registry-client'
