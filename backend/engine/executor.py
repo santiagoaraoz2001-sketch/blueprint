@@ -1807,8 +1807,9 @@ async def execute_pipeline(
             _cache_block_outputs(node_id, run_id, node_outputs, block_schema, db)
 
             # Register artifacts produced by this block (best-effort, never crashes)
+            artifact_ids: list[str] = []
             try:
-                register_block_artifacts(
+                artifact_ids = register_block_artifacts(
                     pipeline_id=pipeline_id,
                     run_id=run_id,
                     node_id=node_id,
@@ -1819,9 +1820,17 @@ async def execute_pipeline(
             except Exception:
                 pass
 
+            # Determine primary output data type from block schema for canvas indicators
+            primary_output_type = None
+            try:
+                if block_schema and block_schema.get("outputs"):
+                    primary_output_type = block_schema["outputs"][0].get("data_type")
+            except Exception:
+                pass
+
             # Heartbeat after each block completes
             run.last_heartbeat = datetime.now(timezone.utc)
-            # Save partial outputs after each block
+            # Save partial outputs after each block (preview-only, not authoritative)
             run.outputs_snapshot = _safe_outputs_snapshot(outputs)
             db.commit()
 
@@ -1840,7 +1849,12 @@ async def execute_pipeline(
 
             log_block_complete(run_id, node_id, block_type, time.time() - block_start_time)
 
-            completed_event = {"node_id": node_id, "index": idx}
+            completed_event = {
+                "node_id": node_id,
+                "index": idx,
+                "primary_output_type": primary_output_type,
+                "artifact_count": len(artifact_ids),
+            }
             try:
                 publish_event(run_id, "node_completed", completed_event)
             except Exception:

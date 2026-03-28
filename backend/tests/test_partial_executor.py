@@ -275,6 +275,8 @@ class TestPartialExecutionValidation:
 
         with patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.publish_event"):
             _run(execute_partial_pipeline(
                 "pipe-1", "run-1", "missing-run", "B", definition, {}, db
@@ -290,6 +292,8 @@ class TestPartialExecutionValidation:
 
         with patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.publish_event"):
             _run(execute_partial_pipeline(
                 "pipe-1", "run-1", "source-run-1", "B", definition, {}, db
@@ -305,6 +309,8 @@ class TestPartialExecutionValidation:
 
         with patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.publish_event"):
             _run(execute_partial_pipeline(
                 "pipe-1", "run-1", "source-run-1", "B", definition, {}, db
@@ -323,6 +329,8 @@ class TestPartialExecutionValidation:
 
         with patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.publish_event"):
             _run(execute_partial_pipeline(
                 "pipe-1", "run-1", "source-run-1", "Z", definition, {}, db
@@ -342,6 +350,8 @@ class TestPartialExecutionValidation:
 
         with patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.publish_event"):
             _run(execute_partial_pipeline(
                 "pipe-1", "run-1", "source-run-1", "C", definition, {}, db
@@ -362,6 +372,8 @@ class TestPartialExecutionValidation:
 
         with patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.publish_event"):
             _run(execute_partial_pipeline(
                 "pipe-1", "run-1", "source-run-1", "B", definition, {}, db
@@ -404,6 +416,8 @@ class TestPartialExecutionValidation:
 
         with patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.publish_event"):
             _run(execute_partial_pipeline(
                 "pipe-1", "run-1", "missing", "B", definition, {}, db
@@ -443,14 +457,19 @@ class TestPartialExecution:
         def mock_publish(run_id, event_type, data):
             events.append((event_type, data))
 
-        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs):
+        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs, **kw):
             executed_nodes.append(node_id)
-            return {"output": f"new_{node_id}"}
+            return {"output": f"new_{node_id}"}, {}
 
         with patch("backend.engine.partial_executor.publish_event", side_effect=mock_publish), \
              patch("backend.engine.partial_executor._find_block_module", return_value=MagicMock()), \
              patch("backend.engine.partial_executor._load_and_run_block", side_effect=mock_run_block), \
              patch("backend.engine.partial_executor._resolve_secrets", side_effect=lambda c: c), \
+             patch("backend.engine.partial_executor.load_block_schema", return_value=None), \
+             patch("backend.engine.partial_executor.register_block_artifacts", return_value=[]), \
+             patch("backend.engine.partial_executor._verify_node_artifacts", return_value=(True, "")), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()):
             _run(execute_partial_pipeline(
@@ -495,10 +514,10 @@ class TestPartialExecution:
         received_configs = {}
         received_inputs = {}
 
-        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs):
+        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs, **kw):
             received_configs[node_id] = dict(config)
             received_inputs[node_id] = dict(inputs)
-            return {"output": f"new_{node_id}_temp_{config.get('temperature', 'default')}"}
+            return {"output": f"new_{node_id}_temp_{config.get('temperature', 'default')}"}, {}
 
         overrides = {"C": {"temperature": 0.1}}
 
@@ -506,6 +525,11 @@ class TestPartialExecution:
              patch("backend.engine.partial_executor._find_block_module", return_value=MagicMock()), \
              patch("backend.engine.partial_executor._load_and_run_block", side_effect=mock_run_block), \
              patch("backend.engine.partial_executor._resolve_secrets", side_effect=lambda c: c), \
+             patch("backend.engine.partial_executor.load_block_schema", return_value=None), \
+             patch("backend.engine.partial_executor.register_block_artifacts", return_value=[]), \
+             patch("backend.engine.partial_executor._verify_node_artifacts", return_value=(True, "")), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()):
             _run(execute_partial_pipeline(
@@ -542,16 +566,21 @@ class TestPartialExecution:
         def mock_publish(run_id, event_type, data):
             events.append((event_type, data))
 
-        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs):
+        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs, **kw):
             nonlocal execution_count
             execution_count += 1
             time.sleep(0.001)  # Simulate minimal work
-            return {"output": f"new_{node_id}"}
+            return {"output": f"new_{node_id}"}, {}
 
         with patch("backend.engine.partial_executor.publish_event", side_effect=mock_publish), \
              patch("backend.engine.partial_executor._find_block_module", return_value=MagicMock()), \
              patch("backend.engine.partial_executor._load_and_run_block", side_effect=mock_run_block), \
              patch("backend.engine.partial_executor._resolve_secrets", side_effect=lambda c: c), \
+             patch("backend.engine.partial_executor.load_block_schema", return_value=None), \
+             patch("backend.engine.partial_executor.register_block_artifacts", return_value=[]), \
+             patch("backend.engine.partial_executor._verify_node_artifacts", return_value=(True, "")), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()):
             _run(execute_partial_pipeline(
@@ -577,6 +606,8 @@ class TestPartialExecution:
 
         with patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.publish_event"):
             _run(execute_partial_pipeline(
                 "pipe-1", "run-1", "source-run-1", "C", definition, {}, db
@@ -602,13 +633,18 @@ class TestPartialExecution:
         def mock_publish(run_id, event_type, data):
             events.append((event_type, data))
 
-        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs):
-            return {"output": f"new_{node_id}"}
+        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs, **kw):
+            return {"output": f"new_{node_id}"}, {}
 
         with patch("backend.engine.partial_executor.publish_event", side_effect=mock_publish), \
              patch("backend.engine.partial_executor._find_block_module", return_value=MagicMock()), \
              patch("backend.engine.partial_executor._load_and_run_block", side_effect=mock_run_block), \
              patch("backend.engine.partial_executor._resolve_secrets", side_effect=lambda c: c), \
+             patch("backend.engine.partial_executor.load_block_schema", return_value=None), \
+             patch("backend.engine.partial_executor.register_block_artifacts", return_value=[]), \
+             patch("backend.engine.partial_executor._verify_node_artifacts", return_value=(True, "")), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()):
             _run(execute_partial_pipeline(
@@ -648,14 +684,19 @@ class TestPartialExecution:
         def mock_publish(run_id, event_type, data):
             events.append((event_type, data))
 
-        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs):
+        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs, **kw):
             executed.append(node_id)
-            return {"output": f"new_{node_id}"}
+            return {"output": f"new_{node_id}"}, {}
 
         with patch("backend.engine.partial_executor.publish_event", side_effect=mock_publish), \
              patch("backend.engine.partial_executor._find_block_module", return_value=MagicMock()), \
              patch("backend.engine.partial_executor._load_and_run_block", side_effect=mock_run_block), \
              patch("backend.engine.partial_executor._resolve_secrets", side_effect=lambda c: c), \
+             patch("backend.engine.partial_executor.load_block_schema", return_value=None), \
+             patch("backend.engine.partial_executor.register_block_artifacts", return_value=[]), \
+             patch("backend.engine.partial_executor._verify_node_artifacts", return_value=(True, "")), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()):
             _run(execute_partial_pipeline(
@@ -682,14 +723,19 @@ class TestPartialExecution:
 
         received_inputs = {}
 
-        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs):
+        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs, **kw):
             received_inputs[node_id] = dict(inputs)
-            return {"output": f"new_{node_id}"}
+            return {"output": f"new_{node_id}"}, {}
 
         with patch("backend.engine.partial_executor.publish_event"), \
              patch("backend.engine.partial_executor._find_block_module", return_value=MagicMock()), \
              patch("backend.engine.partial_executor._load_and_run_block", side_effect=mock_run_block), \
              patch("backend.engine.partial_executor._resolve_secrets", side_effect=lambda c: c), \
+             patch("backend.engine.partial_executor.load_block_schema", return_value=None), \
+             patch("backend.engine.partial_executor.register_block_artifacts", return_value=[]), \
+             patch("backend.engine.partial_executor._verify_node_artifacts", return_value=(True, "")), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()):
             _run(execute_partial_pipeline(
@@ -716,14 +762,19 @@ class TestPartialExecution:
         def mock_publish(run_id, event_type, data):
             events.append((event_type, data))
 
-        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs):
+        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs, **kw):
             executed.append(node_id)
-            return {"output": f"new_{node_id}"}
+            return {"output": f"new_{node_id}"}, {}
 
         with patch("backend.engine.partial_executor.publish_event", side_effect=mock_publish), \
              patch("backend.engine.partial_executor._find_block_module", return_value=MagicMock()), \
              patch("backend.engine.partial_executor._load_and_run_block", side_effect=mock_run_block), \
              patch("backend.engine.partial_executor._resolve_secrets", side_effect=lambda c: c), \
+             patch("backend.engine.partial_executor.load_block_schema", return_value=None), \
+             patch("backend.engine.partial_executor.register_block_artifacts", return_value=[]), \
+             patch("backend.engine.partial_executor._verify_node_artifacts", return_value=(True, "")), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()):
             _run(execute_partial_pipeline(
@@ -756,14 +807,19 @@ class TestPartialExecution:
         def mock_publish(run_id, event_type, data):
             events.append((event_type, data))
 
-        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs):
+        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs, **kw):
             executed.append(node_id)
-            return {"output": f"new_{node_id}"}
+            return {"output": f"new_{node_id}"}, {}
 
         with patch("backend.engine.partial_executor.publish_event", side_effect=mock_publish), \
              patch("backend.engine.partial_executor._find_block_module", return_value=MagicMock()), \
              patch("backend.engine.partial_executor._load_and_run_block", side_effect=mock_run_block), \
              patch("backend.engine.partial_executor._resolve_secrets", side_effect=lambda c: c), \
+             patch("backend.engine.partial_executor.load_block_schema", return_value=None), \
+             patch("backend.engine.partial_executor.register_block_artifacts", return_value=[]), \
+             patch("backend.engine.partial_executor._verify_node_artifacts", return_value=(True, "")), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()):
             _run(execute_partial_pipeline(
@@ -786,14 +842,19 @@ class TestPartialExecution:
 
         executed = []
 
-        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs):
+        def mock_run_block(block_dir, config, inputs, run_dir, run_id, node_id, *cbs, **kw):
             executed.append(node_id)
-            return {"output": f"new_{node_id}"}
+            return {"output": f"new_{node_id}"}, {}
 
         with patch("backend.engine.partial_executor.publish_event"), \
              patch("backend.engine.partial_executor._find_block_module", return_value=MagicMock()), \
              patch("backend.engine.partial_executor._load_and_run_block", side_effect=mock_run_block), \
              patch("backend.engine.partial_executor._resolve_secrets", side_effect=lambda c: c), \
+             patch("backend.engine.partial_executor.load_block_schema", return_value=None), \
+             patch("backend.engine.partial_executor.register_block_artifacts", return_value=[]), \
+             patch("backend.engine.partial_executor._verify_node_artifacts", return_value=(True, "")), \
+             patch("backend.engine.partial_executor.resolve_configs", side_effect=lambda nodes, edges, order, **kw: {n["id"]: n.get("data", {}).get("config", {}) for n in nodes}), \
+             patch("backend.engine.partial_executor.is_cache_valid", return_value=True), \
              patch("backend.engine.partial_executor.ARTIFACTS_DIR", MagicMock()), \
              patch("builtins.open", MagicMock()):
             _run(execute_partial_pipeline(

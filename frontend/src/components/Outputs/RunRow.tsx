@@ -14,7 +14,7 @@ import {
   Loader2,
   Ban,
 } from 'lucide-react'
-import ArtifactRow from './ArtifactRow'
+import ArtifactBrowser from '@/components/Artifacts/ArtifactBrowser'
 import type { RunWithArtifacts } from '@/hooks/useOutputs'
 
 const STATUS_CONFIG: Record<string, { color: string; icon: typeof CheckCircle2; label: string }> = {
@@ -209,7 +209,7 @@ export default function RunRow({ run, selected, onToggleSelect }: RunRowProps) {
             gap: 12,
           }}
         >
-          {/* Artifacts */}
+          {/* Artifacts — full browser with grouped view and previews */}
           {run.artifacts.length > 0 && (
             <div>
               <div
@@ -224,9 +224,7 @@ export default function RunRow({ run, selected, onToggleSelect }: RunRowProps) {
               >
                 ARTIFACTS
               </div>
-              {run.artifacts.map((a) => (
-                <ArtifactRow key={a.id} artifact={a} />
-              ))}
+              <ArtifactBrowser runId={run.id} />
             </div>
           )}
 

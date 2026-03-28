@@ -10,6 +10,7 @@ export interface NodeStatus {
   status: 'pending' | 'running' | 'complete' | 'failed' | 'cached'
   progress: number
   error?: string
+  primaryOutputType?: string | null
 }
 
 export interface PartialRunMeta {
@@ -28,6 +29,8 @@ export interface SSEEventData {
   eta?: number
   error?: string
   event?: string
+  primary_output_type?: string | null
+  artifact_count?: number
 }
 
 interface RunState {
@@ -330,6 +333,7 @@ export const useRunStore = create<RunState>((set, get) => ({
               nodeId: data.node_id || '',
               status: 'complete',
               progress: 1,
+              primaryOutputType: data.primary_output_type || null,
             },
           },
         })

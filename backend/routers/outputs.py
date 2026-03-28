@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -269,6 +270,23 @@ def get_artifact(artifact_id: str, db: Session = Depends(get_db)):
     if not artifact:
         raise HTTPException(404, "Artifact not found")
     return artifact
+
+
+@router.get("/artifacts/{artifact_id}/download")
+def download_artifact(artifact_id: str, db: Session = Depends(get_db)):
+    """Stream the raw artifact file for download."""
+    import os
+
+    artifact = db.query(Artifact).filter(Artifact.id == artifact_id).first()
+    if not artifact:
+        raise HTTPException(404, "Artifact not found")
+    if not os.path.isfile(artifact.file_path):
+        raise HTTPException(404, "Artifact file no longer exists on disk")
+    return FileResponse(
+        path=artifact.file_path,
+        filename=artifact.name,
+        media_type="application/octet-stream",
+    )
 
 
 @router.get("/live", response_model=list[LiveRunItem])

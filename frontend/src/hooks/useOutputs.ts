@@ -142,18 +142,20 @@ export function useOutputRuns(opts: {
 export function useOutputArtifacts(opts: {
   projectId?: string | null
   pipelineId?: string | null
+  runId?: string | null
   artifactType?: string | null
   limit?: number
   enabled?: boolean
 } = {}) {
-  const { projectId, pipelineId, artifactType, limit = 100, enabled = true } = opts
+  const { projectId, pipelineId, runId, artifactType, limit = 100, enabled = true } = opts
 
   return useQuery({
-    queryKey: outputsKeys.artifacts({ projectId, pipelineId, artifactType }),
+    queryKey: outputsKeys.artifacts({ projectId, pipelineId, artifactType, ...(runId ? { runId } : {}) }),
     queryFn: async () => {
       const params = new URLSearchParams()
       if (projectId) params.set('project_id', projectId)
       if (pipelineId) params.set('pipeline_id', pipelineId)
+      if (runId) params.set('run_id', runId)
       if (artifactType) params.set('artifact_type', artifactType)
       if (limit) params.set('limit', String(limit))
       const qs = params.toString()
