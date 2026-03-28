@@ -156,10 +156,27 @@ def resolve_pipeline_config(pipeline_id: str, db: Session = Depends(get_db)):
 @router.get("/{pipeline_id}/compile")
 def compile_pipeline(pipeline_id: str, db: Session = Depends(get_db)):
     from ..engine.compiler import compile_pipeline_to_python
+    from ..engine.graph_utils import validate_exportable
+
     pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
     if not pipeline:
         raise HTTPException(404, "Pipeline not found")
-    
+
     definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+
+    # Kill switch: block export for unsupported pipelines
+    export_errors = validate_exportable(nodes, edges)
+    if export_errors:
+        raise HTTPException(
+            400,
+            detail={
+                "error": "export_unsupported",
+                "reasons": export_errors,
+                "remediation": "Remove unsupported blocks or use the full executor instead.",
+            },
+        )
+
     script = compile_pipeline_to_python(pipeline.name, definition)
     return PlainTextResponse(content=script, media_type="text/x-python")

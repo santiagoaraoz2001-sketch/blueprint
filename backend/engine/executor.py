@@ -794,6 +794,10 @@ async def _execute_loop(
         timeout_seconds = block_schema.get("timeout") if block_schema else None
         is_composite = block_schema.get("composite", False) if block_schema else False
 
+        # Embed block version into config_snapshot for cache validation
+        if block_schema and block_schema.get("version"):
+            body_data["block_version"] = block_schema["version"]
+
         # Validate config once (static across iterations)
         if block_schema:
             body_config = validate_config(block_schema, body_config)
@@ -1530,6 +1534,10 @@ async def execute_pipeline(
                 timeout_seconds = block_schema.get("timeout") if block_schema else None
                 max_retries = block_schema.get("max_retries", 0) if block_schema else 0
                 is_composite = block_schema.get("composite", False) if block_schema else False
+
+                # --- Embed block version into config_snapshot for cache validation ---
+                if block_schema and block_schema.get("version"):
+                    node_data["block_version"] = block_schema["version"]
 
                 # --- Pre-execution validation ---
                 if block_schema:

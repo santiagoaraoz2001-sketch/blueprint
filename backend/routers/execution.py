@@ -12,6 +12,7 @@ from ..models.run import Run
 from ..engine.executor import execute_pipeline, request_cancel
 from ..engine.partial_executor import execute_partial_pipeline
 from ..engine.validator import validate_pipeline
+from ..engine.graph_utils import contains_loop_or_cycle
 from ..engine.block_registry import get_block_config_schema, is_known_block
 from ..block_sdk.config_validator import (
     validate_and_apply_defaults,
@@ -131,6 +132,18 @@ def execute_from_node(
     nodes = definition.get("nodes", [])
     if not nodes:
         raise HTTPException(400, "Pipeline has no blocks")
+
+    # --- Kill switch: block partial rerun for loops/cycles ---
+    edges = definition.get("edges", [])
+    if contains_loop_or_cycle(nodes, edges):
+        raise HTTPException(
+            400,
+            detail={
+                "error": "partial_rerun_unsupported",
+                "message": "Partial re-run is not supported for pipelines containing loops. Please run the full pipeline instead.",
+                "remediation": "Remove the loop or run the full pipeline.",
+            },
+        )
 
     # --- Validate source run (fail-fast before thread submission) ---
     source_run = db.query(Run).filter(Run.id == body.source_run_id).first()

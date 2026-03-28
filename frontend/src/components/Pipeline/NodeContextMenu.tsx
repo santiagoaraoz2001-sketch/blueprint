@@ -5,6 +5,7 @@ import { useRunStore } from '@/stores/runStore'
 import { useReactFlow } from '@xyflow/react'
 import { Settings, Copy, Maximize, Trash2, RotateCcw, Eye, GitCompare } from 'lucide-react'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import { containsLoopOrCycle } from '@/lib/graph-utils'
 
 interface NodeContextMenuProps {
   visible: boolean
@@ -40,8 +41,12 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
     return s && (s.status === 'complete' || s.status === 'cached')
   })
 
-  // Can only re-run if upstream is all good
-  const canRerun = canRerunFromHere && allUpstreamHaveOutputs
+  // Kill switch: check if pipeline contains loops or cycles
+  const { nodes: allNodes, edges: allEdges } = usePipelineStore.getState()
+  const hasLoopOrCycle = containsLoopOrCycle(allNodes, allEdges)
+
+  // Can only re-run if upstream is all good and no loops/cycles
+  const canRerun = canRerunFromHere && allUpstreamHaveOutputs && !hasLoopOrCycle
 
   const handleRerunFromHere = () => {
     if (!activeRunId || !canRerun) return
@@ -81,7 +86,9 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
 
   // Compute disabled reason for tooltip
   let rerunDisabledReason = ''
-  if (!isRunComplete) {
+  if (hasLoopOrCycle) {
+    rerunDisabledReason = 'Partial re-run is not available for pipelines with loops or cycles'
+  } else if (!isRunComplete) {
     rerunDisabledReason = 'Run must be complete first'
   } else if (!allUpstreamHaveOutputs) {
     rerunDisabledReason = 'Upstream nodes have no cached outputs'
