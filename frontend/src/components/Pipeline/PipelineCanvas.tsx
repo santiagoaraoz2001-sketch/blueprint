@@ -27,6 +27,7 @@ import EdgePreviewPanel from './EdgePreviewPanel'
 import InheritanceOverlay, { OVERLAY_COLORS } from './InheritanceOverlay'
 import NodeContextMenu from './NodeContextMenu'
 import RerunOverlay from './RerunOverlay'
+import CopilotPanel from '../Copilot/CopilotPanel'
 
 const nodeTypes: NodeTypes = {
   blockNode: BlockNode as any,
@@ -821,6 +822,8 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
           </div>
         )
       })()}
+
+      <CopilotPanel />
     </div>
   )
 }

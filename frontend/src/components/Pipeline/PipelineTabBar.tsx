@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { usePipelineStore, type PipelineTab } from '@/stores/pipelineStore'
 import { useShallow } from 'zustand/react/shallow'
-import { Plus, X, Copy, Pencil, Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { Plus, X, Copy, Pencil, Loader2, CheckCircle2, XCircle, FlaskConical } from 'lucide-react'
+import VariantConfigDialog from '../Copilot/VariantConfigDialog'
 
 const STATUS_COLORS: Record<PipelineTab['runStatus'], string> = {
   idle: T.dim,
@@ -26,6 +27,7 @@ export default function PipelineTabBar() {
   const [editingTabId, setEditingTabId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [contextMenu, setContextMenu] = useState<{ tabId: string; x: number; y: number } | null>(null)
+  const [variantDialog, setVariantDialog] = useState<{ tabId: string } | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -248,6 +250,11 @@ export default function PipelineTabBar() {
             label="Duplicate"
             onClick={() => { duplicateTab(contextMenu.tabId); setContextMenu(null) }}
           />
+          <ContextMenuItem
+            icon={<FlaskConical size={10} />}
+            label="Clone as Variant"
+            onClick={() => { setVariantDialog({ tabId: contextMenu.tabId }); setContextMenu(null) }}
+          />
           {tabs.length > 1 && (
             <ContextMenuItem
               icon={<X size={10} />}
@@ -258,6 +265,54 @@ export default function PipelineTabBar() {
           )}
         </div>
       )}
+
+      {/* Clone as Variant dialog */}
+      {variantDialog && (() => {
+        const state = usePipelineStore.getState()
+        const savedTabs = tabs.map((t) =>
+          t.id === state.activeTabId
+            ? { ...t, nodes: state.nodes, edges: state.edges, pipelineId: state.id, name: state.name }
+            : t
+        )
+        const sourceTab = savedTabs.find((t) => t.id === variantDialog.tabId)
+        const pipelineId = sourceTab?.pipelineId || ''
+        const pipelineName = sourceTab?.name || 'Untitled'
+        const definition = { nodes: sourceTab?.nodes || [], edges: sourceTab?.edges || [] }
+
+        return (
+          <VariantConfigDialog
+            visible
+            pipelineId={pipelineId}
+            pipelineName={pipelineName}
+            definition={definition}
+            onClose={() => setVariantDialog(null)}
+            onConfirm={(overrides) => {
+              // Clone tab with config overrides applied
+              const tabId = variantDialog.tabId
+              duplicateTab(tabId)
+
+              // Apply overrides to the newly created tab's nodes
+              setTimeout(() => {
+                const latest = usePipelineStore.getState()
+                const newNodes = latest.nodes.map((n: any) => {
+                  const nodeOverrides = overrides[n.id]
+                  if (!nodeOverrides) return n
+                  return {
+                    ...n,
+                    data: {
+                      ...n.data,
+                      config: { ...n.data.config, ...nodeOverrides },
+                    },
+                  }
+                })
+                usePipelineStore.setState({ nodes: newNodes, isDirty: true })
+              }, 50)
+
+              setVariantDialog(null)
+            }}
+          />
+        )
+      })()}
     </div>
   )
 }
