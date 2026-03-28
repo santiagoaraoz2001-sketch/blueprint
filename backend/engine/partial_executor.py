@@ -18,8 +18,10 @@ from sqlalchemy.orm import Session
 from ..config import ARTIFACTS_DIR
 from ..models.run import Run, LiveRun
 from ..routers.events import publish_event
+from ..utils.redact import scrub_traceback
 from .executor import (
     _topological_sort,
+    _detect_loops,
     _find_block_module,
     _load_and_run_block,
     _resolve_secrets,
@@ -32,12 +34,15 @@ from .executor import (
     _cancel_events,
     _cancel_lock,
     BLOCK_ALIASES,
+    CONFIG_MIGRATIONS,
     SAFE_BLOCK_TYPE,
     MEMORY_PRESSURE_THRESHOLD,
 )
+from .config_resolver import resolve_configs
 from .block_registry import resolve_output_handle
 from .composite import CompositeBlockContext
 from .schema_validator import load_block_schema
+from .graph_utils import is_cache_valid
 
 
 def _get_downstream_nodes(start_id: str, nodes: list, edges: list) -> set[str]:
@@ -210,6 +215,22 @@ async def execute_partial_pipeline(
         # --- Topological sort ---
         order = _topological_sort(nodes, edges)
 
+        # --- Refuse partial re-run for pipelines with loops ---
+        try:
+            loops = _detect_loops(nodes, edges)
+        except ValueError:
+            loops = []  # Illegal cycle — will surface via other validation
+        if loops:
+            raise ValueError(
+                "Partial re-run is not supported for pipelines containing "
+                "loop controllers. Please use full execution instead."
+            )
+
+        # --- Resolve config inheritance across the DAG ---
+        resolved_configs = resolve_configs(
+            nodes, edges, order, find_block_dir_fn=_find_block_module,
+        )
+
         # --- Find downstream nodes (inclusive of start) ---
         downstream = _get_downstream_nodes(start_node_id, nodes, edges)
         upstream_ids = set(order) - downstream
@@ -295,10 +316,47 @@ async def execute_partial_pipeline(
 
             node_data = node.get("data", {})
             block_type = node_data.get("type", "")
-            config = dict(node_data.get("config", {}))
+            # Use resolved config (with inheritance) instead of raw node config
+            config = dict(resolved_configs.get(node_id, node_data.get("config", {})))
+            # Strip provenance metadata
+            config.pop("_inherited", None)
             category = node_data.get("category", "flow")
 
+            # Apply CONFIG_MIGRATIONS for aliased block types
+            original_type = block_type
+            if original_type in CONFIG_MIGRATIONS:
+                for mig_key, mig_val in CONFIG_MIGRATIONS[original_type].items():
+                    config.setdefault(mig_key, mig_val)
+
             # ---- CACHED NODE: use outputs from source run ----
+            if node_id not in downstream:
+                # Kill switch: validate cache before reuse
+                if not is_cache_valid(node_id, pipeline_id, config, db):
+                    # Determine reason for logging
+                    import sys as _sys
+                    reason = "config_changed"  # default
+                    _last_run = db.query(Run).filter(
+                        Run.pipeline_id == pipeline_id
+                    ).order_by(Run.started_at.desc()).first()
+                    if _last_run and _last_run.status != "complete":
+                        reason = "run_incomplete"
+                    print(
+                        f"[kill-switch] Cache invalidated for node {node_id}: {reason}",
+                        file=_sys.stderr,
+                    )
+                    try:
+                        publish_event(run_id, "cache_invalidated", {
+                            "node_id": node_id,
+                            "reason": reason,
+                        })
+                    except Exception:
+                        pass
+                    # Force re-execution by adding to downstream
+                    downstream.add(node_id)
+                    # Fall through to the EXECUTE NODE path below
+                    # (the continue below will be skipped because
+                    # node_id is now in downstream)
+
             if node_id not in downstream:
                 outputs[node_id] = cached_outputs.get(node_id, {})
 
@@ -467,16 +525,15 @@ async def execute_partial_pipeline(
                     metrics_file.flush()
                     metrics_log_buffer.append(metric_event)
 
-                # Detect composite blocks
+                # Detect composite blocks + read timeout from schema
                 block_schema = load_block_schema(block_dir)
                 is_composite = block_schema.get("composite", False) if block_schema else False
                 context_cls = CompositeBlockContext if is_composite else None
-
-                # Read timeout/retry from schema — parity with main executor
-                block_schema = load_block_schema(block_dir)
                 timeout_seconds = block_schema.get("timeout") if block_schema else None
-                is_composite = block_schema.get("composite", False) if block_schema else False
-                context_cls = CompositeBlockContext if is_composite else context_cls
+
+                # Embed block version into config_snapshot for cache validation
+                if block_schema and block_schema.get("version"):
+                    node_data["block_version"] = block_schema["version"]
 
                 try:
                     node_outputs, data_fingerprints = _load_and_run_block(
@@ -512,7 +569,7 @@ async def execute_partial_pipeline(
                     except Exception:
                         pass
                     run.status = "failed"
-                    run.error_message = f"Block {block_type} failed: {str(e)}\n\n{tb}"
+                    run.error_message = scrub_traceback(f"Block {block_type} failed: {str(e)}\n\n{tb}")
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     live.status = "failed"
                     db.commit()
@@ -620,7 +677,7 @@ async def execute_partial_pipeline(
     except Exception as e:
         tb = traceback.format_exc()
         run.status = "failed"
-        run.error_message = f"{str(e)}\n\n{tb}"
+        run.error_message = scrub_traceback(f"{str(e)}\n\n{tb}")
         run.finished_at = datetime.now(timezone.utc)
         run.duration_seconds = time.time() - start_time
         run.outputs_snapshot = _safe_outputs_snapshot(outputs)

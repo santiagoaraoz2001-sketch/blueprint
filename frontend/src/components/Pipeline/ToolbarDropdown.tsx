@@ -8,6 +8,8 @@ interface DropdownItem {
   onClick: () => void
   color?: string
   separator?: boolean
+  disabled?: boolean
+  tooltip?: string
 }
 
 interface ToolbarDropdownProps {
@@ -83,7 +85,9 @@ export default function ToolbarDropdown({ label, icon, items, style }: ToolbarDr
                 <div style={{ height: 1, background: T.border, margin: '2px 0' }} />
               )}
               <button
-                onClick={() => { item.onClick(); setOpen(false) }}
+                onClick={item.disabled ? undefined : () => { item.onClick(); setOpen(false) }}
+                disabled={item.disabled}
+                title={item.disabled ? item.tooltip : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -92,14 +96,15 @@ export default function ToolbarDropdown({ label, icon, items, style }: ToolbarDr
                   padding: '7px 12px',
                   background: 'transparent',
                   border: 'none',
-                  color: item.color || T.sec,
+                  color: item.disabled ? T.dim : (item.color || T.sec),
                   fontFamily: F,
                   fontSize: FS.xs,
-                  cursor: 'pointer',
+                  cursor: item.disabled ? 'default' : 'pointer',
                   textAlign: 'left',
                   transition: 'background 0.1s',
+                  opacity: item.disabled ? 0.4 : 1,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = T.surface4 }}
+                onMouseEnter={(e) => { if (!item.disabled) e.currentTarget.style.background = T.surface4 }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
               >
                 {item.icon}

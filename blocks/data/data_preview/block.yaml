@@ -2,30 +2,34 @@ name: Data Preview
 type: data_preview
 category: data
 description: Preview dataset statistics and sample rows
-version: "2.0.0"
-
+version: 2.0.0
 inputs:
-  - id: dataset
-    label: Dataset
-    data_type: dataset
-    required: true
-
+- id: dataset
+  label: Dataset
+  data_type: dataset
+  required: true
 outputs:
-  - id: stats
-    label: Stats
-    data_type: metrics
-    description: "Object with total_rows, columns, num_columns, per-column null_count/unique/min/max/mean, and optional text length stats (min_len, max_len, mean_len, median_len) per string column"
-    aliases: [metrics]
-  - id: preview
-    label: Preview Rows
-    data_type: dataset
-    description: "JSON array of sampled/filtered rows (up to num_rows). Same schema as input."
-    aliases: [dataset]
-  - id: preview_dataset
-    label: Dataset (passthrough)
-    data_type: dataset
-    aliases: [dataset]
-    description: "Full input dataset forwarded unchanged (when passthrough is enabled)"
+- id: stats
+  label: Stats
+  data_type: metrics
+  description: Object with total_rows, columns, num_columns, per-column null_count/unique/min/max/mean,
+    and optional text length stats (min_len, max_len, mean_len, median_len) per string
+    column
+  aliases:
+  - metrics
+- id: preview
+  label: Preview Rows
+  data_type: dataset
+  description: JSON array of sampled/filtered rows (up to num_rows). Same schema as
+    input.
+  aliases:
+  - dataset
+- id: preview_dataset
+  label: Dataset (passthrough)
+  data_type: dataset
+  aliases:
+  - dataset
+  description: Full input dataset forwarded unchanged (when passthrough is enabled)
 config:
   num_rows:
     type: integer
@@ -46,27 +50,36 @@ config:
   sort_by:
     type: string
     label: Sort By Column
-    default: ""
-    description: Sort rows by this column before previewing (useful for inspecting outliers)
+    default: ''
+    description: Sort rows by this column before previewing (useful for inspecting
+      outliers)
   sample_mode:
     type: select
     label: Sample Mode
-    options: [head, tail, random]
+    options:
+    - head
+    - tail
+    - random
     default: head
-    description: "head: first N rows; tail: last N rows; random: random sample"
+    description: 'head: first N rows; tail: last N rows; random: random sample'
   filter_column:
     type: string
     label: Filter Column
-    default: ""
-    description: Only preview rows where this column matches filter_value (or is non-empty if filter_value is blank)
+    default: ''
+    description: Only preview rows where this column matches filter_value (or is non-empty
+      if filter_value is blank)
   filter_value:
     type: string
     label: Filter Value
-    default: ""
+    default: ''
     description: Value to match in filter_column (blank = show non-empty rows)
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

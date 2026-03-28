@@ -1,33 +1,32 @@
-name: "Agent \u2192 Text"
+name: Agent → Text
 type: agent_text_bridge
 category: agents
 description: Extract text from structured agent outputs for downstream processing
-version: "1.1.0"
-
+version: 1.1.0
 inputs:
-  - id: agent
-    label: Agent Output
-    data_type: any
-    required: true
-  - id: dataset
-    label: Task Context
-    data_type: dataset
-    required: false
-
+- id: agent
+  label: Agent Output
+  data_type: any
+  required: true
+- id: dataset
+  label: Task Context
+  data_type: dataset
+  required: false
 outputs:
-  - id: text
-    label: Extracted Text
-    data_type: text
-    aliases: [response, output]
-  - id: output_dataset
-    label: Full Responses
-    aliases: [dataset]
-    data_type: dataset
-
-  - id: metrics
-    label: Extraction Metrics
-    data_type: metrics
-
+- id: text
+  label: Extracted Text
+  data_type: text
+  aliases:
+  - response
+  - output
+- id: output_dataset
+  label: Full Responses
+  aliases:
+  - dataset
+  data_type: dataset
+- id: metrics
+  label: Extraction Metrics
+  data_type: metrics
 config:
   extract_field:
     type: string
@@ -37,12 +36,17 @@ config:
   fallback_fields:
     type: string
     label: Fallback Fields
-    default: "response,output,text,code,answer"
-    description: Comma-separated fallback field names tried in order if primary field is missing
+    default: response,output,text,code,answer
+    description: Comma-separated fallback field names tried in order if primary field
+      is missing
   separator:
     type: string
     label: List Separator
-    default: "\n---\n"
+    default: '
+
+      ---
+
+      '
     description: Separator used when joining multiple extracted items
   max_length:
     type: integer
@@ -50,17 +54,26 @@ config:
     default: 0
     min: 0
     max: 1000000
-    description: "Maximum characters in extracted text (0 = no limit). Truncated with '...' suffix."
+    description: Maximum characters in extracted text (0 = no limit). Truncated with
+      '...' suffix.
   output_format:
     type: select
     label: Output Format
-    options: [raw, markdown, json]
+    options:
+    - raw
+    - markdown
+    - json
     default: raw
-    description: "raw: text as-is, markdown: with metadata header, json: structured extraction result"
+    description: 'raw: text as-is, markdown: with metadata header, json: structured
+      extraction result'
     section: advanced
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

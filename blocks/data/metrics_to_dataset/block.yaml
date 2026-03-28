@@ -1,44 +1,53 @@
 name: Metrics to Dataset
 type: metrics_to_dataset
 category: data
-version: "2.0.0"
-description: Convert metrics from an evaluation or training run into a dataset for saving or further analysis
+version: 2.0.0
+description: Convert metrics from an evaluation or training run into a dataset for
+  saving or further analysis
 maturity: stable
-tags: [adapter, conversion, metrics, dataset]
-
+tags:
+- adapter
+- conversion
+- metrics
+- dataset
 inputs:
-  - id: metrics
-    label: Metrics
-    data_type: metrics
-    required: true
-  - id: metrics_b
-    label: Second Metrics (optional)
-    data_type: metrics
-    required: false
-
+- id: metrics
+  label: Metrics
+  data_type: metrics
+  required: true
+- id: metrics_b
+  label: Second Metrics (optional)
+  data_type: metrics
+  required: false
 outputs:
-  - id: dataset
-    label: Dataset
-    data_type: dataset
-  - id: output_metrics
-    label: Conversion Stats
-    aliases: [metrics]
-    data_type: metrics
+- id: dataset
+  label: Dataset
+  data_type: dataset
+- id: output_metrics
+  label: Conversion Stats
+  aliases:
+  - metrics
+  data_type: metrics
 config:
   format:
     type: select
     label: Output Format
-    default: "rows"
-    options: ["rows", "columns"]
-    description: "rows = one row per metric, columns = one column per metric"
+    default: rows
+    options:
+    - rows
+    - columns
+    description: rows = one row per metric, columns = one column per metric
   label:
     type: string
     label: Run Label
-    default: ""
-    description: "Label to identify this metrics set (useful when merging)"
-
+    default: ''
+    description: Label to identify this metrics set (useful when merging)
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

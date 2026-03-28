@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { T, F, FS, FD } from '@/lib/design-tokens'
 import {
-  BLOCK_REGISTRY,
+  getAllBlocks,
   type BlockDefinition,
   type PortDefinition,
   getPortColor,
@@ -44,7 +44,7 @@ export default function BlockDetailPage({ block, onBack, onSelectBlock }: BlockD
     const compatible: { block: BlockDefinition; direction: 'input' | 'output'; portLabel: string }[] = []
     const seen = new Set<string>()
 
-    for (const other of BLOCK_REGISTRY) {
+    for (const other of getAllBlocks()) {
       if (other.type === block.type) continue
 
       // Can this block's outputs connect to other's inputs?

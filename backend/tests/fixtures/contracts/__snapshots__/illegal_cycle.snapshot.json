@@ -1,0 +1,36 @@
+{
+  "compiler": {
+    "code_length": 4208,
+    "generated": true,
+    "has_blocks": true
+  },
+  "fixture_name": "illegal_cycle",
+  "loop_aware_sort": {
+    "error": "Pipeline contains a cycle that doesn't pass through a Loop Controller block."
+  },
+  "loop_detection": {
+    "error": "Pipeline contains a cycle that doesn't pass through a Loop Controller block.",
+    "error_type": "ValueError"
+  },
+  "partial_rerun_safety": {
+    "has_loop_controller": false,
+    "safe_per_contract": false
+  },
+  "topological_sort": {
+    "all_nodes_included": false,
+    "node_count": 0,
+    "order": []
+  },
+  "validation": {
+    "block_count": 3,
+    "edge_count": 3,
+    "error_count": 1,
+    "errors": [
+      "Pipeline contains a cycle that doesn't pass through a Loop Controller block."
+    ],
+    "estimated_runtime_s": 25,
+    "valid": false,
+    "warning_count": 0,
+    "warnings": []
+  }
+}

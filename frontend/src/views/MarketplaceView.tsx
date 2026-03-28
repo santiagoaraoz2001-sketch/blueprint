@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { T, F, FS, FD, CATEGORY_COLORS } from '@/lib/design-tokens'
-import { BLOCK_REGISTRY, type BlockDefinition, getBlocksByCategory, getPortColor } from '@/lib/block-registry'
+import { getAllBlocks, getBlockDefinition, type BlockDefinition, getBlocksByCategory, getPortColor } from '@/lib/block-registry'
 import { getIcon } from '@/lib/icon-utils'
 import PanelCard from '@/components/shared/PanelCard'
 import BlockDetailPage from '@/components/Marketplace/BlockDetailPage'
@@ -87,7 +87,7 @@ export default function MarketplaceView() {
   }, [search, activeTab])
 
   const filtered = useMemo(() => {
-    return BLOCK_REGISTRY.filter((b) => {
+    return getAllBlocks().filter((b) => {
       const q = search.toLowerCase()
       const matchSearch =
         !search ||
@@ -483,7 +483,7 @@ export default function MarketplaceView() {
               <CategoryButton
                 label="All Blocks"
                 color={T.cyan}
-                count={BLOCK_REGISTRY.length}
+                count={getAllBlocks().length}
                 active={categoryFilter === ''}
                 onClick={() => setCategoryFilter('')}
               />
@@ -986,7 +986,7 @@ function PresetsTab() {
           </div>
         ) : (
           filteredTypes.map(blockType => {
-            const blockDef = BLOCK_REGISTRY.find(b => b.type === blockType)
+            const blockDef = getBlockDefinition(blockType)
             const blockName = blockDef?.name || blockType
             const accent = blockDef?.accent || T.dim
             return (

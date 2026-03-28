@@ -1,0 +1,68 @@
+{
+  "name": "partial_rerun_unsafe",
+  "description": "Pipeline with loop controller — partial rerun should be refused.",
+  "nodes": [
+    {
+      "id": "data_source",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Data Source",
+        "category": "data",
+        "config": {"text": "seed"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "loop_ctrl",
+      "type": "blockNode",
+      "data": {
+        "type": "loop_controller",
+        "label": "Loop Controller",
+        "category": "flow",
+        "config": {"iterations": 3},
+        "inputs": [
+          {"id": "input", "dataType": "any", "required": false},
+          {"id": "feedback", "dataType": "any", "required": false}
+        ],
+        "outputs": [
+          {"id": "body", "dataType": "any"},
+          {"id": "result", "dataType": "dataset"}
+        ]
+      }
+    },
+    {
+      "id": "body_block",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "Body Block",
+        "category": "inference",
+        "config": {"model_name": "test-model"},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "response", "dataType": "text"}]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "data_source", "target": "loop_ctrl", "sourceHandle": "text", "targetHandle": "input"},
+    {"id": "e2", "source": "loop_ctrl", "target": "body_block", "sourceHandle": "body", "targetHandle": "text"},
+    {"id": "e3", "source": "body_block", "target": "loop_ctrl", "sourceHandle": "response", "targetHandle": "feedback"}
+  ],
+  "expected": {
+    "partial_rerun": {
+      "safe": false,
+      "error_code": "E_PARTIAL_RERUN_LOOP",
+      "reason": "Pipeline contains a loop controller — partial rerun would silently drop loop body nodes"
+    },
+    "validation": {
+      "has_cycle": true,
+      "note": "Current validator flags all cycles including legal loops"
+    },
+    "loop_detection": {
+      "loop_count": 1,
+      "loops": [{"controller_id": "loop_ctrl", "body_node_ids": ["body_block"]}]
+    }
+  }
+}

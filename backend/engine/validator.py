@@ -3,7 +3,8 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from .block_registry import is_known_block, get_block_types, get_block_config_schema
+from ..services.registry import get_global_registry
+from .executor import _detect_loops
 from ..block_sdk.config_validator import (
     validate_and_apply_defaults,
     _validate_type,
@@ -38,50 +39,6 @@ CATEGORY_RUNTIME = {
     "endpoints": 3,
 }
 
-# Port type compatibility matrix (mirrors frontend isPortCompatible in block-registry-types.ts)
-# SOURCE → CAN CONNECT TO
-# Must be kept in sync with the frontend COMPAT map.
-COMPAT = {
-    # Identity
-    ("dataset", "dataset"), ("text", "text"), ("model", "model"),
-    ("config", "config"), ("metrics", "metrics"), ("embedding", "embedding"),
-    ("artifact", "artifact"), ("agent", "agent"), ("any", "any"),
-    # Cross-type coercions (from frontend COMPAT map)
-    ("dataset", "text"),
-    ("text", "dataset"), ("text", "config"),
-    ("config", "text"),
-    ("metrics", "dataset"), ("metrics", "text"),
-    ("embedding", "dataset"),
-    ("artifact", "text"),
-}
-
-# Backward-compat aliases for legacy port type names
-_PORT_TYPE_ALIASES: dict[str, str] = {
-    "data": "dataset",
-    "external": "dataset",
-    "training": "model",
-    "intervention": "any",
-    "checkpoint": "model",
-    "optimizer": "config",
-    "schedule": "config",
-    "api": "dataset",
-    "file": "dataset",
-    "cloud": "config",
-}
-
-
-def _resolve_port_type(port_type: str) -> str:
-    """Resolve legacy port type aliases."""
-    return _PORT_TYPE_ALIASES.get(port_type, port_type)
-
-
-def _port_compatible(src_type: str, tgt_type: str) -> bool:
-    src = _resolve_port_type(src_type)
-    tgt = _resolve_port_type(tgt_type)
-    if src == "any" or tgt == "any":
-        return True
-    return (src, tgt) in COMPAT
-
 # Critical config fields that must be set for specific block types
 CRITICAL_CONFIG_FIELDS = {
     "llm_inference": ["model_name"],
@@ -105,6 +62,7 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         ValidationReport with errors, warnings, and metadata.
     """
     report = ValidationReport()
+    registry = get_global_registry()
 
     nodes = definition.get("nodes", [])
     edges = definition.get("edges", [])
@@ -126,7 +84,7 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         node_map[nid] = node
 
     # ── 1. Check for unknown node types ──
-    known_types = get_block_types()
+    known_types = registry.get_block_types()
     for node in nodes:
         if node.get("type") in ("groupNode", "stickyNote"):
             continue
@@ -135,47 +93,36 @@ def validate_pipeline(definition: dict) -> ValidationReport:
             node_label = node.get("data", {}).get("label", node.get("id", "?"))
             report.warnings.append(f"Block '{node_label}' uses unknown type '{block_type}' — it may not have a run.py implementation")
 
-    # ── 2. Check for cycles (DFS) ──
-    # Build adjacency only for executable nodes (skip groupNode, stickyNote)
+    # ── 2. Check for cycles / legal loops ──
+    # Use _detect_loops() which distinguishes legal single-controller loops
+    # from illegal cycles. Legal loops are reported as warnings, not errors.
     visual_types = {"groupNode", "stickyNote"}
-    exec_node_ids = {nid for nid, n in node_map.items() if n.get("type") not in visual_types}
+    exec_nodes = [n for n in nodes if n.get("type") not in visual_types]
+    exec_node_ids = {n.get("id") for n in exec_nodes}
+    exec_edges = [
+        e for e in edges
+        if e.get("source") in exec_node_ids and e.get("target") in exec_node_ids
+    ]
 
-    adjacency: dict[str, list[str]] = {nid: [] for nid in exec_node_ids}
-    for edge in edges:
-        src = edge.get("source", "")
-        tgt = edge.get("target", "")
-        if src in adjacency and tgt in exec_node_ids:
-            adjacency[src].append(tgt)
-
-    # DFS cycle detection (iterative to avoid stack overflow on large pipelines)
-    WHITE, GRAY, BLACK = 0, 1, 2
-    color = {nid: WHITE for nid in exec_node_ids}
-    has_cycle = False
-
-    for start in exec_node_ids:
-        if color[start] != WHITE:
-            continue
-        stack = [(start, iter(adjacency.get(start, [])))]
-        color[start] = GRAY
-
-        while stack:
-            node_id, children = stack[-1]
-            try:
-                child = next(children)
-                if color.get(child) == GRAY:
-                    has_cycle = True
-                    break
-                if color.get(child) == WHITE:
-                    color[child] = GRAY
-                    stack.append((child, iter(adjacency.get(child, []))))
-            except StopIteration:
-                color[node_id] = BLACK
-                stack.pop()
-
-        if has_cycle:
-            report.errors.append("Pipeline contains a cycle — blocks cannot have circular dependencies")
-            report.valid = False
-            break
+    try:
+        detected_loops = _detect_loops(exec_nodes, exec_edges)
+        if detected_loops:
+            loop_parts = []
+            for lp in detected_loops:
+                ctrl_label = node_map.get(lp.controller_id, {}).get(
+                    "data", {}
+                ).get("label", lp.controller_id)
+                loop_parts.append(
+                    f"'{ctrl_label}' ({len(lp.body_node_ids)} body block"
+                    f"{'s' if len(lp.body_node_ids) != 1 else ''})"
+                )
+            report.warnings.append(
+                f"Pipeline contains {len(detected_loops)} loop(s): "
+                + ", ".join(loop_parts)
+            )
+    except ValueError as exc:
+        report.errors.append(str(exc))
+        report.valid = False
 
     # ── 3. Check disconnected nodes & required ports ──
     connected_target_handles = set()
@@ -193,7 +140,7 @@ def validate_pipeline(definition: dict) -> ValidationReport:
                 node_data = node_map.get(did, {})
                 node_label = node_data.get("data", {}).get("label", did)
                 report.warnings.append(f"Block '{node_label}' ({did}) is not connected to any other block")
-                
+
     for node in nodes:
         if node.get("type") in ("groupNode", "stickyNote"):
             continue
@@ -221,26 +168,26 @@ def validate_pipeline(definition: dict) -> ValidationReport:
             report.errors.append(f"Self-loop detected on node: {src}")
             report.valid = False
             continue
-            
+
         src_data = node_map[src].get("data", {})
         tgt_data = node_map[tgt].get("data", {})
         src_handle = edge.get("sourceHandle")
         tgt_handle = edge.get("targetHandle")
-        
+
         src_port_type = "any"
         tgt_port_type = "any"
-        
+
         for out_port in src_data.get("outputs", []):
             if out_port.get("id") == src_handle:
                 src_port_type = out_port.get("dataType", "any")
                 break
-                
+
         for in_port in tgt_data.get("inputs", []):
             if in_port.get("id") == tgt_handle:
                 tgt_port_type = in_port.get("dataType", "any")
                 break
-                
-        if not _port_compatible(src_port_type, tgt_port_type):
+
+        if not registry.is_port_compatible(src_port_type, tgt_port_type):
             src_label = src_data.get("label", src)
             tgt_label = tgt_data.get("label", tgt)
             report.errors.append(f"Incompatible connection: Cannot connect {src_port_type.upper()} ({src_label}) to {tgt_port_type.upper()} ({tgt_label})")
@@ -277,7 +224,7 @@ def validate_pipeline(definition: dict) -> ValidationReport:
         if not block_type:
             continue
 
-        schema = get_block_config_schema(block_type)
+        schema = registry.get_block_config_schema(block_type)
         if not schema:
             continue
 

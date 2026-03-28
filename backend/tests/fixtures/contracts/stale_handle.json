@@ -1,0 +1,60 @@
+{
+  "name": "stale_handle",
+  "description": "Edge references an old/renamed output port handle. Tests alias resolution.",
+  "nodes": [
+    {
+      "id": "producer",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "Producer",
+        "category": "inference",
+        "config": {"model_name": "test-model"},
+        "inputs": [{"id": "text", "dataType": "text", "required": false}],
+        "outputs": [
+          {"id": "response", "dataType": "text", "aliases": ["output", "text", "result"]}
+        ]
+      }
+    },
+    {
+      "id": "consumer",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Consumer",
+        "category": "output",
+        "config": {"format": "json"},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "dataset", "dataType": "dataset"}]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_stale",
+      "source": "producer",
+      "target": "consumer",
+      "sourceHandle": "output",
+      "targetHandle": "text",
+      "_note": "sourceHandle 'output' is a stale alias — canonical is 'response'"
+    }
+  ],
+  "expected": {
+    "validation": {
+      "valid": true,
+      "note": "Backend validator warns about non-existent port 'output' but does not fail. resolve_output_handle() resolves 'output'→'response' at execution time."
+    },
+    "handle_resolution": {
+      "source_handle_before": "output",
+      "source_handle_after": "response",
+      "resolved_by": "block_registry.resolve_output_handle()"
+    },
+    "compiler": {
+      "should_generate": true,
+      "resolves_alias": true
+    },
+    "partial_rerun": {
+      "safe": true
+    }
+  }
+}

@@ -2,35 +2,37 @@ name: Push to HuggingFace Hub
 type: hf_hub_push
 category: endpoints
 description: Upload model or dataset to HuggingFace Hub with repo management.
-version: "1.0.0"
-
+version: 1.0.0
 inputs:
-  - id: data
-    label: Model or Dataset
-    data_type: any
-    required: true
-
+- id: data
+  label: Model or Dataset
+  data_type: any
+  required: true
 outputs:
-  - id: repo_url
-    label: Repository URL
-    data_type: text
-    description: "Full URL to the HuggingFace repository"
-  - id: summary
-    label: Push Summary
-    data_type: metrics
-    description: "Object with keys: repo_id (string), repo_type (string), files_uploaded (int), private (bool), revision (string)"
-
-    aliases: [metrics]
+- id: repo_url
+  label: Repository URL
+  data_type: text
+  description: Full URL to the HuggingFace repository
+- id: summary
+  label: Push Summary
+  data_type: metrics
+  description: 'Object with keys: repo_id (string), repo_type (string), files_uploaded
+    (int), private (bool), revision (string)'
+  aliases:
+  - metrics
 config:
   repo_id:
     type: string
     label: Repository ID
-    default: ""
-    description: "e.g. username/model-name"
+    default: ''
+    description: e.g. username/model-name
   repo_type:
     type: select
     label: Repository Type
-    options: [model, dataset, space]
+    options:
+    - model
+    - dataset
+    - space
     default: model
   private:
     type: boolean
@@ -43,8 +45,8 @@ config:
   hf_token:
     type: string
     label: HuggingFace Token
-    default: ""
-    description: "HF API token. Supports $secret:HF_TOKEN syntax"
+    default: ''
+    description: HF API token. Supports $secret:HF_TOKEN syntax
   create_repo:
     type: boolean
     label: Create Repo if Missing
@@ -57,11 +59,15 @@ config:
   path_in_repo:
     type: string
     label: Path in Repo
-    default: ""
+    default: ''
     description: Subdirectory within repo to upload to (e.g. models/v2)
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

@@ -3,7 +3,7 @@ import SectionAnchor from '@/components/Help/SectionAnchor'
 import { Terminal } from 'lucide-react'
 import { helpCard as card, helpBody as body, helpStepList as stepList, helpCodeBlock as codeBlock } from './styles'
 
-export const CLI_TOOLS_TEXT = `CLI Tools. Block Test Runner: python -m backend.tests.block_runner <block_dir> [options]. Options: --fixture small|medium|realistic, --config key=value, --verbose, --timeout SECONDS. Block Scaffold: python scripts/scaffold_block.py --name "Name" --category data --type my_block. Creates skeleton block.yaml + run.py. Block Registry Codegen: python scripts/generate_block_registry.py. Regenerates frontend/src/lib/block-registry.generated.ts from all block.yaml files. Run after adding or modifying blocks. Plugin Manager: python scripts/blueprint_plugin.py [list|install|remove|create|info] [args]. Launch Script: ./launch.sh. One-command launcher: creates venv, installs deps, starts backend + frontend. Pipeline Validator API: POST /api/pipelines/{id}/validate. Also accessible via the Validate button in the Pipeline Editor toolbar.`
+export const CLI_TOOLS_TEXT = `CLI Tools. Block Test Runner: python -m backend.tests.block_runner <block_dir> [options]. Options: --fixture small|medium|realistic, --config key=value, --verbose, --timeout SECONDS. Block Scaffold: python scripts/scaffold_block.py --name "Name" --category data --type my_block. Creates skeleton block.yaml + run.py. Block Registry Codegen: python scripts/generate_block_registry.py. Regenerates generated TypeScript types and config interfaces from all block.yaml files. Also regenerates port compatibility code from docs/PORT_COMPATIBILITY.yaml. Run after adding or modifying blocks. The backend registry API (GET /api/registry/blocks) is the primary source of truth at runtime. Plugin Manager: python scripts/blueprint_plugin.py [list|install|remove|create|info] [args]. Launch Script: ./launch.sh. One-command launcher: creates venv, installs deps, starts backend + frontend. Pipeline Validator API: POST /api/pipelines/{id}/validate. Also accessible via the Validate button in the Pipeline Editor toolbar.`
 
 export default function CLITools() {
   return (
@@ -52,8 +52,10 @@ export default function CLITools() {
       <div style={card}>
         <div style={codeBlock}>python scripts/generate_block_registry.py</div>
         <p style={body}>
-          Regenerates <code>frontend/src/lib/block-registry.generated.ts</code> from all{' '}
+          Regenerates TypeScript config interfaces and block-type unions from all{' '}
           <code>block.yaml</code> files. Run this after adding or modifying any block.
+          At runtime, the backend registry API (<code>/api/registry/blocks</code>) is the
+          source of truth.
         </p>
       </div>
 

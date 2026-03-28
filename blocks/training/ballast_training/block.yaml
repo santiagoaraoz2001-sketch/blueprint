@@ -2,32 +2,29 @@ name: BALLAST Training
 type: ballast_training
 category: training
 description: Balanced layer-wise training — freeze early layers, scale LR by depth
-version: "1.1.0"
-
+version: 1.1.0
 inputs:
-  - id: dataset
-    label: Training Data
-    data_type: dataset
-    required: true
-  - id: model
-    label: Base Model
-    data_type: model
-    required: false
-  - id: dataset_meta
-    label: Dataset Info
-    data_type: config
-    required: false
-
+- id: dataset
+  label: Training Data
+  data_type: dataset
+  required: true
+- id: model
+  label: Base Model
+  data_type: model
+  required: false
+- id: dataset_meta
+  label: Dataset Info
+  data_type: config
+  required: false
 outputs:
-  - id: trained_model
-    label: Trained Model
-    aliases: [model]
-    data_type: model
-
-  - id: metrics
-    label: Training Metrics
-    data_type: metrics
-
+- id: trained_model
+  label: Trained Model
+  aliases:
+  - model
+  data_type: model
+- id: metrics
+  label: Training Metrics
+  data_type: metrics
 config:
   model_name:
     type: string
@@ -37,22 +34,22 @@ config:
   layer_depth:
     type: float
     label: Layer Depth
-    description: "Fraction of layers to train (0.5 = train top 50% of layers)"
+    description: Fraction of layers to train (0.5 = train top 50% of layers)
     default: 0.5
     min: 0.1
     max: 1.0
   balance_factor:
     type: float
     label: Balance Factor
-    description: "LR scaling — deeper layers get up to balance_factor * base_lr"
+    description: LR scaling — deeper layers get up to balance_factor * base_lr
     default: 1.0
     min: 0.1
     max: 5.0
   lr:
     type: float
     label: Learning Rate
-    default: 0.00002
-    min: 0.0000001
+    default: 2.0e-05
+    min: 1.0e-07
     max: 0.01
   epochs:
     type: integer
@@ -75,36 +72,45 @@ config:
   text_column:
     type: string
     label: Text Column
-    description: "JSON key containing training text (leave empty for auto-detect: 'text' or first key)"
-    default: ""
+    description: 'JSON key containing training text (leave empty for auto-detect:
+      ''text'' or first key)'
+    default: ''
   training_format:
     type: text_area
     label: Training Format
-    description: "Template for structuring training examples. Use {text}, {instruction}, {output} placeholders."
-    default: ""
+    description: Template for structuring training examples. Use {text}, {instruction},
+      {output} placeholders.
+    default: ''
   eval_split:
     type: float
     label: Eval Split
-    description: "Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)"
+    description: Fraction of data to use for validation (0 = no eval, 0.1 = 10% eval)
     default: 0.0
     min: 0.0
     max: 0.3
   checkpoint_interval:
     type: integer
     label: Checkpoint Interval
-    description: "Save checkpoint every N epochs (0 = final only)"
+    description: Save checkpoint every N epochs (0 = final only)
     default: 0
     min: 0
     max: 100
   prefer_framework:
     type: select
     label: Preferred Framework
-    options: ["auto", "mlx", "pytorch"]
-    default: "auto"
-    description: "Force a specific training framework. 'auto' detects the best available."
-
+    options:
+    - auto
+    - mlx
+    - pytorch
+    default: auto
+    description: Force a specific training framework. 'auto' detects the best available.
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

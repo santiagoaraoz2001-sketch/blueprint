@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { T, F, FS, CONNECTOR_COLORS, CATEGORY_COLORS } from '@/lib/design-tokens'
-import { getBlocksByCategory, getPortColor, type BlockDefinition, BLOCK_REGISTRY, isPortCompatible, getBlockDefinition } from '@/lib/block-registry'
+import { getBlocksByCategory, getPortColor, type BlockDefinition, getAllBlocks, isPortCompatible, getBlockDefinition } from '@/lib/block-registry'
 import { BLOCK_ALIASES, CATEGORY_ALIASES } from '@/lib/search-aliases'
 import BlockTooltip from './BlockTooltip'
 import BlockDetailPanel from './BlockDetailPanel'
@@ -160,7 +160,7 @@ export default function BlockLibrary() {
     e.dataTransfer.effectAllowed = 'move'
 
     // Custom drag ghost image
-    const def = BLOCK_REGISTRY.find((b) => b.type === blockType)
+    const def = getBlockDefinition(blockType)
     if (def) {
       const ghost = document.createElement('div')
       ghost.style.cssText = `
@@ -828,8 +828,8 @@ function ConnectorDetailPopup({
   if (!desc) return null
 
   // Find blocks that use this connector type as input or output
-  const inputBlocks = BLOCK_REGISTRY.filter(b => !b.deprecated && b.inputs.some(p => p.dataType === connectorType))
-  const outputBlocks = BLOCK_REGISTRY.filter(b => !b.deprecated && b.outputs.some(p => p.dataType === connectorType))
+  const inputBlocks = getAllBlocks().filter(b => !b.deprecated && b.inputs.some(p => p.dataType === connectorType))
+  const outputBlocks = getAllBlocks().filter(b => !b.deprecated && b.outputs.some(p => p.dataType === connectorType))
 
   return (
     <div

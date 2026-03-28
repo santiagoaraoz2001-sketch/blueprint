@@ -1,0 +1,97 @@
+{
+  "name": "legal_loop",
+  "description": "Source→LoopController→Body→LoopController(feedback). Single-controller loop.",
+  "nodes": [
+    {
+      "id": "data_source",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Data Source",
+        "category": "data",
+        "config": {"text": "seed data"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "loop_ctrl",
+      "type": "blockNode",
+      "data": {
+        "type": "loop_controller",
+        "label": "Loop Controller",
+        "category": "flow",
+        "config": {"iterations": 5, "stop_metric": "", "context_management": "retain"},
+        "inputs": [
+          {"id": "input", "dataType": "any", "required": false},
+          {"id": "feedback", "dataType": "any", "required": false}
+        ],
+        "outputs": [
+          {"id": "body", "dataType": "any"},
+          {"id": "result", "dataType": "dataset"},
+          {"id": "metrics", "dataType": "metrics"}
+        ]
+      }
+    },
+    {
+      "id": "loop_body",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "Loop Body LLM",
+        "category": "inference",
+        "config": {"model_name": "test-model", "temperature": 0.8},
+        "inputs": [{"id": "text", "dataType": "text", "required": true}],
+        "outputs": [{"id": "response", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "after_loop",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "After Loop",
+        "category": "output",
+        "config": {"format": "json"},
+        "inputs": [{"id": "dataset", "dataType": "dataset", "required": true}],
+        "outputs": [{"id": "dataset", "dataType": "dataset"}]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "data_source", "target": "loop_ctrl", "sourceHandle": "text", "targetHandle": "input"},
+    {"id": "e2", "source": "loop_ctrl", "target": "loop_body", "sourceHandle": "body", "targetHandle": "text"},
+    {"id": "e3", "source": "loop_body", "target": "loop_ctrl", "sourceHandle": "response", "targetHandle": "feedback"},
+    {"id": "e4", "source": "loop_ctrl", "target": "after_loop", "sourceHandle": "result", "targetHandle": "dataset"}
+  ],
+  "_note": "e4 causes after_loop to be in Kahn's residual set even though it is not in the cycle SCC. Current _detect_loops raises because after_loop forms a single-node SCC with no controller.",
+  "expected": {
+    "validation": {
+      "valid_per_contract": true,
+      "valid_current_backend_validator": false,
+      "note": "Current backend validator reports ALL cycles as errors. Contract says this loop is legal."
+    },
+    "topological_order_after_removing_feedback": ["data_source", "loop_ctrl", "loop_body", "after_loop"],
+    "loop_detection": {
+      "current_behavior": "raises ValueError because after_loop (downstream of loop_ctrl) gets stuck in Kahn's residual, forms its own single-node SCC with no controller. This is a known bug in _detect_loops.",
+      "expected_per_contract": {
+        "loop_count": 1,
+        "loops": [
+          {
+            "controller_id": "loop_ctrl",
+            "body_node_ids": ["loop_body"],
+            "feedback_edge_ids": ["e3"]
+          }
+        ]
+      }
+    },
+    "compiler": {
+      "should_generate": false,
+      "refusal_reason": "E_EXPORT_NO_LOOPS"
+    },
+    "partial_rerun": {
+      "safe": false,
+      "refusal_reason": "E_PARTIAL_RERUN_LOOP"
+    }
+  }
+}

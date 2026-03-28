@@ -1,67 +1,69 @@
 name: LLM Inference
 type: llm_inference
 category: inference
-description: "Universal inference block — auto-detects frameworks and models"
-version: "2.0.0"
-
+description: Universal inference block — auto-detects frameworks and models
+version: 2.0.0
 inputs:
-  - id: model
-    label: Model
-    data_type: model
-    required: false
-    description: "Connect a Model Selector block. If not connected, uses Ollama default."
-  - id: prompt
-    label: Prompt
-    data_type: text
-    required: true
-    description: "Input prompt or message"
-  - id: system_prompt
-    label: System Prompt
-    data_type: text
-    required: false
-    description: "System prompt (ignored by frameworks that don't support it)"
-  - id: context
-    label: Context
-    data_type: any
-    required: false
-    description: "Additional context from upstream blocks (RAG, agent state, etc.)"
-
+- id: model
+  label: Model
+  data_type: model
+  required: false
+  description: Connect a Model Selector block. If not connected, uses Ollama default.
+- id: prompt
+  label: Prompt
+  data_type: text
+  required: true
+  description: Input prompt or message
+- id: system_prompt
+  label: System Prompt
+  data_type: text
+  required: false
+  description: System prompt (ignored by frameworks that don't support it)
+- id: context
+  label: Context
+  data_type: any
+  required: false
+  description: Additional context from upstream blocks (RAG, agent state, etc.)
 outputs:
-  - id: response
-    label: Response
-    data_type: text
-    description: "Model response text"
-    aliases: [text, output]
-  - id: metadata
-    label: Metadata
-    data_type: metrics
-    description: "Inference metadata: tokens, latency, model used, framework"
-    aliases: [metrics]
-  - id: llm_config
-    label: LLM Config
-    data_type: llm
-    aliases: [llm]
-    description: "Framework + model + config for downstream blocks to make their own calls"
-
+- id: response
+  label: Response
+  data_type: text
+  description: Model response text
+  aliases:
+  - text
+  - output
+- id: metadata
+  label: Metadata
+  data_type: metrics
+  description: 'Inference metadata: tokens, latency, model used, framework'
+  aliases:
+  - metrics
+- id: llm_config
+  label: LLM Config
+  data_type: llm
+  aliases:
+  - llm
+  description: Framework + model + config for downstream blocks to make their own
+    calls
 config:
   prompt_template:
     type: text_area
     label: Prompt Template
-    default: "{input}"
-    description: "Use {context} for upstream context, {input} for user_input"
+    default: '{input}'
+    description: Use {context} for upstream context, {input} for user_input
     propagate: true
   user_input:
     type: text_area
     label: User Input
-    default: ""
-    description: "The user prompt to send to the model"
+    default: ''
+    description: The user prompt to send to the model
   max_tokens:
     type: integer
     label: Max Tokens
     default: null
     min: 1
     max: 32768
-    description: "null = use framework default"
+    description: null = use framework default
     propagate: true
     section: sampling
   temperature:
@@ -70,19 +72,19 @@ config:
     default: null
     min: 0.0
     max: 2.0
-    description: "null = use framework default"
+    description: null = use framework default
     propagate: true
     section: sampling
   system_prompt:
     type: text_area
     label: System Prompt
-    default: ""
-    description: "System message (ignored by MLX)"
+    default: ''
+    description: System message (ignored by MLX)
   stop_sequences:
     type: string
     label: Stop Sequences
-    default: ""
-    description: "Comma-separated stop strings"
+    default: ''
+    description: Comma-separated stop strings
     section: advanced
   top_p:
     type: float
@@ -104,12 +106,18 @@ config:
     type: select
     label: Output Format
     default: text
-    options: [text, json]
-    description: "text = raw response, json = wrapped with metadata"
+    options:
+    - text
+    - json
+    description: text = raw response, json = wrapped with metadata
     section: advanced
-
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

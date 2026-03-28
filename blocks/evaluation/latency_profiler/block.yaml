@@ -1,85 +1,89 @@
 name: Latency Profiler
 type: latency_profiler
 category: evaluation
-description: Profile model inference latency and throughput across batch sizes and input lengths
-version: "2.0.0"
-
+description: Profile model inference latency and throughput across batch sizes and
+  input lengths
+version: 2.0.0
 inputs:
-  - id: model
-    label: Model
-    data_type: model
-    required: false
-    description: Model to profile (Ollama, HF, or MLX)
-
-  - id: dataset
-    label: Custom Prompts
-    data_type: dataset
-    required: false
-    description: "Optional custom prompts for profiling — uses text column"
-
+- id: model
+  label: Model
+  data_type: model
+  required: false
+  description: Model to profile (Ollama, HF, or MLX)
+- id: dataset
+  label: Custom Prompts
+  data_type: dataset
+  required: false
+  description: Optional custom prompts for profiling — uses text column
 outputs:
-  - id: metrics
-    label: Performance Metrics
-    data_type: metrics
-    description: 'Aggregate: best/worst avg_latency_ms, best_throughput, num_configs, model, provider'
-  - id: results
-    label: Detailed Profiles
-    data_type: artifact
-    description: 'latency_profiles.json: per batch_size x input_length: avg/min/max/p50/p95 ms, throughput'
-
-  - id: profiled_dataset
-    label: Timing Data
-    data_type: dataset
-    aliases: [dataset]
-    description: "Per-config timings: batch_size, input_length, avg_ms, p50_ms, p95_ms, throughput"
+- id: metrics
+  label: Performance Metrics
+  data_type: metrics
+  description: 'Aggregate: best/worst avg_latency_ms, best_throughput, num_configs,
+    model, provider'
+- id: results
+  label: Detailed Profiles
+  data_type: artifact
+  description: 'latency_profiles.json: per batch_size x input_length: avg/min/max/p50/p95
+    ms, throughput'
+- id: profiled_dataset
+  label: Timing Data
+  data_type: dataset
+  aliases:
+  - dataset
+  description: 'Per-config timings: batch_size, input_length, avg_ms, p50_ms, p95_ms,
+    throughput'
 config:
   model_name:
     type: string
     label: Model Name
-    default: ""
-    description: "Model identifier (overridden by connected model input)"
+    default: ''
+    description: Model identifier (overridden by connected model input)
   provider:
     type: select
     label: Provider
-    options: [ollama, mlx, auto]
+    options:
+    - ollama
+    - mlx
+    - auto
     default: auto
-    description: "Inference provider to use"
+    description: Inference provider to use
   endpoint:
     type: string
     label: API Endpoint
-    default: "http://localhost:11434"
-    description: "API endpoint for Ollama or compatible servers"
+    default: http://localhost:11434
+    description: API endpoint for Ollama or compatible servers
   batch_sizes:
     type: string
     label: Batch Sizes
-    default: "1,2,4,8"
-    description: "Comma-separated batch sizes to profile"
+    default: 1,2,4,8
+    description: Comma-separated batch sizes to profile
   input_lengths:
     type: string
     label: Input Lengths (tokens)
-    default: "32,128,512"
-    description: "Comma-separated input lengths to test"
+    default: 32,128,512
+    description: Comma-separated input lengths to test
   output_length:
     type: integer
     label: Output Length (tokens)
     default: 64
     min: 1
     max: 2048
-    description: "Number of tokens to generate per request"
+    description: Number of tokens to generate per request
   num_warmup:
     type: integer
     label: Warmup Runs
     default: 2
     min: 0
     max: 10
-    description: "Warmup runs before measurement (excluded from results)"
+    description: Warmup runs before measurement (excluded from results)
   num_runs:
     type: integer
     label: Measurement Runs
     default: 5
     min: 1
     max: 100
-    description: "Number of timed runs per configuration"
+    description: Number of timed runs per configuration
   temperature:
     type: float
     label: Temperature
@@ -97,19 +101,25 @@ config:
   output_format:
     type: select
     label: Output Format
-    options: [json, csv]
+    options:
+    - json
+    - csv
     default: json
-    description: "Format for dataset and report outputs (json or csv)"
+    description: Format for dataset and report outputs (json or csv)
   decimal_precision:
     type: integer
     label: Decimal Precision
     default: 4
     min: 1
     max: 6
-    description: "Decimal places for all computed scores"
-
+    description: Decimal places for all computed scores
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess

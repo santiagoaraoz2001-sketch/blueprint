@@ -18,6 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BLOCKS_DIR = PROJECT_ROOT / "blocks"
 OUTPUT_FILE = PROJECT_ROOT / "frontend" / "src" / "lib" / "block-registry.generated.ts"
 CONFIGS_FILE = PROJECT_ROOT / "frontend" / "src" / "lib" / "block-configs.generated.ts"
+BLOCK_TYPES_FILE = PROJECT_ROOT / "frontend" / "src" / "lib" / "generated" / "block-types.ts"
 
 # Map block.yaml config types to TypeScript ConfigField types
 YAML_TYPE_TO_TS = {
@@ -390,7 +391,7 @@ def generate_typescript(blocks: list[dict]) -> str:
         f"// Generated from {len(blocks)} block.yaml files across {len(categories)} categories",
         "// Run: python scripts/generate_block_registry.py",
         "",
-        "import type { BlockDefinition } from './block-registry'",
+        "import type { BlockDefinition } from './block-registry-types'",
         "",
         "export const BLOCK_REGISTRY: BlockDefinition[] = [",
     ]
@@ -551,6 +552,23 @@ def generate_block_configs(blocks: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def generate_block_types_union(blocks: list[dict]) -> str:
+    """Generate frontend/src/lib/generated/block-types.ts — union type of all block types."""
+    block_types = sorted(set(b["type"] for b in blocks))
+    lines = [
+        "// AUTO-GENERATED — DO NOT EDIT MANUALLY",
+        f"// Generated from {len(blocks)} block.yaml files",
+        "// Run: python scripts/generate_block_registry.py",
+        "",
+        "export type BlockType =",
+    ]
+    for i, bt in enumerate(block_types):
+        sep = "" if i == len(block_types) - 1 else " |"
+        lines.append(f"  | '{_esc(bt)}'")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
 def main():
     if not BLOCKS_DIR.is_dir():
         print(f"ERROR: Blocks directory not found: {BLOCKS_DIR}", file=sys.stderr)
@@ -564,13 +582,18 @@ def main():
 
     ts_content = generate_typescript(blocks)
     configs_content = generate_block_configs(blocks)
+    block_types_content = generate_block_types_union(blocks)
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_FILE.write_text(ts_content)
     CONFIGS_FILE.write_text(configs_content)
 
+    BLOCK_TYPES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    BLOCK_TYPES_FILE.write_text(block_types_content)
+
     print(f"Generated {OUTPUT_FILE} with {len(blocks)} blocks")
     print(f"Generated {CONFIGS_FILE} with {len(blocks)} config interfaces")
+    print(f"Generated {BLOCK_TYPES_FILE} with {len(blocks)} block types")
 
     # Summary by category
     categories: dict[str, int] = {}

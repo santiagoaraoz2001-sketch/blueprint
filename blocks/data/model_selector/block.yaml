@@ -2,45 +2,49 @@ name: Model Selector
 type: model_selector
 category: data
 description: Select a base model from HuggingFace, Ollama, MLX, or local path
-version: "1.0.0"
-
+version: 1.0.0
 inputs: []
-
 outputs:
-  - id: model
-    label: Model
-    data_type: model
-  - id: llm
-    label: LLM Config
-    data_type: llm
-    description: "Model info wrapped as LLM config for direct agent connection"
-
+- id: model
+  label: Model
+  data_type: model
+- id: llm
+  label: LLM Config
+  data_type: llm
+  description: Model info wrapped as LLM config for direct agent connection
 config:
   source:
     type: select
     label: Model Source
-    options: [huggingface, ollama, mlx, local_path]
-    default: "huggingface"
+    options:
+    - huggingface
+    - ollama
+    - mlx
+    - local_path
+    default: huggingface
   model_id:
     type: string
     label: Model ID
-    description: "Select from detected models or type manually"
-    default: ""
+    description: Select from detected models or type manually
+    default: ''
   revision:
     type: string
     label: Revision
     description: Git revision / branch
-    default: "main"
+    default: main
   local_path:
     type: file_path
     label: Local Path
     description: Path to local model directory or file
-    default: ""
+    default: ''
   quantization:
     type: select
     label: Quantization
-    options: [none, 4bit, 8bit]
-    default: "none"
+    options:
+    - none
+    - 4bit
+    - 8bit
+    default: none
   auto_download:
     type: boolean
     label: Auto Download
@@ -54,11 +58,16 @@ config:
   hf_override:
     type: string
     label: HuggingFace ID Override
-    default: ""
-    description: "Explicit HuggingFace model ID to pass to training/merge blocks. Overrides auto-resolution. Example: meta-llama/Llama-3.2-1B"
-
+    default: ''
+    description: 'Explicit HuggingFace model ID to pass to training/merge blocks.
+      Overrides auto-resolution. Example: meta-llama/Llama-3.2-1B'
 side_inputs:
-  - id: _loop
-    label: Loop
-    data_type: any
-    required: false
+- id: _loop
+  label: Loop
+  data_type: any
+  required: false
+maturity: stable
+exportable: true
+requires: []
+execution:
+  isolation: inprocess
