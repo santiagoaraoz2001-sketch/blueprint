@@ -20,7 +20,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from backend.database import Base  # noqa: E402
 from backend.config import DATABASE_URL, ensure_dirs  # noqa: E402
-from backend.models import project, experiment, experiment_phase, pipeline, pipeline_version, run, dataset, artifact, paper, model_record  # noqa: E402, F401
+from backend.models import project, experiment, experiment_phase, pipeline, pipeline_version, run, dataset, artifact, paper, experiment_note, model_record  # noqa: E402, F401
 
 # Ensure data directories exist before migration
 ensure_dirs()

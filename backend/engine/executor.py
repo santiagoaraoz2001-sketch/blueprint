@@ -2494,6 +2494,13 @@ async def execute_pipeline(
         except Exception:
             pass
 
+        # Auto-journal: generate experiment journal entry (never crashes execution)
+        try:
+            from ..services.experiment_journal import on_run_journal
+            on_run_journal(run_id, db)
+        except Exception:
+            pass
+
         # Auto-register models produced by training/merge blocks (never crashes execution)
         try:
             from ..services.model_auto_register import auto_register_models
@@ -2528,6 +2535,13 @@ async def execute_pipeline(
         try:
             from ..services.project_lifecycle import on_run_failed
             on_run_failed(run_id, db)
+        except Exception:
+            pass
+
+        # Auto-journal: generate experiment journal entry for failed runs too
+        try:
+            from ..services.experiment_journal import on_run_journal
+            on_run_journal(run_id, db)
         except Exception:
             pass
 

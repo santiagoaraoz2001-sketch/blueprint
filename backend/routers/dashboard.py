@@ -636,3 +636,297 @@ async def stream_project_events(project_id: str):
                         del _project_queues[project_id]
 
     return EventSourceResponse(event_generator())
+
+
+# ── Project Timeline ────────────────────────────────────────────────────
+
+@router.get("/{project_id}/timeline")
+def get_project_timeline(
+    project_id: str,
+    experiment_id: str | None = None,
+    starred_only: bool = False,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    limit: int = 50,
+    cursor: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Cursor-paginated experiment timeline for a project."""
+    from datetime import datetime, timezone
+    from ..models.experiment_note import ExperimentNote
+
+    limit = max(1, min(limit, 200))
+
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    run_query = db.query(Run).filter(Run.project_id == project_id)
+
+    if experiment_id:
+        pipeline_ids = [
+            p.id for p in db.query(Pipeline.id).filter(Pipeline.experiment_id == experiment_id).all()
+        ]
+        if pipeline_ids:
+            run_query = run_query.filter(Run.pipeline_id.in_(pipeline_ids))
+        else:
+            return {"project_id": project_id, "entries": [], "next_cursor": None, "has_more": False}
+
+    if starred_only:
+        run_query = run_query.filter(Run.best_in_project == True)
+
+    if date_from:
+        try:
+            run_query = run_query.filter(Run.started_at >= datetime.fromisoformat(date_from))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            run_query = run_query.filter(Run.started_at <= datetime.fromisoformat(date_to))
+        except ValueError:
+            pass
+
+    if cursor:
+        try:
+            run_query = run_query.filter(Run.started_at < datetime.fromisoformat(cursor))
+        except ValueError:
+            pass
+
+    runs = run_query.order_by(Run.started_at.desc()).limit(limit + 1).all()
+    has_more = len(runs) > limit
+    if has_more:
+        runs = runs[:limit]
+
+    run_ids = [r.id for r in runs]
+    if not run_ids:
+        return {"project_id": project_id, "entries": [], "next_cursor": None, "has_more": False}
+
+    notes = db.query(ExperimentNote).filter(ExperimentNote.run_id.in_(run_ids)).all()
+    note_by_run = {n.run_id: n for n in notes}
+
+    pipeline_ids_list = list(set(r.pipeline_id for r in runs))
+    pipelines = db.query(Pipeline).filter(Pipeline.id.in_(pipeline_ids_list)).all()
+    pipeline_map = {p.id: p for p in pipelines}
+
+    entries = []
+    for run in runs:
+        note = note_by_run.get(run.id)
+        pipeline = pipeline_map.get(run.pipeline_id)
+        created_at = note.created_at if note else run.started_at
+        entries.append({
+            "run_id": run.id,
+            "run_status": run.status,
+            "best_in_project": run.best_in_project,
+            "timestamp": created_at.isoformat() if created_at else None,
+            "experiment_name": pipeline.name if pipeline else None,
+            "auto_summary": note.auto_summary if note else None,
+            "user_notes": note.user_notes if note else None,
+            "note_id": note.id if note else None,
+            "duration_seconds": run.duration_seconds,
+            "metrics": run.metrics if isinstance(run.metrics, dict) else {},
+        })
+
+    next_cursor = None
+    if has_more and runs:
+        last_run = runs[-1]
+        if last_run.started_at:
+            next_cursor = last_run.started_at.isoformat()
+
+    return {"project_id": project_id, "entries": entries, "next_cursor": next_cursor, "has_more": has_more}
+
+
+# ── Research Export ─────────────────────────────────────────────────────
+
+def _flatten_for_export(d: dict, prefix: str = "") -> dict:
+    items = {}
+    if not isinstance(d, dict):
+        return items
+    for k, v in d.items():
+        key = f"{prefix}.{k}" if prefix else k
+        if isinstance(v, dict):
+            items.update(_flatten_for_export(v, key))
+        else:
+            items[key] = v
+    return items
+
+
+_EXPORT_SECRET_PATTERNS = {"api_key", "secret", "token", "password", "credential", "auth", "private_key"}
+
+
+@router.get("/{project_id}/export/report")
+def export_research_report(project_id: str, db: Session = Depends(get_db)):
+    """Generate a structured Markdown research report with YAML frontmatter."""
+    from datetime import datetime, timezone
+    from fastapi.responses import Response
+    from ..models.experiment_note import ExperimentNote
+    from ..models.artifact import ArtifactRecord
+
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    runs = db.query(Run).filter(Run.project_id == project_id).order_by(Run.started_at.asc()).all()
+    pipeline_ids = list(set(r.pipeline_id for r in runs))
+    pipelines = db.query(Pipeline).filter(Pipeline.id.in_(pipeline_ids)).all() if pipeline_ids else []
+    pipeline_map = {p.id: p for p in pipelines}
+
+    run_ids = [r.id for r in runs]
+    notes = db.query(ExperimentNote).filter(ExperimentNote.run_id.in_(run_ids)).all() if run_ids else []
+    note_by_run = {n.run_id: n for n in notes}
+    artifacts = db.query(ArtifactRecord).filter(ArtifactRecord.run_id.in_(run_ids)).all() if run_ids else []
+
+    best_run = next((r for r in runs if r.best_in_project), None)
+
+    lines = []
+    lines.append("---")
+    lines.append(f'title: "{project.name}"')
+    lines.append(f'project_id: "{project.id}"')
+    lines.append(f'generated_at: "{datetime.now(timezone.utc).isoformat()}"')
+    lines.append(f"total_runs: {len(runs)}")
+    if best_run:
+        lines.append(f'best_run_id: "{best_run.id}"')
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# {project.name}")
+    lines.append("")
+    lines.append("## Hypothesis")
+    lines.append("")
+    lines.append(project.hypothesis or "_No hypothesis specified._")
+    lines.append("")
+    lines.append("## Methodology")
+    lines.append("")
+    for pl in pipelines:
+        defn = pl.definition if isinstance(pl.definition, dict) else {}
+        pl_nodes = defn.get("nodes", [])
+        block_list = ", ".join(n.get("data", {}).get("label", n.get("data", {}).get("type", "unknown")) for n in pl_nodes[:10])
+        if len(pl_nodes) > 10:
+            block_list += f", ... (+{len(pl_nodes) - 10} more)"
+        first_run = next((r for r in runs if r.pipeline_id == pl.id), None)
+        config_summary = ""
+        if first_run and isinstance(first_run.config_snapshot, dict):
+            flat = _flatten_for_export(first_run.config_snapshot)
+            interesting = {k: v for k, v in flat.items()
+                          if not k.startswith(("nodes.", "edges.", "workspace_config."))
+                          and not any(pat in k.lower() for pat in _EXPORT_SECRET_PATTERNS)}
+            top_keys = list(interesting.items())[:3]
+            if top_keys:
+                config_summary = " Key configuration: " + ", ".join(f"`{k}={v}`" for k, v in top_keys) + "."
+        lines.append(f"- **{pl.name}**: {len(pl_nodes)}-step pipeline: {block_list}.{config_summary}")
+    lines.append("")
+    lines.append("## Results")
+    lines.append("")
+    if runs:
+        all_metric_keys: set[str] = set()
+        for r in runs:
+            if isinstance(r.metrics, dict):
+                all_metric_keys.update(r.metrics.keys())
+        sorted_metrics = sorted(all_metric_keys)
+        if sorted_metrics:
+            header = "| Run | Status | Duration |"
+            separator = "|-----|--------|----------|"
+            for mk in sorted_metrics:
+                header += f" {mk} |"
+                separator += "------|"
+            lines.append(header)
+            lines.append(separator)
+            for r in runs:
+                pl = pipeline_map.get(r.pipeline_id)
+                name = (pl.name if pl else r.id[:8])
+                dur = f"{r.duration_seconds:.1f}s" if r.duration_seconds else "-"
+                pin = " **[BEST]**" if r.best_in_project else ""
+                row = f"| {name}{pin} | {r.status} | {dur} |"
+                m = r.metrics if isinstance(r.metrics, dict) else {}
+                for mk in sorted_metrics:
+                    val = m.get(mk)
+                    if val is None:
+                        row += " - |"
+                    elif isinstance(val, float):
+                        row += f" {val:.6g} |"
+                    else:
+                        row += f" {val} |"
+                lines.append(row)
+        else:
+            lines.append("_No metrics recorded._")
+    else:
+        lines.append("_No runs completed._")
+    lines.append("")
+    lines.append("## Timeline")
+    lines.append("")
+    for r in runs:
+        note = note_by_run.get(r.id)
+        ts = r.started_at.strftime("%Y-%m-%d %H:%M") if r.started_at else "?"
+        summary = note.auto_summary if note else f"Run {r.status}"
+        user_note = f"\n  > {note.user_notes}" if note and note.user_notes else ""
+        pin_marker = " [BEST]" if r.best_in_project else ""
+        lines.append(f"- **{ts}**{pin_marker}: {summary}{user_note}")
+    lines.append("")
+    lines.append("## Key Findings")
+    lines.append("")
+    if best_run:
+        best_note = note_by_run.get(best_run.id)
+        lines.append(f"_{best_note.auto_summary}_" if best_note else f"_Best run: {best_run.id[:8]} (status: {best_run.status})_")
+    else:
+        lines.append("_[Fill in key findings before export]_")
+    lines.append("")
+    lines.append("## Artifact References")
+    lines.append("")
+    if artifacts:
+        lines.append("| Artifact ID | Node | Port | Data Type | Size | Hash |")
+        lines.append("|-------------|------|------|-----------|------|------|")
+        for ar in artifacts[:50]:
+            hash_short = ar.content_hash[:12] if ar.content_hash else "-"
+            size_kb = f"{ar.size_bytes / 1024:.1f}KB" if ar.size_bytes else "-"
+            lines.append(f"| {ar.id[:12]} | {ar.node_id} | {ar.port_id} | {ar.data_type} | {size_kb} | {hash_short} |")
+    else:
+        lines.append("_No artifacts recorded._")
+    lines.append("")
+
+    return Response(content="\n".join(lines), media_type="text/markdown", headers={
+        "Content-Disposition": f'attachment; filename="blueprint-report-{project.id[:8]}.md"',
+    })
+
+
+@router.get("/{project_id}/export/json")
+def export_dashboard_json(project_id: str, db: Session = Depends(get_db)):
+    """Export raw dashboard data as JSON for programmatic consumption."""
+    from datetime import datetime, timezone
+    from ..models.experiment_note import ExperimentNote
+    from ..models.artifact import ArtifactRecord
+
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    runs = db.query(Run).filter(Run.project_id == project_id).order_by(Run.started_at.asc()).all()
+    pipeline_ids = list(set(r.pipeline_id for r in runs))
+    pipelines = db.query(Pipeline).filter(Pipeline.id.in_(pipeline_ids)).all() if pipeline_ids else []
+
+    run_ids = [r.id for r in runs]
+    notes = db.query(ExperimentNote).filter(ExperimentNote.run_id.in_(run_ids)).all() if run_ids else []
+    note_by_run = {n.run_id: n for n in notes}
+    artifacts = db.query(ArtifactRecord).filter(ArtifactRecord.run_id.in_(run_ids)).all() if run_ids else []
+
+    return {
+        "project": {
+            "id": project.id, "name": project.name,
+            "hypothesis": project.hypothesis, "status": project.status,
+            "created_at": project.created_at.isoformat() if project.created_at else None,
+        },
+        "pipelines": [{"id": p.id, "name": p.name, "description": p.description,
+                        "block_count": len((p.definition or {}).get("nodes", []))} for p in pipelines],
+        "runs": [{
+            "id": r.id, "pipeline_id": r.pipeline_id, "status": r.status,
+            "best_in_project": r.best_in_project,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "duration_seconds": r.duration_seconds,
+            "metrics": r.metrics if isinstance(r.metrics, dict) else {},
+            "journal": {
+                "auto_summary": note_by_run[r.id].auto_summary if r.id in note_by_run else None,
+                "user_notes": note_by_run[r.id].user_notes if r.id in note_by_run else None,
+            },
+        } for r in runs],
+        "artifacts": [{"id": ar.id, "run_id": ar.run_id, "node_id": ar.node_id,
+                        "port_id": ar.port_id, "data_type": ar.data_type,
+                        "size_bytes": ar.size_bytes, "content_hash": ar.content_hash} for ar in artifacts],
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }

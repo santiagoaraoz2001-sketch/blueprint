@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { useMetricsStore, type MetricPoint } from '@/stores/metricsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { api } from '@/api/client'
 import { comparisonToTable } from '@/services/metricsBridge'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
-import { TableProperties } from 'lucide-react'
+import { TableProperties, Trophy } from 'lucide-react'
 import ConfigDiff from './ConfigDiff'
+import TraceabilityPanel from '@/components/Dashboard/TraceabilityPanel'
 import toast from 'react-hot-toast'
 
 interface ComparisonViewProps {
@@ -31,6 +32,8 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export default function ComparisonView({ runIds }: ComparisonViewProps) {
   const runs = useMetricsStore((s) => s.runs)
+  const [traceTarget, setTraceTarget] = useState<{ runId: string; nodeId: string; metricName: string } | null>(null)
+  const [pinnedRunId, setPinnedRunId] = useState<string | null>(null)
 
   // Load metrics for each run that's not already in the store
   useEffect(() => {
@@ -217,8 +220,50 @@ export default function ComparisonView({ runIds }: ComparisonViewProps) {
         )
       })}
 
+      {/* Pin & Trace controls */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
+        {runIds.map((id, i) => {
+          const run = runs[id]
+          const isPinned = pinnedRunId === id
+          return (
+            <button
+              key={id}
+              onClick={async () => {
+                try {
+                  await api.post(`/runs/${id}/pin-best`)
+                  setPinnedRunId(id)
+                  toast.success('Run pinned as best')
+                } catch { toast.error('Failed to pin') }
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '3px 8px',
+                background: isPinned ? `${T.amber}18` : 'transparent',
+                border: `1px solid ${isPinned ? T.amber + '44' : T.border}`,
+                borderRadius: 3, cursor: 'pointer',
+                fontFamily: F, fontSize: FS.xxs,
+                color: isPinned ? T.amber : T.dim,
+              }}
+            >
+              <Trophy size={10} color={isPinned ? T.amber : T.dim} fill={isPinned ? T.amber : 'none'} />
+              {run?.pipelineName || id.slice(0, 8)}
+            </button>
+          )
+        })}
+      </div>
+
       {/* Config diff */}
       <ConfigDiff runIds={runIds} />
+
+      {/* Traceability Panel */}
+      {traceTarget && (
+        <TraceabilityPanel
+          runId={traceTarget.runId}
+          nodeId={traceTarget.nodeId}
+          metricName={traceTarget.metricName}
+          onClose={() => setTraceTarget(null)}
+        />
+      )}
     </div>
   )
 }
