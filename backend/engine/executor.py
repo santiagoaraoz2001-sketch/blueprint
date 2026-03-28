@@ -93,6 +93,8 @@ from .fingerprint import compute_fingerprints
 from .block_registry import BlockRegistryService
 from .metrics_schema import create_metric
 from .artifact_registry import register_block_artifacts
+from .artifacts import ArtifactStore
+from ..models.artifact import ArtifactRecord
 
 # Ensure the repo root is on sys.path so blocks can do cross-block imports
 # like `from blocks.inference._inference_utils import ...`.
@@ -716,6 +718,105 @@ def _safe_bool(value: Any, default: bool) -> bool:
     return default
 
 
+# ── Artifact Cache Integration ────────────────────────────────────────
+# Module-level ArtifactStore instance, reused across all runs.
+_artifact_store = ArtifactStore(base_path=Path(ARTIFACTS_DIR))
+
+# Logger for artifact cache (best-effort, never crashes execution)
+import logging as _logging
+_artifact_cache_logger = _logging.getLogger("blueprint.artifact_cache")
+
+
+def _infer_port_data_type(port_id: str, value: Any, block_schema: dict | None) -> str:
+    """Infer the data_type for an output port.
+
+    1. Check block_schema outputs for a declared data_type
+    2. Fall back to heuristic type detection from the value
+    """
+    if block_schema:
+        for output_def in block_schema.get("outputs", []):
+            if isinstance(output_def, dict) and output_def.get("id") == port_id:
+                return output_def.get("data_type", "text")
+
+    # Heuristic fallback
+    if isinstance(value, str):
+        return "text"
+    if isinstance(value, dict):
+        # Dicts with numeric values look like metrics
+        if value and all(isinstance(v, (int, float)) for v in value.values()):
+            return "metrics"
+        return "config"
+    if isinstance(value, list):
+        return "dataset"
+    if isinstance(value, bytes):
+        return "artifact"
+    return "text"
+
+
+def _is_json_serializable(value: Any) -> bool:
+    """Quick check if a value can be serialized as JSON."""
+    try:
+        json.dumps(value)
+        return True
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+def _cache_block_outputs(
+    node_id: str,
+    run_id: str,
+    node_outputs: dict[str, Any],
+    block_schema: dict | None,
+    db: Session,
+) -> None:
+    """Store each output port as a cached artifact with SHA-256 verification.
+
+    Best-effort: logs warnings on failure, never raises.
+    Skips values that are not serializable by the artifact cache.
+    Persists ArtifactRecord rows in the DB for later retrieval.
+    """
+    if not node_outputs:
+        return
+
+    records: list[ArtifactRecord] = []
+    for port_id, value in node_outputs.items():
+        try:
+            data_type = _infer_port_data_type(port_id, value, block_schema)
+
+            # Skip non-serializable values for non-raw types
+            if data_type != "artifact" and not _is_json_serializable(value):
+                # Fall back to text serialization of the string representation
+                data_type = "text"
+                value = str(value)
+
+            manifest = _artifact_store.store(
+                node_id=node_id,
+                port_id=port_id,
+                run_id=run_id,
+                data=value,
+                data_type=data_type,
+            )
+            records.append(ArtifactRecord.from_manifest(manifest))
+        except Exception as exc:
+            _artifact_cache_logger.debug(
+                "Artifact cache: skipped port %s/%s: %s", node_id, port_id, exc
+            )
+
+    if records:
+        try:
+            for record in records:
+                db.add(record)
+            db.flush()  # flush within the existing transaction, committed by caller
+        except Exception as exc:
+            _artifact_cache_logger.warning(
+                "Artifact cache: DB flush failed for node %s: %s", node_id, exc
+            )
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+
 @dataclass
 class _BodyBlockInfo:
     """Pre-computed per-body-block metadata (computed once, reused each iteration)."""
@@ -1009,6 +1110,9 @@ async def _execute_loop(
             outputs[_nid] = node_outputs
             if data_fingerprints:
                 all_fingerprints[_nid] = data_fingerprints
+
+            # Cache loop body outputs as typed artifacts (best-effort)
+            _cache_block_outputs(_nid, run_id, node_outputs, info.schema, db)
 
             # Register artifacts produced by this loop body block (best-effort)
             try:
@@ -1688,6 +1792,9 @@ async def execute_pipeline(
                 db.commit()
                 log_run_failed(run_id, error_msg, node_id)
                 return
+
+            # Cache block outputs as typed artifacts with SHA-256 verification (best-effort)
+            _cache_block_outputs(node_id, run_id, node_outputs, block_schema, db)
 
             # Register artifacts produced by this block (best-effort, never crashes)
             try:

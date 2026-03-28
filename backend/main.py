@@ -21,7 +21,7 @@ from .database import SessionLocal, init_db
 from .services.registry import BlockRegistryService, set_global_registry
 from .models.run import LiveRun, Run
 from .routers import (
-    block_generator, blocks, connectors, control_tower, custom_blocks,
+    artifacts, block_generator, blocks, connectors, control_tower, custom_blocks,
     datasets, events, execution, inference, marketplace, models, outputs,
     papers, pipelines, plugins, projects, registry, runs, secrets, sweeps,
     system, workspace,
@@ -270,6 +270,7 @@ app.include_router(connectors.router)
 app.include_router(block_generator.router)
 app.include_router(outputs.router)
 app.include_router(workspace.router)
+app.include_router(artifacts.router)
 app.include_router(registry.router)
 if ENABLE_MARKETPLACE:
     app.include_router(marketplace.router)
