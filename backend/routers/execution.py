@@ -32,6 +32,8 @@ from ..schemas.execution import (
     GatewayValidationResponse,
     BlockConfigValidationResponse,
     PipelineTestResponse,
+    AutofixRequest,
+    AutofixResponse,
 )
 
 router = APIRouter(prefix="/api", tags=["execution"])
@@ -302,6 +304,68 @@ def validate_pipeline_endpoint(pipeline_id: str, db: Session = Depends(get_db)):
         "block_count": report.block_count,
         "edge_count": report.edge_count,
     }
+
+
+@router.post("/pipelines/{pipeline_id}/autofix", response_model=AutofixResponse)
+def autofix_pipeline(pipeline_id: str, body: AutofixRequest, db: Session = Depends(get_db)):
+    """Propose or apply deterministic fixes for pipeline validation errors.
+
+    action='propose': validate the pipeline and return proposed fixes.
+    action='apply': apply selected patches (by patch_id), save the pipeline,
+                    and return the updated definition.
+    """
+    from ..engine.autofix import AutofixEngine
+    from ..engine.validator import validate_pipeline as _validate
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+
+    registry = get_global_registry()
+    engine = AutofixEngine(registry)
+
+    if body.action == "propose":
+        # Run validation to get current errors
+        report = _validate(definition)
+        patches = engine.propose_fixes(report.errors, report.warnings, nodes, edges)
+        return {
+            "patches": [p.to_dict() for p in patches],
+            "applied": [],
+            "skipped": [],
+            "definition": None,
+        }
+
+    elif body.action == "apply":
+        if not body.patch_ids:
+            raise HTTPException(400, "patch_ids required for action='apply'")
+
+        # First propose to get the patches, then apply selected ones
+        report = _validate(definition)
+        patches = engine.propose_fixes(report.errors, report.warnings, nodes, edges)
+        new_nodes, new_edges, result = engine.apply_fixes(
+            body.patch_ids, nodes, edges, all_patches=patches,
+        )
+
+        if result.applied:
+            # Save the updated pipeline
+            updated_def = {**definition, "nodes": new_nodes, "edges": new_edges}
+            pipeline.definition = updated_def
+            db.commit()
+            db.refresh(pipeline)
+
+        return {
+            "patches": [p.to_dict() for p in patches],
+            "applied": result.applied,
+            "skipped": result.skipped,
+            "definition": pipeline.definition if result.applied else None,
+        }
+
+    else:
+        raise HTTPException(400, f"Invalid action: {body.action}. Use 'propose' or 'apply'.")
 
 
 @router.post("/blocks/{block_type}/validate-config", response_model=BlockConfigValidationResponse)

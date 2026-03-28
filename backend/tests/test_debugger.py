@@ -10,9 +10,10 @@ Tests:
 
 import asyncio
 import contextlib
-import json
+import tempfile
 import threading
 import time
+from pathlib import Path
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -94,13 +95,28 @@ def _executor_mocks(stack, capture_fn, fake_outputs):
     p("backend.engine.executor.log_block_start")
     p("backend.engine.executor.log_block_complete")
     p("backend.engine.executor.log_block_failed")
-    # ARTIFACTS_DIR mock
-    arts_mock = MagicMock()
-    arts_mock.__truediv__ = lambda self, x: MagicMock(
-        mkdir=MagicMock(),
-        __truediv__=lambda self2, y: MagicMock(parent=MagicMock(mkdir=MagicMock())),
-    )
-    p("backend.engine.executor.ARTIFACTS_DIR", new=arts_mock)
+    # Mock prepare_node_runtime (added by main) to return a PreparedNode-like object
+    fake_prepared = MagicMock()
+    fake_prepared.block_dir = MagicMock()
+    fake_prepared.block_schema = None
+    fake_prepared.timeout_seconds = None
+    fake_prepared.max_retries = 0
+    fake_prepared.is_composite = False
+    fake_prepared.context_cls = None
+    fake_prepared.cleaned_config = {}
+    fake_prepared.run_dir = "/tmp/fake_run_dir"
+    fake_prepared.block_version = None
+    fake_prepared.block_type = "text_input"
+    fake_prepared.node_id = ""
+    p("backend.engine.executor.prepare_node_runtime", return_value=fake_prepared)
+    p("backend.engine.executor.apply_multi_input_policy", side_effect=lambda schema, inputs: inputs)
+    # Mock lazy imports to avoid hitting MagicMock run objects
+    p("backend.engine.run_export.generate_run_export", return_value={})
+    p("backend.engine.executor._write_error_log")
+    p("backend.engine.executor.scrub_traceback", side_effect=lambda x: x)
+    # Use a real temp directory for ARTIFACTS_DIR so metrics_file = open(...) works
+    tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
+    p("backend.engine.executor.ARTIFACTS_DIR", new=Path(tmpdir))
 
 
 # ────────────────────────────────────────────────────────────────

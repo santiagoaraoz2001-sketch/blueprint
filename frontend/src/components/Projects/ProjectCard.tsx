@@ -11,7 +11,7 @@ interface ProjectCardProps {
 
 export default function ProjectCard({ project, onClick }: ProjectCardProps) {
   const accent = STATUS_COLORS[project.status] || T.dim
-  const updatedDate = new Date(project.updated_at).toLocaleDateString('en-US', {
+  const updatedDate = new Date(project.updated_at ?? Date.now()).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   })
@@ -59,7 +59,7 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
         {/* Tags */}
         {project.tags.length > 0 && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {project.tags.map((tag) => (
+            {project.tags.map((tag: string) => (
               <span
                 key={tag}
                 style={{

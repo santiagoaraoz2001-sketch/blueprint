@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { api } from '@/api/client'
 
-export type ThemeMode = 'dark' | 'light'
+export type ThemeMode = 'dark' | 'light' | 'system'
 export type FontChoice = 'jetbrains' | 'inter' | 'fira' | 'ibm-plex'
 export type FontSizeScale = 'compact' | 'default' | 'comfortable' | 'large'
 export type AccentColor = 'cyan' | 'orange' | 'green' | 'blue' | 'purple' | 'pink'
@@ -87,6 +87,8 @@ interface SettingsState {
   audioOnPipelineComplete: boolean
   audioOnError: boolean
 
+  /** Resolve 'system' to 'dark' | 'light' based on OS preference */
+  resolvedTheme: () => 'dark' | 'light'
   setTheme: (theme: ThemeMode) => void
   setAccentColor: (color: AccentColor) => void
   setFont: (font: FontChoice) => void
@@ -136,6 +138,13 @@ export const useSettingsStore = create<SettingsState>()(
       audioOnPipelineComplete: true,
       audioOnError: true,
 
+      resolvedTheme: () => {
+        const t = get().theme
+        if (t === 'system') {
+          return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        }
+        return t
+      },
       setTheme: (theme) => set({ theme }),
       setAccentColor: (accentColor) => set({ accentColor }),
       setFont: (font) => set({ font }),

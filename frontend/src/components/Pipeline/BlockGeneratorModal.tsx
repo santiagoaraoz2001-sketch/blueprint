@@ -344,7 +344,7 @@ export default function BlockGeneratorModal({ visible, onClose, onInstalled }: P
                 {useMemo(() => (
                   <Editor
                     language={activeTab === 'yaml' ? 'yaml' : 'python'}
-                    theme="vs-dark"
+                    theme={document.documentElement.dataset.theme === 'light' ? 'vs' : 'vs-dark'}
                     value={activeTab === 'yaml' ? result.block_yaml : result.run_py}
                     options={{
                       readOnly: true,

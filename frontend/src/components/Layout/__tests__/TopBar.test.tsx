@@ -3,7 +3,14 @@ import { render, screen } from '@testing-library/react'
 import TopBar from '../TopBar'
 
 vi.mock('@/stores/uiStore', () => ({
-  useUIStore: () => ({ activeView: 'editor' }),
+  useUIStore: (selector?: (s: any) => any) => {
+    const state = {
+      activeView: 'editor',
+      helpPanelOpen: false,
+      toggleHelpPanel: vi.fn(),
+    }
+    return selector ? selector(state) : state
+  },
 }))
 
 vi.mock('@/stores/guideStore', () => ({

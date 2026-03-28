@@ -33,10 +33,10 @@ interface RunRowProps {
 }
 
 const STATUS_ICONS: Record<string, { icon: typeof CheckCircle2; color: string }> = {
-  complete: { icon: CheckCircle2, color: '#10B981' },
-  failed: { icon: XCircle, color: '#ff433d' },
-  running: { icon: Loader, color: '#00BFA5' },
-  pending: { icon: Clock, color: '#64748B' },
+  complete: { icon: CheckCircle2, color: T.green },
+  failed: { icon: XCircle, color: T.red },
+  running: { icon: Loader, color: T.cyan },
+  pending: { icon: Clock, color: T.dim },
 }
 
 function formatDuration(seconds: number | undefined): string {

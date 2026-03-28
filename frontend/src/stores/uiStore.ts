@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type View = 'dashboard' | 'editor' | 'results' | 'datasets' | 'data' | 'visualization' | 'marketplace' | 'settings' | 'paper' | 'help' | 'workshop' | 'inference' | 'research' | 'research-detail' | 'monitor' | 'output'
+export type View = 'dashboard' | 'editor' | 'results' | 'datasets' | 'data' | 'visualization' | 'marketplace' | 'settings' | 'paper' | 'help' | 'workshop' | 'inference' | 'research' | 'research-detail' | 'monitor' | 'output' | 'project'
 
 interface UIState {
   activeView: View
@@ -13,6 +13,8 @@ interface UIState {
   selectedPaperProjectId: string | null
   monitorRunId: string | null
   compareRunIds: string[] | null
+  /** Whether the contextual help panel is open */
+  helpPanelOpen: boolean
   setView: (view: View) => void
   toggleSidebar: () => void
   setSelectedProject: (id: string | null) => void
@@ -26,6 +28,7 @@ interface UIState {
   setCompareRunIds: (ids: string[] | null) => void
   openMonitor: (runId: string) => void
   openComparison: (runIds: string[]) => void
+  toggleHelpPanel: () => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -37,6 +40,7 @@ export const useUIStore = create<UIState>((set) => ({
   selectedPaperProjectId: null,
   monitorRunId: null,
   compareRunIds: null,
+  helpPanelOpen: false,
   setView: (view) => set({ activeView: view }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSelectedProject: (id) => set({ selectedProjectId: id }),
@@ -48,4 +52,5 @@ export const useUIStore = create<UIState>((set) => ({
   setCompareRunIds: (ids) => set({ compareRunIds: ids }),
   openMonitor: (runId) => set({ activeView: 'monitor', monitorRunId: runId, compareRunIds: null }),
   openComparison: (runIds) => set({ activeView: 'monitor', compareRunIds: runIds, monitorRunId: null }),
+  toggleHelpPanel: () => set((s) => ({ helpPanelOpen: !s.helpPanelOpen })),
 }))

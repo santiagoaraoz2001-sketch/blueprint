@@ -1,0 +1,10 @@
+# Test dependencies for Blueprint contract tests and block verification.
+# Install with: pip install -r backend/requirements-test.txt
+
+# Core test framework
+pytest>=7.0.0
+pytest-timeout>=2.2.0
+pytest-asyncio>=0.23.0
+
+# Already in requirements.txt but pinned here for CI reproducibility
+pyyaml>=6.0.0
