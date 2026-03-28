@@ -86,6 +86,8 @@ side_inputs:
   data_type: any
   required: false
 exportable: true
-requires: []
+requires:
+  - torch
+  - transformers
 execution:
   isolation: inprocess

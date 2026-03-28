@@ -76,6 +76,7 @@ export default function Sidebar() {
 
   return (
     <aside
+      data-testid="app-sidebar"
       style={{
         width,
         minWidth: width,

@@ -23,7 +23,13 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from backend.tests.fixtures.loader import load_all_fixtures, get_definition, get_expected
 from backend.engine.executor import _topological_sort, _detect_loops, _topological_sort_with_loops
-from backend.engine.validator import validate_pipeline, _port_compatible, _resolve_port_type
+from backend.engine.validator import validate_pipeline
+from backend.routers.registry import _is_port_compatible as _port_compatible, PORT_TYPE_ALIASES
+
+
+def _resolve_port_type(port_type: str) -> str:
+    """Resolve port type aliases to canonical type."""
+    return PORT_TYPE_ALIASES.get(port_type, port_type)
 from backend.engine.compiler import compile_pipeline_to_python
 from backend.engine.block_registry import resolve_output_handle
 

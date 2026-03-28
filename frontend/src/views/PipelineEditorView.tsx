@@ -16,6 +16,7 @@ import { validatePipelineClient, type DiagnosticReport } from '@/lib/pipeline-va
 import PipelineMonitor, { type MonitorBlock } from '@/components/Pipeline/PipelineMonitor'
 import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp, AlertCircle, WifiOff } from 'lucide-react'
 import TemplateGallery from '@/components/Pipeline/TemplateGallery'
+import TemplateLanding from '@/components/Templates/TemplateLanding'
 import ToolbarDropdown from '@/components/Pipeline/ToolbarDropdown'
 import MissionController from '@/components/Mission/MissionController'
 import { useRunStore } from '@/stores/runStore'
@@ -75,6 +76,28 @@ export default function PipelineEditorView() {
       setView('dashboard')
     }
   }, [selectedProjectId, setView])
+
+  // First-launch detection: show template landing when no pipelines exist
+  const [firstLaunchChecked, setFirstLaunchChecked] = useState(false)
+  const [showFirstLaunch, setShowFirstLaunch] = useState(false)
+
+  useEffect(() => {
+    if (firstLaunchChecked) return
+    fetchPipelines().then(() => {
+      const state = usePipelineStore.getState()
+      if (state.pipelines.length === 0 && state.nodes.length === 0 && !state.id) {
+        setShowFirstLaunch(true)
+      }
+      setFirstLaunchChecked(true)
+    })
+  }, [firstLaunchChecked, fetchPipelines])
+
+  // Exit first-launch when a pipeline is loaded or created
+  useEffect(() => {
+    if (showFirstLaunch && (nodes.length > 0 || pipelines.length > 0)) {
+      setShowFirstLaunch(false)
+    }
+  }, [showFirstLaunch, nodes.length, pipelines.length])
 
   const [showAgent, setShowAgent] = useState(false)
   const [showPipelineList, setShowPipelineList] = useState(false)
@@ -235,6 +258,11 @@ export default function PipelineEditorView() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipelineId, nodes.length, edges.length, validateBackend, markStale, configFingerprint])
+
+  // Show TemplateLanding for first-launch (no pipelines exist)
+  if (showFirstLaunch) {
+    return <TemplateLanding />
+  }
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

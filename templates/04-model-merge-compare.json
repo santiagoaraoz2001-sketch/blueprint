@@ -1,0 +1,218 @@
+{
+  "id": "model-merge-compare",
+  "name": "Model Merge & Compare",
+  "description": "Select two models, merge them using SLERP interpolation, then compare the merged model against the originals with side-by-side evaluation.",
+  "difficulty": "intermediate",
+  "estimated_runtime": "30 min",
+  "required_services": [],
+  "required_capabilities": [
+    "torch"
+  ],
+  "tags": [
+    "merge",
+    "comparison",
+    "slerp"
+  ],
+  "nodes": [
+    {
+      "id": "mc_1",
+      "type": "blockNode",
+      "position": {
+        "x": 250,
+        "y": 80
+      },
+      "data": {
+        "type": "model_selector",
+        "label": "Model A",
+        "category": "data",
+        "icon": "Box",
+        "accent": "#62B8D9",
+        "config": {},
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "mc_2",
+      "type": "blockNode",
+      "position": {
+        "x": 650,
+        "y": 80
+      },
+      "data": {
+        "type": "model_selector",
+        "label": "Model B",
+        "category": "data",
+        "icon": "Box",
+        "accent": "#62B8D9",
+        "config": {},
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "mc_3",
+      "type": "blockNode",
+      "position": {
+        "x": 450,
+        "y": 280
+      },
+      "data": {
+        "type": "slerp_merge",
+        "label": "SLERP Merge",
+        "category": "merge",
+        "icon": "GitMerge",
+        "accent": "#D87CB8",
+        "config": {
+          "t": 0.5
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "mc_4",
+      "type": "blockNode",
+      "position": {
+        "x": 250,
+        "y": 480
+      },
+      "data": {
+        "type": "lm_eval_harness",
+        "label": "Eval Original",
+        "category": "evaluation",
+        "icon": "ClipboardCheck",
+        "accent": "#65D68B",
+        "config": {
+          "tasks": "hellaswag",
+          "num_fewshot": 0
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "mc_5",
+      "type": "blockNode",
+      "position": {
+        "x": 650,
+        "y": 480
+      },
+      "data": {
+        "type": "lm_eval_harness",
+        "label": "Eval Merged",
+        "category": "evaluation",
+        "icon": "ClipboardCheck",
+        "accent": "#65D68B",
+        "config": {
+          "tasks": "hellaswag",
+          "num_fewshot": 0
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    },
+    {
+      "id": "mc_6",
+      "type": "blockNode",
+      "position": {
+        "x": 450,
+        "y": 660
+      },
+      "data": {
+        "type": "results_formatter",
+        "label": "Compare Results",
+        "category": "output",
+        "icon": "FileOutput",
+        "accent": "#65D68B",
+        "config": {
+          "format": "csv",
+          "include_config": true
+        },
+        "status": "idle",
+        "progress": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "mc_e1",
+      "source": "mc_1",
+      "target": "mc_3",
+      "sourceHandle": "model",
+      "targetHandle": "model_a",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#B29CEA",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "mc_e2",
+      "source": "mc_2",
+      "target": "mc_3",
+      "sourceHandle": "model",
+      "targetHandle": "model_b",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#B29CEA",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "mc_e3",
+      "source": "mc_1",
+      "target": "mc_4",
+      "sourceHandle": "model",
+      "targetHandle": "model",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#B29CEA",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "mc_e4",
+      "source": "mc_3",
+      "target": "mc_5",
+      "sourceHandle": "model",
+      "targetHandle": "model",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#B29CEA",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "mc_e5",
+      "source": "mc_4",
+      "target": "mc_6",
+      "sourceHandle": "metrics",
+      "targetHandle": "metrics",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#52D975",
+        "strokeWidth": 1.5
+      }
+    },
+    {
+      "id": "mc_e6",
+      "source": "mc_5",
+      "target": "mc_6",
+      "sourceHandle": "metrics",
+      "targetHandle": "metrics",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#52D975",
+        "strokeWidth": 1.5
+      }
+    }
+  ],
+  "default_config": {}
+}
