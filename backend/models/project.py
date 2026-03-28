@@ -29,6 +29,7 @@ class Project(Base):
     estimated_compute_hours = Column(Float, default=0)
     estimated_cost_usd = Column(Float, default=0)
     actual_compute_hours = Column(Float, default=0)
+    pipeline_config = Column(JSON, default=dict)  # project-level config overrides: {key: value}
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

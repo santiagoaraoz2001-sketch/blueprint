@@ -82,15 +82,38 @@ def _recover_stale_runs():
 
 
 def _periodic_recovery_loop():
-    """Background thread that checks for stale runs every RECOVERY_CHECK_INTERVAL seconds."""
+    """Background thread that checks for stale runs every RECOVERY_CHECK_INTERVAL seconds.
+
+    Also performs periodic decision log cleanup (daily cadence — runs when the
+    interval counter aligns, not on every check).
+    """
+    _cycle_count = 0
+    # Run decision cleanup roughly once per hour (RECOVERY_CHECK_INTERVAL is 120s,
+    # so every 30 cycles ≈ 3600s = 1 hour).
+    _DECISION_CLEANUP_CYCLES = max(1, 3600 // RECOVERY_CHECK_INTERVAL)
+
     while not _recovery_stop.is_set():
         _recovery_stop.wait(RECOVERY_CHECK_INTERVAL)
         if _recovery_stop.is_set():
             break
+        _cycle_count += 1
+
         try:
             _recover_stale_runs()
         except Exception as e:
             _recovery_logger.warning("Periodic recovery check failed: %s", e)
+
+        # Decision log cleanup — hourly cadence
+        if _cycle_count % _DECISION_CLEANUP_CYCLES == 0:
+            try:
+                from .services.decision_cleanup import cleanup_old_decisions
+                result = cleanup_old_decisions()
+                if result.get("deleted", 0) > 0:
+                    _recovery_logger.info(
+                        "Decision cleanup: deleted %d records", result["deleted"],
+                    )
+            except Exception as e:
+                _recovery_logger.debug("Decision cleanup skipped: %s", e)
 
 
 _shutdown_once = threading.Event()
@@ -179,6 +202,13 @@ async def lifespan(app: FastAPI):
 
     # Recover stale runs from previous crash
     _recover_stale_runs()
+
+    # Clean up old execution decisions on startup
+    try:
+        from .services.decision_cleanup import cleanup_old_decisions
+        cleanup_old_decisions()
+    except Exception:
+        pass  # Non-critical — cleanup will run periodically
 
     # Start periodic stale-run recovery thread
     _recovery_stop.clear()

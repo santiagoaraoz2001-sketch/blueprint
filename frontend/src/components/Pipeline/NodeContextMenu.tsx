@@ -3,7 +3,7 @@ import { T, F, FS } from '@/lib/design-tokens'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useRunStore } from '@/stores/runStore'
 import { useReactFlow } from '@xyflow/react'
-import { Settings, Copy, Maximize, Trash2, RotateCcw, Eye, GitCompare } from 'lucide-react'
+import { Settings, Copy, Maximize, Trash2, RotateCcw, Eye, GitCompare, Search } from 'lucide-react'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { containsLoopOrCycle } from '@/lib/graph-utils'
 
@@ -13,9 +13,10 @@ interface NodeContextMenuProps {
   y: number
   nodeId: string
   onClose: () => void
+  onInspectConfig?: (nodeId: string) => void
 }
 
-export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: NodeContextMenuProps) {
+export default function NodeContextMenu({ visible, x, y, nodeId, onClose, onInspectConfig }: NodeContextMenuProps) {
   const { fitView } = useReactFlow()
   const runStatus = useRunStore((s) => s.status)
   const activeRunId = useRunStore((s) => s.activeRunId)
@@ -148,6 +149,15 @@ export default function NodeContextMenu({ visible, x, y, nodeId, onClose }: Node
         label="Edit Config"
         shortcut=""
         onClick={handleEditConfig}
+      />
+      <ContextMenuBtn
+        icon={<Search size={10} />}
+        label="Inspect Config"
+        shortcut=""
+        onClick={() => {
+          onInspectConfig?.(nodeId)
+          onClose()
+        }}
       />
       <ContextMenuBtn
         icon={<Copy size={10} />}
