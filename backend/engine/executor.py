@@ -52,6 +52,7 @@ from .artifacts import ArtifactStore
 from ..models.artifact import ArtifactRecord
 from .subprocess_runner import SubprocessBlockRunner
 from .worker_tracker import track_worker, untrack_worker
+from ..models.execution_decision import ExecutionDecision
 
 # Ensure the repo root is on sys.path so blocks can do cross-block imports
 # like `from blocks.inference._inference_utils import ...`.
@@ -652,6 +653,36 @@ def _safe_commit(db: Session):
         db.rollback()
 
 
+def _record_decision(
+    db: Session,
+    run_id: str,
+    node_id: str,
+    decision: str,
+    reason: str,
+    cache_fingerprint: str | None = None,
+    plan_hash: str | None = None,
+) -> None:
+    """Write an ExecutionDecision record. Best-effort — never raises."""
+    try:
+        record = ExecutionDecision(
+            id=str(uuid.uuid4()),
+            run_id=run_id,
+            node_id=node_id,
+            decision=decision,
+            reason=reason,
+            cache_fingerprint=cache_fingerprint,
+            plan_hash=plan_hash,
+            timestamp=datetime.now(timezone.utc),
+        )
+        db.add(record)
+        _safe_commit(db)
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
 def _start_heartbeat(run_id: str, interval: float = 30.0):
     """Start a background thread that updates last_heartbeat every `interval` seconds.
 
@@ -1245,9 +1276,17 @@ async def execute_pipeline(
     project_id: str | None = None,
 ):
     """Execute a full pipeline. Called in a background thread."""
+    from .config_merge import merge_workspace_config
+
     nodes = definition.get("nodes", [])
     edges = definition.get("edges", [])
-    workspace_config = definition.get("workspace_config") or None
+
+    # Merge config from all scopes: global workspace → project → pipeline definition
+    workspace_config = merge_workspace_config(
+        definition_config=definition.get("workspace_config") or None,
+        project_id=project_id,
+        db=db,
+    ) or None
 
     if not nodes:
         # Create a completed Run record so clients don't get a 404
@@ -1378,6 +1417,14 @@ async def execute_pipeline(
             nid: cfg for nid, (cfg, _src) in _resolved_tuples.items()
         }
 
+        # Compute plan hash for decision log
+        import hashlib as _hashlib
+        _plan_hasher = _hashlib.sha256()
+        for _nid in order:
+            _plan_hasher.update(_nid.encode())
+            _plan_hasher.update(config_fps.get(_nid, "").encode())
+        _plan_hash = _plan_hasher.hexdigest()[:16]
+
         for idx, node_id in enumerate(order):
             node = node_map.get(node_id)
             if not node:
@@ -1385,10 +1432,17 @@ async def execute_pipeline(
 
             # Skip visual grouping nodes
             if node.get("type") == "groupNode":
+                _record_decision(db, run_id, node_id, "skipped", "Visual-only groupNode", plan_hash=_plan_hash)
                 continue
 
             # Skip loop body nodes — they are executed by _execute_loop
             if node_id in loop_body_node_ids:
+                _record_decision(
+                    db, run_id, node_id, "skipped",
+                    "Loop body node — executed by loop controller",
+                    cache_fingerprint=config_fps.get(node_id),
+                    plan_hash=_plan_hash,
+                )
                 continue
 
             # Check for cancellation before each block
@@ -1462,6 +1516,21 @@ async def execute_pipeline(
             db.commit()
 
             category = node_data.get("category", "flow")
+
+            # Record execution decision
+            _node_fp = config_fps.get(node_id)
+            if node_id in loop_controller_ids:
+                _record_decision(
+                    db, run_id, node_id, "execute",
+                    f"Loop controller — executing loop body ({block_type})",
+                    cache_fingerprint=_node_fp, plan_hash=_plan_hash,
+                )
+            else:
+                _record_decision(
+                    db, run_id, node_id, "execute",
+                    f"Executing block {block_type} (step {idx + 1}/{len(nodes)})",
+                    cache_fingerprint=_node_fp, plan_hash=_plan_hash,
+                )
 
             started_event = {
                 "node_id": node_id,

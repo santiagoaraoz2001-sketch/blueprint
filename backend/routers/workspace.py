@@ -169,6 +169,160 @@ def open_in_finder(db: Session = Depends(get_db)):
         return {"ok": False, "error": str(e)}
 
 
+@router.get("/config")
+def get_workspace_config(db: Session = Depends(get_db)):
+    """Return global workspace-level pipeline config overrides.
+
+    These are the lowest-precedence overrides, applied to ALL pipelines.
+    Project-level overrides (via /api/projects/{id}/config) take precedence
+    over global overrides.
+    """
+    settings = _get_or_create_settings(db)
+    config = settings.pipeline_config or {}
+
+    # Compute 'affects N blocks' counts by checking which blocks have matching schema keys
+    affects_counts: dict[str, int] = {}
+    try:
+        from ..services.registry import get_global_registry
+        registry = get_global_registry()
+        if registry:
+            all_schemas = registry.list_all()
+            for key in config:
+                count = 0
+                for schema in all_schemas:
+                    config_fields = getattr(schema, 'config', [])
+                    field_keys = {
+                        (f.get('key') if isinstance(f, dict) else getattr(f, 'key', ''))
+                        for f in config_fields
+                    }
+                    if key in field_keys:
+                        count += 1
+                affects_counts[key] = count
+    except Exception:
+        pass
+
+    return {
+        "scope": "global",
+        "config": config,
+        "affects_counts": affects_counts,
+    }
+
+
+@router.put("/config")
+def update_workspace_config(body: dict, db: Session = Depends(get_db)):
+    """Update workspace-level pipeline config overrides.
+
+    Body: { "config": { key: value, ... } }
+    Replaces the entire workspace config dict.
+    """
+    settings = _get_or_create_settings(db)
+    new_config = body.get("config", {})
+    if not isinstance(new_config, dict):
+        from fastapi import HTTPException
+        raise HTTPException(400, "config must be a dict")
+    settings.pipeline_config = new_config
+    db.commit()
+    db.refresh(settings)
+    return {"ok": True, "config": settings.pipeline_config}
+
+
+@router.post("/config/preview-impact")
+def preview_workspace_config_impact(body: dict, db: Session = Depends(get_db)):
+    """Preview the impact of workspace config changes on a pipeline.
+
+    Body: {
+        "pipeline_id": str,
+        "config": { key: value },
+        "scope": "global" | "project"  (default: "global")
+    }
+    Returns a diff of what would change per node.
+
+    When scope is "global", the proposed config replaces the global workspace config.
+    When scope is "project", the proposed config replaces the project config while
+    keeping the global config unchanged.
+    """
+    from ..models.pipeline import Pipeline
+    from ..engine.planner import GraphPlanner
+    from ..engine.config_merge import merge_workspace_config
+    from ..services.registry import get_global_registry
+
+    pipeline_id = body.get("pipeline_id")
+    proposed_config = body.get("config", {})
+    scope = body.get("scope", "global")
+    if not pipeline_id:
+        from fastapi import HTTPException
+        raise HTTPException(400, "pipeline_id is required")
+
+    pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not pipeline:
+        from fastapi import HTTPException
+        raise HTTPException(404, "Pipeline not found")
+
+    definition = pipeline.definition or {}
+    nodes = definition.get("nodes", [])
+    edges = definition.get("edges", [])
+    definition_config = definition.get("workspace_config") or None
+
+    registry = get_global_registry()
+    if registry is None:
+        from ..services.registry import BlockRegistryService
+        registry = BlockRegistryService()
+
+    planner = GraphPlanner(registry)
+
+    # Current effective config (merges global → project → definition)
+    current_merged = merge_workspace_config(
+        definition_config=definition_config,
+        project_id=pipeline.project_id,
+        db=db,
+    )
+    result_before = planner.plan(nodes, edges, workspace_config=current_merged or None)
+
+    # Proposed effective config — depends on scope
+    if scope == "project":
+        # Replace project config with proposed, keep global
+        from ..models.workspace import WorkspaceSettings as _WS
+        _ws = db.query(_WS).filter_by(id="default").first()
+        proposed_merged = dict(_ws.pipeline_config or {}) if _ws else {}
+        proposed_merged.update(proposed_config)
+        if definition_config:
+            proposed_merged.update(definition_config)
+    else:
+        # Replace global config with proposed, keep project
+        from ..models.project import Project as _Proj
+        proposed_merged = dict(proposed_config)
+        if pipeline.project_id:
+            _proj = db.query(_Proj).filter_by(id=pipeline.project_id).first()
+            if _proj and _proj.pipeline_config:
+                proposed_merged.update(_proj.pipeline_config)
+        if definition_config:
+            proposed_merged.update(definition_config)
+
+    result_after = planner.plan(nodes, edges, workspace_config=proposed_merged or None)
+
+    diffs: dict[str, dict] = {}
+    if result_before.plan and result_after.plan:
+        node_label_map = {n["id"]: n for n in nodes}
+        for node_id in result_after.plan.nodes:
+            before_node = result_before.plan.nodes.get(node_id)
+            after_node = result_after.plan.nodes.get(node_id)
+            if not before_node or not after_node:
+                continue
+
+            node_diffs: dict[str, dict] = {}
+            all_keys = set(before_node.resolved_config.keys()) | set(after_node.resolved_config.keys())
+            for key in all_keys:
+                old_val = before_node.resolved_config.get(key)
+                new_val = after_node.resolved_config.get(key)
+                if old_val != new_val:
+                    node_diffs[key] = {"before": old_val, "after": new_val}
+            if node_diffs:
+                node_label = node_label_map.get(node_id, {}).get("data", {}).get("label", node_id)
+                diffs[node_id] = {"label": node_label, "changes": node_diffs}
+
+    return {"diffs": diffs}
+
+
 @router.get("/inbox", response_model=list[InboxFile])
 def list_inbox(db: Session = Depends(get_db)):
     """List files currently in the inbox directory."""

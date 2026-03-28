@@ -1,0 +1,110 @@
+{
+  "name": "expected_failures",
+  "description": "3 deliberate errors: (a) disconnected required port, (b) type-incompatible connection, (c) nonexistent block type.",
+  "nodes": [
+    {
+      "id": "valid_source",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Valid Source",
+        "category": "data",
+        "config": {"text": "valid data"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "missing_input",
+      "type": "blockNode",
+      "data": {
+        "type": "text_concatenator",
+        "label": "Missing Required Input",
+        "category": "data",
+        "config": {"separator": " ", "template": "{text_a}", "trim_whitespace": true},
+        "inputs": [
+          {"id": "text_a", "dataType": "text", "required": true},
+          {"id": "text_b", "dataType": "text", "required": true}
+        ],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "type_mismatch_src",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Text Source for Mismatch",
+        "category": "data",
+        "config": {"text": "this is text, not a dataset"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "type_mismatch_tgt",
+      "type": "blockNode",
+      "data": {
+        "type": "local_file_loader",
+        "label": "Expects Dataset Config",
+        "category": "data",
+        "config": {"file_path": "/tmp/test.txt", "format": "txt"},
+        "inputs": [
+          {"id": "config", "dataType": "config", "required": false}
+        ],
+        "outputs": [
+          {"id": "dataset", "dataType": "dataset"}
+        ]
+      }
+    },
+    {
+      "id": "nonexistent",
+      "type": "blockNode",
+      "data": {
+        "type": "totally_fake_block_type_xyz",
+        "label": "Nonexistent Block",
+        "category": "data",
+        "config": {},
+        "inputs": [{"id": "input", "dataType": "any", "required": false}],
+        "outputs": [{"id": "output", "dataType": "any"}]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_partial",
+      "source": "valid_source",
+      "target": "missing_input",
+      "sourceHandle": "text",
+      "targetHandle": "text_a",
+      "_note": "Only text_a is connected; text_b (required) is disconnected"
+    },
+    {
+      "id": "e_type_bad",
+      "source": "type_mismatch_src",
+      "target": "type_mismatch_tgt",
+      "sourceHandle": "text",
+      "targetHandle": "config",
+      "_note": "text→config is incompatible per current backend"
+    },
+    {
+      "id": "e_fake",
+      "source": "valid_source",
+      "target": "nonexistent",
+      "sourceHandle": "text",
+      "targetHandle": "input"
+    }
+  ],
+  "expected": {
+    "validation": "fail",
+    "execution_order": [],
+    "final_status": "failed",
+    "expected_errors": [
+      "disconnected_required_port: missing_input.text_b is required but not connected",
+      "type_incompatible: text→config connection is not allowed",
+      "nonexistent_block: totally_fake_block_type_xyz not found in registry"
+    ],
+    "partial_rerun_allowed": false,
+    "export_allowed": false
+  }
+}

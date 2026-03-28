@@ -1,5 +1,7 @@
 # Blueprint — ML Experiment Workbench
 
+[![Contract Tests](https://github.com/santiagoaraoz2001-sketch/blueprint/actions/workflows/contract-tests.yml/badge.svg)](https://github.com/santiagoaraoz2001-sketch/blueprint/actions/workflows/contract-tests.yml)
+
 **by Specific Labs**
 
 A local-first ML experiment workbench for building, running, and analyzing machine learning pipelines. Blueprint gives you a visual canvas to wire together data loading, preprocessing, model training, evaluation, and more — all from your desktop.
