@@ -67,6 +67,23 @@ if _blocks_parent not in sys.path:
 _cancel_events: dict[str, threading.Event] = {}
 _cancel_lock = threading.Lock()
 
+# ── Debug / breakpoint infrastructure ──
+_debug_lock = threading.Lock()
+_debug_resume_events: dict[str, threading.Event] = {}
+_debug_step_flags: dict[str, bool] = {}  # True = pause after NEXT node too
+_debug_abort_flags: dict[str, bool] = {}  # True = abort run
+
+# Concurrency semaphore: limits *actively executing* (non-paused) pipeline runs.
+# When a run pauses at a breakpoint it releases a slot so other runs can proceed.
+# The thread pool itself is sized larger (see execution.py) to hold paused threads.
+MAX_ACTIVE_RUNS = int(os.environ.get("BLUEPRINT_MAX_ACTIVE_RUNS", "4"))
+_active_run_semaphore = threading.Semaphore(MAX_ACTIVE_RUNS)
+
+# Maximum time (seconds) a breakpoint pause blocks before auto-aborting.
+# Prevents indefinitely blocked threads when a user walks away.
+# Override via BLUEPRINT_BREAKPOINT_TIMEOUT env var.
+BREAKPOINT_PAUSE_TIMEOUT_S = int(os.environ.get("BLUEPRINT_BREAKPOINT_TIMEOUT", "1800"))  # 30 min
+
 
 def request_cancel(run_id: str):
     """Signal a running pipeline to cancel. Called from the cancel endpoint."""
@@ -74,6 +91,167 @@ def request_cancel(run_id: str):
         event = _cancel_events.get(run_id)
         if event:
             event.set()
+
+
+def debug_action(run_id: str, action: str):
+    """Handle a debug action: resume, step, or abort.
+
+    Called from the debug API endpoint while execution is paused at a breakpoint.
+    """
+    with _debug_lock:
+        resume_event = _debug_resume_events.get(run_id)
+        if not resume_event:
+            return False
+
+        if action == "resume":
+            _debug_step_flags[run_id] = False
+            resume_event.set()
+        elif action == "step":
+            _debug_step_flags[run_id] = True
+            resume_event.set()
+        elif action == "abort":
+            _debug_abort_flags[run_id] = True
+            resume_event.set()
+        else:
+            return False
+        return True
+
+
+class BreakpointAbort(Exception):
+    """Raised when a breakpoint pause results in an abort or timeout."""
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
+def _pause_at_breakpoint(
+    run_id: str,
+    node_id: str,
+    idx: int,
+    total: int,
+    order: list[str],
+    outputs: dict[str, dict[str, Any]],
+    *,
+    conditional: bool = False,
+):
+    """Shared breakpoint pause logic used by both the main loop and _execute_loop.
+
+    Emits a ``breakpoint_hit`` SSE event, releases the active-run semaphore so
+    other pipelines can proceed, blocks until a debug action arrives (or timeout
+    expires), then re-acquires the semaphore.
+
+    Raises ``BreakpointAbort`` if the user chose *abort* or the timeout expired.
+    """
+    # Build a truncated outputs preview for the SSE event
+    outputs_preview: dict[str, dict] = {}
+    for cid, couts in outputs.items():
+        safe: dict[str, Any] = {}
+        for k, v in couts.items():
+            try:
+                json.dumps(v)
+                safe[k] = v if not isinstance(v, str) or len(v) < 500 else v[:500] + "..."
+            except Exception:
+                safe[k] = str(v)[:500]
+        outputs_preview[cid] = safe
+
+    completed_nodes = [nid for nid in order[:idx + (1 if conditional else 0)] if nid in outputs]
+
+    try:
+        publish_event(run_id, "breakpoint_hit", {
+            "node_id": node_id,
+            "completed_nodes": completed_nodes,
+            "outputs_preview": outputs_preview,
+            "index": idx,
+            "total": total,
+            "conditional": conditional,
+        })
+    except Exception:
+        pass
+
+    # Release the active-run semaphore while paused so other pipelines can run.
+    _active_run_semaphore.release()
+
+    try:
+        with _debug_lock:
+            resume_event = _debug_resume_events.get(run_id)
+
+        if resume_event:
+            resume_event.clear()
+            # Block with a timeout — prevents indefinitely stuck threads
+            signalled = resume_event.wait(timeout=BREAKPOINT_PAUSE_TIMEOUT_S)
+
+            if not signalled:
+                # Timeout expired — treat as auto-abort
+                with _debug_lock:
+                    _debug_abort_flags[run_id] = True
+
+        # Check if abort was requested (by user action or timeout)
+        with _debug_lock:
+            if _debug_abort_flags.get(run_id, False):
+                _debug_abort_flags[run_id] = False
+                timed_out = not signalled if resume_event else False
+                reason = (
+                    f"Breakpoint pause timed out after {BREAKPOINT_PAUSE_TIMEOUT_S}s"
+                    if timed_out
+                    else "Aborted at breakpoint"
+                )
+                raise BreakpointAbort(reason)
+    finally:
+        # Re-acquire the semaphore before resuming active execution
+        _active_run_semaphore.acquire()
+
+
+def evaluate_breakpoint_condition(condition: dict, outputs: dict) -> bool:
+    """Evaluate a declarative breakpoint condition against block outputs.
+
+    Condition format: {field: str, op: str, value: number}
+    Operators: gt, lt, gte, lte, eq, neq
+
+    Returns True if the condition is met (breakpoint should fire).
+    Returns True on evaluation errors (fail-open: pause on error).
+    """
+    if not condition or not isinstance(condition, dict):
+        return True  # No condition = always pause
+
+    field = condition.get("field", "")
+    op = condition.get("op", "")
+    threshold = condition.get("value")
+
+    if not field or not op or threshold is None:
+        return True  # Malformed condition = always pause
+
+    # Look up the field in the block outputs
+    actual_value = outputs.get(field)
+
+    # If the field is nested in a dict output, try a single level of nesting
+    if actual_value is None:
+        for v in outputs.values():
+            if isinstance(v, dict) and field in v:
+                actual_value = v[field]
+                break
+
+    if actual_value is None:
+        return True  # Field not found = pause (fail-open)
+
+    try:
+        actual_value = float(actual_value)
+        threshold = float(threshold)
+    except (TypeError, ValueError):
+        return True  # Non-numeric = pause (fail-open)
+
+    ops = {
+        "gt": lambda a, b: a > b,
+        "lt": lambda a, b: a < b,
+        "gte": lambda a, b: a >= b,
+        "lte": lambda a, b: a <= b,
+        "eq": lambda a, b: a == b,
+        "neq": lambda a, b: a != b,
+    }
+    comparator = ops.get(op)
+    if not comparator:
+        return True  # Unknown op = pause (fail-open)
+
+    return comparator(actual_value, threshold)
 
 
 def _infer_severity(msg: object) -> str:
@@ -908,6 +1086,7 @@ async def _execute_loop(
     start_time: float,
     db: Session,
     live: LiveRun,
+    breakpoints: dict[str, dict | bool] | None = None,
 ):
     """Execute a loop body repeatedly.
 
@@ -1112,6 +1291,27 @@ async def _execute_loop(
                 loop_id=loop.controller_id,
             )
 
+            # ── Loop body breakpoint check (pre-execution) ──
+            if breakpoints:
+                bp_info_loop = breakpoints.get(_nid)
+                should_pause_loop = False
+                if bp_info_loop is True:
+                    should_pause_loop = True
+                else:
+                    with _debug_lock:
+                        if _debug_step_flags.get(run_id, False):
+                            should_pause_loop = True
+                            _debug_step_flags[run_id] = False
+
+                if should_pause_loop:
+                    # Use body_node_ids as the order for the preview
+                    loop_order = [loop.controller_id] + loop.body_node_ids
+                    _pause_at_breakpoint(
+                        run_id, _nid, i, iterations,
+                        loop_order, outputs, conditional=False,
+                    )
+                    # BreakpointAbort propagates up to the caller
+
             # Gather inputs from upstream edges (including controller outputs)
             node_inputs: dict[str, Any] = {}
             _multi_counts: dict[str, int] = {}
@@ -1237,6 +1437,19 @@ async def _execute_loop(
             metrics_file.flush()
 
             log_block_complete(run_id, _nid, _block_type, time.time() - body_block_start)
+
+            # ── Loop body conditional breakpoint check (post-execution) ──
+            if breakpoints:
+                bp_info_loop_post = breakpoints.get(_nid)
+                if isinstance(bp_info_loop_post, dict):
+                    loop_node_outs = outputs.get(_nid, {})
+                    if evaluate_breakpoint_condition(bp_info_loop_post, loop_node_outs):
+                        loop_order = [loop.controller_id] + loop.body_node_ids
+                        _pause_at_breakpoint(
+                            run_id, _nid, i, iterations,
+                            loop_order, outputs, conditional=True,
+                        )
+                        # BreakpointAbort propagates up to the caller
 
         # Update LiveRun progress during loop
         live.block_progress = (i + 1) / iterations
@@ -1403,6 +1616,20 @@ async def execute_pipeline(
     with _cancel_lock:
         _cancel_events[run_id] = threading.Event()
 
+    # Register debug state for breakpoint support
+    with _debug_lock:
+        _debug_resume_events[run_id] = threading.Event()
+        _debug_step_flags[run_id] = False
+        _debug_abort_flags[run_id] = False
+
+    # Build breakpoint lookup from node data
+    breakpoints: dict[str, dict | bool] = {}
+    for n in nodes:
+        nd = n.get("data", {})
+        if nd.get("breakpoint"):
+            condition = nd.get("breakpoint_condition")
+            breakpoints[n["id"]] = condition if condition else True
+
     run = Run(
         id=run_id,
         pipeline_id=pipeline_id,
@@ -1424,6 +1651,10 @@ async def execute_pipeline(
     db.commit()
 
     log_run_start(run_id, pipeline_id, len(nodes))
+
+    # Acquire the active-run semaphore — limits concurrent active execution.
+    # Released in finally (or temporarily during breakpoint pauses).
+    _active_run_semaphore.acquire()
 
     # Start continuous heartbeat thread (every 30s, own DB session)
     heartbeat_stop = _start_heartbeat(run_id)
@@ -1643,6 +1874,44 @@ async def execute_pipeline(
             log_block_start(run_id, node_id, block_type, idx, len(nodes))
             block_start_time = time.time()
 
+            # ── Breakpoint check (pre-execution) ──
+            # Unconditional breakpoints pause before execution.
+            # Conditional breakpoints are checked after execution (see below).
+            # Also pause here if "step" mode was set by a previous debug_action.
+            should_pause_pre = False
+            bp_info = breakpoints.get(node_id)
+            if bp_info is True:
+                should_pause_pre = True
+            else:
+                with _debug_lock:
+                    if _debug_step_flags.get(run_id, False):
+                        should_pause_pre = True
+                        _debug_step_flags[run_id] = False
+
+            if should_pause_pre:
+                try:
+                    _pause_at_breakpoint(
+                        run_id, node_id, idx, len(nodes),
+                        order, outputs, conditional=False,
+                    )
+                except BreakpointAbort as abort:
+                    run.status = "cancelled"
+                    run.error_message = abort.reason
+                    run.finished_at = datetime.now(timezone.utc)
+                    run.duration_seconds = time.time() - start_time
+                    run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    run.data_fingerprints = all_fingerprints
+                    live.status = "cancelled"
+                    db.commit()
+                    try:
+                        publish_event(run_id, "run_cancelled", {
+                            "run_id": run_id,
+                            "duration": run.duration_seconds,
+                            "reason": "debug_abort",
+                        })
+                    except Exception:
+                        pass
+                    return
             # Record execution decision and measure pre-execution memory
             _mem_before = measure_memory_mb()
             _config_src = _resolved_tuples.get(node_id, (None, None))
@@ -1680,7 +1949,26 @@ async def execute_pipeline(
                         start_time=start_time,
                         db=db,
                         live=live,
+                        breakpoints=breakpoints,
                     )
+                except BreakpointAbort as abort:
+                    run.status = "cancelled"
+                    run.error_message = abort.reason
+                    run.finished_at = datetime.now(timezone.utc)
+                    run.duration_seconds = time.time() - start_time
+                    run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    run.data_fingerprints = all_fingerprints
+                    live.status = "cancelled"
+                    db.commit()
+                    try:
+                        publish_event(run_id, "run_cancelled", {
+                            "run_id": run_id,
+                            "duration": run.duration_seconds,
+                            "reason": "debug_abort",
+                        })
+                    except Exception:
+                        pass
+                    return
                 except InterruptedError:
                     run.status = "cancelled"
                     run.error_message = "Cancelled by user"
@@ -2100,6 +2388,36 @@ async def execute_pipeline(
             except Exception:
                 pass
 
+            # ── Conditional breakpoint check (post-execution) ──
+            bp_info_post = breakpoints.get(node_id)
+            if isinstance(bp_info_post, dict):
+                node_outs = outputs.get(node_id, {})
+                condition_met = evaluate_breakpoint_condition(bp_info_post, node_outs)
+                if condition_met:
+                    try:
+                        _pause_at_breakpoint(
+                            run_id, node_id, idx, len(nodes),
+                            order, outputs, conditional=True,
+                        )
+                    except BreakpointAbort as abort:
+                        run.status = "cancelled"
+                        run.error_message = abort.reason
+                        run.finished_at = datetime.now(timezone.utc)
+                        run.duration_seconds = time.time() - start_time
+                        run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                        run.data_fingerprints = all_fingerprints
+                        live.status = "cancelled"
+                        db.commit()
+                        try:
+                            publish_event(run_id, "run_cancelled", {
+                                "run_id": run_id,
+                                "duration": run.duration_seconds,
+                                "reason": "debug_abort",
+                            })
+                        except Exception:
+                            pass
+                        return
+
             # Heartbeat after each block completes
             run.last_heartbeat = datetime.now(timezone.utc)
             # Save partial outputs after each block (preview-only, not authoritative)
@@ -2211,6 +2529,8 @@ async def execute_pipeline(
         except Exception:
             pass
     finally:
+        # Release the active-run semaphore
+        _active_run_semaphore.release()
         # Flush and clean up decision records
         try:
             flush_decisions(run_id)
@@ -2223,6 +2543,11 @@ async def execute_pipeline(
         # Clean up cancel event
         with _cancel_lock:
             _cancel_events.pop(run_id, None)
+        # Clean up debug state
+        with _debug_lock:
+            _debug_resume_events.pop(run_id, None)
+            _debug_step_flags.pop(run_id, None)
+            _debug_abort_flags.pop(run_id, None)
         # Stop heartbeat thread
         heartbeat_stop.set()
         # Stop system metrics publisher

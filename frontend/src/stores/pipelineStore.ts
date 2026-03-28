@@ -203,6 +203,8 @@ interface PipelineState {
   updateNodeConfig: (id: string, config: Record<string, unknown>) => void
   updateNodeData: (id: string, data: Partial<BlockNodeData>) => void
   selectNode: (id: string | null) => void
+  toggleBreakpoint: (id: string) => void
+  setBreakpointCondition: (id: string, condition: { field: string; op: string; value: number } | null) => void
   focusErrorNode: (id: string | null) => void
   saveAsTemplate: (name: string, description: string, category: string) => void
   groupSelectedNodes: () => void
@@ -870,6 +872,35 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
   },
 
   selectNode: (id) => set({ selectedNodeId: id }),
+
+  toggleBreakpoint: (id) => {
+    set((state) => {
+      const node = state.nodes.find((n: Node<BlockNodeData>) => n.id === id)
+      if (node) {
+        const current = !!node.data.breakpoint
+        node.data.breakpoint = !current
+        if (current) {
+          // Remove condition when removing breakpoint
+          delete node.data.breakpoint_condition
+        }
+      }
+      state.isDirty = true
+    })
+  },
+
+  setBreakpointCondition: (id, condition) => {
+    set((state) => {
+      const node = state.nodes.find((n: Node<BlockNodeData>) => n.id === id)
+      if (node) {
+        if (condition) {
+          node.data.breakpoint_condition = condition
+        } else {
+          delete node.data.breakpoint_condition
+        }
+      }
+      state.isDirty = true
+    })
+  },
 
   focusErrorNode: (id) => {
     set({ focusedErrorNodeId: id })

@@ -8,7 +8,7 @@ import { usePipelineStore, type BlockNodeData, type NodeExecutionState } from '@
 import { useRunStore } from '@/stores/runStore'
 import { useValidationStore, type NodeValidationError } from '@/stores/validationStore'
 import { OVERLAY_COLORS } from './InheritanceOverlay'
-import { AlertTriangle, Clock, Lock, StickyNote, HelpCircle } from 'lucide-react'
+import { AlertTriangle, Clock, Lock, Circle, StickyNote, HelpCircle } from 'lucide-react'
 import { estimatePipeline, formatTimeShort } from '@/lib/pipeline-estimator'
 
 function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; selected?: boolean }) {
@@ -421,6 +421,30 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
           zIndex: 20,
           border: '2px solid rgba(0,0,0,0.6)',
         }} />
+      )}
+
+      {/* Breakpoint indicator — red dot at top-left */}
+      {data.breakpoint && (
+        <div
+          title={
+            data.breakpoint_condition
+              ? `Breakpoint: pauses when ${(data.breakpoint_condition as any).field} ${(data.breakpoint_condition as any).op} ${(data.breakpoint_condition as any).value}`
+              : 'Breakpoint set'
+          }
+          style={{
+            position: 'absolute',
+            top: -4,
+            left: -4,
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: T.red,
+            boxShadow: `0 0 6px ${T.red}80`,
+            zIndex: 25,
+            border: '1px solid rgba(0,0,0,0.4)',
+            animation: effectiveStatus === 'running' ? 'breakpoint-pulse 1.5s ease-in-out infinite' : 'none',
+          }}
+        />
       )}
 
       {/* Header */}
@@ -1045,6 +1069,14 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
       )}
     </div>
   )
+}
+
+// Inject breakpoint pulse keyframes once
+const _bpStyle = document.createElement('style')
+_bpStyle.textContent = `@keyframes breakpoint-pulse { 0%, 100% { box-shadow: 0 0 6px rgba(255,94,114,0.5); } 50% { box-shadow: 0 0 14px rgba(255,94,114,0.9), 0 0 4px rgba(255,94,114,1); } }`
+if (!document.head.querySelector('[data-bp-pulse]')) {
+  _bpStyle.setAttribute('data-bp-pulse', '1')
+  document.head.appendChild(_bpStyle)
 }
 
 export default memo(BlockNode)

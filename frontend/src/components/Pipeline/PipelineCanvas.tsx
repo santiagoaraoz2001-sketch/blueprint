@@ -27,6 +27,8 @@ import EdgePreviewPanel from './EdgePreviewPanel'
 import InheritanceOverlay, { OVERLAY_COLORS } from './InheritanceOverlay'
 import NodeContextMenu from './NodeContextMenu'
 import RerunOverlay from './RerunOverlay'
+import DebugToolbar from '@/components/Debug/DebugToolbar'
+import DataInspector from '@/components/Debug/DataInspector'
 import BlockSearch from '@/components/Search/BlockSearch'
 import BlockSuggestions from '@/components/Search/BlockSuggestions'
 import BlockDoc from '@/components/Blocks/BlockDoc'
@@ -459,6 +461,13 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
           e.preventDefault()
           fitView({ duration: 400, padding: 0.2 })
         }
+      } else if ((e.key === 'b' || e.key === 'B') && !meta) {
+        // Toggle breakpoint on the single selected node
+        const selected = nodes.filter((n) => n.selected)
+        if (selected.length === 1) {
+          e.preventDefault()
+          usePipelineStore.getState().toggleBreakpoint(selected[0].id)
+        }
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedIds.length > 0) {
           e.preventDefault()
@@ -784,6 +793,10 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
         onShowDoc={(blockType) => showBlockDoc(blockType, { x: contextMenu.x, y: contextMenu.y })}
         onInspectConfig={(nid) => setInspectNodeId(nid)}
       />
+
+      {/* Debug toolbar — shown when paused at breakpoint */}
+      <DebugToolbar />
+      <DataInspector />
 
       {/* Config Inspector panel */}
       {inspectNodeId && (
