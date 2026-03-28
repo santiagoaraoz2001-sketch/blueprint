@@ -53,6 +53,8 @@ interface ProjectState {
   fetchDashboard: () => Promise<DashboardStats>
   clonePipeline: (pipelineId: string) => Promise<any>
   cloneFromRun: (runId: string) => Promise<any>
+  cloneAsVariant: (pipelineId: string, data: { name?: string; project_id?: string; variant_notes?: string }) => Promise<any>
+  updateRunMetadata: (runId: string, data: { notes?: string; tags?: string; starred?: boolean }) => Promise<any>
 }
 
 function isDemoMode() {
@@ -211,5 +213,13 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   cloneFromRun: async (runId) => {
     return api.post(`/runs/${runId}/clone-pipeline`, {})
+  },
+
+  cloneAsVariant: async (pipelineId: string, data: { name?: string; project_id?: string; variant_notes?: string }) => {
+    return api.post(`/pipelines/${pipelineId}/clone-variant`, data)
+  },
+
+  updateRunMetadata: async (runId: string, data: { notes?: string; tags?: string; starred?: boolean }) => {
+    return api.put(`/runs/${runId}/metadata`, data)
   },
 }))

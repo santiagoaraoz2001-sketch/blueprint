@@ -144,6 +144,7 @@ side_inputs:
   required: false
 maturity: stable
 exportable: true
-requires: []
+requires:
+  - scikit_learn
 execution:
   isolation: inprocess

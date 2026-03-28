@@ -1,0 +1,82 @@
+{
+  "name": "stale_handle",
+  "description": "Pipeline saved with old block version — edge references renamed output port.",
+  "nodes": [
+    {
+      "id": "old_block",
+      "type": "blockNode",
+      "data": {
+        "type": "llm_inference",
+        "label": "Old LLM Block",
+        "category": "inference",
+        "block_version": "1.0.0",
+        "config": {"model_name": "test-model"},
+        "inputs": [
+          {"id": "prompt", "dataType": "text", "required": true}
+        ],
+        "outputs": [
+          {"id": "response", "dataType": "text", "aliases": ["output", "text", "result"]}
+        ]
+      }
+    },
+    {
+      "id": "prompt_src",
+      "type": "blockNode",
+      "data": {
+        "type": "text_input",
+        "label": "Prompt",
+        "category": "data",
+        "config": {"text": "test prompt"},
+        "inputs": [],
+        "outputs": [{"id": "text", "dataType": "text"}]
+      }
+    },
+    {
+      "id": "consumer",
+      "type": "blockNode",
+      "data": {
+        "type": "data_export",
+        "label": "Export",
+        "category": "endpoints",
+        "config": {"format": "json"},
+        "inputs": [
+          {"id": "data", "dataType": "any", "required": true}
+        ],
+        "outputs": [
+          {"id": "file_path", "dataType": "artifact"},
+          {"id": "status", "dataType": "metrics"},
+          {"id": "summary", "dataType": "metrics"}
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "prompt_src",
+      "target": "old_block",
+      "sourceHandle": "text",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "e_stale",
+      "source": "old_block",
+      "target": "consumer",
+      "sourceHandle": "output",
+      "targetHandle": "data",
+      "_note": "sourceHandle 'output' is stale — canonical port is now 'response'"
+    }
+  ],
+  "expected": {
+    "validation": "pass",
+    "execution_order": ["prompt_src", "old_block", "consumer"],
+    "final_status": "completed",
+    "expected_errors": [],
+    "expected_warnings": ["version_mismatch", "stale_handle"],
+    "partial_rerun_allowed": true,
+    "export_allowed": true,
+    "handle_resolution": {
+      "output_resolves_to": "response"
+    }
+  }
+}

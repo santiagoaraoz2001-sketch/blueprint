@@ -56,7 +56,7 @@ export default function MergeDashboard({ blockId }: Props) {
             <div style={{
               width: `${Math.round(progress * 100)}%`,
               height: '100%',
-              background: `linear-gradient(90deg, #00BFA5, ${T.cyan})`,
+              background: `linear-gradient(90deg, ${T.teal}, ${T.cyan})`,
               transition: 'width 0.3s ease',
               borderRadius: 4,
             }} />

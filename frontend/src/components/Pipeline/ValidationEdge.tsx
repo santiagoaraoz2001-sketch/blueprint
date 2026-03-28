@@ -12,7 +12,6 @@ import {
   type EdgeProps,
 } from '@xyflow/react'
 import { useValidationStore } from '@/stores/validationStore'
-import { T } from '@/lib/design-tokens'
 
 function ValidationEdge({
   id,
@@ -24,7 +23,6 @@ function ValidationEdge({
   targetPosition,
   style,
   markerEnd,
-  ...rest
 }: EdgeProps) {
   const hasError = useValidationStore((s) => !!s.edgeErrors[id])
 
