@@ -5,11 +5,14 @@ import CommandPalette from '@/components/shared/CommandPalette'
 import StartScreen from '@/components/Layout/StartScreen'
 import WelcomeModal from '@/components/Layout/WelcomeModal'
 import SplashScreen from '@/components/Layout/SplashScreen'
+import OnboardingWizard from '@/components/Onboarding/OnboardingWizard'
 import { useUIStore } from '@/stores/uiStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { injectThemeCSSVars } from '@/lib/design-tokens'
+import HelpPanel from '@/components/Help/HelpPanel'
+import LiveAnnouncer from '@/components/shared/LiveAnnouncer'
 import DashboardView from '@/views/DashboardView'
 import PipelineEditorView from '@/views/PipelineEditorView'
 import ResultsView from '@/views/ResultsView'
@@ -25,6 +28,7 @@ import ResearchDashboardView from '@/views/ResearchDashboardView'
 import PaperDetailView from '@/views/PaperDetailView'
 import MonitorView from '@/views/MonitorView'
 import ModelRegistryView from '@/views/ModelRegistryView'
+import ProjectView from '@/views/ProjectView'
 
 // Lazy-loaded views
 const HelpView = lazy(() => import('@/views/HelpView'))
@@ -45,6 +49,7 @@ const baseViewComponents: Record<string, React.ComponentType> = {
   'research-detail': PaperDetailView,
   monitor: MonitorView,
   models: ModelRegistryView,
+  project: ProjectView,
 }
 
 function ViewTransition({ viewKey, children }: { viewKey: string; children: React.ReactNode }) {
@@ -118,9 +123,17 @@ export default function App() {
     localStorage.setItem(MIGRATED_KEY, '1')
   }, [])
 
-  // Inject CSS variables whenever theme changes
+  // Inject CSS variables whenever theme changes (including system preference)
   useEffect(() => {
     injectThemeCSSVars(theme)
+
+    // Listen for OS color-scheme changes when theme is 'system'
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      const handler = () => injectThemeCSSVars('system')
+      mq.addEventListener('change', handler)
+      return () => mq.removeEventListener('change', handler)
+    }
   }, [theme])
 
   // Handle URL params for monitor popout and deep linking
@@ -151,8 +164,11 @@ export default function App() {
         </ErrorBoundary>
       </AppShell>
       <CommandPalette />
+      <HelpPanel />
+      <LiveAnnouncer />
       <StartScreen />
       <WelcomeModal />
+      <OnboardingWizard />
     </SplashScreen>
   )
 }

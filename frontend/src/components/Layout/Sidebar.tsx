@@ -1,4 +1,5 @@
 import { T, F, FS, BRAND_TEAL } from '@/lib/design-tokens'
+import Tooltip from '@/components/shared/Tooltip'
 import { useUIStore, type View } from '@/stores/uiStore'
 import { useProjectStore } from '@/stores/projectStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -77,6 +78,7 @@ export default function Sidebar() {
 
   return (
     <aside
+      data-testid="app-sidebar"
       style={{
         width,
         minWidth: width,
@@ -120,6 +122,7 @@ export default function Sidebar() {
         <button
           onClick={toggleSidebar}
           aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!sidebarCollapsed}
           style={{
             width: 28,
             height: 28,
@@ -146,7 +149,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav items */}
-      <nav style={{ flex: 1, overflowY: 'auto', padding: '6px 8px 10px' }}>
+      <nav aria-label="Main navigation" role="navigation" style={{ flex: 1, overflowY: 'auto', padding: '6px 8px 10px' }}>
         {(['build', 'run', 'analyze', 'write', 'system'] as NavItem['group'][]).map((group) => {
           const items = navItems.filter((item) => item.group === group)
           if (items.length === 0) return null
@@ -172,10 +175,12 @@ export default function Sidebar() {
                 const active = activeView === item.id || (item.id === 'research' && activeView === 'research-detail')
                 const Icon   = item.icon
 
-                return (
+                const btn = (
                   <button
                     key={item.id}
                     onClick={() => setView(item.id)}
+                    aria-current={active ? 'page' : undefined}
+                    aria-label={`Navigate to ${item.label}`}
                     style={{
                       width: '100%',
                       display: 'flex',
@@ -257,19 +262,39 @@ export default function Sidebar() {
                     )}
                   </button>
                 )
+
+                return sidebarCollapsed ? (
+                  <Tooltip key={item.id} content={item.label} position="right">
+                    {btn}
+                  </Tooltip>
+                ) : (
+                  <span key={item.id}>{btn}</span>
+                )
               })}
             </div>
           )
         })}
       </nav>
 
-      {/* Active project */}
+      {/* Active project — click navigates to ProjectView */}
       <div
         role="button"
         tabIndex={0}
-        onClick={() => setView('dashboard')}
+        onClick={() => {
+          if (selectedProjectId) {
+            setView('project' as any)
+          } else {
+            setView('dashboard')
+          }
+        }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') setView('dashboard')
+          if (e.key === 'Enter' || e.key === ' ') {
+            if (selectedProjectId) {
+              setView('project' as any)
+            } else {
+              setView('dashboard')
+            }
+          }
         }}
         style={{
           borderTop:    `0.5px solid ${T.border}`,

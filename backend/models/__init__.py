@@ -8,8 +8,10 @@ from .dataset import Dataset
 from .artifact import Artifact, ArtifactRecord
 from .sweep import Sweep
 from .model_record import ModelRecord
+from .execution_decision import ExecutionDecision
 
 __all__ = [
     "Project", "Experiment", "ExperimentPhase", "Pipeline", "PipelineVersion",
-    "Run", "LiveRun", "Dataset", "Artifact", "ArtifactRecord", "Sweep", "ModelRecord",
+    "Run", "LiveRun", "Dataset", "Artifact", "ArtifactRecord", "Sweep",
+    "ModelRecord", "ExecutionDecision",
 ]

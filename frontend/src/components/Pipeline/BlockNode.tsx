@@ -8,13 +8,19 @@ import { usePipelineStore, type BlockNodeData, type NodeExecutionState } from '@
 import { useRunStore } from '@/stores/runStore'
 import { useValidationStore, type NodeValidationError } from '@/stores/validationStore'
 import { OVERLAY_COLORS } from './InheritanceOverlay'
-import { AlertTriangle, Clock, Lock } from 'lucide-react'
+import { AlertTriangle, Clock, Lock, Circle, StickyNote, HelpCircle } from 'lucide-react'
 import { estimatePipeline, formatTimeShort } from '@/lib/pipeline-estimator'
 
 function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; selected?: boolean }) {
   const [isHovered, setIsHovered] = useState(false)
   const [hoveredPort, setHoveredPort] = useState<string | null>(null)
   const [showErrorTooltip, setShowErrorTooltip] = useState(false)
+  const [showNoteEditor, setShowNoteEditor] = useState(false)
+  const [showNotePreview, setShowNotePreview] = useState(false)
+  const [noteText, setNoteText] = useState(data.notes || '')
+  const updateNodeData = usePipelineStore((s) => s.updateNodeData)
+
+  const hasNote = !!data.notes
 
   // Count connections per handle — uses ReactFlow internal store with custom equality
   // so this node ONLY re-renders when its OWN connection counts change (not all edges).
@@ -42,7 +48,6 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
   // Backend validation errors for this node
   const backendNodeErrors: NodeValidationError[] = useValidationStore((s) => s.nodeErrors[id] || [])
   const hasBackendErrors = backendNodeErrors.some(e => e.severity === 'error')
-  const hasBackendWarnings = !hasBackendErrors && backendNodeErrors.length > 0
 
   // Inheritance overlay — derived selector returns primitive for O(1) lookup + minimal re-renders
   const overlayRole = usePipelineStore(
@@ -418,6 +423,30 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
         }} />
       )}
 
+      {/* Breakpoint indicator — red dot at top-left */}
+      {data.breakpoint && (
+        <div
+          title={
+            data.breakpoint_condition
+              ? `Breakpoint: pauses when ${(data.breakpoint_condition as any).field} ${(data.breakpoint_condition as any).op} ${(data.breakpoint_condition as any).value}`
+              : 'Breakpoint set'
+          }
+          style={{
+            position: 'absolute',
+            top: -4,
+            left: -4,
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: T.red,
+            boxShadow: `0 0 6px ${T.red}80`,
+            zIndex: 25,
+            border: '1px solid rgba(0,0,0,0.4)',
+            animation: effectiveStatus === 'running' ? 'breakpoint-pulse 1.5s ease-in-out infinite' : 'none',
+          }}
+        />
+      )}
+
       {/* Header */}
       <div
         style={{
@@ -466,6 +495,37 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
             {data.label}
           </div>
         </div>
+        {/* Doc button — visible on hover */}
+        {isHovered && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              const rect = e.currentTarget.getBoundingClientRect()
+              window.dispatchEvent(new CustomEvent('blueprint:show-block-doc', {
+                detail: { blockType: data.type, anchor: { x: rect.right + 8, y: rect.top } },
+              }))
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 18,
+              height: 18,
+              borderRadius: 4,
+              background: `${T.surface4}`,
+              border: `1px solid ${T.border}`,
+              cursor: 'pointer',
+              padding: 0,
+              flexShrink: 0,
+              transition: 'background 0.1s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = `${T.cyan}20` }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = T.surface4 }}
+            title="Documentation"
+          >
+            <HelpCircle size={10} color={T.dim} />
+          </button>
+        )}
       </div>
 
       {/* Description — always visible */}
@@ -870,8 +930,153 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
           </div>
         )
       })()}
+
+      {/* Note icon — shown at bottom-right when node has a note */}
+      {(hasNote || isHovered) && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 6,
+            right: 6,
+            zIndex: 25,
+            cursor: 'pointer',
+          }}
+          onMouseEnter={() => { if (hasNote) setShowNotePreview(true) }}
+          onMouseLeave={() => setShowNotePreview(false)}
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowNoteEditor(!showNoteEditor)
+            setShowNotePreview(false)
+            setNoteText(data.notes || '')
+          }}
+        >
+          <StickyNote
+            size={12}
+            color={hasNote ? '#FFB74D' : T.dim}
+            fill={hasNote ? 'rgba(255, 183, 77, 0.15)' : 'none'}
+            style={{ opacity: hasNote ? 1 : 0.5 }}
+          />
+
+          {/* Note preview tooltip */}
+          {showNotePreview && hasNote && !showNoteEditor && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                right: 0,
+                marginBottom: 4,
+                width: 200,
+                padding: '6px 10px',
+                background: T.surface2,
+                border: '1px solid rgba(255, 183, 77, 0.3)',
+                borderRadius: 6,
+                boxShadow: `0 4px 16px ${T.shadowHeavy}`,
+                zIndex: 100,
+                pointerEvents: 'none',
+              }}
+            >
+              <span style={{
+                fontFamily: F,
+                fontSize: FS.xxs,
+                color: T.sec,
+                lineHeight: 1.4,
+              }}>
+                {(data.notes || '').slice(0, 80)}{(data.notes || '').length > 80 ? '...' : ''}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Note editor — anchored below the node */}
+      {showNoteEditor && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            right: 0,
+            marginTop: 8,
+            width: 200,
+            padding: '8px',
+            background: T.surface2,
+            border: '1px solid rgba(255, 183, 77, 0.3)',
+            borderRadius: 8,
+            boxShadow: `0 8px 24px ${T.shadowHeavy}`,
+            zIndex: 100,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <textarea
+            autoFocus
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            placeholder="Add a note..."
+            style={{
+              width: '100%',
+              minHeight: 60,
+              maxHeight: 120,
+              padding: '6px 8px',
+              background: T.surface3,
+              border: `1px solid ${T.border}`,
+              borderRadius: 4,
+              color: T.text,
+              fontFamily: F,
+              fontSize: FS.xxs,
+              resize: 'vertical',
+              outline: 'none',
+              lineHeight: 1.5,
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#FFB74D' }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = T.border }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 6 }}>
+            <button
+              onClick={() => setShowNoteEditor(false)}
+              style={{
+                padding: '3px 8px',
+                background: 'none',
+                border: `1px solid ${T.border}`,
+                borderRadius: 4,
+                color: T.dim,
+                fontFamily: F,
+                fontSize: FS.xxs,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                updateNodeData(id, { notes: noteText || undefined })
+                setShowNoteEditor(false)
+              }}
+              style={{
+                padding: '3px 8px',
+                background: 'rgba(255, 183, 77, 0.2)',
+                border: '1px solid rgba(255, 183, 77, 0.4)',
+                borderRadius: 4,
+                color: '#FFB74D',
+                fontFamily: F,
+                fontSize: FS.xxs,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+// Inject breakpoint pulse keyframes once
+const _bpStyle = document.createElement('style')
+_bpStyle.textContent = `@keyframes breakpoint-pulse { 0%, 100% { box-shadow: 0 0 6px rgba(255,94,114,0.5); } 50% { box-shadow: 0 0 14px rgba(255,94,114,0.9), 0 0 4px rgba(255,94,114,1); } }`
+if (!document.head.querySelector('[data-bp-pulse]')) {
+  _bpStyle.setAttribute('data-bp-pulse', '1')
+  document.head.appendChild(_bpStyle)
 }
 
 export default memo(BlockNode)

@@ -42,8 +42,10 @@ from .config_resolver import resolve_configs
 from .block_registry import resolve_output_handle
 from .composite import CompositeBlockContext
 from .schema_validator import load_block_schema
+from .runtime_prep import prepare_node_runtime, PreparedNode, apply_multi_input_policy
 from .graph_utils import is_cache_valid
 from .artifact_registry import register_block_artifacts, _sha256_file
+from .decision_recorder import record_decision, update_decision, flush_decisions, cleanup_decisions, measure_memory_mb
 from ..models.artifact import Artifact
 
 
@@ -233,7 +235,11 @@ async def execute_partial_pipeline(
             except Exception:
                 pass
             metrics_log_buffer.append(event_data)
-            publish_event(run_id, "system_metric", event_data)
+            # SSE (crash-safe — must never kill the metrics loop)
+            try:
+                publish_event(run_id, "system_metric", event_data)
+            except Exception:
+                pass
 
     system_thread = threading.Thread(target=_system_metrics_loop, daemon=True)
     system_thread.start()
@@ -425,6 +431,19 @@ async def execute_partial_pipeline(
                 if node_id not in downstream:
                     outputs[node_id] = cached_outputs.get(node_id, {})
 
+                    # Record cache_hit decision
+                    record_decision(
+                        db,
+                        run_id=run_id,
+                        node_id=node_id,
+                        block_type=block_type,
+                        execution_order=idx,
+                        decision="cache_hit",
+                        decision_reason=f"outputs reused from source run {source_run_id}",
+                        status="cached",
+                        resolved_config=config,
+                    )
+
                     cache_event = {
                         "node_id": node_id,
                         "block_type": block_type,
@@ -469,6 +488,22 @@ async def execute_partial_pipeline(
             live.block_progress = 0.0
             live.overall_progress = idx / len(nodes)
             db.commit()
+
+            # Record execution decision and measure pre-execution memory
+            _partial_mem_before = measure_memory_mb()
+            _partial_block_start = time.time()
+            _partial_dec_key = record_decision(
+                db,
+                run_id=run_id,
+                node_id=node_id,
+                block_type=block_type,
+                execution_order=idx,
+                decision="execute",
+                decision_reason=f"partial re-run from {start_node_id}",
+                status="running",
+                started_at=datetime.now(timezone.utc),
+                resolved_config=config,
+            )
 
             started_event = {
                 "node_id": node_id,
@@ -516,22 +551,39 @@ async def execute_partial_pipeline(
                         else:
                             node_inputs[tgt_handle] = value
 
-            # Find and run block
-            block_dir = _find_block_module(block_type)
+            # --- Prepare node: resolve block dir, schema, validation, secrets ---
+            try:
+                prepared = prepare_node_runtime(
+                    node_id=node_id,
+                    block_type=block_type,
+                    config=config,
+                    node_inputs=node_inputs,
+                    run_id=run_id,
+                    find_block_fn=_find_block_module,
+                    resolve_secrets_fn=_resolve_secrets,
+                    block_aliases=BLOCK_ALIASES,
+                    safe_block_type_re=SAFE_BLOCK_TYPE,
+                )
+            except RuntimeError:
+                prepared = None
 
-            # Custom block fallback
-            if block_dir is None:
-                base_type = config.get("baseType", "")
-                if base_type and SAFE_BLOCK_TYPE.match(base_type):
-                    base_type = BLOCK_ALIASES.get(base_type, base_type)
-                    block_dir = _find_block_module(base_type)
+            if prepared:
+                block_dir = prepared.block_dir
+                block_schema = prepared.block_schema
+                config = prepared.cleaned_config
+                run_dir = prepared.run_dir
+                context_cls = prepared.context_cls
 
-            run_dir = str(ARTIFACTS_DIR / run_id / node_id)
+                # Apply multi-input aggregation policy
+                if block_schema and _multi_counts:
+                    node_inputs = apply_multi_input_policy(
+                        block_schema, node_inputs, _multi_counts,
+                    )
 
-            # Resolve secrets
-            config = _resolve_secrets(config)
+                # Embed block version into config_snapshot for cache validation
+                if prepared.block_version:
+                    node_data["block_version"] = prepared.block_version
 
-            if block_dir:
                 _last_progress_commit = time.time()
 
                 def progress_cb(current, total):
@@ -590,16 +642,6 @@ async def execute_partial_pipeline(
                     metrics_file.flush()
                     metrics_log_buffer.append(metric_event)
 
-                # Detect composite blocks + read timeout from schema
-                block_schema = load_block_schema(block_dir)
-                is_composite = block_schema.get("composite", False) if block_schema else False
-                context_cls = CompositeBlockContext if is_composite else None
-                timeout_seconds = block_schema.get("timeout") if block_schema else None
-
-                # Embed block version into config_snapshot for cache validation
-                if block_schema and block_schema.get("version"):
-                    node_data["block_version"] = block_schema["version"]
-
                 try:
                     node_outputs, data_fingerprints = _load_and_run_block(
                         block_dir, config, node_inputs, run_dir,
@@ -610,6 +652,10 @@ async def execute_partial_pipeline(
                     if data_fingerprints:
                         all_fingerprints[node_id] = data_fingerprints
                 except InterruptedError:
+                    update_decision(db, _partial_dec_key,
+                        status="cancelled",
+                        duration_ms=round((time.time() - _partial_block_start) * 1000, 1),
+                    )
                     run.status = "cancelled"
                     run.error_message = "Cancelled by user"
                     run.finished_at = datetime.now(timezone.utc)
@@ -627,6 +673,13 @@ async def execute_partial_pipeline(
                     return
                 except Exception as e:
                     tb = traceback.format_exc()
+                    from .error_classifier import classify_error
+                    _cls = classify_error(e, block_type=block_type)
+                    update_decision(db, _partial_dec_key,
+                        status="failed",
+                        duration_ms=round((time.time() - _partial_block_start) * 1000, 1),
+                        error_json=_cls.to_dict(),
+                    )
                     try:
                         publish_event(run_id, "node_failed", {
                             "node_id": node_id, "error": str(e),
@@ -638,9 +691,27 @@ async def execute_partial_pipeline(
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     live.status = "failed"
                     db.commit()
+                    # Record downstream nodes as not_executed
+                    for later_idx in range(idx + 1, len(order)):
+                        nid = order[later_idx]
+                        nd = node_map.get(nid)
+                        if not nd or nd.get("type") == "groupNode" or nid not in downstream:
+                            continue
+                        record_decision(
+                            db, run_id=run_id, node_id=nid,
+                            block_type=nd.get("data", {}).get("type", ""),
+                            execution_order=later_idx, decision="skipped",
+                            decision_reason=f"Not executed — upstream failure at {node_id}",
+                            status="not_executed",
+                        )
                     _write_error_log(run_id, tb)
                     return
             else:
+                update_decision(db, _partial_dec_key,
+                    status="failed",
+                    duration_ms=round((time.time() - _partial_block_start) * 1000, 1),
+                    error_json={"title": "Block Not Found", "message": f"Block type '{block_type}' not found", "action": "Install the block", "severity": "error"},
+                )
                 try:
                     publish_event(run_id, "node_failed", {
                         "node_id": node_id,
@@ -654,6 +725,15 @@ async def execute_partial_pipeline(
                 live.status = "failed"
                 db.commit()
                 return
+
+            # Update decision record on success with memory measurement
+            _partial_mem_after = measure_memory_mb()
+            _partial_mem_peak = max(_partial_mem_before or 0, _partial_mem_after or 0) if (_partial_mem_before or _partial_mem_after) else None
+            update_decision(db, _partial_dec_key,
+                status="completed",
+                duration_ms=round((time.time() - _partial_block_start) * 1000, 1),
+                memory_peak_mb=_partial_mem_peak,
+            )
 
             # Register artifacts produced by this block (best-effort)
             artifact_ids: list[str] = []
@@ -790,6 +870,15 @@ async def execute_partial_pipeline(
         except Exception:
             pass
     finally:
+        # Flush and clean up decision records
+        try:
+            flush_decisions(run_id)
+        except Exception:
+            pass
+        try:
+            cleanup_decisions(run_id)
+        except Exception:
+            pass
         with _cancel_lock:
             _cancel_events.pop(run_id, None)
         system_metrics_stop.set()

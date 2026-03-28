@@ -2,6 +2,8 @@ import { T, F, FD, BRAND_TEAL } from '@/lib/design-tokens'
 import { useUIStore } from '@/stores/uiStore'
 import { useGuideStore } from '@/stores/guideStore'
 import { motion } from 'framer-motion'
+import { HelpCircle } from 'lucide-react'
+import Tooltip from '@/components/shared/Tooltip'
 
 // Electron drag region style (not in CSSProperties type)
 const dragStyle   = { WebkitAppRegion: 'drag'    } as React.CSSProperties
@@ -31,11 +33,15 @@ const viewLabels: Record<string, string> = {
 
 export default function TopBar() {
   const { activeView } = useUIStore()
+  const helpPanelOpen = useUIStore((s) => s.helpPanelOpen)
+  const toggleHelpPanel = useUIStore((s) => s.toggleHelpPanel)
   const guideActive = useGuideStore((s) => s.guideActive)
   const toggleGuide = useGuideStore((s) => s.toggleGuide)
 
   return (
     <header
+      role="banner"
+      aria-label="Application header"
       style={{
         flexShrink: 0,
         zIndex: 40,
@@ -211,25 +217,51 @@ export default function TopBar() {
           {viewLabels[activeView] || activeView.toUpperCase()}
         </span>
 
+        {/* Help panel toggle */}
+        <Tooltip content="Contextual Help" shortcut="?" position="bottom">
+          <button
+            onClick={toggleHelpPanel}
+            aria-label="Toggle help panel"
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 6,
+              border: helpPanelOpen ? `1px solid ${T.cyan}60` : `1px solid ${T.borderHi}`,
+              background: helpPanelOpen ? `${T.cyan}18` : T.surface5,
+              color: helpPanelOpen ? T.cyan : T.dim,
+              cursor: 'pointer',
+              display: 'grid',
+              placeItems: 'center',
+              transition: 'all 0.14s ease',
+              ...noDragStyle,
+            }}
+          >
+            <HelpCircle size={12} />
+          </button>
+        </Tooltip>
+
         {/* GUIDE toggle */}
-        <button
-          onClick={toggleGuide}
-          style={{
-            fontSize: 6,
-            letterSpacing: '0.14em',
-            fontWeight: 900,
-            fontFamily: F,
-            background: guideActive ? `${T.cyan}18` : T.surface5,
-            border: guideActive ? `1px solid ${T.cyan}60` : `1px solid ${T.borderHi}`,
-            color: guideActive ? T.cyan : T.dim,
-            padding: '2px 7px',
-            cursor: 'pointer',
-            lineHeight: 1,
-            ...noDragStyle,
-          }}
-        >
-          GUIDE
-        </button>
+        <Tooltip content="Toggle Guide Tips" shortcut="G" position="bottom">
+          <button
+            onClick={toggleGuide}
+            aria-label={guideActive ? 'Hide guide tips' : 'Show guide tips'}
+            style={{
+              fontSize: 6,
+              letterSpacing: '0.14em',
+              fontWeight: 900,
+              fontFamily: F,
+              background: guideActive ? `${T.cyan}18` : T.surface5,
+              border: guideActive ? `1px solid ${T.cyan}60` : `1px solid ${T.borderHi}`,
+              color: guideActive ? T.cyan : T.dim,
+              padding: '2px 7px',
+              cursor: 'pointer',
+              lineHeight: 1,
+              ...noDragStyle,
+            }}
+          >
+            GUIDE
+          </button>
+        </Tooltip>
       </div>
     </header>
   )

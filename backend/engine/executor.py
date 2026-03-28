@@ -22,68 +22,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# Path safety: block types must be simple identifiers
-SAFE_BLOCK_TYPE = re.compile(r'^[a-zA-Z0-9_]+$')
-
-# Backward-compat aliases for renamed blocks
-BLOCK_ALIASES = {
-    "model_prompt": "llm_inference",
-    "huggingface_dataset_loader": "huggingface_loader",
-    "huggingface_model": "huggingface_model_loader",
-    "model_loader": "model_selector",
-    "data_exporter": "data_export",
-    "results_exporter": "data_export",
-    # Block consolidation aliases
-    "debate_composite": "multi_agent_debate",
-    "checkpoint_gate": "quality_gate",
-    "notification_sender": "notification_hub",
-    "manual_review": "human_review_gate",
-    "save_csv": "data_export",
-    "save_json": "data_export",
-    "save_parquet": "data_export",
-    "save_txt": "data_export",
-    "save_yaml": "data_export",
-    "save_local": "data_export",
-    # Deprecated inference blocks → llm_inference
-    "batch_inference": "llm_inference",
-    "few_shot_prompting": "llm_inference",
-    "text_translator": "llm_inference",
-    "text_classifier": "llm_inference",
-    "streaming_server": "llm_inference",
-    "text_summarizer": "llm_inference",
-    "structured_output": "llm_inference",
-    "function_calling": "llm_inference",
-    "chat_completion": "llm_inference",
-    # Deprecated model blocks → model_selector
-    "gguf_model": "model_selector",
-    "mlx_model": "model_selector",
-    "ollama_model": "model_selector",
-}
-
-# Config defaults injected when an aliased block resolves to its new type.
-# This ensures saved workflows that used the old block type still work correctly.
-CONFIG_MIGRATIONS: dict[str, dict[str, object]] = {
-    "save_csv": {"format": "csv"},
-    "save_json": {"format": "json"},
-    "save_parquet": {"format": "parquet"},
-    "save_txt": {"format": "txt"},
-    "save_yaml": {"format": "yaml"},
-    "save_local": {"format": "auto"},
-}
+# Single source of truth for block aliases — shared with subprocess worker
+from .block_aliases import SAFE_BLOCK_TYPE, BLOCK_ALIASES, CONFIG_MIGRATIONS
 
 from sqlalchemy.orm import Session
 
-from ..config import ARTIFACTS_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR
+from ..config import ARTIFACTS_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR, CUSTOM_BLOCKS_DIR, MAX_PARALLEL_BLOCKS
 from ..database import SessionLocal
 from ..models.run import Run, LiveRun
 from ..block_sdk.context import BlockContext
 from ..block_sdk.exceptions import BlockError, BlockInputError, BlockConfigError, BlockTimeoutError
+from .decision_recorder import record_decision, update_decision, flush_decisions, cleanup_decisions, measure_memory_mb
 from .composite import CompositeBlockContext, execute_sub_pipeline
 from ..routers.events import publish_event
 from ..utils.secrets import get_secret
 from ..utils.redact import scrub_traceback
 from .block_registry import resolve_output_handle
 from .schema_validator import load_block_schema, validate_inputs, validate_config
+from .runtime_prep import prepare_node_runtime, PreparedNode, apply_multi_input_policy
 from ..utils.structured_logger import (
     log_run_start, log_run_complete, log_run_failed,
     log_block_start, log_block_complete, log_block_failed,
@@ -95,6 +51,9 @@ from .metrics_schema import create_metric
 from .artifact_registry import register_block_artifacts
 from .artifacts import ArtifactStore
 from ..models.artifact import ArtifactRecord
+from .subprocess_runner import SubprocessBlockRunner
+from .worker_tracker import track_worker, untrack_worker
+from ..models.execution_decision import ExecutionDecision
 
 # Ensure the repo root is on sys.path so blocks can do cross-block imports
 # like `from blocks.inference._inference_utils import ...`.
@@ -108,6 +67,23 @@ if _blocks_parent not in sys.path:
 _cancel_events: dict[str, threading.Event] = {}
 _cancel_lock = threading.Lock()
 
+# ── Debug / breakpoint infrastructure ──
+_debug_lock = threading.Lock()
+_debug_resume_events: dict[str, threading.Event] = {}
+_debug_step_flags: dict[str, bool] = {}  # True = pause after NEXT node too
+_debug_abort_flags: dict[str, bool] = {}  # True = abort run
+
+# Concurrency semaphore: limits *actively executing* (non-paused) pipeline runs.
+# When a run pauses at a breakpoint it releases a slot so other runs can proceed.
+# The thread pool itself is sized larger (see execution.py) to hold paused threads.
+MAX_ACTIVE_RUNS = int(os.environ.get("BLUEPRINT_MAX_ACTIVE_RUNS", "4"))
+_active_run_semaphore = threading.Semaphore(MAX_ACTIVE_RUNS)
+
+# Maximum time (seconds) a breakpoint pause blocks before auto-aborting.
+# Prevents indefinitely blocked threads when a user walks away.
+# Override via BLUEPRINT_BREAKPOINT_TIMEOUT env var.
+BREAKPOINT_PAUSE_TIMEOUT_S = int(os.environ.get("BLUEPRINT_BREAKPOINT_TIMEOUT", "1800"))  # 30 min
+
 
 def request_cancel(run_id: str):
     """Signal a running pipeline to cancel. Called from the cancel endpoint."""
@@ -115,6 +91,191 @@ def request_cancel(run_id: str):
         event = _cancel_events.get(run_id)
         if event:
             event.set()
+
+
+def debug_action(run_id: str, action: str):
+    """Handle a debug action: resume, step, or abort.
+
+    Called from the debug API endpoint while execution is paused at a breakpoint.
+    """
+    with _debug_lock:
+        resume_event = _debug_resume_events.get(run_id)
+        if not resume_event:
+            return False
+
+        if action == "resume":
+            _debug_step_flags[run_id] = False
+            resume_event.set()
+        elif action == "step":
+            _debug_step_flags[run_id] = True
+            resume_event.set()
+        elif action == "abort":
+            _debug_abort_flags[run_id] = True
+            resume_event.set()
+        else:
+            return False
+        return True
+
+
+class BreakpointAbort(Exception):
+    """Raised when a breakpoint pause results in an abort or timeout."""
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
+def _pause_at_breakpoint(
+    run_id: str,
+    node_id: str,
+    idx: int,
+    total: int,
+    order: list[str],
+    outputs: dict[str, dict[str, Any]],
+    *,
+    conditional: bool = False,
+):
+    """Shared breakpoint pause logic used by both the main loop and _execute_loop.
+
+    Emits a ``breakpoint_hit`` SSE event, releases the active-run semaphore so
+    other pipelines can proceed, blocks until a debug action arrives (or timeout
+    expires), then re-acquires the semaphore.
+
+    Raises ``BreakpointAbort`` if the user chose *abort* or the timeout expired.
+    """
+    # Build a truncated outputs preview for the SSE event
+    outputs_preview: dict[str, dict] = {}
+    for cid, couts in outputs.items():
+        safe: dict[str, Any] = {}
+        for k, v in couts.items():
+            try:
+                json.dumps(v)
+                safe[k] = v if not isinstance(v, str) or len(v) < 500 else v[:500] + "..."
+            except Exception:
+                safe[k] = str(v)[:500]
+        outputs_preview[cid] = safe
+
+    completed_nodes = [nid for nid in order[:idx + (1 if conditional else 0)] if nid in outputs]
+
+    try:
+        publish_event(run_id, "breakpoint_hit", {
+            "node_id": node_id,
+            "completed_nodes": completed_nodes,
+            "outputs_preview": outputs_preview,
+            "index": idx,
+            "total": total,
+            "conditional": conditional,
+        })
+    except Exception:
+        pass
+
+    # Release the active-run semaphore while paused so other pipelines can run.
+    _active_run_semaphore.release()
+
+    try:
+        with _debug_lock:
+            resume_event = _debug_resume_events.get(run_id)
+
+        if resume_event:
+            resume_event.clear()
+            # Block with a timeout — prevents indefinitely stuck threads
+            signalled = resume_event.wait(timeout=BREAKPOINT_PAUSE_TIMEOUT_S)
+
+            if not signalled:
+                # Timeout expired — treat as auto-abort
+                with _debug_lock:
+                    _debug_abort_flags[run_id] = True
+
+        # Check if abort was requested (by user action or timeout)
+        with _debug_lock:
+            if _debug_abort_flags.get(run_id, False):
+                _debug_abort_flags[run_id] = False
+                timed_out = not signalled if resume_event else False
+                reason = (
+                    f"Breakpoint pause timed out after {BREAKPOINT_PAUSE_TIMEOUT_S}s"
+                    if timed_out
+                    else "Aborted at breakpoint"
+                )
+                raise BreakpointAbort(reason)
+    finally:
+        # Re-acquire the semaphore before resuming active execution
+        _active_run_semaphore.acquire()
+
+
+def evaluate_breakpoint_condition(condition: dict, outputs: dict) -> bool:
+    """Evaluate a declarative breakpoint condition against block outputs.
+
+    Condition format: {field: str, op: str, value: number}
+    Operators: gt, lt, gte, lte, eq, neq
+
+    Returns True if the condition is met (breakpoint should fire).
+    Returns True on evaluation errors (fail-open: pause on error).
+    """
+    if not condition or not isinstance(condition, dict):
+        return True  # No condition = always pause
+
+    field = condition.get("field", "")
+    op = condition.get("op", "")
+    threshold = condition.get("value")
+
+    if not field or not op or threshold is None:
+        return True  # Malformed condition = always pause
+
+    # Look up the field in the block outputs
+    actual_value = outputs.get(field)
+
+    # If the field is nested in a dict output, try a single level of nesting
+    if actual_value is None:
+        for v in outputs.values():
+            if isinstance(v, dict) and field in v:
+                actual_value = v[field]
+                break
+
+    if actual_value is None:
+        return True  # Field not found = pause (fail-open)
+
+    try:
+        actual_value = float(actual_value)
+        threshold = float(threshold)
+    except (TypeError, ValueError):
+        return True  # Non-numeric = pause (fail-open)
+
+    ops = {
+        "gt": lambda a, b: a > b,
+        "lt": lambda a, b: a < b,
+        "gte": lambda a, b: a >= b,
+        "lte": lambda a, b: a <= b,
+        "eq": lambda a, b: a == b,
+        "neq": lambda a, b: a != b,
+    }
+    comparator = ops.get(op)
+    if not comparator:
+        return True  # Unknown op = pause (fail-open)
+
+    return comparator(actual_value, threshold)
+
+
+def _infer_severity(msg: object) -> str:
+    """Infer log severity from a message's text prefix.
+
+    Used as a fallback when the block does not provide an explicit severity
+    via ``ctx.log_message(msg, severity="...")``.
+
+    Recognized prefixes (case-insensitive):
+        [ERROR], ERROR:  → "error"
+        [WARN], [WARNING], WARNING:  → "warn"
+        [DEBUG]  → "debug"
+        everything else  → "info"
+    """
+    if not isinstance(msg, str):
+        return "info"
+    lower = msg.lower()
+    if lower.startswith("[error]") or lower.startswith("error:"):
+        return "error"
+    if lower.startswith(("[warn]", "[warning]", "warning:")):
+        return "warn"
+    if lower.startswith("[debug]"):
+        return "debug"
+    return "info"
 
 
 def _topological_sort(nodes: list[dict], edges: list[dict]) -> list[str]:
@@ -535,6 +696,52 @@ def _load_and_run_block_with_timeout(
     return result[0]
 
 
+# Module-level subprocess runner (reused across all runs)
+_subprocess_runner = SubprocessBlockRunner()
+
+
+def _run_block_subprocess(
+    block_type: str,
+    config: dict,
+    inputs: dict[str, Any],
+    run_id: str,
+    node_id: str,
+    timeout_seconds: int | None = None,
+    progress_cb=None,
+    message_cb=None,
+) -> tuple[dict[str, Any], dict[str, dict]]:
+    """Execute a block in an isolated subprocess.
+
+    Returns (outputs, data_fingerprints). The subprocess writes fingerprints
+    to a JSON file which the runner reads back after completion.
+    """
+    def _progress_forwarder(percent: float, message: str):
+        if progress_cb and percent >= 0:
+            total = 100
+            current = int(percent * total)
+            try:
+                progress_cb(current, total)
+            except Exception:
+                pass
+        if message_cb and message and not message.startswith("Progress:"):
+            try:
+                message_cb(message)
+            except Exception:
+                pass
+
+    outputs, fingerprints = _subprocess_runner.run_block(
+        block_type=block_type,
+        config=config,
+        inputs=inputs,
+        timeout_seconds=timeout_seconds or 3600,
+        progress_callback=_progress_forwarder,
+        run_id=run_id,
+        node_id=node_id,
+    )
+
+    return outputs, fingerprints
+
+
 def _resolve_secrets(config: dict) -> dict:
     """Replace $secret:<name> references in config values with actual secrets."""
     resolved = {}
@@ -647,6 +854,36 @@ def _safe_commit(db: Session):
         db.commit()
     except Exception:
         db.rollback()
+
+
+def _record_decision(
+    db: Session,
+    run_id: str,
+    node_id: str,
+    decision: str,
+    reason: str,
+    cache_fingerprint: str | None = None,
+    plan_hash: str | None = None,
+) -> None:
+    """Write an ExecutionDecision record. Best-effort — never raises."""
+    try:
+        record = ExecutionDecision(
+            id=str(uuid.uuid4()),
+            run_id=run_id,
+            node_id=node_id,
+            decision=decision,
+            reason=reason,
+            cache_fingerprint=cache_fingerprint,
+            plan_hash=plan_hash,
+            timestamp=datetime.now(timezone.utc),
+        )
+        db.add(record)
+        _safe_commit(db)
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
 
 def _start_heartbeat(run_id: str, interval: float = 30.0):
@@ -849,6 +1086,7 @@ async def _execute_loop(
     start_time: float,
     db: Session,
     live: LiveRun,
+    breakpoints: dict[str, dict | bool] | None = None,
 ):
     """Execute a loop body repeatedly.
 
@@ -900,51 +1138,47 @@ async def _execute_loop(
             body_node_id, body_data.get("config", {}),
         )
         body_config = {k: v for k, v in body_config.items() if k != "_inherited"}
-        body_config = _resolve_secrets(body_config)
 
         category = body_data.get("category", "flow")
 
-        block_dir = _find_block_module(body_type)
-        if block_dir is None:
-            base_type = body_config.get("baseType", "")
-            if base_type and SAFE_BLOCK_TYPE.match(base_type):
-                base_type = BLOCK_ALIASES.get(base_type, base_type)
-                block_dir = _find_block_module(base_type)
-
-        if block_dir is None:
-            raise RuntimeError(
-                f"Block type '{body_type}' not found in loop body"
-            )
-
-        block_schema = load_block_schema(block_dir)
-        timeout_seconds = block_schema.get("timeout") if block_schema else None
-        is_composite = block_schema.get("composite", False) if block_schema else False
-
-        # Embed block version into config_snapshot for cache validation
-        if block_schema and block_schema.get("version"):
-            body_data["block_version"] = block_schema["version"]
-
-        # Validate config once (static across iterations)
-        if block_schema:
-            body_config = validate_config(block_schema, body_config)
-
-        context_cls = CompositeBlockContext if is_composite else None
-        run_dir = str(ARTIFACTS_DIR / run_id / body_node_id)
-
         # Pre-filter edges targeting this body node
         incoming_edges = [e for e in edges if e.get("target") == body_node_id]
+
+        # Build placeholder inputs from connected edges so validate_config
+        # knows which mandatory config fields are satisfied by connections
+        placeholder_inputs: dict[str, Any] = {}
+        for edge in incoming_edges:
+            tgt_handle = edge.get("targetHandle", "")
+            if tgt_handle:
+                placeholder_inputs[tgt_handle] = True  # non-None placeholder
+
+        prepared = prepare_node_runtime(
+            node_id=body_node_id,
+            block_type=body_type,
+            config=body_config,
+            node_inputs=placeholder_inputs,
+            run_id=run_id,
+            find_block_fn=_find_block_module,
+            resolve_secrets_fn=_resolve_secrets,
+            block_aliases=BLOCK_ALIASES,
+            safe_block_type_re=SAFE_BLOCK_TYPE,
+        )
+
+        # Embed block version into config_snapshot for cache validation
+        if prepared.block_version:
+            body_data["block_version"] = prepared.block_version
 
         body_block_infos.append(_BodyBlockInfo(
             node_id=body_node_id,
             block_type=body_type,
             category=category,
-            block_dir=block_dir,
-            schema=block_schema,
-            config=body_config,
-            timeout_seconds=timeout_seconds,
-            is_composite=is_composite,
-            context_cls=context_cls,
-            run_dir=run_dir,
+            block_dir=prepared.block_dir,
+            schema=prepared.block_schema,
+            config=prepared.cleaned_config,
+            timeout_seconds=prepared.timeout_seconds,
+            is_composite=prepared.is_composite,
+            context_cls=prepared.context_cls,
+            run_dir=prepared.run_dir,
             incoming_edges=incoming_edges,
         ))
 
@@ -1039,6 +1273,44 @@ async def _execute_loop(
             metrics_file.flush()
 
             body_block_start = time.time()
+            _body_mem_before = measure_memory_mb()
+
+            # Record decision for loop body block
+            _body_dec_key = record_decision(
+                db,
+                run_id=run_id,
+                node_id=_nid,
+                block_type=_block_type,
+                execution_order=body_block_infos.index(info),
+                decision="execute",
+                decision_reason=f"loop iteration {i}",
+                status="running",
+                started_at=datetime.now(timezone.utc),
+                resolved_config=info.config,
+                iteration=i,
+                loop_id=loop.controller_id,
+            )
+
+            # ── Loop body breakpoint check (pre-execution) ──
+            if breakpoints:
+                bp_info_loop = breakpoints.get(_nid)
+                should_pause_loop = False
+                if bp_info_loop is True:
+                    should_pause_loop = True
+                else:
+                    with _debug_lock:
+                        if _debug_step_flags.get(run_id, False):
+                            should_pause_loop = True
+                            _debug_step_flags[run_id] = False
+
+                if should_pause_loop:
+                    # Use body_node_ids as the order for the preview
+                    loop_order = [loop.controller_id] + loop.body_node_ids
+                    _pause_at_breakpoint(
+                        run_id, _nid, i, iterations,
+                        loop_order, outputs, conditional=False,
+                    )
+                    # BreakpointAbort propagates up to the caller
 
             # Gather inputs from upstream edges (including controller outputs)
             node_inputs: dict[str, Any] = {}
@@ -1076,10 +1348,14 @@ async def _execute_loop(
                 except Exception:
                     pass
 
-            def message_cb(msg, __nid=_nid):
+            def message_cb(msg, explicit_severity=None, __nid=_nid):
+                if explicit_severity:
+                    severity = explicit_severity
+                else:
+                    severity = _infer_severity(msg)
                 try:
                     publish_event(run_id, "node_log", {
-                        "node_id": __nid, "message": msg,
+                        "node_id": __nid, "message": msg, "severity": severity,
                     })
                 except Exception:
                     pass
@@ -1140,8 +1416,18 @@ async def _execute_loop(
             except Exception:
                 pass
 
+            # Update decision for loop body block on success
+            _body_mem_after = measure_memory_mb()
+            _body_mem_peak = max(_body_mem_before or 0, _body_mem_after or 0) if (_body_mem_before or _body_mem_after) else None
+            update_decision(db, _body_dec_key,
+                status="completed",
+                duration_ms=round((time.time() - body_block_start) * 1000, 1),
+                memory_peak_mb=_body_mem_peak,
+            )
+
             # Emit node_completed for body block
-            completed_event = {"node_id": _nid, "iteration": i}
+            body_duration_ms = round((time.time() - body_block_start) * 1000)
+            completed_event = {"node_id": _nid, "iteration": i, "duration_ms": body_duration_ms}
             try:
                 publish_event(run_id, "node_completed", completed_event)
             except Exception:
@@ -1151,6 +1437,19 @@ async def _execute_loop(
             metrics_file.flush()
 
             log_block_complete(run_id, _nid, _block_type, time.time() - body_block_start)
+
+            # ── Loop body conditional breakpoint check (post-execution) ──
+            if breakpoints:
+                bp_info_loop_post = breakpoints.get(_nid)
+                if isinstance(bp_info_loop_post, dict):
+                    loop_node_outs = outputs.get(_nid, {})
+                    if evaluate_breakpoint_condition(bp_info_loop_post, loop_node_outs):
+                        loop_order = [loop.controller_id] + loop.body_node_ids
+                        _pause_at_breakpoint(
+                            run_id, _nid, i, iterations,
+                            loop_order, outputs, conditional=True,
+                        )
+                        # BreakpointAbort propagates up to the caller
 
         # Update LiveRun progress during loop
         live.block_progress = (i + 1) / iterations
@@ -1207,6 +1506,7 @@ async def _execute_loop(
                         publish_event(run_id, "node_log", {
                             "node_id": loop.controller_id,
                             "message": f"Early stop: {stop_metric}={metric_value} > {stop_threshold}",
+                            "severity": "info",
                         })
                     except Exception:
                         pass
@@ -1216,6 +1516,7 @@ async def _execute_loop(
                         publish_event(run_id, "node_log", {
                             "node_id": loop.controller_id,
                             "message": f"Early stop: {stop_metric}={metric_value} < {stop_threshold}",
+                            "severity": "info",
                         })
                     except Exception:
                         pass
@@ -1237,6 +1538,41 @@ async def _execute_loop(
     }
 
 
+def _record_downstream_not_executed(
+    db: Session,
+    run_id: str,
+    failed_node_id: str,
+    failed_idx: int,
+    order: list[str],
+    node_map: dict,
+    loop_body_node_ids: set[str],
+    resolved_configs: dict,
+    resolved_tuples: dict,
+):
+    """After a node fails, mark all subsequent nodes as not_executed."""
+    for later_idx in range(failed_idx + 1, len(order)):
+        nid = order[later_idx]
+        if nid in loop_body_node_ids:
+            continue
+        nd = node_map.get(nid)
+        if not nd or nd.get("type") == "groupNode":
+            continue
+        bt = nd.get("data", {}).get("type", "")
+        src = resolved_tuples.get(nid, (None, None))
+        record_decision(
+            db,
+            run_id=run_id,
+            node_id=nid,
+            block_type=bt,
+            execution_order=later_idx,
+            decision="skipped",
+            decision_reason=f"Not executed — upstream failure at {failed_node_id}",
+            status="not_executed",
+            resolved_config=resolved_configs.get(nid),
+            config_sources=src[1] if isinstance(src, tuple) and len(src) > 1 else None,
+        )
+
+
 async def execute_pipeline(
     pipeline_id: str,
     run_id: str,
@@ -1246,9 +1582,17 @@ async def execute_pipeline(
     project_id: str | None = None,
 ):
     """Execute a full pipeline. Called in a background thread."""
+    from .config_merge import merge_workspace_config
+
     nodes = definition.get("nodes", [])
     edges = definition.get("edges", [])
-    workspace_config = definition.get("workspace_config") or None
+
+    # Merge config from all scopes: global workspace → project → pipeline definition
+    workspace_config = merge_workspace_config(
+        definition_config=definition.get("workspace_config") or None,
+        project_id=project_id,
+        db=db,
+    ) or None
 
     if not nodes:
         # Create a completed Run record so clients don't get a 404
@@ -1272,6 +1616,20 @@ async def execute_pipeline(
     with _cancel_lock:
         _cancel_events[run_id] = threading.Event()
 
+    # Register debug state for breakpoint support
+    with _debug_lock:
+        _debug_resume_events[run_id] = threading.Event()
+        _debug_step_flags[run_id] = False
+        _debug_abort_flags[run_id] = False
+
+    # Build breakpoint lookup from node data
+    breakpoints: dict[str, dict | bool] = {}
+    for n in nodes:
+        nd = n.get("data", {})
+        if nd.get("breakpoint"):
+            condition = nd.get("breakpoint_condition")
+            breakpoints[n["id"]] = condition if condition else True
+
     run = Run(
         id=run_id,
         pipeline_id=pipeline_id,
@@ -1293,6 +1651,10 @@ async def execute_pipeline(
     db.commit()
 
     log_run_start(run_id, pipeline_id, len(nodes))
+
+    # Acquire the active-run semaphore — limits concurrent active execution.
+    # Released in finally (or temporarily during breakpoint pauses).
+    _active_run_semaphore.acquire()
 
     # Start continuous heartbeat thread (every 30s, own DB session)
     heartbeat_stop = _start_heartbeat(run_id)
@@ -1332,8 +1694,11 @@ async def execute_pipeline(
                 pass
             # Layer 2: buffer
             metrics_log_buffer.append(event_data)
-            # SSE
-            publish_event(run_id, "system_metric", event_data)
+            # SSE (crash-safe — must never kill the metrics loop)
+            try:
+                publish_event(run_id, "system_metric", event_data)
+            except Exception:
+                pass
 
     system_thread = threading.Thread(target=_system_metrics_loop, daemon=True)
     system_thread.start()
@@ -1376,6 +1741,14 @@ async def execute_pipeline(
             nid: cfg for nid, (cfg, _src) in _resolved_tuples.items()
         }
 
+        # Compute plan hash for decision log
+        import hashlib as _hashlib
+        _plan_hasher = _hashlib.sha256()
+        for _nid in order:
+            _plan_hasher.update(_nid.encode())
+            _plan_hasher.update(config_fps.get(_nid, "").encode())
+        _plan_hash = _plan_hasher.hexdigest()[:16]
+
         for idx, node_id in enumerate(order):
             node = node_map.get(node_id)
             if not node:
@@ -1383,10 +1756,17 @@ async def execute_pipeline(
 
             # Skip visual grouping nodes
             if node.get("type") == "groupNode":
+                _record_decision(db, run_id, node_id, "skipped", "Visual-only groupNode", plan_hash=_plan_hash)
                 continue
 
             # Skip loop body nodes — they are executed by _execute_loop
             if node_id in loop_body_node_ids:
+                _record_decision(
+                    db, run_id, node_id, "skipped",
+                    "Loop body node — executed by loop controller",
+                    cache_fingerprint=config_fps.get(node_id),
+                    plan_hash=_plan_hash,
+                )
                 continue
 
             # Check for cancellation before each block
@@ -1461,6 +1841,21 @@ async def execute_pipeline(
 
             category = node_data.get("category", "flow")
 
+            # Record execution decision
+            _node_fp = config_fps.get(node_id)
+            if node_id in loop_controller_ids:
+                _record_decision(
+                    db, run_id, node_id, "execute",
+                    f"Loop controller — executing loop body ({block_type})",
+                    cache_fingerprint=_node_fp, plan_hash=_plan_hash,
+                )
+            else:
+                _record_decision(
+                    db, run_id, node_id, "execute",
+                    f"Executing block {block_type} (step {idx + 1}/{len(nodes)})",
+                    cache_fingerprint=_node_fp, plan_hash=_plan_hash,
+                )
+
             started_event = {
                 "node_id": node_id,
                 "block_type": block_type,
@@ -1478,6 +1873,62 @@ async def execute_pipeline(
 
             log_block_start(run_id, node_id, block_type, idx, len(nodes))
             block_start_time = time.time()
+
+            # ── Breakpoint check (pre-execution) ──
+            # Unconditional breakpoints pause before execution.
+            # Conditional breakpoints are checked after execution (see below).
+            # Also pause here if "step" mode was set by a previous debug_action.
+            should_pause_pre = False
+            bp_info = breakpoints.get(node_id)
+            if bp_info is True:
+                should_pause_pre = True
+            else:
+                with _debug_lock:
+                    if _debug_step_flags.get(run_id, False):
+                        should_pause_pre = True
+                        _debug_step_flags[run_id] = False
+
+            if should_pause_pre:
+                try:
+                    _pause_at_breakpoint(
+                        run_id, node_id, idx, len(nodes),
+                        order, outputs, conditional=False,
+                    )
+                except BreakpointAbort as abort:
+                    run.status = "cancelled"
+                    run.error_message = abort.reason
+                    run.finished_at = datetime.now(timezone.utc)
+                    run.duration_seconds = time.time() - start_time
+                    run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    run.data_fingerprints = all_fingerprints
+                    live.status = "cancelled"
+                    db.commit()
+                    try:
+                        publish_event(run_id, "run_cancelled", {
+                            "run_id": run_id,
+                            "duration": run.duration_seconds,
+                            "reason": "debug_abort",
+                        })
+                    except Exception:
+                        pass
+                    return
+            # Record execution decision and measure pre-execution memory
+            _mem_before = measure_memory_mb()
+            _config_src = _resolved_tuples.get(node_id, (None, None))
+            _dec_rec = record_decision(
+                db,
+                run_id=run_id,
+                node_id=node_id,
+                block_type=block_type,
+                execution_order=idx,
+                decision="execute",
+                decision_reason="full pipeline execution",
+                status="running",
+                started_at=datetime.now(timezone.utc),
+                resolved_config=resolved_configs.get(node_id),
+                config_sources=_config_src[1] if isinstance(_config_src, tuple) and len(_config_src) > 1 else None,
+                loop_id=None,
+            )
 
             # Handle loop_controller nodes: execute the full loop
             if node_id in loop_controller_ids:
@@ -1498,7 +1949,26 @@ async def execute_pipeline(
                         start_time=start_time,
                         db=db,
                         live=live,
+                        breakpoints=breakpoints,
                     )
+                except BreakpointAbort as abort:
+                    run.status = "cancelled"
+                    run.error_message = abort.reason
+                    run.finished_at = datetime.now(timezone.utc)
+                    run.duration_seconds = time.time() - start_time
+                    run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                    run.data_fingerprints = all_fingerprints
+                    live.status = "cancelled"
+                    db.commit()
+                    try:
+                        publish_event(run_id, "run_cancelled", {
+                            "run_id": run_id,
+                            "duration": run.duration_seconds,
+                            "reason": "debug_abort",
+                        })
+                    except Exception:
+                        pass
+                    return
                 except InterruptedError:
                     run.status = "cancelled"
                     run.error_message = "Cancelled by user"
@@ -1518,6 +1988,11 @@ async def execute_pipeline(
                     return
                 except BlockError as e:
                     log_block_failed(run_id, node_id, block_type, e.message)
+                    update_decision(db, _dec_rec,
+                        status="failed",
+                        duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                        error_json={"title": type(e).__name__, "message": e.message, "action": "", "severity": "error"},
+                    )
                     error_payload = {
                         "node_id": node_id,
                         "error": e.message,
@@ -1534,10 +2009,18 @@ async def execute_pipeline(
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     live.status = "failed"
                     db.commit()
+                    _record_downstream_not_executed(db, run_id, node_id, idx, order, node_map, loop_body_node_ids, resolved_configs, _resolved_tuples)
                     log_run_failed(run_id, e.message, node_id)
                     return
                 except Exception as e:
                     tb = traceback.format_exc()
+                    from .error_classifier import classify_error as _classify
+                    _cls = _classify(e, block_type=block_type)
+                    update_decision(db, _dec_rec,
+                        status="failed",
+                        duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                        error_json=_cls.to_dict(),
+                    )
                     log_block_failed(run_id, node_id, block_type, str(e), tb)
                     try:
                         publish_event(run_id, "node_failed", {"node_id": node_id, "error": str(e)})
@@ -1549,18 +2032,27 @@ async def execute_pipeline(
                     run.data_fingerprints = all_fingerprints
                     live.status = "failed"
                     db.commit()
+                    _record_downstream_not_executed(db, run_id, node_id, idx, order, node_map, loop_body_node_ids, resolved_configs, _resolved_tuples)
                     _write_error_log(run_id, tb)
                     log_run_failed(run_id, str(e), node_id)
                     return
 
                 # Loop completed — emit node_completed and continue
                 node_outputs = outputs.get(node_id, {})
+                _mem_after_loop = measure_memory_mb()
+                _mem_peak_loop = max(_mem_before or 0, _mem_after_loop or 0) if (_mem_before or _mem_after_loop) else None
+                update_decision(db, _dec_rec,
+                    status="completed",
+                    duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                    memory_peak_mb=_mem_peak_loop,
+                )
                 run.last_heartbeat = datetime.now(timezone.utc)
                 run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                 db.commit()
 
+                loop_duration_ms = round((time.time() - block_start_time) * 1000)
                 log_block_complete(run_id, node_id, block_type, time.time() - block_start_time)
-                completed_event = {"node_id": node_id, "index": idx}
+                completed_event = {"node_id": node_id, "index": idx, "duration_ms": loop_duration_ms}
                 try:
                     publish_event(run_id, "node_completed", completed_event)
                 except Exception:
@@ -1598,22 +2090,41 @@ async def execute_pipeline(
                         else:
                             node_inputs[tgt_handle] = value
 
-            # Find and run block
-            block_dir = _find_block_module(block_type)
+            # --- Prepare node: resolve block dir, schema, validation, secrets ---
+            try:
+                prepared = prepare_node_runtime(
+                    node_id=node_id,
+                    block_type=block_type,
+                    config=config,
+                    node_inputs=node_inputs,
+                    run_id=run_id,
+                    find_block_fn=_find_block_module,
+                    resolve_secrets_fn=_resolve_secrets,
+                    block_aliases=BLOCK_ALIASES,
+                    safe_block_type_re=SAFE_BLOCK_TYPE,
+                )
+            except RuntimeError:
+                prepared = None
 
-            # Custom block fallback: if no run.py found, try the baseType
-            if block_dir is None:
-                base_type = config.get("baseType", "")
-                if base_type and SAFE_BLOCK_TYPE.match(base_type):
-                    base_type = BLOCK_ALIASES.get(base_type, base_type)
-                    block_dir = _find_block_module(base_type)
+            if prepared:
+                block_dir = prepared.block_dir
+                block_schema = prepared.block_schema
+                config = prepared.cleaned_config
+                run_dir = prepared.run_dir
+                timeout_seconds = prepared.timeout_seconds
+                max_retries = prepared.max_retries
+                context_cls = prepared.context_cls
 
-            run_dir = str(ARTIFACTS_DIR / run_id / node_id)
+                # Apply multi-input aggregation policy
+                if block_schema and _multi_counts:
+                    node_inputs = apply_multi_input_policy(
+                        block_schema, node_inputs, _multi_counts,
+                    )
 
-            # Resolve any $secret: references in config
-            config = _resolve_secrets(config)
+                # Embed block version into config_snapshot for cache validation
+                if prepared.block_version:
+                    node_data["block_version"] = prepared.block_version
 
-            if block_dir:
                 # Progress commit throttling: commit at most every 2 seconds
                 _last_progress_commit = time.time()
 
@@ -1646,9 +2157,15 @@ async def execute_pipeline(
                     except Exception:
                         pass
 
-                def message_cb(msg):
+                def message_cb(msg, explicit_severity=None):
+                    if explicit_severity:
+                        severity = explicit_severity
+                    else:
+                        severity = _infer_severity(msg)
                     try:
-                        publish_event(run_id, "node_log", {"node_id": node_id, "message": msg})
+                        publish_event(run_id, "node_log", {
+                            "node_id": node_id, "message": msg, "severity": severity,
+                        })
                     except Exception:
                         pass
 
@@ -1674,34 +2191,48 @@ async def execute_pipeline(
                     # Layer 2: buffer
                     metrics_log_buffer.append(event_dict)
 
-                # --- Load schema once for validation, timeout, and retry ---
-                block_schema = load_block_schema(block_dir)
-                timeout_seconds = block_schema.get("timeout") if block_schema else None
-                max_retries = block_schema.get("max_retries", 0) if block_schema else 0
-                is_composite = block_schema.get("composite", False) if block_schema else False
-
-                # --- Embed block version into config_snapshot for cache validation ---
-                if block_schema and block_schema.get("version"):
-                    node_data["block_version"] = block_schema["version"]
-
-                # --- Pre-execution validation ---
+                # Check isolation mode from block schema
+                isolation_mode = "inprocess"  # default
                 if block_schema:
-                    validate_inputs(block_schema, node_inputs)
-                    config = validate_config(block_schema, config)
+                    execution_cfg = block_schema.get("execution", {})
+                    if isinstance(execution_cfg, dict):
+                        isolation_mode = execution_cfg.get("isolation", "inprocess")
 
-                # Choose context class: composite blocks get CompositeBlockContext
-                context_cls = CompositeBlockContext if is_composite else None
+                # Guard: composite blocks cannot run in subprocess isolation.
+                # Sub-pipeline execution requires in-process access to the
+                # executor internals (_load_and_run_block, CompositeBlockContext).
+                # Fall back gracefully with a warning instead of crashing.
+                is_composite = block_schema.get("composite", False) if block_schema else False
+                if isolation_mode == "subprocess" and is_composite:
+                    import logging as _lg
+                    _lg.getLogger("blueprint.executor").warning(
+                        "Block '%s' (type=%s) declares execution.isolation=subprocess "
+                        "but is also a composite block. Composite blocks require "
+                        "in-process execution for sub-pipeline support. "
+                        "Falling back to inprocess isolation.",
+                        node_id, block_type,
+                    )
+                    isolation_mode = "inprocess"
 
                 # --- Execute with retry + timeout ---
                 try:
                     for attempt in range(max_retries + 1):
                         try:
-                            node_outputs, data_fingerprints = _load_and_run_block_with_timeout(
-                                block_dir, config, node_inputs, run_dir,
-                                run_id, node_id, progress_cb, message_cb, metric_cb,
-                                timeout_seconds=timeout_seconds,
-                                context_cls=context_cls,
-                            )
+                            if isolation_mode == "subprocess":
+                                node_outputs, data_fingerprints = _run_block_subprocess(
+                                    block_type, config, node_inputs,
+                                    run_id, node_id,
+                                    timeout_seconds=timeout_seconds,
+                                    progress_cb=progress_cb,
+                                    message_cb=message_cb,
+                                )
+                            else:
+                                node_outputs, data_fingerprints = _load_and_run_block_with_timeout(
+                                    block_dir, config, node_inputs, run_dir,
+                                    run_id, node_id, progress_cb, message_cb, metric_cb,
+                                    timeout_seconds=timeout_seconds,
+                                    context_cls=context_cls,
+                                )
                             outputs[node_id] = node_outputs
                             if data_fingerprints:
                                 all_fingerprints[node_id] = data_fingerprints
@@ -1739,6 +2270,11 @@ async def execute_pipeline(
                     return
                 except BlockError as e:
                     log_block_failed(run_id, node_id, block_type, e.message)
+                    update_decision(db, _dec_rec,
+                        status="failed",
+                        duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                        error_json={"title": type(e).__name__, "message": e.message, "action": "", "severity": "error"},
+                    )
                     error_payload = {
                         "node_id": node_id,
                         "error": e.message,
@@ -1759,6 +2295,8 @@ async def execute_pipeline(
                     run.outputs_snapshot = _safe_outputs_snapshot(outputs)
                     live.status = "failed"
                     db.commit()
+                    # Record downstream nodes as not_executed
+                    _record_downstream_not_executed(db, run_id, node_id, idx, order, node_map, loop_body_node_ids, resolved_configs, _resolved_tuples)
                     log_run_failed(run_id, e.message, node_id)
                     return
                 except Exception as e:
@@ -1768,6 +2306,12 @@ async def execute_pipeline(
                     classified = classify_error(e, block_type=block_type)
                     classified_msg = f"[{classified.title}] {classified.message}"
                     classified_action = classified.action
+
+                    update_decision(db, _dec_rec,
+                        status="failed",
+                        duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                        error_json=classified.to_dict(),
+                    )
 
                     log_block_failed(run_id, node_id, block_type, str(e), tb)
                     try:
@@ -1784,11 +2328,18 @@ async def execute_pipeline(
                     run.data_fingerprints = all_fingerprints
                     live.status = "failed"
                     db.commit()
+                    # Record downstream nodes as not_executed
+                    _record_downstream_not_executed(db, run_id, node_id, idx, order, node_map, loop_body_node_ids, resolved_configs, _resolved_tuples)
                     _write_error_log(run_id, tb)
                     log_run_failed(run_id, str(e), node_id)
                     return
             else:
                 error_msg = f"Block type '{block_type}' not found. No run.py available."
+                update_decision(db, _dec_rec,
+                    status="failed",
+                    duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                    error_json={"title": "Block Not Found", "message": error_msg, "action": "Install the block or check block type", "severity": "error"},
+                )
                 log_block_failed(run_id, node_id, block_type, error_msg)
                 try:
                     publish_event(run_id, "node_failed", {"node_id": node_id, "error": f"Block type '{block_type}' not found"})
@@ -1802,6 +2353,15 @@ async def execute_pipeline(
                 db.commit()
                 log_run_failed(run_id, error_msg, node_id)
                 return
+
+            # Update decision record on success with memory measurement
+            _mem_after = measure_memory_mb()
+            _mem_peak = max(_mem_before or 0, _mem_after or 0) if (_mem_before or _mem_after) else None
+            update_decision(db, _dec_rec,
+                status="completed",
+                duration_ms=round((time.time() - block_start_time) * 1000, 1),
+                memory_peak_mb=_mem_peak,
+            )
 
             # Cache block outputs as typed artifacts with SHA-256 verification (best-effort)
             _cache_block_outputs(node_id, run_id, node_outputs, block_schema, db)
@@ -1828,6 +2388,36 @@ async def execute_pipeline(
             except Exception:
                 pass
 
+            # ── Conditional breakpoint check (post-execution) ──
+            bp_info_post = breakpoints.get(node_id)
+            if isinstance(bp_info_post, dict):
+                node_outs = outputs.get(node_id, {})
+                condition_met = evaluate_breakpoint_condition(bp_info_post, node_outs)
+                if condition_met:
+                    try:
+                        _pause_at_breakpoint(
+                            run_id, node_id, idx, len(nodes),
+                            order, outputs, conditional=True,
+                        )
+                    except BreakpointAbort as abort:
+                        run.status = "cancelled"
+                        run.error_message = abort.reason
+                        run.finished_at = datetime.now(timezone.utc)
+                        run.duration_seconds = time.time() - start_time
+                        run.outputs_snapshot = _safe_outputs_snapshot(outputs)
+                        run.data_fingerprints = all_fingerprints
+                        live.status = "cancelled"
+                        db.commit()
+                        try:
+                            publish_event(run_id, "run_cancelled", {
+                                "run_id": run_id,
+                                "duration": run.duration_seconds,
+                                "reason": "debug_abort",
+                            })
+                        except Exception:
+                            pass
+                        return
+
             # Heartbeat after each block completes
             run.last_heartbeat = datetime.now(timezone.utc)
             # Save partial outputs after each block (preview-only, not authoritative)
@@ -1849,11 +2439,13 @@ async def execute_pipeline(
 
             log_block_complete(run_id, node_id, block_type, time.time() - block_start_time)
 
+            block_duration_ms = round((time.time() - block_start_time) * 1000)
             completed_event = {
                 "node_id": node_id,
                 "index": idx,
                 "primary_output_type": primary_output_type,
                 "artifact_count": len(artifact_ids),
+                "duration_ms": block_duration_ms,
             }
             try:
                 publish_event(run_id, "node_completed", completed_event)
@@ -1944,9 +2536,25 @@ async def execute_pipeline(
         except Exception:
             pass
     finally:
+        # Release the active-run semaphore
+        _active_run_semaphore.release()
+        # Flush and clean up decision records
+        try:
+            flush_decisions(run_id)
+        except Exception:
+            pass
+        try:
+            cleanup_decisions(run_id)
+        except Exception:
+            pass
         # Clean up cancel event
         with _cancel_lock:
             _cancel_events.pop(run_id, None)
+        # Clean up debug state
+        with _debug_lock:
+            _debug_resume_events.pop(run_id, None)
+            _debug_step_flags.pop(run_id, None)
+            _debug_abort_flags.pop(run_id, None)
         # Stop heartbeat thread
         heartbeat_stop.set()
         # Stop system metrics publisher

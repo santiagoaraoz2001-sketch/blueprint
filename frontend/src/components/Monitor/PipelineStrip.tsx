@@ -13,17 +13,17 @@ interface PipelineStripProps {
 function BlockStatusIcon({ status }: { status: string }) {
   switch (status) {
     case 'complete':
-      return <CheckCircle2 size={11} color="#22c55e" />
+      return <CheckCircle2 size={11} color={T.green} />
     case 'running':
       return (
         <Loader
           size={11}
-          color="#00BFA5"
+          color={T.cyan}
           style={{ animation: 'spin 1s linear infinite' }}
         />
       )
     case 'failed':
-      return <XCircle size={11} color="#ff433d" />
+      return <XCircle size={11} color={T.red} />
     default:
       return <Circle size={11} color={T.dim} />
   }
@@ -31,9 +31,9 @@ function BlockStatusIcon({ status }: { status: string }) {
 
 function borderColor(status: string): string {
   switch (status) {
-    case 'complete': return '#22c55e'
-    case 'running': return '#00BFA5'
-    case 'failed': return '#ff433d'
+    case 'complete': return T.green
+    case 'running': return T.cyan
+    case 'failed': return T.red
     default: return 'transparent'
   }
 }
@@ -131,7 +131,7 @@ export default function PipelineStrip({ runId, viewedBlockId, onSelectBlock }: P
                     style={{
                       width: `${Math.round(block.progress * 100)}%`,
                       height: '100%',
-                      background: '#00BFA5',
+                      background: T.cyan,
                       transition: 'width 0.3s ease',
                     }}
                   />
@@ -142,14 +142,14 @@ export default function PipelineStrip({ runId, viewedBlockId, onSelectBlock }: P
               <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.dim }}>✓</span>
             )}
             {block.status === 'failed' && (
-              <span style={{ fontFamily: F, fontSize: FS.xxs, color: '#ff433d' }}>✗</span>
+              <span style={{ fontFamily: F, fontSize: FS.xxs, color: T.red }}>✗</span>
             )}
           </button>
         )
       })}
       <style>{`
         @keyframes monitor-pulse {
-          0%, 100% { border-left-color: #00BFA5; }
+          0%, 100% { border-left-color: ${T.cyan}; }
           50% { border-left-color: transparent; }
         }
       `}</style>

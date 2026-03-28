@@ -10,6 +10,33 @@ set -e
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 cd "$SCRIPT_DIR"
 
+# ── Parse arguments ─────────────────────────────────────────
+PROFILE="base"
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --profile)
+      PROFILE="$2"
+      shift 2
+      ;;
+    --profile=*)
+      PROFILE="${1#*=}"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+# Validate profile
+case "$PROFILE" in
+  base|inference|training|eval|full) ;;
+  *)
+    echo -e "${RED:-}Error: Unknown profile '$PROFILE'. Choose from: base, inference, training, eval, full${NC:-}"
+    exit 1
+    ;;
+esac
+
 # Colors
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
@@ -124,11 +151,21 @@ trap cleanup EXIT INT TERM
 
 # ── Check Python dependencies ────────────────────────────────
 
+# Map profile to requirements file
+case "$PROFILE" in
+  full|eval) REQ_FILE="backend/requirements-eval.txt" ;;
+  training)  REQ_FILE="backend/requirements-training.txt" ;;
+  inference) REQ_FILE="backend/requirements-inference.txt" ;;
+  *)         REQ_FILE="backend/requirements-base.txt" ;;
+esac
+
+echo -e "${DIM}Install profile:${NC} ${GREEN}$PROFILE${NC} ${DIM}($REQ_FILE)${NC}"
+
 if ! "$PYTHON" -c "import fastapi" 2>/dev/null; then
-  echo -e "${CYAN}Installing Python dependencies...${NC}"
-  if ! "$PIP" install -r backend/requirements.txt --quiet; then
+  echo -e "${CYAN}Installing Python dependencies ($PROFILE profile)...${NC}"
+  if ! "$PIP" install -r "$REQ_FILE" --quiet; then
     echo -e "${RED}Error: Failed to install Python dependencies.${NC}"
-    echo -e "${RED}Try running manually: ${VENV_DIR}/bin/pip3 install -r backend/requirements.txt${NC}"
+    echo -e "${RED}Try running manually: ${VENV_DIR}/bin/pip3 install -r $REQ_FILE${NC}"
     exit 1
   fi
   echo -e "${GREEN}Dependencies installed.${NC}"

@@ -15,7 +15,7 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
-from ..config import BASE_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR
+from ..config import BASE_DIR, BUILTIN_BLOCKS_DIR, BLOCKS_DIR, ARTIFACTS_DIR
 
 SAFE_MODEL_ID = re.compile(r'^[a-zA-Z0-9_\-./]+$')
 
@@ -37,6 +37,7 @@ from ..schemas.system import (
     DependencyCheckResponse,
     InstallResponse,
     DiagnosticsResponse,
+    HealthResponse,
 )
 
 router = APIRouter(prefix="/api/system", tags=["system"])
@@ -206,6 +207,236 @@ def capabilities():
         can_run_local_llm=usable_memory >= 4,
         disk_ok=disk_free >= 10,
         accelerators=accel,
+    )
+
+
+@router.get("/capabilities/detailed")
+def detailed_capabilities():
+    """Return detailed capability detection including per-library availability.
+
+    Uses the CapabilityDetector singleton for comprehensive checks including
+    torch, transformers, peft, ollama, GPU, and installed profile detection.
+    """
+    from ..services.capability_detector import get_capability_detector
+    detector = get_capability_detector()
+    return detector.detect()
+
+
+@router.post("/capabilities/refresh")
+def refresh_capabilities():
+    """Force re-detection of all capabilities (e.g. after pip install)."""
+    from ..services.capability_detector import get_capability_detector
+    detector = get_capability_detector()
+    return detector.refresh()
+
+
+# ---------------------------------------------------------------------------
+# One-click recovery: start services
+# ---------------------------------------------------------------------------
+
+_SERVICE_COMMANDS: dict[str, list[str]] = {
+    "ollama": ["ollama", "serve"],
+}
+
+
+@router.post("/start-service/{name}")
+def start_service(name: str):
+    """Start a known service by name (e.g. 'ollama').
+
+    Launches the service as a tracked background subprocess that will be
+    cleaned up during server shutdown.  Returns immediately — the service
+    may still be booting.
+    """
+    if name not in _SERVICE_COMMANDS:
+        raise HTTPException(404, f"Unknown service: {name}. Available: {list(_SERVICE_COMMANDS.keys())}")
+
+    cmd = _SERVICE_COMMANDS[name]
+    try:
+        # Check if already running externally (not spawned by us)
+        if name == "ollama":
+            from ..services.capability_detector import _check_ollama
+            if _check_ollama():
+                return {"status": "already_running", "service": name}
+
+        from ..services.process_manager import get_process_manager
+        mgr = get_process_manager()
+
+        # ProcessManager handles dedup (returns existing if alive)
+        tracked = mgr.start(name, cmd)
+        return {
+            "status": "started",
+            "service": name,
+            "pid": tracked.pid,
+            "command": " ".join(cmd),
+        }
+    except FileNotFoundError:
+        raise HTTPException(
+            422,
+            f"Service binary not found: {cmd[0]}. Install {name} first.",
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Failed to start {name}: {e}")
+
+
+@router.post("/stop-service/{name}")
+def stop_service(name: str):
+    """Stop a previously started service by name."""
+    from ..services.process_manager import get_process_manager
+    mgr = get_process_manager()
+    if mgr.stop(name):
+        return {"status": "stopped", "service": name}
+    raise HTTPException(404, f"No tracked process named '{name}'")
+
+
+@router.get("/services")
+def list_services():
+    """Return status of all tracked background services."""
+    from ..services.process_manager import get_process_manager
+    mgr = get_process_manager()
+    return {"services": [tp.to_dict() for tp in mgr.list_all()]}
+
+
+# ---------------------------------------------------------------------------
+# Health (status bar polling)
+# ---------------------------------------------------------------------------
+
+# ── Background Ollama connectivity checker ────────────────────────────
+#
+# Probing Ollama synchronously on every /health poll (every 5s from every
+# connected frontend) would block the endpoint for up to 1s per request
+# when Ollama is down or slow. Instead, a single daemon thread checks
+# connectivity every 10s and caches the boolean result. The health
+# endpoint reads the cached value with zero latency.
+
+import threading as _health_threading
+import time as _health_time
+
+_ollama_lock = _health_threading.Lock()
+_ollama_connected: bool = False
+_ollama_last_check: float = 0.0
+_ollama_checker_started: bool = False
+_OLLAMA_CHECK_INTERVAL = 10.0  # seconds between probes
+
+
+def _probe_ollama() -> bool:
+    """Non-blocking probe: try to reach the Ollama API tags endpoint."""
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            "http://127.0.0.1:11434/api/tags", method="GET"
+        )
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
+def _ollama_check_loop():
+    """Background loop that probes Ollama and caches the result.
+
+    Runs as a daemon thread — automatically dies when the main process exits.
+    Uses a shorter interval (3s) right after startup or when Ollama is down,
+    to detect recovery quickly. Falls back to the standard interval when
+    connected, to minimize overhead.
+    """
+    global _ollama_connected, _ollama_last_check
+
+    while True:
+        connected = _probe_ollama()
+        with _ollama_lock:
+            _ollama_connected = connected
+            _ollama_last_check = _health_time.monotonic()
+
+        # Poll faster when disconnected (detect recovery sooner)
+        interval = _OLLAMA_CHECK_INTERVAL if connected else 3.0
+        _health_time.sleep(interval)
+
+
+def _ensure_ollama_checker():
+    """Lazily start the background checker on first health request.
+
+    Lazy startup avoids spawning a thread during module import (which
+    would be surprising in test environments or CLI tools that import
+    but never serve).
+    """
+    global _ollama_checker_started
+    if _ollama_checker_started:
+        return
+    with _ollama_lock:
+        if _ollama_checker_started:
+            return  # double-check under lock
+        _ollama_checker_started = True
+        t = _health_threading.Thread(target=_ollama_check_loop, daemon=True)
+        t.start()
+
+
+def _get_ollama_status() -> bool:
+    """Read the cached Ollama connectivity status (zero-latency)."""
+    _ensure_ollama_checker()
+    with _ollama_lock:
+        return _ollama_connected
+
+
+@router.get("/health", response_model=HealthResponse)
+def health():
+    """Aggregated health snapshot for the frontend status bar.
+
+    Polled every ~5 seconds. Non-blocking, best-effort for all fields.
+    Ollama status comes from a background thread (zero latency).
+    """
+    import shutil
+
+    cpu = 0.0
+    mem_pct = 0.0
+    mem_total_gb = 0.0
+    gpu_pct: float | None = None
+    gpu_name: str | None = None
+
+    if _HAS_PSUTIL:
+        cpu = psutil.cpu_percent(interval=None)
+        mem = psutil.virtual_memory()
+        mem_pct = mem.percent
+        mem_total_gb = round(mem.total / (1024 ** 3), 1)
+
+    # Disk free space
+    disk_free_gb = 0.0
+    try:
+        usage = shutil.disk_usage("/")
+        disk_free_gb = round(usage.free / (1024 ** 3), 1)
+    except Exception:
+        pass
+
+    # GPU info (best-effort)
+    try:
+        profile = get_hardware_profile()
+        gpus = profile.get("gpu", [])
+        for g in gpus:
+            if g.get("type") in ("metal", "cuda", "rocm"):
+                gpu_name = g.get("name")
+                gpu_pct = g.get("utilization")
+                break
+    except Exception:
+        pass
+
+    # Active runs count
+    active_runs = 0
+    queued_runs = 0
+    try:
+        from ..routers.events import _run_queues
+        active_runs = len(_run_queues)
+    except Exception:
+        pass
+
+    return HealthResponse(
+        cpu_percent=cpu,
+        memory_percent=mem_pct,
+        memory_total_gb=mem_total_gb,
+        gpu_percent=gpu_pct,
+        gpu_name=gpu_name,
+        disk_free_gb=disk_free_gb,
+        ollama_connected=_get_ollama_status(),
+        active_runs=active_runs,
+        queued_runs=queued_runs,
     )
 
 
@@ -538,3 +769,33 @@ def get_run_diagnostics(run_id: str):
         result["truncated"] = True
         result["max_events"] = _MAX_DIAGNOSTICS_EVENTS
     return result
+
+
+# ---------------------------------------------------------------------------
+# Help Documentation
+# ---------------------------------------------------------------------------
+
+# Resolve docs/help/ relative to the project root (two levels up from this file).
+_HELP_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "help"
+
+# Allow only alphanumeric chars, hyphens, and underscores in topic names.
+_SAFE_TOPIC = re.compile(r'^[a-zA-Z0-9_\-]+$')
+
+
+@router.get("/help/{topic}")
+def get_help_topic(topic: str):
+    """Return the markdown content for a help documentation topic."""
+    if not _SAFE_TOPIC.match(topic):
+        raise HTTPException(400, "Invalid topic name")
+
+    help_file = (_HELP_DIR / f"{topic}.md").resolve()
+
+    # Prevent directory traversal: resolved path must be inside _HELP_DIR.
+    if not str(help_file).startswith(str(_HELP_DIR.resolve())):
+        raise HTTPException(400, "Invalid topic path")
+
+    if not help_file.is_file():
+        raise HTTPException(404, f"Help topic '{topic}' not found")
+
+    content = help_file.read_text(encoding="utf-8")
+    return {"topic": topic, "content": content}
