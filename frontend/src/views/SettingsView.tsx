@@ -978,7 +978,7 @@ export default function SettingsView() {
                     fontWeight: 700,
                   }}
                 >
-                  v0.2.2
+                  v0.3.0
                 </span>
               </div>
 
