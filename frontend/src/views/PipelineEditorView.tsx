@@ -300,7 +300,7 @@ export default function PipelineEditorView() {
 
   // Show TemplateLanding for first-launch (no pipelines exist)
   if (showFirstLaunch) {
-    return <TemplateLanding />
+    return <TemplateLanding onDismiss={() => setShowFirstLaunch(false)} />
   }
 
   return (
