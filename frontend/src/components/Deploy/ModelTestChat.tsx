@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { T, FS } from '@/lib/design-tokens'
+import { T, F, FS } from '@/lib/design-tokens'
 import {
   X, Send, Bot, User, Clock, Zap, AlertCircle, Loader2,
 } from 'lucide-react'
@@ -20,7 +20,6 @@ interface ModelTestChatProps {
 const OLLAMA_BASE = '/api/inference/ollama'
 
 export default function ModelTestChat({ modelName, onClose }: ModelTestChatProps) {
-  const t = T
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [generating, setGenerating] = useState(false)
@@ -211,29 +210,29 @@ export default function ModelTestChat({ modelName, onClose }: ModelTestChatProps
     }} onClick={onClose}>
       <div
         style={{
-          background: t.bg, border: `1px solid ${t.border}`, borderRadius: 12,
+          background: T.bg, border: `1px solid ${T.border}`, borderRadius: 12,
           width: 560, height: '70vh', display: 'flex', flexDirection: 'column',
-          boxShadow: t.shadowHeavy,
+          boxShadow: T.shadowHeavy,
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{
-          padding: '12px 16px', borderBottom: `1px solid ${t.border}`,
+          padding: '12px 16px', borderBottom: `1px solid ${T.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Bot size={16} style={{ color: t.cyan }} />
-            <span style={{ fontSize: FS.sm, fontWeight: 700, color: t.text }}>Test Model</span>
+            <Bot size={16} style={{ color: T.cyan }} />
+            <span style={{ fontFamily: F, fontSize: FS.sm, fontWeight: 700, color: T.text }}>Test Model</span>
             <span style={{
-              fontSize: FS.xs, color: t.dim, background: t.surface3, borderRadius: 4,
+              fontFamily: F, fontSize: FS.xs, color: T.dim, background: T.surface3, borderRadius: 4,
               padding: '1px 6px',
             }}>
               {modelName}
             </span>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.dim, padding: 4 }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.dim, padding: 4 }}>
             <X size={16} />
           </button>
         </div>
@@ -245,8 +244,8 @@ export default function ModelTestChat({ modelName, onClose }: ModelTestChatProps
           ))}
           {generating && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px' }}>
-              <Loader2 size={14} style={{ color: t.cyan, animation: 'spin 1s linear infinite' }} />
-              <span style={{ fontSize: FS.xs, color: t.dim }}>Generating...</span>
+              <Loader2 size={14} style={{ color: T.cyan, animation: 'spin 1s linear infinite' }} />
+              <span style={{ fontFamily: F, fontSize: FS.xs, color: T.dim }}>Generating...</span>
               <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </div>
           )}
@@ -255,7 +254,7 @@ export default function ModelTestChat({ modelName, onClose }: ModelTestChatProps
 
         {/* Input */}
         <div style={{
-          padding: '10px 12px', borderTop: `1px solid ${t.border}`,
+          padding: '10px 12px', borderTop: `1px solid ${T.border}`,
           display: 'flex', gap: 8, flexShrink: 0,
         }}>
           <input
@@ -267,9 +266,9 @@ export default function ModelTestChat({ modelName, onClose }: ModelTestChatProps
             placeholder={ollamaAvailable ? 'Type a message...' : 'Ollama not available'}
             disabled={!ollamaAvailable || generating}
             style={{
-              fontSize: FS.xs, flex: 1, padding: '8px 12px', borderRadius: 8,
-              border: `1px solid ${t.border}`, background: t.surface2,
-              color: t.text, outline: 'none',
+              fontFamily: F, fontSize: FS.xs, flex: 1, padding: '8px 12px', borderRadius: 8,
+              border: `1px solid ${T.border}`, background: T.surface2,
+              color: T.text, outline: 'none',
             }}
           />
           <button
@@ -277,7 +276,7 @@ export default function ModelTestChat({ modelName, onClose }: ModelTestChatProps
             disabled={!input.trim() || generating || !ollamaAvailable}
             style={{
               padding: '8px 12px', borderRadius: 8,
-              background: t.cyan, color: t.bg, border: 'none',
+              background: T.cyan, color: T.bg, border: 'none',
               cursor: input.trim() && !generating ? 'pointer' : 'not-allowed',
               opacity: input.trim() && !generating ? 1 : 0.4,
               display: 'flex', alignItems: 'center',
@@ -293,17 +292,15 @@ export default function ModelTestChat({ modelName, onClose }: ModelTestChatProps
 
 
 function MessageBubble({ message }: { message: ChatMessage }) {
-  const t = T
-
   if (message.role === 'system') {
     return (
       <div style={{
         display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 10px',
-        marginBottom: 8, borderRadius: 8, background: `${t.amber}11`,
-        border: `1px solid ${t.amber}22`,
+        marginBottom: 8, borderRadius: 8, background: `${T.amber}11`,
+        border: `1px solid ${T.amber}22`,
       }}>
-        <AlertCircle size={13} style={{ color: t.amber, marginTop: 1, flexShrink: 0 }} />
-        <span style={{ fontSize: FS.xs, color: t.amber }}>{message.content}</span>
+        <AlertCircle size={13} style={{ color: T.amber, marginTop: 1, flexShrink: 0 }} />
+        <span style={{ fontFamily: F, fontSize: FS.xs, color: T.amber }}>{message.content}</span>
       </div>
     )
   }
@@ -319,16 +316,16 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3,
       }}>
-        {isUser ? <User size={11} style={{ color: t.dim }} /> : <Bot size={11} style={{ color: t.cyan }} />}
-        <span style={{ fontSize: 10, color: t.dim }}>
+        {isUser ? <User size={11} style={{ color: T.dim }} /> : <Bot size={11} style={{ color: T.cyan }} />}
+        <span style={{ fontFamily: F, fontSize: FS.xs, color: T.dim }}>
           {isUser ? 'You' : 'Model'}
         </span>
       </div>
       <div style={{
-        fontSize: FS.xs, padding: '8px 12px', borderRadius: 10,
+        fontFamily: F, fontSize: FS.xs, padding: '8px 12px', borderRadius: 10,
         maxWidth: '85%', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-        background: isUser ? t.cyan : t.surface3,
-        color: isUser ? t.bg : t.text,
+        background: isUser ? T.cyan : T.surface3,
+        color: isUser ? T.bg : T.text,
         lineHeight: 1.5,
       }}>
         {message.content}
@@ -337,12 +334,12 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       {!isUser && (message.latencyMs || message.tokensPerSec) && (
         <div style={{ display: 'flex', gap: 10, marginTop: 3 }}>
           {message.latencyMs != null && (
-            <span style={{ fontSize: 10, color: t.dim, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <span style={{ fontFamily: F, fontSize: 10, color: T.dim, display: 'flex', alignItems: 'center', gap: 2 }}>
               <Clock size={9} /> {message.latencyMs}ms
             </span>
           )}
           {message.tokensPerSec != null && (
-            <span style={{ fontSize: 10, color: t.dim, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <span style={{ fontFamily: F, fontSize: 10, color: T.dim, display: 'flex', alignItems: 'center', gap: 2 }}>
               <Zap size={9} /> {message.tokensPerSec} tok/s
             </span>
           )}

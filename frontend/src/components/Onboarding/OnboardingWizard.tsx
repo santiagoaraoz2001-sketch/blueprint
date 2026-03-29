@@ -95,12 +95,39 @@ export default function OnboardingWizard() {
   const [step, setStep] = useState(0)
   const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null)
 
+  // Wait for BOTH the StartScreen and WelcomeModal to be completed before showing.
+  // Poll localStorage for both keys so we don't overlap with earlier onboarding steps.
   useEffect(() => {
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      // Small delay to let the app render first
-      const timer = setTimeout(() => setActive(true), 800)
+    if (localStorage.getItem(STORAGE_KEY)) return // Already completed — never show again
+
+    const check = () => {
+      const onboarded = localStorage.getItem('blueprint-onboarded')
+      // settingsStore persists hasSeenWelcome inside the 'blueprint-settings' key
+      let welcomeDone = false
+      try {
+        const raw = localStorage.getItem('blueprint-settings')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          welcomeDone = !!parsed?.state?.hasSeenWelcome
+        }
+      } catch { /* ignore */ }
+      return !!(onboarded && welcomeDone)
+    }
+
+    // If both are already done (returning user who hasn't done the wizard), show immediately
+    if (check()) {
+      const timer = setTimeout(() => setActive(true), 600)
       return () => clearTimeout(timer)
     }
+
+    // Otherwise poll until both are done
+    const interval = setInterval(() => {
+      if (check()) {
+        clearInterval(interval)
+        setTimeout(() => setActive(true), 600)
+      }
+    }, 500)
+    return () => clearInterval(interval)
   }, [])
 
   // Update spotlight position when step changes

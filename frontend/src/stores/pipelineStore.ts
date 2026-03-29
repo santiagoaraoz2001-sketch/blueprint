@@ -1056,10 +1056,14 @@ export const usePipelineStore = create<PipelineState>()(immer((set, get) => ({
         future: [],
       })
 
-      // Restore full undo/redo history from SNAPSHOTS_DIR file (async, non-blocking)
+      // Restore full undo/redo history from SNAPSHOTS_DIR file (async, non-blocking).
+      // Guard against race: if user loads a different pipeline before this resolves,
+      // discard the stale history to avoid overwriting the new pipeline's state.
+      const loadedId = id
       api.get<{ exists: boolean; history_snapshots: string | null }>(
         `/pipelines/${id}/history/snapshots`
       ).then((res) => {
+        if (get().id !== loadedId) return // Pipeline changed — discard stale history
         if (res.exists && res.history_snapshots) {
           const restored = deserializeHistory(res.history_snapshots)
           set({ past: restored.past, future: restored.future })
