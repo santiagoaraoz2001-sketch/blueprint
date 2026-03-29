@@ -40,7 +40,7 @@ export type RunResponse = components['schemas']['RunResponse']
 // ═══════════════════════════════════════════════════
 //  EXECUTION
 // ═══════════════════════════════════════════════════
-export type ExecuteResponse = components['schemas']['ExecuteResponse']
+export type ExecuteResponse = { run_id: string; status?: string }
 export type PartialExecuteResponse = components['schemas']['PartialExecuteResponse']
 export type CancelResponse = components['schemas']['CancelResponse']
 export type RunOutputsResponse = components['schemas']['RunOutputsResponse']

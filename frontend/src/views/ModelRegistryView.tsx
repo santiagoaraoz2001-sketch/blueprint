@@ -1,8 +1,8 @@
-import { T, F, FS } from '@/lib/design-tokens'
+import { T } from '@/lib/design-tokens'
 import ModelRegistry from '@/components/Models/ModelRegistry'
 
 export default function ModelRegistryView() {
-  const t = T()
+  const t = T
 
   return (
     <div style={{

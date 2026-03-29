@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { T, F } from '@/lib/design-tokens'
+import { T, FS } from '@/lib/design-tokens'
 import { api } from '@/api/client'
 import {
   X, Server, Cloud, FileType, Globe, ArrowRight, ArrowLeft,
@@ -32,8 +32,8 @@ const TARGET_INFO: Record<Target, { icon: typeof Server; label: string; descript
   server: { icon: Globe, label: 'API Server', description: 'Generate a standalone FastAPI inference server', color: '#5B96FF' },
 }
 
-export default function DeployModal({ modelId, modelName, modelFormat, modelPath, onClose }: DeployModalProps) {
-  const t = T()
+export default function DeployModal({ modelId, modelName, modelFormat: _modelFormat, modelPath, onClose }: DeployModalProps) {
+  const t = T
   const [step, setStep] = useState<Step>('select')
   const [target, setTarget] = useState<Target | null>(null)
   const [targets, setTargets] = useState<DeployTargets | null>(null)
@@ -154,7 +154,7 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
           padding: '14px 16px', borderBottom: `1px solid ${t.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ ...F.sm, fontWeight: 700, color: t.text }}>
+          <span style={{ fontSize: FS.sm,fontWeight: 700, color: t.text }}>
             Deploy — {modelName}
           </span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.dim, padding: 4 }}>
@@ -166,7 +166,7 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
           {/* Step 1: Select target */}
           {step === 'select' && (
             <div>
-              <p style={{ ...F.xs, color: t.dim, marginTop: 0, marginBottom: 12 }}>
+              <p style={{ fontSize: FS.xs,color: t.dim, marginTop: 0, marginBottom: 12 }}>
                 Select a deployment target for this model
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -198,8 +198,8 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
                         <Icon size={18} style={{ color: info.color }} />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ ...F.sm, fontWeight: 600, color: disabled ? t.dim : t.text }}>{info.label}</div>
-                        <div style={{ ...F.xs, color: t.dim, marginTop: 2 }}>
+                        <div style={{ fontSize: FS.sm,fontWeight: 600, color: disabled ? t.dim : t.text }}>{info.label}</div>
+                        <div style={{ fontSize: FS.xs,color: t.dim, marginTop: 2 }}>
                           {disabled ? disabledReason : info.description}
                         </div>
                       </div>
@@ -217,7 +217,7 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
               <button
                 onClick={() => setStep('select')}
                 style={{
-                  ...F.xs, display: 'flex', alignItems: 'center', gap: 4,
+                  fontSize: FS.xs,display: 'flex', alignItems: 'center', gap: 4,
                   color: t.cyan, background: 'none', border: 'none', cursor: 'pointer',
                   padding: '4px 0', marginBottom: 12, fontWeight: 500,
                 }}
@@ -225,7 +225,7 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
                 <ArrowLeft size={14} /> Back
               </button>
 
-              <h3 style={{ ...F.sm, fontWeight: 600, color: t.text, marginTop: 0, marginBottom: 12 }}>
+              <h3 style={{ fontSize: FS.sm,fontWeight: 600, color: t.text, marginTop: 0, marginBottom: 12 }}>
                 Configure {TARGET_INFO[target].label} Export
               </h3>
 
@@ -252,7 +252,7 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
                           onChange={(e) => setHfUseSaved(e.target.checked)}
                           style={{ accentColor: t.cyan }}
                         />
-                        <span style={{ ...F.xs, color: t.green }}>
+                        <span style={{ fontSize: FS.xs,color: t.green }}>
                           Use saved token from secrets store
                         </span>
                       </div>
@@ -267,7 +267,7 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
                             onChange={(e) => setHfSaveToken(e.target.checked)}
                             style={{ accentColor: t.cyan }}
                           />
-                          <span style={{ ...F.xs, color: t.sec }}>
+                          <span style={{ fontSize: FS.xs,color: t.sec }}>
                             Save token to encrypted secrets store for future use
                           </span>
                         </div>
@@ -280,7 +280,7 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
                       onChange={(e) => setHfPrivate(e.target.checked)}
                       style={{ accentColor: t.cyan }}
                     />
-                    <span style={{ ...F.xs, color: t.sec }}>Private repository</span>
+                    <span style={{ fontSize: FS.xs,color: t.sec }}>Private repository</span>
                   </div>
                 </div>
               )}
@@ -305,7 +305,7 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
                 onClick={handleDeploy}
                 disabled={!isConfigValid(target, { ollamaName, hfRepoId, hfToken, hfUseSaved, onnxPath, serverDir })}
                 style={{
-                  ...F.sm, marginTop: 16, padding: '10px 20px', borderRadius: 8,
+                  fontSize: FS.sm,marginTop: 16, padding: '10px 20px', borderRadius: 8,
                   background: t.cyan, color: t.bg, border: 'none',
                   cursor: 'pointer', fontWeight: 600, width: '100%',
                   opacity: isConfigValid(target, { ollamaName, hfRepoId, hfToken, hfUseSaved, onnxPath, serverDir }) ? 1 : 0.5,
@@ -322,8 +322,8 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
               {deploying && (
                 <>
                   <Loader2 size={32} style={{ color: t.cyan, animation: 'spin 1s linear infinite', marginBottom: 12 }} />
-                  <p style={{ ...F.sm, color: t.text, margin: 0 }}>Deploying to {target ? TARGET_INFO[target].label : ''}...</p>
-                  <p style={{ ...F.xs, color: t.dim, marginTop: 4 }}>This may take a few minutes</p>
+                  <p style={{ fontSize: FS.sm,color: t.text, margin: 0 }}>Deploying to {target ? TARGET_INFO[target].label : ''}...</p>
+                  <p style={{ fontSize: FS.xs,color: t.dim, marginTop: 4 }}>This may take a few minutes</p>
                   <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
                 </>
               )}
@@ -331,37 +331,37 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
               {!deploying && result && (
                 <>
                   <CheckCircle size={32} style={{ color: t.green, marginBottom: 12 }} />
-                  <p style={{ ...F.sm, fontWeight: 600, color: t.green, margin: 0 }}>Deploy Successful</p>
+                  <p style={{ fontSize: FS.sm,fontWeight: 600, color: t.green, margin: 0 }}>Deploy Successful</p>
                   <div style={{
                     marginTop: 12, textAlign: 'left', background: t.surface2,
                     borderRadius: 8, padding: 12,
                   }}>
-                    {result.model_name && (
+                    {!!result.model_name && (
                       <ResultRow label="Model Name" value={String(result.model_name)} />
                     )}
-                    {result.url && (
+                    {!!result.url && (
                       <ResultRow label="URL" value={String(result.url)} isLink />
                     )}
-                    {result.path && (
+                    {!!result.path && (
                       <ResultRow label="Path" value={String(result.path)} />
                     )}
-                    {result.output_dir && (
+                    {!!result.output_dir && (
                       <ResultRow label="Output" value={String(result.output_dir)} />
                     )}
                     {result.size != null && (
                       <ResultRow label="Size" value={formatSize(Number(result.size))} />
                     )}
-                    {result.files && (
+                    {!!result.files && (
                       <ResultRow label="Files" value={(result.files as string[]).join(', ')} />
                     )}
-                    {result.message && (
+                    {!!result.message && (
                       <ResultRow label="Info" value={String(result.message)} />
                     )}
                   </div>
                   <button
                     onClick={onClose}
                     style={{
-                      ...F.sm, marginTop: 16, padding: '8px 20px', borderRadius: 8,
+                      fontSize: FS.sm,marginTop: 16, padding: '8px 20px', borderRadius: 8,
                       background: t.cyan, color: t.bg, border: 'none',
                       cursor: 'pointer', fontWeight: 600,
                     }}
@@ -374,18 +374,18 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
               {!deploying && error && (
                 <>
                   <AlertCircle size={32} style={{ color: t.red, marginBottom: 12 }} />
-                  <p style={{ ...F.sm, fontWeight: 600, color: t.red, margin: 0 }}>Deploy Failed</p>
+                  <p style={{ fontSize: FS.sm,fontWeight: 600, color: t.red, margin: 0 }}>Deploy Failed</p>
                   <div style={{
                     marginTop: 12, background: `${t.red}11`, border: `1px solid ${t.red}33`,
                     borderRadius: 8, padding: 12, textAlign: 'left',
                   }}>
-                    <p style={{ ...F.xs, color: t.red, margin: 0, whiteSpace: 'pre-wrap' }}>{error}</p>
+                    <p style={{ fontSize: FS.xs,color: t.red, margin: 0, whiteSpace: 'pre-wrap' }}>{error}</p>
                   </div>
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
                     <button
                       onClick={() => { setStep('config'); setError(null) }}
                       style={{
-                        ...F.sm, padding: '8px 16px', borderRadius: 8,
+                        fontSize: FS.sm,padding: '8px 16px', borderRadius: 8,
                         background: 'none', color: t.sec, border: `1px solid ${t.border}`,
                         cursor: 'pointer', fontWeight: 500,
                       }}
@@ -395,7 +395,7 @@ export default function DeployModal({ modelId, modelName, modelFormat, modelPath
                     <button
                       onClick={handleDeploy}
                       style={{
-                        ...F.sm, padding: '8px 16px', borderRadius: 8,
+                        fontSize: FS.sm,padding: '8px 16px', borderRadius: 8,
                         background: t.cyan, color: t.bg, border: 'none',
                         cursor: 'pointer', fontWeight: 600,
                       }}
@@ -440,14 +440,14 @@ function formatSize(bytes: number): string {
 }
 
 function Label({ text }: { text: string }) {
-  const t = T()
-  return <label style={{ ...F.xs, color: t.sec, fontWeight: 600, display: 'block', marginBottom: 4 }}>{text}</label>
+  const t = T
+  return <label style={{ fontSize: FS.xs,color: t.sec, fontWeight: 600, display: 'block', marginBottom: 4 }}>{text}</label>
 }
 
 function Input({ value, onChange, placeholder, type = 'text' }: {
   value: string; onChange: (v: string) => void; placeholder: string; type?: string
 }) {
-  const t = T()
+  const t = T
   return (
     <input
       type={type}
@@ -455,7 +455,7 @@ function Input({ value, onChange, placeholder, type = 'text' }: {
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       style={{
-        ...F.xs, width: '100%', padding: '8px 10px', borderRadius: 6,
+        fontSize: FS.xs,width: '100%', padding: '8px 10px', borderRadius: 6,
         border: `1px solid ${t.border}`, background: t.surface2,
         color: t.text, outline: 'none', fontFamily: 'JetBrains Mono, monospace',
         boxSizing: 'border-box',
@@ -465,31 +465,31 @@ function Input({ value, onChange, placeholder, type = 'text' }: {
 }
 
 function Hint({ text }: { text: string }) {
-  const t = T()
+  const t = T
   return (
-    <div style={{ ...F.xs, color: t.dim, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+    <div style={{ fontSize: FS.xs,color: t.dim, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
       <Info size={10} /> {text}
     </div>
   )
 }
 
 function ResultRow({ label, value, isLink }: { label: string; value: string; isLink?: boolean }) {
-  const t = T()
+  const t = T
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${t.border}22` }}>
-      <span style={{ ...F.xs, color: t.dim }}>{label}</span>
+      <span style={{ fontSize: FS.xs,color: t.dim }}>{label}</span>
       {isLink ? (
         <a
           href={value}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ ...F.xs, color: t.cyan, textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace' }}
+          style={{ fontSize: FS.xs,color: t.cyan, textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace' }}
         >
           {value}
         </a>
       ) : (
         <span style={{
-          ...F.xs, color: t.text, fontFamily: 'JetBrains Mono, monospace',
+          fontSize: FS.xs,color: t.text, fontFamily: 'JetBrains Mono, monospace',
           maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {value}

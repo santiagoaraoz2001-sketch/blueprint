@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { T, F, FCODE, FS, MOTION } from '@/lib/design-tokens'
 import {
   ChevronLeft,
@@ -13,7 +13,7 @@ import {
   Database,
   Loader2,
 } from 'lucide-react'
-import type { ReplayNode, ReplayData, ReplayArtifact, ReplayLoopSummary } from '@/hooks/useReplay'
+import type { ReplayNode, ReplayArtifact } from '@/hooks/useReplay'
 import { useReplayData, downloadSupportBundle } from '@/hooks/useReplay'
 
 // ── Status colors & helpers ────────────────────────────────────────────

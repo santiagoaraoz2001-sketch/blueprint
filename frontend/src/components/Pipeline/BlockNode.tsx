@@ -8,7 +8,7 @@ import { usePipelineStore, type BlockNodeData, type NodeExecutionState } from '@
 import { useRunStore } from '@/stores/runStore'
 import { useValidationStore, type NodeValidationError } from '@/stores/validationStore'
 import { OVERLAY_COLORS } from './InheritanceOverlay'
-import { AlertTriangle, Clock, Lock, Circle, StickyNote, HelpCircle } from 'lucide-react'
+import { AlertTriangle, Clock, Lock, StickyNote, HelpCircle } from 'lucide-react'
 import { estimatePipeline, formatTimeShort } from '@/lib/pipeline-estimator'
 
 function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; selected?: boolean }) {
@@ -424,7 +424,7 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
       )}
 
       {/* Breakpoint indicator — red dot at top-left */}
-      {data.breakpoint && (
+      {!!data.breakpoint && (
         <div
           title={
             data.breakpoint_condition

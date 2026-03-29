@@ -157,7 +157,7 @@ export default function PipelineEditorView() {
     }
     // Sync run status to active tab
     if (runStatus !== 'idle') {
-      updateTabRunStatus(activeTabId, runStatus)
+      updateTabRunStatus(activeTabId, runStatus as 'idle' | 'running' | 'complete' | 'failed' | 'cancelled')
     }
   }, [runStatus, activeTabId, updateTabRunStatus])
 

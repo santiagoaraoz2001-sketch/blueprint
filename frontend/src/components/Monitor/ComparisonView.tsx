@@ -222,7 +222,7 @@ export default function ComparisonView({ runIds }: ComparisonViewProps) {
 
       {/* Pin & Trace controls */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
-        {runIds.map((id, i) => {
+        {runIds.map((id, _i) => {
           const run = runs[id]
           const isPinned = pinnedRunId === id
           return (

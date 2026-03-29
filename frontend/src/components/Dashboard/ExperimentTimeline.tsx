@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { api } from '@/api/client'
-import { Clock, Pencil, Check, Star, Filter, Calendar, Loader2 } from 'lucide-react'
+import { Clock, Pencil, Star, Loader2 } from 'lucide-react'
 
 interface TimelineEntry {
   run_id: string

@@ -134,7 +134,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
-  toggleStar: async (runId, projectId) => {
+  toggleStar: async (runId, _projectId) => {
     try {
       const res = await api.post<{ run_id: string; starred: boolean }>(`/runs/${runId}/star`)
       // Optimistic update: update the dashboard in-memory

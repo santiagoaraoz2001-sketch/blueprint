@@ -6,8 +6,8 @@ import { usePipelineStore } from '@/stores/pipelineStore'
 import { api } from '@/api/client'
 import toast from 'react-hot-toast'
 import {
-  GitCompare, Plus, Copy, ChevronDown, ArrowUpDown,
-  Star, Tag, StickyNote, CheckCircle2, XCircle, Clock, Loader2,
+  GitCompare, Plus, Copy, ArrowUpDown,
+  Loader2,
 } from 'lucide-react'
 
 interface PipelineCard {
@@ -33,22 +33,10 @@ const STATUS_DOT: Record<string, { color: string; label: string }> = {
   cancelled: { color: T.dim, label: 'Cancelled' },
 }
 
-const TAG_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']
-
-function hashString(str: string): number {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i)
-    hash |= 0
-  }
-  return Math.abs(hash)
-}
-
 export default function ProjectView() {
   const selectedProjectId = useUIStore((s) => s.selectedProjectId)
   const setView = useUIStore((s) => s.setView)
   const setSelectedPipeline = useUIStore((s) => s.setSelectedPipeline)
-  const fetchProject = useProjectStore((s) => s.fetchProject)
   const updateProject = useProjectStore((s) => s.updateProject)
   const loadPipeline = usePipelineStore((s) => s.loadPipeline)
 

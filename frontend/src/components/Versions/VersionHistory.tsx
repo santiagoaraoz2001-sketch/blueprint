@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { T, F, FS } from '@/lib/design-tokens'
+import { useState, useEffect, useCallback } from 'react'
+import { T, FS } from '@/lib/design-tokens'
 import { api } from '@/api/client'
 import { usePipelineStore, type BlockNodeData } from '@/stores/pipelineStore'
 import { History, RotateCcw, Eye, EyeOff, Clock, User, ChevronDown, ChevronUp, GitBranch } from 'lucide-react'
@@ -124,13 +124,13 @@ export default function VersionHistory() {
     }
   }, [pipelineId, fetchVersions])
 
-  const t = T()
+  const t = T
 
   if (!pipelineId) {
     return (
       <div style={{ padding: 24, color: t.dim, textAlign: 'center' }}>
         <History size={32} style={{ marginBottom: 8, opacity: 0.5 }} />
-        <p style={{ ...F.sm }}>Save a pipeline to see version history</p>
+        <p style={{ fontSize: FS.sm }}>Save a pipeline to see version history</p>
       </div>
     )
   }
@@ -144,9 +144,9 @@ export default function VersionHistory() {
         display: 'flex', alignItems: 'center', gap: 8,
       }}>
         <GitBranch size={16} style={{ color: t.cyan }} />
-        <span style={{ ...F.sm, fontWeight: 600, color: t.text }}>Version History</span>
+        <span style={{ fontSize: FS.sm,fontWeight: 600, color: t.text }}>Version History</span>
         <span style={{
-          ...F.xs, color: t.dim, marginLeft: 'auto',
+          fontSize: FS.xs,color: t.dim, marginLeft: 'auto',
           background: t.surface3, borderRadius: 8, padding: '2px 8px',
         }}>
           {versions.length}
@@ -156,12 +156,12 @@ export default function VersionHistory() {
       {/* Version list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
         {loading && (
-          <div style={{ padding: 24, textAlign: 'center', color: t.dim, ...F.sm }}>
+          <div style={{ padding: 24, textAlign: 'center', color: t.dim, fontSize: FS.sm }}>
             Loading versions...
           </div>
         )}
         {!loading && versions.length === 0 && (
-          <div style={{ padding: 24, textAlign: 'center', color: t.dim, ...F.sm }}>
+          <div style={{ padding: 24, textAlign: 'center', color: t.dim, fontSize: FS.sm }}>
             No versions yet. Save (Cmd+S) to create the first version.
           </div>
         )}
@@ -192,15 +192,15 @@ export default function VersionHistory() {
                 <div style={{
                   width: 28, height: 28, borderRadius: '50%',
                   background: t.surface3, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  ...F.xs, fontWeight: 700, color: t.cyan, flexShrink: 0,
+                  fontSize: FS.xs,fontWeight: 700, color: t.cyan, flexShrink: 0,
                 }}>
                   v{v.version_number}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ ...F.xs, color: t.text, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: FS.xs,color: t.text, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {v.message || 'Auto-save'}
                   </div>
-                  <div style={{ ...F.xs, color: t.dim, display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <div style={{ fontSize: FS.xs,color: t.dim, display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                     <Clock size={10} />
                     {new Date(v.created_at).toLocaleString()}
                     <User size={10} style={{ marginLeft: 4 }} />
@@ -216,7 +216,7 @@ export default function VersionHistory() {
                   <button
                     onClick={() => handlePreview(v.version_number)}
                     style={{
-                      ...F.xs,
+                      fontSize: FS.xs,
                       padding: '5px 10px', borderRadius: 6,
                       border: `1px solid ${t.border}`,
                       background: isPreview ? t.cyan : t.surface3,
@@ -231,7 +231,7 @@ export default function VersionHistory() {
                   <button
                     onClick={() => handleRestore(v.version_number)}
                     style={{
-                      ...F.xs,
+                      fontSize: FS.xs,
                       padding: '5px 10px', borderRadius: 6,
                       border: `1px solid ${t.border}`,
                       background: t.surface3,
@@ -250,19 +250,19 @@ export default function VersionHistory() {
               {isPreview && previewDiff && (
                 <div style={{ padding: '0 12px 10px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {previewDiff.added.size > 0 && (
-                    <span style={{ ...F.xs, color: t.green, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <span style={{ fontSize: FS.xs,color: t.green, display: 'flex', alignItems: 'center', gap: 3 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.green, display: 'inline-block' }} />
                       {previewDiff.added.size} added
                     </span>
                   )}
                   {previewDiff.removed.size > 0 && (
-                    <span style={{ ...F.xs, color: t.red, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <span style={{ fontSize: FS.xs,color: t.red, display: 'flex', alignItems: 'center', gap: 3 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.red, display: 'inline-block' }} />
                       {previewDiff.removed.size} removed
                     </span>
                   )}
                   {previewDiff.modified.size > 0 && (
-                    <span style={{ ...F.xs, color: t.amber, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <span style={{ fontSize: FS.xs,color: t.amber, display: 'flex', alignItems: 'center', gap: 3 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.amber, display: 'inline-block' }} />
                       {previewDiff.modified.size} modified
                     </span>
@@ -284,7 +284,7 @@ export default function VersionHistory() {
         }}>
           <div style={{
             position: 'absolute', top: 8, left: 12, zIndex: 10,
-            ...F.xs, color: t.dim, background: `${t.bg}cc`, padding: '2px 8px', borderRadius: 6,
+            fontSize: FS.xs,color: t.dim, background: `${t.bg}cc`, padding: '2px 8px', borderRadius: 6,
           }}>
             Preview — v{previewVersionId} (read-only)
           </div>
@@ -294,9 +294,9 @@ export default function VersionHistory() {
               let borderColor = 'transparent'
               let borderStyle = 'solid'
               if (diff) {
-                if (diff.removed.has(n.id)) { borderColor = T().red; borderStyle = 'dashed' }
-                else if (diff.added.has(n.id)) { borderColor = T().green; borderStyle = 'solid' }
-                else if (diff.modified.has(n.id)) { borderColor = T().amber; borderStyle = 'solid' }
+                if (diff.removed.has(n.id)) { borderColor = T.red; borderStyle = 'dashed' }
+                else if (diff.added.has(n.id)) { borderColor = T.green; borderStyle = 'solid' }
+                else if (diff.modified.has(n.id)) { borderColor = T.amber; borderStyle = 'solid' }
               }
               return {
                 ...n,

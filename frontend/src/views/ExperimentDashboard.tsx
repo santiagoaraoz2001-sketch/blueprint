@@ -3,16 +3,19 @@ import { Star } from 'lucide-react'
 import { T, F, FCODE, FS, GLOW } from '@/lib/design-tokens'
 import { STATUS_COLORS } from '@/lib/design-tokens'
 import { useDashboardStore } from '@/stores/dashboardStore'
+import { useUIStore } from '@/stores/uiStore'
 import { ComparisonMatrix } from '@/components/Dashboard/ComparisonMatrix'
 import { MetricOverlay } from '@/components/Dashboard/MetricOverlay'
 import { SequentialRunModal } from '@/components/Dashboard/SequentialRunModal'
 import { useSSE } from '@/hooks/useSSE'
 
 interface ExperimentDashboardProps {
-  projectId: string
+  projectId?: string
 }
 
-export function ExperimentDashboard({ projectId }: ExperimentDashboardProps) {
+export function ExperimentDashboard({ projectId: projectIdProp }: ExperimentDashboardProps = {}) {
+  const storeProjectId = useUIStore((s) => s.selectedProjectId)
+  const projectId = projectIdProp ?? storeProjectId ?? ''
   const {
     dashboard,
     matrix,
@@ -24,7 +27,6 @@ export function ExperimentDashboard({ projectId }: ExperimentDashboardProps) {
     fetchComparisonMatrix,
     fetchMetricsLogs,
     toggleRunSelection,
-    setSelectedRunIds,
     toggleStar,
     startSequentialRun,
     reset,

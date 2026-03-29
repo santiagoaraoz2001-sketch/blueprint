@@ -29,16 +29,12 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(['pipeline_id'], ['blueprint_pipelines.id']),
         sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('pipeline_id', 'version_number', name='uq_pipeline_version'),
     )
     op.create_index(
         'ix_pipeline_versions_pipeline_id',
         'blueprint_pipeline_versions',
         ['pipeline_id'],
-    )
-    op.create_unique_constraint(
-        'uq_pipeline_version',
-        'blueprint_pipeline_versions',
-        ['pipeline_id', 'version_number'],
     )
 
     # Model records table

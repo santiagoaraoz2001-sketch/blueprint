@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { T, F, FS } from '@/lib/design-tokens'
+import { T, FS } from '@/lib/design-tokens'
 import { api } from '@/api/client'
-import { useUIStore } from '@/stores/uiStore'
 import {
   Package, Search, Tag, HardDrive, Calendar, Link, ChevronRight,
-  ArrowLeft, Trash2, Download, Filter, X, Rocket, MessageSquare,
+  ArrowLeft, Trash2, Download, X, Rocket, MessageSquare,
 } from 'lucide-react'
 import DeployModal from '@/components/Deploy/DeployModal'
 import ModelTestChat from '@/components/Deploy/ModelTestChat'
@@ -54,11 +53,11 @@ function formatBytes(bytes: number | null): string {
 }
 
 function FormatBadge({ format }: { format: string }) {
-  const t = T()
+  const t = T
   const color = FORMAT_COLORS[format] || t.dim
   return (
     <span style={{
-      ...F.xs,
+      fontSize: FS.xs,
       padding: '2px 8px',
       borderRadius: 4,
       background: `${color}22`,
@@ -77,7 +76,7 @@ function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => voi
   const [loading, setLoading] = useState(true)
   const [showDeploy, setShowDeploy] = useState(false)
   const [showTestChat, setShowTestChat] = useState(false)
-  const t = T()
+  const t = T
 
   useEffect(() => {
     setLoading(true)
@@ -88,11 +87,11 @@ function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => voi
   }, [modelId])
 
   if (loading) {
-    return <div style={{ padding: 24, textAlign: 'center', color: t.dim, ...F.sm }}>Loading model card...</div>
+    return <div style={{ padding: 24, textAlign: 'center', color: t.dim, fontSize: FS.sm }}>Loading model card...</div>
   }
 
   if (!card) {
-    return <div style={{ padding: 24, textAlign: 'center', color: t.dim, ...F.sm }}>Model not found</div>
+    return <div style={{ padding: 24, textAlign: 'center', color: t.dim, fontSize: FS.sm }}>Model not found</div>
   }
 
   const { model, provenance, training_config, metrics } = card
@@ -103,7 +102,7 @@ function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => voi
       <button
         onClick={onBack}
         style={{
-          ...F.xs, display: 'flex', alignItems: 'center', gap: 4,
+          fontSize: FS.xs, display: 'flex', alignItems: 'center', gap: 4,
           color: t.cyan, background: 'none', border: 'none', cursor: 'pointer',
           padding: '4px 0', marginBottom: 12, fontWeight: 500,
         }}
@@ -115,10 +114,10 @@ function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => voi
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <Package size={20} style={{ color: t.cyan }} />
-          <h2 style={{ ...F.base, fontWeight: 700, color: t.text, margin: 0 }}>{model.name}</h2>
+          <h2 style={{ fontSize: FS.md, fontWeight: 700, color: t.text, margin: 0 }}>{model.name}</h2>
           <FormatBadge format={model.format} />
         </div>
-        <div style={{ ...F.xs, color: t.dim, display: 'flex', gap: 12 }}>
+        <div style={{ fontSize: FS.xs, color: t.dim, display: 'flex', gap: 12 }}>
           <span>v{model.version}</span>
           <span>{formatBytes(model.size_bytes)}</span>
           <span>{new Date(model.created_at).toLocaleDateString()}</span>
@@ -130,7 +129,7 @@ function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => voi
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 16 }}>
           {model.tags.split(',').filter(Boolean).map((tag) => (
             <span key={tag} style={{
-              ...F.xs, padding: '2px 8px', borderRadius: 4,
+              fontSize: FS.xs, padding: '2px 8px', borderRadius: 4,
               background: t.surface3, color: t.sec,
             }}>
               <Tag size={10} style={{ marginRight: 3 }} />{tag.trim()}
@@ -161,7 +160,7 @@ function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => voi
       {Object.keys(training_config).length > 0 && (
         <Section title="Training Configuration">
           <div style={{
-            ...F.xs, fontFamily: 'JetBrains Mono, monospace',
+            fontSize: FS.xs, fontFamily: 'JetBrains Mono, monospace',
             background: t.surface2, borderRadius: 6, padding: 12,
             maxHeight: 200, overflowY: 'auto', color: t.sec,
             whiteSpace: 'pre-wrap', wordBreak: 'break-all',
@@ -176,7 +175,7 @@ function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => voi
         <button
           onClick={() => setShowDeploy(true)}
           style={{
-            ...F.xs, padding: '8px 16px', borderRadius: 6,
+            fontSize: FS.xs, padding: '8px 16px', borderRadius: 6,
             background: t.cyan, color: t.bg, border: 'none',
             cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
           }}
@@ -186,7 +185,7 @@ function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => voi
         <button
           onClick={() => setShowTestChat(true)}
           style={{
-            ...F.xs, padding: '8px 16px', borderRadius: 6,
+            fontSize: FS.xs, padding: '8px 16px', borderRadius: 6,
             background: 'none', color: t.cyan, border: `1px solid ${t.cyan}44`,
             cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
           }}
@@ -195,7 +194,7 @@ function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => voi
         </button>
         {model.model_path && (
           <button style={{
-            ...F.xs, padding: '8px 16px', borderRadius: 6,
+            fontSize: FS.xs, padding: '8px 16px', borderRadius: 6,
             background: 'none', color: t.sec, border: `1px solid ${t.border}`,
             cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
           }}>
@@ -227,10 +226,10 @@ function ModelCardView({ modelId, onBack }: { modelId: string; onBack: () => voi
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const t = T()
+  const t = T
   return (
     <div style={{ marginBottom: 16 }}>
-      <h3 style={{ ...F.xs, color: t.dim, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+      <h3 style={{ fontSize: FS.xs, color: t.dim, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
         {title}
       </h3>
       <div style={{ background: t.surface, borderRadius: 8, border: `1px solid ${t.border}`, padding: 10 }}>
@@ -241,11 +240,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
-  const t = T()
+  const t = T
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${t.border}22` }}>
-      <span style={{ ...F.xs, color: t.dim }}>{label}</span>
-      <span style={{ ...F.xs, color: t.text, fontFamily: 'JetBrains Mono, monospace', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+      <span style={{ fontSize: FS.xs, color: t.dim }}>{label}</span>
+      <span style={{ fontSize: FS.xs, color: t.text, fontFamily: 'JetBrains Mono, monospace', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
     </div>
   )
 }
@@ -256,7 +255,7 @@ export default function ModelRegistry() {
   const [search, setSearch] = useState('')
   const [formatFilter, setFormatFilter] = useState<string | null>(null)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
-  const t = T()
+  const t = T
 
   const fetchModels = useCallback(async () => {
     setLoading(true)
@@ -302,9 +301,9 @@ export default function ModelRegistry() {
         display: 'flex', alignItems: 'center', gap: 8,
       }}>
         <Package size={16} style={{ color: t.purple }} />
-        <span style={{ ...F.sm, fontWeight: 600, color: t.text }}>Model Registry</span>
+        <span style={{ fontSize: FS.sm, fontWeight: 600, color: t.text }}>Model Registry</span>
         <span style={{
-          ...F.xs, color: t.dim, marginLeft: 'auto',
+          fontSize: FS.xs, color: t.dim, marginLeft: 'auto',
           background: t.surface3, borderRadius: 8, padding: '2px 8px',
         }}>
           {models.length}
@@ -324,7 +323,7 @@ export default function ModelRegistry() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search models..."
             style={{
-              ...F.xs, background: 'none', border: 'none', outline: 'none',
+              fontSize: FS.xs, background: 'none', border: 'none', outline: 'none',
               color: t.text, width: '100%',
             }}
           />
@@ -337,7 +336,7 @@ export default function ModelRegistry() {
             key={fmt}
             onClick={() => setFormatFilter(formatFilter === fmt ? null : fmt)}
             style={{
-              ...F.xs, padding: '4px 8px', borderRadius: 4,
+              fontSize: FS.xs, padding: '4px 8px', borderRadius: 4,
               border: `1px solid ${formatFilter === fmt ? (FORMAT_COLORS[fmt] || t.border) : t.border}`,
               background: formatFilter === fmt ? `${FORMAT_COLORS[fmt] || t.cyan}22` : 'transparent',
               color: formatFilter === fmt ? (FORMAT_COLORS[fmt] || t.cyan) : t.dim,
@@ -352,15 +351,15 @@ export default function ModelRegistry() {
       {/* Model list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 8px' }}>
         {loading && (
-          <div style={{ padding: 24, textAlign: 'center', color: t.dim, ...F.sm }}>
+          <div style={{ padding: 24, textAlign: 'center', color: t.dim, fontSize: FS.sm }}>
             Loading models...
           </div>
         )}
         {!loading && models.length === 0 && (
           <div style={{ padding: 24, textAlign: 'center', color: t.dim }}>
             <Package size={32} style={{ marginBottom: 8, opacity: 0.4 }} />
-            <p style={{ ...F.sm, margin: 0 }}>No models registered yet.</p>
-            <p style={{ ...F.xs, marginTop: 4 }}>Models are auto-registered when training or merge blocks complete.</p>
+            <p style={{ fontSize: FS.sm, margin: 0 }}>No models registered yet.</p>
+            <p style={{ fontSize: FS.xs, marginTop: 4 }}>Models are auto-registered when training or merge blocks complete.</p>
           </div>
         )}
         {models.map((model) => (
@@ -382,12 +381,12 @@ export default function ModelRegistry() {
           >
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <span style={{ ...F.sm, fontWeight: 600, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: FS.sm, fontWeight: 600, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {model.name}
                 </span>
                 <FormatBadge format={model.format} />
               </div>
-              <div style={{ ...F.xs, color: t.dim, display: 'flex', gap: 12 }}>
+              <div style={{ fontSize: FS.xs, color: t.dim, display: 'flex', gap: 12 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                   <HardDrive size={10} /> {formatBytes(model.size_bytes)}
                 </span>

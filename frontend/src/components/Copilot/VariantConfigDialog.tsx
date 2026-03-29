@@ -8,7 +8,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { T, F, FS, DEPTH, MOTION } from '@/lib/design-tokens'
+import { T, F, FS, DEPTH } from '@/lib/design-tokens'
 import { api } from '@/api/client'
 
 // ── Types ─────────────────────────────────────────────────────────

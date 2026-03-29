@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { T, F, FCODE, FS } from '@/lib/design-tokens'
-import { useRunStore, type BreakpointState } from '@/stores/runStore'
+import { useRunStore } from '@/stores/runStore'
 import { X, Code, Eye } from 'lucide-react'
 
 /**

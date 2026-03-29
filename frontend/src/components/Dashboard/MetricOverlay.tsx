@@ -4,7 +4,7 @@ import {
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { T, F, FCODE, FS } from '@/lib/design-tokens'
-import type { DashboardRunData, DashboardExperiment, ComparisonMatrixData } from '@/stores/dashboardStore'
+import type { DashboardRunData, DashboardExperiment } from '@/stores/dashboardStore'
 
 // 6-color palette per spec
 const CHART_COLORS = [
