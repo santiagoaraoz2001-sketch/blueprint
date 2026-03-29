@@ -10,13 +10,14 @@ import TemplateGallery from './TemplateGallery'
 import TemplatePreview from './TemplatePreview'
 import { usePipelineStore } from '@/stores/pipelineStore'
 
-export default function TemplateLanding() {
+export default function TemplateLanding({ onDismiss }: { onDismiss?: () => void } = {}) {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const newPipeline = usePipelineStore((s) => s.newPipeline)
 
   const handleBlankCanvas = useCallback(() => {
     newPipeline()
-  }, [newPipeline])
+    onDismiss?.()
+  }, [newPipeline, onDismiss])
 
   const handleSelectTemplate = useCallback((templateId: string) => {
     setSelectedTemplateId(templateId)

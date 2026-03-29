@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { Handle, Position, useStore } from '@xyflow/react'
 import { T, F, FS } from '@/lib/design-tokens'
 import { getBlockDefinition, getPortColor, computeBlockWidth } from '@/lib/block-registry'
@@ -24,6 +24,9 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
 
   // Count connections per handle — uses ReactFlow internal store with custom equality
   // so this node ONLY re-renders when its OWN connection counts change (not all edges).
+  // The selector MUST return a cached object when data hasn't changed, otherwise
+  // React 18's useSyncExternalStore triggers an infinite loop warning.
+  const cachedCountsRef = useRef<Record<string, number>>({})
   const connectionSelector = useCallback(
     (s: any) => {
       const counts: Record<string, number> = {}
@@ -33,20 +36,22 @@ function BlockNode({ id, data, selected }: { id: string; data: BlockNodeData; se
         if (edge.source === id && edge.sourceHandle)
           counts[`out-${edge.sourceHandle}`] = (counts[`out-${edge.sourceHandle}`] || 0) + 1
       }
+      // Return cached object if data is unchanged to satisfy useSyncExternalStore
+      const prev = cachedCountsRef.current
+      if (JSON.stringify(prev) === JSON.stringify(counts)) return prev
+      cachedCountsRef.current = counts
       return counts
     },
     [id]
   )
-  const handleConnectionCounts = useStore(
-    connectionSelector,
-    (a, b) => JSON.stringify(a) === JSON.stringify(b)
-  )
+  const handleConnectionCounts = useStore(connectionSelector)
 
   const focusedErrorNodeId = usePipelineStore((s) => s.focusedErrorNodeId)
   const isErrorFocused = focusedErrorNodeId === id
 
-  // Backend validation errors for this node
-  const backendNodeErrors: NodeValidationError[] = useValidationStore((s) => s.nodeErrors[id] || [])
+  // Backend validation errors for this node — use stable empty array to avoid re-renders
+  const EMPTY_ERRORS: NodeValidationError[] = useMemo(() => [], [])
+  const backendNodeErrors: NodeValidationError[] = useValidationStore((s) => s.nodeErrors[id]) || EMPTY_ERRORS
   const hasBackendErrors = backendNodeErrors.some(e => e.severity === 'error')
 
   // Inheritance overlay — derived selector returns primitive for O(1) lookup + minimal re-renders
