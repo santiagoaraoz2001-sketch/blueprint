@@ -17,7 +17,6 @@ export const OVERLAY_COLORS = {
  */
 export default function InheritanceOverlay() {
   const overlay = usePipelineStore((s) => s.inheritanceOverlay)
-  const deactivate = usePipelineStore((s) => s.deactivateInheritanceOverlay)
 
   // Derived selector — returns a primitive string so this component only re-renders
   // when the resolved label actually changes (not on every node position change)
@@ -33,12 +32,12 @@ export default function InheritanceOverlay() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        deactivate()
+        usePipelineStore.getState().deactivateInheritanceOverlay()
       }
     }
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [overlay, deactivate])
+  }, [overlay])
 
   if (!overlay) return null
 
@@ -97,7 +96,7 @@ export default function InheritanceOverlay() {
       )}
 
       <button
-        onClick={deactivate}
+        onClick={() => usePipelineStore.getState().deactivateInheritanceOverlay()}
         title="Close (Esc)"
         style={{
           background: 'none',

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { T, FS } from '@/lib/design-tokens'
+import { T, F, FS } from '@/lib/design-tokens'
 import { api } from '@/api/client'
 import {
   X, Server, Cloud, FileType, Globe, ArrowRight, ArrowLeft,
@@ -33,7 +33,6 @@ const TARGET_INFO: Record<Target, { icon: typeof Server; label: string; descript
 }
 
 export default function DeployModal({ modelId, modelName, modelFormat: _modelFormat, modelPath, onClose }: DeployModalProps) {
-  const t = T
   const [step, setStep] = useState<Step>('select')
   const [target, setTarget] = useState<Target | null>(null)
   const [targets, setTargets] = useState<DeployTargets | null>(null)
@@ -117,17 +116,17 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
     }
   }
 
-  const isTargetDisabled = (t: Target): string | null => {
+  const isTargetDisabled = (tgt: Target): string | null => {
     if (!targets) return 'Loading...'
-    if (t === 'ollama') {
+    if (tgt === 'ollama') {
       if (!targets.ollama.cli_available) return 'Ollama not installed. Install from https://ollama.com'
       if (!targets.ollama.server_running) return 'Ollama server is not running. Start it with "ollama serve"'
       if (!modelPath) return 'Model has no file path'
     }
-    if (t === 'huggingface' && !targets.huggingface.available) {
+    if (tgt === 'huggingface' && !targets.huggingface.available) {
       return `huggingface_hub not installed. Run: ${targets.huggingface.install_command}`
     }
-    if (t === 'onnx' && !targets.onnx.available) {
+    if (tgt === 'onnx' && !targets.onnx.available) {
       return `PyTorch not installed. Run: ${targets.onnx.install_command}`
     }
     return null
@@ -143,21 +142,21 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
     }} onClick={onClose}>
       <div
         style={{
-          background: t.bg, border: `1px solid ${t.border}`, borderRadius: 12,
+          background: T.bg, border: `1px solid ${T.border}`, borderRadius: 12,
           width: 520, maxHeight: '80vh', overflow: 'auto',
-          boxShadow: t.shadowHeavy,
+          boxShadow: T.shadowHeavy,
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{
-          padding: '14px 16px', borderBottom: `1px solid ${t.border}`,
+          padding: '14px 16px', borderBottom: `1px solid ${T.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontSize: FS.sm,fontWeight: 700, color: t.text }}>
+          <span style={{ fontFamily: F, fontSize: FS.sm, fontWeight: 700, color: T.text }}>
             Deploy — {modelName}
           </span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.dim, padding: 4 }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.dim, padding: 4 }}>
             <X size={16} />
           </button>
         </div>
@@ -166,7 +165,7 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
           {/* Step 1: Select target */}
           {step === 'select' && (
             <div>
-              <p style={{ fontSize: FS.xs,color: t.dim, marginTop: 0, marginBottom: 12 }}>
+              <p style={{ fontFamily: F, fontSize: FS.xs, color: T.dim, marginTop: 0, marginBottom: 12 }}>
                 Select a deployment target for this model
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -183,8 +182,8 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
                       style={{
                         display: 'flex', alignItems: 'center', gap: 12,
                         padding: '12px 14px', borderRadius: 8,
-                        border: `1px solid ${disabled ? t.border : t.borderHi}`,
-                        background: disabled ? t.surface2 : t.surface,
+                        border: `1px solid ${disabled ? T.border : T.borderHi}`,
+                        background: disabled ? T.surface2 : T.surface,
                         cursor: disabled ? 'not-allowed' : 'pointer',
                         opacity: disabled ? 0.5 : 1,
                         textAlign: 'left', transition: 'border-color 0.15s',
@@ -198,12 +197,12 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
                         <Icon size={18} style={{ color: info.color }} />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: FS.sm,fontWeight: 600, color: disabled ? t.dim : t.text }}>{info.label}</div>
-                        <div style={{ fontSize: FS.xs,color: t.dim, marginTop: 2 }}>
+                        <div style={{ fontFamily: F, fontSize: FS.sm, fontWeight: 600, color: disabled ? T.dim : T.text }}>{info.label}</div>
+                        <div style={{ fontFamily: F, fontSize: FS.xs, color: T.dim, marginTop: 2 }}>
                           {disabled ? disabledReason : info.description}
                         </div>
                       </div>
-                      {!disabled && <ArrowRight size={14} style={{ color: t.dim }} />}
+                      {!disabled && <ArrowRight size={14} style={{ color: T.dim }} />}
                     </button>
                   )
                 })}
@@ -217,15 +216,15 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
               <button
                 onClick={() => setStep('select')}
                 style={{
-                  fontSize: FS.xs,display: 'flex', alignItems: 'center', gap: 4,
-                  color: t.cyan, background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: F, fontSize: FS.xs, display: 'flex', alignItems: 'center', gap: 4,
+                  color: T.cyan, background: 'none', border: 'none', cursor: 'pointer',
                   padding: '4px 0', marginBottom: 12, fontWeight: 500,
                 }}
               >
                 <ArrowLeft size={14} /> Back
               </button>
 
-              <h3 style={{ fontSize: FS.sm,fontWeight: 600, color: t.text, marginTop: 0, marginBottom: 12 }}>
+              <h3 style={{ fontFamily: F, fontSize: FS.sm, fontWeight: 600, color: T.text, marginTop: 0, marginBottom: 12 }}>
                 Configure {TARGET_INFO[target].label} Export
               </h3>
 
@@ -250,9 +249,9 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
                         <input
                           type="checkbox" checked={hfUseSaved}
                           onChange={(e) => setHfUseSaved(e.target.checked)}
-                          style={{ accentColor: t.cyan }}
+                          style={{ accentColor: T.cyan }}
                         />
-                        <span style={{ fontSize: FS.xs,color: t.green }}>
+                        <span style={{ fontFamily: F, fontSize: FS.xs, color: T.green }}>
                           Use saved token from secrets store
                         </span>
                       </div>
@@ -265,9 +264,9 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
                           <input
                             type="checkbox" checked={hfSaveToken}
                             onChange={(e) => setHfSaveToken(e.target.checked)}
-                            style={{ accentColor: t.cyan }}
+                            style={{ accentColor: T.cyan }}
                           />
-                          <span style={{ fontSize: FS.xs,color: t.sec }}>
+                          <span style={{ fontFamily: F, fontSize: FS.xs, color: T.sec }}>
                             Save token to encrypted secrets store for future use
                           </span>
                         </div>
@@ -278,9 +277,9 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
                     <input
                       type="checkbox" checked={hfPrivate}
                       onChange={(e) => setHfPrivate(e.target.checked)}
-                      style={{ accentColor: t.cyan }}
+                      style={{ accentColor: T.cyan }}
                     />
-                    <span style={{ fontSize: FS.xs,color: t.sec }}>Private repository</span>
+                    <span style={{ fontFamily: F, fontSize: FS.xs, color: T.sec }}>Private repository</span>
                   </div>
                 </div>
               )}
@@ -305,8 +304,8 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
                 onClick={handleDeploy}
                 disabled={!isConfigValid(target, { ollamaName, hfRepoId, hfToken, hfUseSaved, onnxPath, serverDir })}
                 style={{
-                  fontSize: FS.sm,marginTop: 16, padding: '10px 20px', borderRadius: 8,
-                  background: t.cyan, color: t.bg, border: 'none',
+                  fontFamily: F, fontSize: FS.sm, marginTop: 16, padding: '10px 20px', borderRadius: 8,
+                  background: T.cyan, color: T.bg, border: 'none',
                   cursor: 'pointer', fontWeight: 600, width: '100%',
                   opacity: isConfigValid(target, { ollamaName, hfRepoId, hfToken, hfUseSaved, onnxPath, serverDir }) ? 1 : 0.5,
                 }}
@@ -321,48 +320,48 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
             <div style={{ textAlign: 'center', padding: '20px 0' }}>
               {deploying && (
                 <>
-                  <Loader2 size={32} style={{ color: t.cyan, animation: 'spin 1s linear infinite', marginBottom: 12 }} />
-                  <p style={{ fontSize: FS.sm,color: t.text, margin: 0 }}>Deploying to {target ? TARGET_INFO[target].label : ''}...</p>
-                  <p style={{ fontSize: FS.xs,color: t.dim, marginTop: 4 }}>This may take a few minutes</p>
+                  <Loader2 size={32} style={{ color: T.cyan, animation: 'spin 1s linear infinite', marginBottom: 12 }} />
+                  <p style={{ fontFamily: F, fontSize: FS.sm, color: T.text, margin: 0 }}>Deploying to {target ? TARGET_INFO[target].label : ''}...</p>
+                  <p style={{ fontFamily: F, fontSize: FS.xs, color: T.dim, marginTop: 4 }}>This may take a few minutes</p>
                   <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
                 </>
               )}
 
               {!deploying && result && (
                 <>
-                  <CheckCircle size={32} style={{ color: t.green, marginBottom: 12 }} />
-                  <p style={{ fontSize: FS.sm,fontWeight: 600, color: t.green, margin: 0 }}>Deploy Successful</p>
+                  <CheckCircle size={32} style={{ color: T.green, marginBottom: 12 }} />
+                  <p style={{ fontFamily: F, fontSize: FS.sm, fontWeight: 600, color: T.green, margin: 0 }}>Deploy Successful</p>
                   <div style={{
-                    marginTop: 12, textAlign: 'left', background: t.surface2,
+                    marginTop: 12, textAlign: 'left', background: T.surface2,
                     borderRadius: 8, padding: 12,
                   }}>
-                    {!!result.model_name && (
+                    {result.model_name != null && (
                       <ResultRow label="Model Name" value={String(result.model_name)} />
                     )}
-                    {!!result.url && (
+                    {result.url != null && (
                       <ResultRow label="URL" value={String(result.url)} isLink />
                     )}
-                    {!!result.path && (
+                    {result.path != null && (
                       <ResultRow label="Path" value={String(result.path)} />
                     )}
-                    {!!result.output_dir && (
+                    {result.output_dir != null && (
                       <ResultRow label="Output" value={String(result.output_dir)} />
                     )}
                     {result.size != null && (
                       <ResultRow label="Size" value={formatSize(Number(result.size))} />
                     )}
-                    {!!result.files && (
+                    {result.files != null && (
                       <ResultRow label="Files" value={(result.files as string[]).join(', ')} />
                     )}
-                    {!!result.message && (
+                    {result.message != null && (
                       <ResultRow label="Info" value={String(result.message)} />
                     )}
                   </div>
                   <button
                     onClick={onClose}
                     style={{
-                      fontSize: FS.sm,marginTop: 16, padding: '8px 20px', borderRadius: 8,
-                      background: t.cyan, color: t.bg, border: 'none',
+                      fontFamily: F, fontSize: FS.sm, marginTop: 16, padding: '8px 20px', borderRadius: 8,
+                      background: T.cyan, color: T.bg, border: 'none',
                       cursor: 'pointer', fontWeight: 600,
                     }}
                   >
@@ -373,20 +372,20 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
 
               {!deploying && error && (
                 <>
-                  <AlertCircle size={32} style={{ color: t.red, marginBottom: 12 }} />
-                  <p style={{ fontSize: FS.sm,fontWeight: 600, color: t.red, margin: 0 }}>Deploy Failed</p>
+                  <AlertCircle size={32} style={{ color: T.red, marginBottom: 12 }} />
+                  <p style={{ fontFamily: F, fontSize: FS.sm, fontWeight: 600, color: T.red, margin: 0 }}>Deploy Failed</p>
                   <div style={{
-                    marginTop: 12, background: `${t.red}11`, border: `1px solid ${t.red}33`,
+                    marginTop: 12, background: `${T.red}11`, border: `1px solid ${T.red}33`,
                     borderRadius: 8, padding: 12, textAlign: 'left',
                   }}>
-                    <p style={{ fontSize: FS.xs,color: t.red, margin: 0, whiteSpace: 'pre-wrap' }}>{error}</p>
+                    <p style={{ fontFamily: F, fontSize: FS.xs, color: T.red, margin: 0, whiteSpace: 'pre-wrap' }}>{error}</p>
                   </div>
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
                     <button
                       onClick={() => { setStep('config'); setError(null) }}
                       style={{
-                        fontSize: FS.sm,padding: '8px 16px', borderRadius: 8,
-                        background: 'none', color: t.sec, border: `1px solid ${t.border}`,
+                        fontFamily: F, fontSize: FS.sm, padding: '8px 16px', borderRadius: 8,
+                        background: 'none', color: T.sec, border: `1px solid ${T.border}`,
                         cursor: 'pointer', fontWeight: 500,
                       }}
                     >
@@ -395,8 +394,8 @@ export default function DeployModal({ modelId, modelName, modelFormat: _modelFor
                     <button
                       onClick={handleDeploy}
                       style={{
-                        fontSize: FS.sm,padding: '8px 16px', borderRadius: 8,
-                        background: t.cyan, color: t.bg, border: 'none',
+                        fontFamily: F, fontSize: FS.sm, padding: '8px 16px', borderRadius: 8,
+                        background: T.cyan, color: T.bg, border: 'none',
                         cursor: 'pointer', fontWeight: 600,
                       }}
                     >
@@ -440,14 +439,12 @@ function formatSize(bytes: number): string {
 }
 
 function Label({ text }: { text: string }) {
-  const t = T
-  return <label style={{ fontSize: FS.xs,color: t.sec, fontWeight: 600, display: 'block', marginBottom: 4 }}>{text}</label>
+  return <label style={{ fontFamily: F, fontSize: FS.xs, color: T.sec, fontWeight: 600, display: 'block', marginBottom: 4 }}>{text}</label>
 }
 
 function Input({ value, onChange, placeholder, type = 'text' }: {
   value: string; onChange: (v: string) => void; placeholder: string; type?: string
 }) {
-  const t = T
   return (
     <input
       type={type}
@@ -455,9 +452,9 @@ function Input({ value, onChange, placeholder, type = 'text' }: {
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       style={{
-        fontSize: FS.xs,width: '100%', padding: '8px 10px', borderRadius: 6,
-        border: `1px solid ${t.border}`, background: t.surface2,
-        color: t.text, outline: 'none', fontFamily: 'JetBrains Mono, monospace',
+        fontFamily: F, fontSize: FS.xs, width: '100%', padding: '8px 10px', borderRadius: 6,
+        border: `1px solid ${T.border}`, background: T.surface2,
+        color: T.text, outline: 'none',
         boxSizing: 'border-box',
       }}
     />
@@ -465,31 +462,29 @@ function Input({ value, onChange, placeholder, type = 'text' }: {
 }
 
 function Hint({ text }: { text: string }) {
-  const t = T
   return (
-    <div style={{ fontSize: FS.xs,color: t.dim, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+    <div style={{ fontFamily: F, fontSize: FS.xs, color: T.dim, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
       <Info size={10} /> {text}
     </div>
   )
 }
 
 function ResultRow({ label, value, isLink }: { label: string; value: string; isLink?: boolean }) {
-  const t = T
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${t.border}22` }}>
-      <span style={{ fontSize: FS.xs,color: t.dim }}>{label}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${T.border}22` }}>
+      <span style={{ fontFamily: F, fontSize: FS.xs, color: T.dim }}>{label}</span>
       {isLink ? (
         <a
           href={value}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ fontSize: FS.xs,color: t.cyan, textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace' }}
+          style={{ fontFamily: F, fontSize: FS.xs, color: T.cyan, textDecoration: 'none' }}
         >
           {value}
         </a>
       ) : (
         <span style={{
-          fontSize: FS.xs,color: t.text, fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: F, fontSize: FS.xs, color: T.text,
           maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {value}

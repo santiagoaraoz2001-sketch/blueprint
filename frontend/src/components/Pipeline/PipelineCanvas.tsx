@@ -47,35 +47,23 @@ const edgeTypes: EdgeTypes = {
 
 export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onShowTemplates?: () => void; onShowAgent?: () => void } = {}) {
   const { fitView, flowToScreenPosition, screenToFlowPosition } = useReactFlow()
-  const {
-    nodes,
-    edges,
-    onNodesChange,
-    onEdgesChange,
-    onConnect,
-    addNode,
-    selectNode,
-    inheritanceOverlay,
-    deactivateInheritanceOverlay,
-    connectionSuggestions,
-    autoWiringNodeId,
-    clearConnectionSuggestions,
-    triggerAutoWiring,
-  } = usePipelineStore(useShallow((s) => ({
-    nodes: s.nodes,
-    edges: s.edges,
-    onNodesChange: s.onNodesChange,
-    onEdgesChange: s.onEdgesChange,
-    onConnect: s.onConnect,
-    addNode: s.addNode,
-    selectNode: s.selectNode,
-    inheritanceOverlay: s.inheritanceOverlay,
-    deactivateInheritanceOverlay: s.deactivateInheritanceOverlay,
-    connectionSuggestions: s.connectionSuggestions,
-    autoWiringNodeId: s.autoWiringNodeId,
-    clearConnectionSuggestions: s.clearConnectionSuggestions,
-    triggerAutoWiring: s.triggerAutoWiring,
-  })))
+  // Data selectors — only re-render when data changes
+  const { nodes, edges, inheritanceOverlay, connectionSuggestions, autoWiringNodeId } =
+    usePipelineStore(useShallow((s) => ({
+      nodes: s.nodes,
+      edges: s.edges,
+      inheritanceOverlay: s.inheritanceOverlay,
+      connectionSuggestions: s.connectionSuggestions,
+      autoWiringNodeId: s.autoWiringNodeId,
+    })))
+
+  // Action refs — stable references, selected individually to avoid useShallow object churn
+  const onNodesChange = usePipelineStore((s) => s.onNodesChange)
+  const onEdgesChange = usePipelineStore((s) => s.onEdgesChange)
+  const onConnect = usePipelineStore((s) => s.onConnect)
+  const addNode = usePipelineStore((s) => s.addNode)
+  const selectNode = usePipelineStore((s) => s.selectNode)
+  const triggerAutoWiring = usePipelineStore((s) => s.triggerAutoWiring)
 
   // Drop zone visual feedback
   const [isDragOver, setIsDragOver] = useState(false)
@@ -217,19 +205,19 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
     if (connectionSuggestions.length > 0) {
       if (suggestionTimerRef.current) clearTimeout(suggestionTimerRef.current)
       suggestionTimerRef.current = setTimeout(() => {
-        clearConnectionSuggestions()
+        usePipelineStore.getState().clearConnectionSuggestions()
       }, 5000)
     }
     return () => {
       if (suggestionTimerRef.current) clearTimeout(suggestionTimerRef.current)
     }
-  }, [connectionSuggestions, clearConnectionSuggestions])
+  }, [connectionSuggestions])
 
   // Wrap onConnect to also clear suggestions on manual edge creation
   const handleManualConnect = useCallback((connection: Connection) => {
     onConnect(connection)
-    clearConnectionSuggestions()
-  }, [onConnect, clearConnectionSuggestions])
+    usePipelineStore.getState().clearConnectionSuggestions()
+  }, [onConnect])
 
   // Connection validation — only allow compatible port types
   const isValidConnection = useCallback((connection: Connection | { source?: string; target?: string; sourceHandle?: string | null; targetHandle?: string | null }) => {
@@ -253,19 +241,19 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
   const onNodeClick = useCallback(
     (_: any, node: any) => {
       // Dismiss inheritance overlay on any click (spec: "click anywhere to exit")
-      deactivateInheritanceOverlay()
+      usePipelineStore.getState().deactivateInheritanceOverlay()
       selectNode(node.id)
     },
-    [selectNode, deactivateInheritanceOverlay]
+    [selectNode]
   )
 
   const onPaneClick = useCallback(() => {
     selectNode(null)
     setPaletteParams((p: any) => ({ ...p, visible: false }))
     setContextMenu((p) => ({ ...p, visible: false }))
-    deactivateInheritanceOverlay()
-    clearConnectionSuggestions()
-  }, [selectNode, deactivateInheritanceOverlay, clearConnectionSuggestions])
+    usePipelineStore.getState().deactivateInheritanceOverlay()
+    usePipelineStore.getState().clearConnectionSuggestions()
+  }, [selectNode])
 
   // Node right-click context menu
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: any) => {
@@ -393,8 +381,8 @@ export default function PipelineCanvas({ onShowTemplates, onShowAgent }: { onSho
       target: s.targetNodeId,
       targetHandle: s.targetPortId,
     })
-    clearConnectionSuggestions()
-  }, [onConnect, clearConnectionSuggestions])
+    usePipelineStore.getState().clearConnectionSuggestions()
+  }, [onConnect])
 
   // ── Keyboard shortcuts: Copy, Paste, Delete, Select All, Escape, Fit View, Redo ──
   const clipboardRef = useRef<{ nodeIds: string[] } | null>(null)
