@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useShallow } from 'zustand/react/shallow'
 import { T, F, FS, GLOW, DEPTH, MOTION } from '@/lib/design-tokens'
+import { useUIStore } from '@/stores/uiStore'
 import { api } from '@/api/client'
 import { evaluateRules, type CopilotAlert } from '@/lib/copilot-rules'
 
@@ -36,15 +37,16 @@ const SEVERITY_ICON: Record<string, string> = {
 }
 
 const SEVERITY_COLOR: Record<string, string> = {
-  error: '#FF5E72',
-  warning: '#FFBE45',
-  info: '#5B96FF',
+  error: T.red,
+  warning: T.amber,
+  info: T.blue,
 }
 
 // ── Component ─────────────────────────────────────────────────────
 
 export default function CopilotPanel() {
-  const [expanded, setExpanded] = useState(false)
+  const expanded = useUIStore((s) => s.copilotOpen)
+  const setExpanded = useUIStore((s) => s.setCopilotOpen)
   const [alerts, setAlerts] = useState<CopilotAlert[]>([])
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [aiStatus, setAiStatus] = useState<CopilotStatus | null>(null)
@@ -150,7 +152,7 @@ export default function CopilotPanel() {
   }, [])
 
   // Badge color
-  const badgeColor = errorCount > 0 ? '#FF5E72' : warningCount > 0 ? '#FFBE45' : T.cyan
+  const badgeColor = errorCount > 0 ? T.red : warningCount > 0 ? T.amber : T.cyan
 
   return (
     <>
@@ -226,6 +228,7 @@ export default function CopilotPanel() {
               right: 24,
               zIndex: 1000,
               width: 320,
+              maxWidth: 'min(320px, calc(100vw - 48px))',
               maxHeight: 420,
               borderRadius: 12,
               border: `1px solid ${T.border}`,

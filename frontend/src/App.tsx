@@ -125,7 +125,8 @@ export default function App() {
     localStorage.setItem(MIGRATED_KEY, '1')
   }, [])
 
-  // Inject CSS variables whenever theme changes (including system preference)
+  // Inject CSS variables whenever theme or accent color changes
+  const accentColor = useSettingsStore((s) => s.accentColor)
   useEffect(() => {
     injectThemeCSSVars(theme)
 
@@ -136,7 +137,7 @@ export default function App() {
       mq.addEventListener('change', handler)
       return () => mq.removeEventListener('change', handler)
     }
-  }, [theme])
+  }, [theme, accentColor])
 
   // Handle URL params for monitor popout and deep linking
   useEffect(() => {

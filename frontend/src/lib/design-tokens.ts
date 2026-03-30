@@ -139,6 +139,12 @@ function hexToRgb(hex: string) {
   return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 }
 }
 
+/** Convert a hex color + alpha (0–1) to an rgba() string */
+export function hexToRgba(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
 // Specific Labs brand teal — fixed, immutable, used ONLY for the logo dot.
 // Never change this to an adaptive or user-selectable value.
 export const BRAND_TEAL = '#2FFCC8'

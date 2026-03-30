@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FD } from '@/lib/design-tokens'
+import { FD, T } from '@/lib/design-tokens'
 import { registry } from '@/lib/registry-client'
-
-const CYAN = '#4af6c3'
 
 interface SplashScreenProps {
   children: React.ReactNode
@@ -231,7 +229,7 @@ export default function SplashScreen({ children }: SplashScreenProps) {
                     width: 3,
                     height: 3,
                     borderRadius: '50%',
-                    background: ready ? CYAN : 'rgba(110,120,136,0.6)',
+                    background: ready ? T.cyan : 'rgba(110,120,136,0.6)',
                     transition: 'background 0.35s ease',
                   }}
                 />

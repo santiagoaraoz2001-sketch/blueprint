@@ -15,6 +15,8 @@ interface UIState {
   compareRunIds: string[] | null
   /** Whether the contextual help panel is open */
   helpPanelOpen: boolean
+  /** Whether the AI copilot panel is open */
+  copilotOpen: boolean
   setView: (view: View) => void
   toggleSidebar: () => void
   setSelectedProject: (id: string | null) => void
@@ -29,6 +31,8 @@ interface UIState {
   openMonitor: (runId: string) => void
   openComparison: (runIds: string[]) => void
   toggleHelpPanel: () => void
+  toggleCopilot: () => void
+  setCopilotOpen: (open: boolean) => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -41,6 +45,7 @@ export const useUIStore = create<UIState>((set) => ({
   monitorRunId: null,
   compareRunIds: null,
   helpPanelOpen: false,
+  copilotOpen: false,
   setView: (view) => set({ activeView: view }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSelectedProject: (id) => set({ selectedProjectId: id }),
@@ -53,4 +58,6 @@ export const useUIStore = create<UIState>((set) => ({
   openMonitor: (runId) => set({ activeView: 'monitor', monitorRunId: runId, compareRunIds: null }),
   openComparison: (runIds) => set({ activeView: 'monitor', compareRunIds: runIds, monitorRunId: null }),
   toggleHelpPanel: () => set((s) => ({ helpPanelOpen: !s.helpPanelOpen })),
+  toggleCopilot: () => set((s) => ({ copilotOpen: !s.copilotOpen })),
+  setCopilotOpen: (open) => set({ copilotOpen: open }),
 }))
