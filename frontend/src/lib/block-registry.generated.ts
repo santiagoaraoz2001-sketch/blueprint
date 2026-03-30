@@ -2,7 +2,7 @@
 // Generated from 119 block.yaml files across 12 categories
 // Run: python scripts/generate_block_registry.py
 
-import type { BlockDefinition } from './block-registry'
+import type { BlockDefinition } from './block-registry-types'
 
 export const BLOCK_REGISTRY: BlockDefinition[] = [
 

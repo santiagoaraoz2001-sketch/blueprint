@@ -26,7 +26,7 @@ export interface LLMAdapter {
     model: string,
     prompt: string,
     systemPrompt: string,
-    options?: { temperature?: number },
+    options?: { temperature?: number; maxTokens?: number },
     apiKey?: string,
   ) => Promise<string>
 }
