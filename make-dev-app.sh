@@ -96,21 +96,25 @@ LAUNCH_SCRIPT="\$REPO_ROOT/launch.sh"
 
 # ── Check if Blueprint is already running ─────────────────────
 BACKEND_PORT=8000
-FRONTEND_PORT=4174
+FRONTEND_PORTS="4174 5173"
 
 backend_up=false
-frontend_up=false
+running_frontend_port=""
 
 if curl -s "http://127.0.0.1:\$BACKEND_PORT/api/health" >/dev/null 2>&1; then
     backend_up=true
 fi
-if curl -s "http://127.0.0.1:\$FRONTEND_PORT" >/dev/null 2>&1; then
-    frontend_up=true
-fi
 
-if [ "\$backend_up" = true ] && [ "\$frontend_up" = true ]; then
+for port in \$FRONTEND_PORTS; do
+    if curl -s "http://127.0.0.1:\$port" >/dev/null 2>&1; then
+        running_frontend_port="\$port"
+        break
+    fi
+done
+
+if [ "\$backend_up" = true ] && [ -n "\$running_frontend_port" ]; then
     osascript -e 'display notification "Blueprint is already running — opening browser." with title "Blueprint"' 2>/dev/null || true
-    open "http://localhost:\$FRONTEND_PORT"
+    open "http://localhost:\$running_frontend_port"
     exit 0
 fi
 
@@ -138,10 +142,41 @@ osascript -e 'display notification "Starting backend and frontend..." with title
 # Updates to launch.sh still take effect without rebuilding the .app.
 cd "\$REPO_ROOT"
 export SCRIPT_DIR="\$REPO_ROOT"
-/bin/bash -c "\$(cat "\$LAUNCH_SCRIPT")" >> "\$LOG_FILE" 2>&1
+/bin/bash -c "\$(cat "\$LAUNCH_SCRIPT")" >> "\$LOG_FILE" 2>&1 &
+LAUNCH_PID=\$!
+
+# ── Wait for services and open browser ────────────────────────
+# launch.sh runs in the background; we poll until both services are
+# up, then open the browser from the launcher process (not the
+# redirected subprocess) so macOS always honours the open command.
+FRONTEND_PORT=4174
+opened=false
+for i in \$(seq 1 60); do
+    if curl -s "http://127.0.0.1:\$BACKEND_PORT/api/health" >/dev/null 2>&1 \
+       && curl -s "http://127.0.0.1:\$FRONTEND_PORT" >/dev/null 2>&1; then
+        open "http://localhost:\$FRONTEND_PORT"
+        opened=true
+        break
+    fi
+    sleep 1
+done
+
+if [ "\$opened" = false ]; then
+    # Check if launch.sh already exited with an error
+    if ! kill -0 "\$LAUNCH_PID" 2>/dev/null; then
+        wait "\$LAUNCH_PID"
+        EXIT_CODE=\$?
+        if [ \$EXIT_CODE -ne 0 ]; then
+            osascript -e "display alert \"Blueprint Failed\" message \"Blueprint exited with an error. Check the log at ~/.blueprint/launch.log for details.\" as critical" 2>/dev/null
+        fi
+        exit \$EXIT_CODE
+    fi
+fi
+
+# ── Keep running until launch.sh exits ────────────────────────
+wait "\$LAUNCH_PID"
 EXIT_CODE=\$?
 
-# ── Show error alert if launch failed ─────────────────────────
 if [ \$EXIT_CODE -ne 0 ]; then
     osascript -e "display alert \"Blueprint Failed\" message \"Blueprint exited with an error. Check the log at ~/.blueprint/launch.log for details.\" as critical" 2>/dev/null
 fi
