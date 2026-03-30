@@ -14,7 +14,7 @@ import BackendValidationPanel from '@/components/Validation/ValidationPanel'
 import PipelineTabBar from '@/components/Pipeline/PipelineTabBar'
 import { validatePipelineClient, type DiagnosticReport } from '@/lib/pipeline-validator'
 import PipelineMonitor, { type MonitorBlock } from '@/components/Pipeline/PipelineMonitor'
-import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp, AlertCircle, WifiOff, History } from 'lucide-react'
+import { Save, StickyNote, Sparkles, FolderOpen, ChevronDown, ShieldCheck, Combine, Ungroup, Undo2, Redo2, Wand2, LayoutTemplate, FilePlus, FileDown, FileUp, AlertCircle, WifiOff, History, BrainCircuit } from 'lucide-react'
 import TemplateGallery from '@/components/Pipeline/TemplateGallery'
 import TemplateLanding from '@/components/Templates/TemplateLanding'
 import ToolbarDropdown from '@/components/Pipeline/ToolbarDropdown'
@@ -77,6 +77,8 @@ export default function PipelineEditorView() {
 
   const selectedProjectId = useUIStore((s) => s.selectedProjectId)
   const setView = useUIStore((s) => s.setView)
+  const copilotOpen = useUIStore((s) => s.copilotOpen)
+  const toggleCopilot = useUIStore((s) => s.toggleCopilot)
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -479,6 +481,12 @@ export default function PipelineEditorView() {
               label: 'Export .blueprint',
               icon: <FileDown size={12} />,
               onClick: exportPipeline,
+              separator: true,
+            },
+            {
+              label: 'AI Workflow Generator',
+              icon: <Sparkles size={12} />,
+              onClick: () => setShowAgent(true),
             },
           ]}
         />
@@ -532,12 +540,12 @@ export default function PipelineEditorView() {
           onClick={() => setShowPipelineNotes(!showPipelineNotes)}
           style={{
             ...btnStyle,
-            color: showPipelineNotes || pipelineNotes ? '#FFB74D' : T.dim,
-            borderColor: showPipelineNotes ? 'rgba(255, 183, 77, 0.3)' : T.border,
+            color: showPipelineNotes || pipelineNotes ? T.amber : T.dim,
+            borderColor: showPipelineNotes ? `${T.amber}4D` : T.border,
           }}
           title="Pipeline notes"
         >
-          <StickyNote size={10} color={showPipelineNotes || pipelineNotes ? '#FFB74D' : undefined} />
+          <StickyNote size={10} color={showPipelineNotes || pipelineNotes ? T.amber : undefined} />
           <span style={{ fontSize: FS.xxs }}>Notes</span>
         </button>
 
@@ -552,19 +560,19 @@ export default function PipelineEditorView() {
 
         <div style={{ width: 1, height: 14, background: T.border }} />
 
-        {/* Agent button */}
+        {/* Copilot toggle */}
         <button
-          onClick={() => setShowAgent(!showAgent)}
+          onClick={toggleCopilot}
           style={{
             ...btnStyle,
-            color: showAgent ? T.cyan : T.dim,
-            border: showAgent ? `1px solid ${T.cyan}50` : `1px solid ${T.border}`,
-            background: showAgent ? `${T.cyan}10` : 'transparent',
+            color: copilotOpen ? T.cyan : T.dim,
+            border: copilotOpen ? `1px solid ${T.cyan}50` : `1px solid ${T.border}`,
+            background: copilotOpen ? `${T.cyan}10` : 'transparent',
           }}
-          title="AI Workflow Generator"
+          title="Toggle Copilot"
         >
-          <Sparkles size={10} />
-          AI
+          <BrainCircuit size={10} />
+          COPILOT
         </button>
 
         <div style={{ flex: 1 }} />
@@ -671,12 +679,12 @@ export default function PipelineEditorView() {
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '6px 12px',
-          background: '#F59E0B10',
-          borderBottom: '1px solid #F59E0B25',
+          background: `${T.amber}10`,
+          borderBottom: `1px solid ${T.amber}25`,
           flexShrink: 0,
         }}>
-          <WifiOff size={14} color="#F59E0B" />
-          <span style={{ fontFamily: F, fontSize: FS.xs, color: '#F59E0B' }}>
+          <WifiOff size={14} color={T.amber} />
+          <span style={{ fontFamily: F, fontSize: FS.xs, color: T.amber }}>
             {sseStatus === 'reconnecting'
               ? 'Reconnecting to server\u2026 Your run is still executing.'
               : 'Connection lost. Your run may still be executing on the server.'}
@@ -718,14 +726,14 @@ export default function PipelineEditorView() {
                 <span style={{
                   fontFamily: F,
                   fontSize: FS.sm,
-                  color: '#FFB74D',
+                  color: T.amber,
                   fontWeight: 700,
                   letterSpacing: '0.06em',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
                 }}>
-                  <StickyNote size={14} color="#FFB74D" />
+                  <StickyNote size={14} color={T.amber} />
                   Pipeline Notes
                 </span>
                 <button
@@ -787,7 +795,7 @@ export default function PipelineEditorView() {
                     background: 'rgba(255, 183, 77, 0.15)',
                     border: '1px solid rgba(255, 183, 77, 0.3)',
                     borderRadius: 6,
-                    color: '#FFB74D',
+                    color: T.amber,
                     fontFamily: F,
                     fontSize: FS.xs,
                     fontWeight: 700,

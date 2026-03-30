@@ -175,17 +175,6 @@
   to   { transform: rotate(-360deg); }
 }
 
-@keyframes screensaver-logo-breathe {
-  0%, 100% { transform: scale(0.97); filter: drop-shadow(0 0 16px rgba(62,232,196,0.15)); }
-  50%       { transform: scale(1.03); filter: drop-shadow(0 0 32px rgba(62,232,196,0.30)); }
-}
-
-@keyframes idle-glow-ring {
-  0%   { transform: scale(0.88); opacity: 0;    }
-  40%  { opacity: 0.18; }
-  100% { transform: scale(1.14); opacity: 0;    }
-}
-
 @keyframes particle-float {
   0%   { transform: translateY(0px) translateX(0px);   opacity: 0;    }
   15%  { opacity: 1;    }
@@ -429,11 +418,11 @@
 @keyframes screensaver-logo-breathe {
   0%, 100% {
     transform: scale(0.97);
-    filter: drop-shadow(0 0 20px rgba(47,252,200,0.30)) drop-shadow(0 0 60px rgba(47,252,200,0.12));
+    filter: drop-shadow(0 0 20px color-mix(in srgb, var(--cyan) 30%, transparent)) drop-shadow(0 0 60px color-mix(in srgb, var(--cyan) 12%, transparent));
   }
   50% {
     transform: scale(1.04);
-    filter: drop-shadow(0 0 40px rgba(47,252,200,0.55)) drop-shadow(0 0 80px rgba(47,252,200,0.25));
+    filter: drop-shadow(0 0 40px color-mix(in srgb, var(--cyan) 55%, transparent)) drop-shadow(0 0 80px color-mix(in srgb, var(--cyan) 25%, transparent));
   }
 }
 

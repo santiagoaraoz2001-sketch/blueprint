@@ -1,58 +1,24 @@
 /**
  * Screensaver — Blueprint / Specific Labs
  *
- * Activates after 90 s of inactivity. Full-screen bioluminescent ambient field
+ * Activates after 90 s of inactivity. Full-screen ambient field
  * with the exact original animated logo SVG at centre stage.
  *
  * Layers (back → front):
  *   0  Void background
- *   1  Deep nebula gradients (slow drift)
- *   2  Perspective grid (receding into depth)
- *   3  60 floating particles (framer-motion)
+ *   1  Deep nebula gradients (slow drift, accent-responsive)
+ *   2  Perspective grid (receding into depth, accent-responsive)
+ *   3  Aurora light ribbons (canvas-based, accent-responsive)
  *   4  Central logo presentation with orbit rings
  *   5  Time display
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FD } from '@/lib/design-tokens'
+import { FD, T, hexToRgba } from '@/lib/design-tokens'
 
 const IDLE_TIMEOUT_MS = 90_000   // 90 s
 const DISMISS_EVENTS  = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel'] as const
-
-// ── Particle seed (deterministic so no layout thrash on re-render) ──
-function seedParticles(n: number) {
-  // Simple LCG for deterministic pseudo-random
-  let seed = 0xDEADBEEF
-  const rand = () => {
-    seed = (seed * 1664525 + 1013904223) & 0xFFFFFFFF
-    return (seed >>> 0) / 0xFFFFFFFF
-  }
-  const accentColors = [
-    'rgba(47,252,200,VAL)',    // vivid teal
-    'rgba(168,126,255,VAL)',   // vivid purple
-    'rgba(255,190,69,VAL)',    // vivid amber
-    'rgba(240,112,200,VAL)',   // vivid pink
-    'rgba(62,240,122,VAL)',    // vivid green
-    'rgba(53,216,240,VAL)',    // vivid cyan-blue
-    'rgba(242,244,248,VAL)',   // white
-    'rgba(242,244,248,VAL)',   // white (more common)
-  ]
-  return Array.from({ length: n }, (_, i) => {
-    const col = accentColors[i % accentColors.length]
-    const opacity = 0.20 + rand() * 0.55
-    return {
-      id:       i,
-      left:     `${rand() * 100}%`,
-      startY:   `${60 + rand() * 40}vh`,   // start in lower portion
-      size:     0.8 + rand() * 2.4,
-      color:    col.replace('VAL', opacity.toFixed(2)),
-      duration: 22 + rand() * 38,
-      delay:    -(rand() * 30),             // negative delay = pre-started
-      driftX:   -14 + rand() * 28,
-    }
-  })
-}
 
 function useIdleTimer(idleMs: number) {
   const [idle, setIdle] = useState(false)
@@ -80,13 +46,13 @@ function useIdleTimer(idleMs: number) {
 function useClock() {
   const [time, setTime] = useState(() => {
     const d = new Date()
-    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   })
 
   useEffect(() => {
     const tick = () => {
       const d = new Date()
-      setTime(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`)
+      setTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
     }
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
@@ -95,10 +61,152 @@ function useClock() {
   return time
 }
 
+// ── Aurora Canvas ─────────────────────────────────────────────────
+// Renders flowing bezier ribbon curves that undulate like an aurora borealis.
+
+function hexToRgbValues(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '')
+  const v = clean.length === 3
+    ? clean.split('').map((x) => x + x).join('')
+    : clean
+  const int = Number.parseInt(v, 16)
+  return [(int >> 16) & 255, (int >> 8) & 255, int & 255]
+}
+
+interface Ribbon {
+  yBase: number       // vertical center (0–1 of canvas height)
+  amplitude: number   // wave height in px
+  frequency: number   // how many waves across the screen
+  speed: number       // radians per millisecond
+  opacity: number     // max ribbon opacity
+  width: number       // ribbon thickness in px
+  phase: number       // initial phase offset
+  hueShift: number    // offset from accent color (degrees)
+}
+
+function AuroraCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const animRef = useRef<number>(0)
+  const ribbonsRef = useRef<Ribbon[]>([])
+
+  const initRibbons = useCallback(() => {
+    return [
+      { yBase: 0.22, amplitude: 50,  frequency: 0.0018, speed: 0.00012, opacity: 0.06, width: 120, phase: 0,    hueShift: 0 },
+      { yBase: 0.32, amplitude: 70,  frequency: 0.0014, speed: 0.00018, opacity: 0.05, width: 150, phase: 1.5,  hueShift: 30 },
+      { yBase: 0.45, amplitude: 40,  frequency: 0.0022, speed: 0.00010, opacity: 0.07, width: 100, phase: 3.0,  hueShift: -20 },
+      { yBase: 0.58, amplitude: 60,  frequency: 0.0016, speed: 0.00015, opacity: 0.04, width: 130, phase: 4.2,  hueShift: 60 },
+      { yBase: 0.72, amplitude: 45,  frequency: 0.0020, speed: 0.00013, opacity: 0.05, width: 110, phase: 5.8,  hueShift: -40 },
+    ]
+  }, [])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const resize = () => {
+      canvas.width = window.innerWidth * window.devicePixelRatio
+      canvas.height = window.innerHeight * window.devicePixelRatio
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
+    }
+    resize()
+    window.addEventListener('resize', resize)
+
+    ribbonsRef.current = initRibbons()
+
+    const w = () => window.innerWidth
+    const h = () => window.innerHeight
+
+    function draw(time: number) {
+      ctx!.clearRect(0, 0, w(), h())
+
+      const [acR, acG, acB] = hexToRgbValues(T.cyan)
+
+      for (const ribbon of ribbonsRef.current) {
+        const centerY = ribbon.yBase * h()
+        const t = time * ribbon.speed + ribbon.phase
+
+        // Apply a subtle hue rotation using channel mixing
+        const shift = ribbon.hueShift / 360
+        const r = Math.min(255, Math.max(0, acR + shift * 60))
+        const g = Math.min(255, Math.max(0, acG - shift * 30))
+        const b = Math.min(255, Math.max(0, acB + shift * 40))
+
+        ctx!.beginPath()
+
+        // Draw a flowing path across the screen width
+        const segments = 80
+        const segW = w() / segments
+
+        for (let i = 0; i <= segments; i++) {
+          const x = i * segW
+          // Multiple sine waves at different frequencies create organic undulation
+          const wave1 = Math.sin(x * ribbon.frequency + t) * ribbon.amplitude
+          const wave2 = Math.sin(x * ribbon.frequency * 0.6 + t * 1.3 + 2.1) * ribbon.amplitude * 0.4
+          const wave3 = Math.sin(x * ribbon.frequency * 1.8 + t * 0.7 + 4.5) * ribbon.amplitude * 0.15
+          const y = centerY + wave1 + wave2 + wave3
+
+          if (i === 0) ctx!.moveTo(x, y)
+          else ctx!.lineTo(x, y)
+        }
+
+        // Draw return path (bottom of ribbon) slightly offset
+        for (let i = segments; i >= 0; i--) {
+          const x = i * segW
+          const wave1 = Math.sin(x * ribbon.frequency + t + 0.3) * ribbon.amplitude
+          const wave2 = Math.sin(x * ribbon.frequency * 0.6 + t * 1.3 + 2.4) * ribbon.amplitude * 0.4
+          const wave3 = Math.sin(x * ribbon.frequency * 1.8 + t * 0.7 + 4.8) * ribbon.amplitude * 0.15
+          const y = centerY + wave1 + wave2 + wave3 + ribbon.width
+
+          ctx!.lineTo(x, y)
+        }
+
+        ctx!.closePath()
+
+        // Gradient fill — transparent at edges, accent color in the center
+        const grad = ctx!.createLinearGradient(0, centerY - ribbon.amplitude, 0, centerY + ribbon.width + ribbon.amplitude)
+        grad.addColorStop(0, `rgba(${r},${g},${b},0)`)
+        grad.addColorStop(0.3, `rgba(${r},${g},${b},${ribbon.opacity})`)
+        grad.addColorStop(0.5, `rgba(${r},${g},${b},${ribbon.opacity * 1.4})`)
+        grad.addColorStop(0.7, `rgba(${r},${g},${b},${ribbon.opacity})`)
+        grad.addColorStop(1, `rgba(${r},${g},${b},0)`)
+
+        ctx!.fillStyle = grad
+        ctx!.fill()
+      }
+
+      animRef.current = requestAnimationFrame(draw)
+    }
+
+    animRef.current = requestAnimationFrame(draw)
+
+    return () => {
+      cancelAnimationFrame(animRef.current)
+      window.removeEventListener('resize', resize)
+    }
+  }, [initRibbons])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+      }}
+    />
+  )
+}
+
 export default function Screensaver() {
-  const idle       = useIdleTimer(IDLE_TIMEOUT_MS)
-  const time       = useClock()
-  const particles  = useMemo(() => seedParticles(60), [])
+  const idle = useIdleTimer(IDLE_TIMEOUT_MS)
+  const time = useClock()
+
+  // Resolve accent-responsive colors at render time
+  const accent = T.cyan
+  const purple = T.purple
 
   return (
     <AnimatePresence>
@@ -127,7 +235,7 @@ export default function Screensaver() {
             }}
           />
 
-          {/* ── Layer 1: Nebula gradients ── */}
+          {/* ── Layer 1: Nebula gradients (accent-responsive) ── */}
           <div
             data-testid="screensaver-nebula"
             style={{
@@ -135,23 +243,23 @@ export default function Screensaver() {
               inset: 0,
               animation: 'screensaver-void-pulse 22s ease-in-out infinite',
               background: `
-                radial-gradient(ellipse 70% 52% at 12% 14%, rgba(47,252,200,0.16)  0%, transparent 100%),
-                radial-gradient(ellipse 60% 46% at 88% 10%, rgba(168,126,255,0.14) 0%, transparent 100%),
-                radial-gradient(ellipse 50% 44% at 52% 92%, rgba(255,190,69,0.11)  0%, transparent 100%),
-                radial-gradient(ellipse 40% 38% at  4% 60%, rgba(47,252,200,0.09)  0%, transparent 100%),
+                radial-gradient(ellipse 70% 52% at 12% 14%, ${hexToRgba(accent, 0.14)}  0%, transparent 100%),
+                radial-gradient(ellipse 60% 46% at 88% 10%, ${hexToRgba(purple, 0.12)} 0%, transparent 100%),
+                radial-gradient(ellipse 50% 44% at 52% 92%, ${hexToRgba(T.amber, 0.09)}  0%, transparent 100%),
+                radial-gradient(ellipse 40% 38% at  4% 60%, ${hexToRgba(accent, 0.07)}  0%, transparent 100%),
                 radial-gradient(ellipse 80% 32% at 50% 50%, rgba(0,0,0,0.28)       0%, transparent 100%)
               `,
             }}
           />
 
-          {/* ── Layer 2: Perspective grid ── */}
+          {/* ── Layer 2: Perspective grid (accent-responsive) ── */}
           <div
             style={{
               position: 'absolute',
               inset: 0,
               backgroundImage: `
-                linear-gradient(rgba(47,252,200,0.07) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(47,252,200,0.07) 1px, transparent 1px)
+                linear-gradient(${hexToRgba(accent, 0.05)} 1px, transparent 1px),
+                linear-gradient(90deg, ${hexToRgba(accent, 0.05)} 1px, transparent 1px)
               `,
               backgroundSize: '36px 36px',
               animation: 'grid-recede 4s linear infinite',
@@ -160,37 +268,8 @@ export default function Screensaver() {
             }}
           />
 
-          {/* ── Layer 3: Particle field ── */}
-          {particles.map((p) => (
-            <motion.div
-              key={p.id}
-              data-testid={p.id === 0 ? 'screensaver-particle' : undefined}
-              style={{
-                position: 'absolute',
-                left: p.left,
-                top: p.startY,
-                width:  p.size,
-                height: p.size,
-                borderRadius: '50%',
-                background: p.color,
-                willChange: 'transform',
-                ...(p.size > 2
-                  ? { boxShadow: `0 0 ${p.size * 2}px ${p.color}` }
-                  : {}),
-              }}
-              animate={{
-                y:       [0, `-${100 + Math.random() * 30}vh`],
-                x:       [0, p.driftX],
-                opacity: [0, 1, 0.8, 0],
-              }}
-              transition={{
-                duration: p.duration,
-                delay:    p.delay,
-                repeat:   Infinity,
-                ease:     'linear',
-              }}
-            />
-          ))}
+          {/* ── Layer 3: Aurora light ribbons ── */}
+          <AuroraCanvas />
 
           {/* ── Layer 4: Central logo ── */}
           <div
@@ -212,7 +291,7 @@ export default function Screensaver() {
                   position: 'absolute',
                   inset: -22,
                   borderRadius: '50%',
-                  border: '0.5px solid rgba(62,232,196,0.12)',
+                  border: `0.5px solid ${hexToRgba(accent, 0.12)}`,
                   animation: 'screensaver-ring-orbit 45s linear infinite',
                 }}
               >
@@ -226,8 +305,8 @@ export default function Screensaver() {
                     width: 5,
                     height: 5,
                     borderRadius: '50%',
-                    background: 'rgba(62,232,196,0.70)',
-                    boxShadow: '0 0 8px rgba(62,232,196,0.55)',
+                    background: hexToRgba(accent, 0.70),
+                    boxShadow: `0 0 8px ${hexToRgba(accent, 0.55)}`,
                   }}
                 />
               </div>
@@ -238,7 +317,7 @@ export default function Screensaver() {
                   position: 'absolute',
                   inset: -6,
                   borderRadius: '50%',
-                  border: '0.5px solid rgba(152,128,232,0.10)',
+                  border: `0.5px solid ${hexToRgba(purple, 0.10)}`,
                   animation: 'screensaver-ring-orbit-rev 30s linear infinite',
                 }}
               >
@@ -252,8 +331,8 @@ export default function Screensaver() {
                     width: 4,
                     height: 4,
                     borderRadius: '50%',
-                    background: 'rgba(152,128,232,0.65)',
-                    boxShadow: '0 0 6px rgba(152,128,232,0.5)',
+                    background: hexToRgba(purple, 0.65),
+                    boxShadow: `0 0 6px ${hexToRgba(purple, 0.5)}`,
                   }}
                 />
               </div>
@@ -264,7 +343,7 @@ export default function Screensaver() {
                   position: 'absolute',
                   inset: -4,
                   borderRadius: '50%',
-                  border: '1px solid rgba(62,232,196,0.14)',
+                  border: `1px solid ${hexToRgba(accent, 0.14)}`,
                   animation: 'idle-glow-ring 4s ease-out infinite',
                 }}
               />
