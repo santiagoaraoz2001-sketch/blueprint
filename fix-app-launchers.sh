@@ -1,8 +1,6 @@
 #!/bin/bash
 # ──────────────────────────────────────────────────────────────
 #  Fix Blueprint.app and Model Manager.app launchers
-#  Rebuilds Blueprint.app from make-dev-app.sh
-#
 #  Usage:  bash fix-app-launchers.sh
 # ──────────────────────────────────────────────────────────────
 
@@ -16,11 +14,24 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ── Fix 1: Blueprint.app ─────────────────────────────────────
-echo -e "${CYAN}Rebuilding Blueprint.app...${NC}"
-bash "$SCRIPT_DIR/make-dev-app.sh"
+BLUEPRINT_LAUNCHER="/Applications/Blueprint.app/Contents/MacOS/blueprint-launcher"
+
+if [ -f "$BLUEPRINT_LAUNCHER" ]; then
+    # Check if the launcher contains the unsafe pattern that causes TCC issues
+    if grep -q "bash \"\$LAUNCH_SCRIPT\"" "$BLUEPRINT_LAUNCHER"; then
+        echo -e "${CYAN}Fixing Blueprint.app launcher (unsafe pattern found)...${NC}"
+        bash "$SCRIPT_DIR/make-dev-app.sh"
+    else
+        echo -e "${CYAN}Blueprint.app launcher is already safe (no unsafe pattern).${NC}"
+    fi
+else
+    echo -e "${CYAN}Blueprint.app not found, installing...${NC}"
+    bash "$SCRIPT_DIR/make-dev-app.sh"
+fi
+
+echo ""
 
 # ── Fix 2: Model Manager.app ─────────────────────────────────
-
 MM_LAUNCHER="/Applications/Model Manager.app/Contents/MacOS/ModelManager"
 
 if [ -f "$MM_LAUNCHER" ]; then
