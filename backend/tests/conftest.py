@@ -123,3 +123,8 @@ def test_client(_isolated_session_factory) -> TestClient:
         session.rollback()
         session.close()
         app.dependency_overrides.pop(get_db, None)
+
+
+# ── Block-level test fixtures (live server) ─────────────────────────
+# Re-export from block_test_helpers so all test_blocks_*.py files can use them.
+from .block_test_helpers import live_backend, ollama_model  # noqa: F401

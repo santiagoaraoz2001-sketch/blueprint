@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime, Float, Integer, JSON, Boolean, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, Float, Integer, JSON, Boolean, ForeignKey, Index
 from ..database import Base
 
 
@@ -7,7 +7,7 @@ class Run(Base):
     __tablename__ = "blueprint_runs"
 
     id = Column(String, primary_key=True)
-    pipeline_id = Column(String, ForeignKey("blueprint_pipelines.id"), nullable=False)
+    pipeline_id = Column(String, ForeignKey("blueprint_pipelines.id"), nullable=False, index=True)
     project_id = Column(String, ForeignKey("blueprint_projects.id"), nullable=True, index=True)
     mlflow_run_id = Column(String, nullable=True)
     status = Column(String, default="pending")  # pending | running | paused | complete | failed | cancelled

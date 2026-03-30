@@ -1640,6 +1640,7 @@ async def execute_pipeline(
         config_snapshot=definition,
     )
     db.add(run)
+    db.flush()  # Ensure Run row exists before LiveRun FK reference
 
     live = LiveRun(
         run_id=run_id,
