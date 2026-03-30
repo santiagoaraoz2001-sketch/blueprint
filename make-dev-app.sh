@@ -127,10 +127,10 @@ osascript << ASCRIPT
 tell application "Terminal"
     activate
     set blueprintRunning to false
-    -- Check if there's already a Blueprint tab
+    -- Check if there's an ACTIVE (busy) Blueprint tab
     repeat with w in windows
         repeat with t in tabs of w
-            if name of t contains "Blueprint" or name of t contains "launch.sh" then
+            if busy of t and ((name of t contains "Blueprint") or (name of t contains "launch.sh")) then
                 set blueprintRunning to true
                 set selected of t to true
                 set index of w to 1
@@ -138,8 +138,7 @@ tell application "Terminal"
         end repeat
     end repeat
     if not blueprintRunning then
-        set newTab to do script "cd \"$REPO_ROOT\" && bash launch.sh; exit"
-        set custom title of newTab to "◆ Blueprint"
+        do script "cd \"$REPO_ROOT\" && bash launch.sh"
     end if
 end tell
 ASCRIPT

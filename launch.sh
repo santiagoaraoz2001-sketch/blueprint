@@ -329,5 +329,8 @@ elif command -v xdg-open >/dev/null 2>&1; then
 fi
 
 # ── Keep running ─────────────────────────────────────────────
+# wait for the backend process specifically (not all children).
+# The vite pipe may exit with non-zero which would trigger set -e
+# and cause cleanup to kill everything.
 
-wait
+wait "$BACKEND_PID" 2>/dev/null || true
