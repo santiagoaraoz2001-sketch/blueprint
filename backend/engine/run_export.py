@@ -70,7 +70,7 @@ def _collect_environment() -> dict[str, Any]:
     env: dict[str, Any] = {
         "python_version": sys.version.split()[0],
         "platform": plat.platform(),
-        "blueprint_version": "0.2.2",
+        "blueprint_version": "0.3.1",
     }
     try:
         import torch
