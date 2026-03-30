@@ -138,7 +138,8 @@ tell application "Terminal"
         end repeat
     end repeat
     if not blueprintRunning then
-        do script "cd \"$REPO_ROOT\" && bash launch.sh; exit"
+        set newTab to do script "cd \"$REPO_ROOT\" && bash launch.sh; exit"
+        set custom title of newTab to "◆ Blueprint"
     end if
 end tell
 ASCRIPT
